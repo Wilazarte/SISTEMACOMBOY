@@ -17,7 +17,7 @@
 
    ⚠ La contraseña inicial es la misma para los 5 usuarios: cámbiela en Supabase → Authentication → Users → usuario → *Update user* antes de usar el ERP en serio. (Para otra contraseña inicial: `SETUP_PASSWORD=MiClave node setup_usuarios.js`.)
 
-   *Alternativa manual:* crear los 5 usuarios en Authentication → Users → *Add user* (marcar **Auto Confirm User**) y volver a ejecutar `supabase_tables.sql`, que genera los perfiles.
+   *Alternativa solo con SQL (sin service role key):* pegar `supabase_usuarios.sql` en el SQL Editor → *Run*. Crea los 5 usuarios (contraseña inicial `123456`, correo confirmado, con su identidad de login) y sus perfiles; se puede ejecutar varias veces.
 3. **Datos anteriores:** entrar con `creador` en cada PC que tenía datos y pulsar **"Subir datos de este navegador"** (menú lateral). Se combinan por id, sin duplicar.
 
 ## Instalar y correr (en cada PC)

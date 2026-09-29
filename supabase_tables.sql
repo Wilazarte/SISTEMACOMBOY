@@ -35,7 +35,7 @@ create unique index if not exists perfiles_id_uidx on public.perfiles (id);
 create unique index if not exists perfiles_usuario_uidx on public.perfiles (usuario);
 
 -- Roles permitidos (si la tabla ya tenía otra regla sobre "rol", se reemplaza).
--- creador/tesoreria/almacen/planilla/gerencia: roles del ERP. redes: solo lectura en sus módulos.
+-- creador/tesoreria/almacen/planilla/gerencia: roles del ERP.
 -- admin/compras/editor: roles antiguos que pudiera tener la tabla; el ERP los trata como solo lectura.
 do $$
 declare c record;
@@ -50,7 +50,7 @@ begin
   end loop;
   alter table public.perfiles
     add constraint perfiles_rol_check
-    check (rol in ('creador', 'tesoreria', 'almacen', 'planilla', 'gerencia', 'redes', 'admin', 'compras', 'editor')) not valid;
+    check (rol in ('creador', 'tesoreria', 'almacen', 'planilla', 'gerencia', 'admin', 'compras', 'editor')) not valid;
 end $$;
 
 -- ---------------------------------------------------------------------

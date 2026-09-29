@@ -13,7 +13,7 @@ import { createClient } from "./supabase/client";
 import type { Rol } from "./types";
 
 /** Roles con permisos definidos en el ERP. Cualquier otro rol de la tabla perfiles se trata como solo lectura. */
-export type RolAuth = "creador" | "tesoreria" | "almacen" | "planilla" | "gerencia" | "redes";
+export type RolAuth = "creador" | "tesoreria" | "almacen" | "planilla" | "gerencia";
 
 /** Dominio de los correos de Supabase Auth: en el login basta con escribir "tesoreria". */
 export const DOMINIO = "comboyvid.local";
@@ -37,7 +37,6 @@ const ROL_NEGOCIO: Record<RolAuth, Rol> = {
   almacen: "ALMACEN",
   planilla: "CONTADOR",
   gerencia: "CONTADOR",
-  redes: "CONTADOR", // solo lectura en los módulos que tenga asignados en perfiles.modulos
 };
 
 const EVENTO = "erp:sesion";
