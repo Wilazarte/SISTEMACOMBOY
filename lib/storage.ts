@@ -744,6 +744,20 @@ function ingresarStock(sede: string, items: { nombre: string; unidad: string; ca
 /** Sede donde ingresa la mercadería de una OC: la del REQ; si no existe, el lugar de entrega. */
 export const sedeIngresoOC = (oc: OrdenCompra): string => buscarReq(oc.reqId)?.sede || oc.lugarEntrega;
 
+/**
+ * Totales de una compra. FACTURA: precios sin IGV (se suma 18 %).
+ * BOLETA: precios con IGV incluido (el total es la suma de filas y se desglosa la base).
+ */
+export function totalesCompra(tipo: Compra["tipoComprobante"], items: { cantidad: number; precioUnit: number }[]) {
+  const suma = r2(items.reduce((a, i) => a + r2((i.cantidad || 0) * (i.precioUnit || 0)), 0));
+  if (tipo === "BOLETA") {
+    const subtotal = r2(suma / (1 + IGV));
+    return { subtotal, igv: r2(suma - subtotal), total: suma };
+  }
+  const igv = r2(suma * IGV);
+  return { subtotal: suma, igv, total: r2(suma + igv) };
+}
+
 const NUM_COMPROBANTE: Record<Compra["tipoComprobante"], RegExp> = {
   FACTURA: /^[EF][A-Z0-9]{3}-\d{1,8}$/,
   BOLETA: /^[BE][A-Z0-9]{3}-\d{1,8}$/,
@@ -775,8 +789,7 @@ export function registrarCompra(
     nombre: i.nombre.trim().replace(/\s+/g, " ").toUpperCase(),
     subtotal: r2(i.cantidad * i.precioUnit),
   }));
-  const subtotal = r2(items.reduce((a, i) => a + i.subtotal, 0));
-  const igv = r2(subtotal * IGV);
+  const { subtotal, igv, total } = totalesCompra(data.tipoComprobante, items);
   const compra: Compra = {
     id: uid(),
     fecha: data.fecha,
@@ -789,7 +802,7 @@ export function registrarCompra(
     items,
     subtotal,
     igv,
-    total: r2(subtotal + igv),
+    total,
     historial: [evento(rol, "Compra registrada", `${numero} · ${prov.razonSocial} · ingreso a ${data.sede}`)],
   };
 

@@ -45,6 +45,7 @@ import {
   registrarCompra,
   rucValido,
   soles,
+  totalesCompra,
   uid,
   useRol,
   useStore,
@@ -264,8 +265,8 @@ function RegistrarCompra({ rol, proveedores, compras, stock }: { rol: Rol; prove
 
   const fechaISO = parseFechaPE(fechaTxt);
   const fechaError = fechaTxt.length === 10 && !fechaISO ? "Fecha inexistente" : fechaISO > hoy() ? "La fecha no puede ser futura" : undefined;
-  const subtotal = r2(filas.reduce((a, i) => a + r2((i.cantidad || 0) * (i.precioUnit || 0)), 0));
-  const igv = r2(subtotal * IGV);
+  const { subtotal, igv, total } = totalesCompra(tipo, filas);
+  const conIgv = tipo === "BOLETA";
   const prov = proveedores.find((p) => p.id === proveedorId);
   const set = (id: string, campo: keyof FilaCompra, v: string | number) => setFilas((p) => p.map((i) => (i.id === id ? { ...i, [campo]: v } : i)));
   const productosStock = useMemo(() => Array.from(new Set(stock.map((s) => s.nombre))).sort(), [stock]);
@@ -294,7 +295,7 @@ function RegistrarCompra({ rol, proveedores, compras, stock }: { rol: Rol; prove
     <div className="space-y-6">
       {habilitado && (
         <Card>
-          <CardHeader title="Registrar compra" subtitle="Compra con factura o boleta. Al guardar, los productos ingresan al stock del almacén seleccionado." />
+          <CardHeader title="Registrar compra" subtitle="Factura: precios sin IGV (se suma 18 %). Boleta: precios con IGV incluido. Al guardar, los productos ingresan al stock del almacén seleccionado." />
           <div className="grid gap-4 p-5 md:grid-cols-3">
             <Field label="Proveedor" className="md:col-span-2" hint={prov ? `RUC ${prov.ruc}` : undefined}>
               <div className="flex gap-2">
@@ -338,7 +339,7 @@ function RegistrarCompra({ rol, proveedores, compras, stock }: { rol: Rol; prove
                   <th className="px-2 py-2 text-left">Producto *</th>
                   <th className="w-28 px-2 py-2 text-left">Unidad</th>
                   <th className="w-28 px-2 py-2 text-left">Cantidad *</th>
-                  <th className="w-36 px-2 py-2 text-left">P. Unit. (sin IGV) *</th>
+                  <th className="w-36 px-2 py-2 text-left">P. Unit. ({conIgv ? "con" : "sin"} IGV) *</th>
                   <th className="w-32 px-2 py-2 text-right">Subtotal</th>
                   <th className="w-10" />
                 </tr>
@@ -384,7 +385,8 @@ function RegistrarCompra({ rol, proveedores, compras, stock }: { rol: Rol; prove
               <Plus size={14} /> Agregar producto
             </Button>
           </div>
-          <Totales subtotal={subtotal} igv={igv} />
+          {conIgv && <p className="px-5 pt-3 text-right text-xs text-slate-500">Boleta: los precios incluyen IGV; la base imponible se obtiene dividiendo el total entre 1.18.</p>}
+          <Totales subtotal={subtotal} igv={igv} total={total} />
           <div className="flex justify-end border-t border-slate-100 px-5 py-4">
             <Button onClick={guardar} disabled={!proveedorId || !fechaISO}>
               <PackagePlus size={16} /> Guardar compra e ingresar a stock
@@ -682,7 +684,7 @@ function Cotizaciones({
   );
 }
 
-function Totales({ subtotal, igv }: { subtotal: number; igv: number }) {
+function Totales({ subtotal, igv, total = r2(subtotal + igv) }: { subtotal: number; igv: number; total?: number }) {
   return (
     <div className="flex justify-end px-5 py-3">
       <dl className="w-72 space-y-1 text-sm">
@@ -696,7 +698,7 @@ function Totales({ subtotal, igv }: { subtotal: number; igv: number }) {
         </div>
         <div className="flex justify-between rounded-lg bg-slate-900 px-3 py-2 font-bold text-white">
           <dt>TOTAL</dt>
-          <dd>{soles(r2(subtotal + igv))}</dd>
+          <dd>{soles(total)}</dd>
         </div>
       </dl>
     </div>

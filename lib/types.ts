@@ -179,8 +179,8 @@ export interface ItemCompra {
   nombre: string;
   unidad: string;
   cantidad: number;
-  precioUnit: number; // valor unitario SIN IGV
-  subtotal: number;
+  precioUnit: number; // FACTURA: sin IGV · BOLETA: con IGV incluido
+  subtotal: number; // cantidad × precioUnit (mismo criterio que precioUnit)
 }
 
 export interface Compra {
@@ -205,6 +205,6 @@ export interface StockItem {
   nombre: string;
   unidad: string;
   cantidad: number;
-  costoUnit: number; // último costo de compra sin IGV
+  costoUnit: number; // último costo: sin IGV (factura / OC) o con IGV (boleta, sin crédito fiscal)
   actualizado: string; // ISO
 }

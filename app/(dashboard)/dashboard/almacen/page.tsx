@@ -478,7 +478,7 @@ function Stock({ stock }: { stock: StockItem[] }) {
     <Card>
       <CardHeader
         title="Stock de almacén"
-        subtitle={`${lista.length} producto(s) · Valorizado ${soles(valorizado)} (último costo sin IGV)`}
+        subtitle={`${lista.length} producto(s) · Valorizado ${soles(valorizado)} (último costo: sin IGV en factura/OC, con IGV en boleta)`}
         action={
           <div className="flex flex-wrap gap-2">
             <Input placeholder="Buscar producto…" value={q} onChange={(e) => setQ(e.target.value)} className="w-48" />
