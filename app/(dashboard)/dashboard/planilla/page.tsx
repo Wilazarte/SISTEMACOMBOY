@@ -17,6 +17,7 @@ import {
   trabajadorVacio,
   useTrabajadores,
 } from "@/lib/storage";
+import { getSesion } from "@/lib/auth";
 import type { TipoAfp, TipoSueldo, Trabajador } from "@/lib/types";
 
 type Tab = "trabajadores" | "planilla";
@@ -73,6 +74,7 @@ function calcular(t: Trabajador, asistencia: Asistencia): TrabajadorCalc {
 
 export default function PlanillaPage() {
   const trabajadores = useTrabajadores();
+  const soloLectura = !!getSesion()?.soloLectura; // Gerencia: ver sin editar
   const [tab, setTab] = useState<Tab>("trabajadores");
   const [asistencia, setAsistencia] = useState<Asistencia>(new Map());
   const [periodo, setPeriodo] = useState("SEMANA 14 - ABRIL 2026");
@@ -157,7 +159,7 @@ export default function PlanillaPage() {
     doc.save(`BOLETA_${t.id}_${t.nombre.replace(/\s+/g, "_")}.pdf`);
   };
 
-  const importarBtn = (
+  const importarBtn = soloLectura ? null : (
     <label className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-600">
       <Upload size={16} /> Importar asistencia
       <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={importarAsistencia} />
@@ -172,7 +174,7 @@ export default function PlanillaPage() {
           <p className="text-sm text-slate-500">Maestro de trabajadores y cálculo de pago según asistencia del reloj</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => setEditando({ form: trabajadorVacio() })}>
+          <Button onClick={() => setEditando({ form: trabajadorVacio() })} disabled={soloLectura}>
             <Plus size={16} /> Registrar trabajador
           </Button>
           {importarBtn}
@@ -243,12 +245,13 @@ export default function PlanillaPage() {
                   </Td>
                   <Td>
                     <div className="flex gap-1">
-                      <Button size="sm" variant="secondary" onClick={() => setEditando({ form: { ...t }, idOriginal: t.id })} title="Editar">
+                      <Button size="sm" variant="secondary" disabled={soloLectura} onClick={() => setEditando({ form: { ...t }, idOriginal: t.id })} title="Editar">
                         <Pencil size={14} />
                       </Button>
                       <Button
                         size="sm"
                         variant="ghost"
+                        disabled={soloLectura}
                         title={t.activo ? "Dar de baja" : "Reactivar"}
                         onClick={() => ejecutar(() => cambiarEstadoTrabajador(t.id, !t.activo), t.activo ? "Trabajador dado de baja" : "Trabajador reactivado")}
                       >
@@ -257,6 +260,7 @@ export default function PlanillaPage() {
                       <Button
                         size="sm"
                         variant="ghost"
+                        disabled={soloLectura}
                         title="Eliminar"
                         onClick={() => confirm(`¿Eliminar a ${t.nombre}? Esta acción no se puede deshacer.`) && ejecutar(() => eliminarTrabajador(t.id), "Trabajador eliminado")}
                       >

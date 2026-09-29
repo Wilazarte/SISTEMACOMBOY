@@ -6,6 +6,7 @@
 // =====================================================================
 
 import { useEffect, useMemo, useState } from "react";
+import { getSesion, rolNegocio } from "./auth";
 import type {
   Compra,
   Cotizacion,
@@ -32,7 +33,7 @@ export const KEYS = {
   FACTURAS: "facturas",
   GUIAS: "guias",
   CONTADORES: "erp_contadores",
-  ROL: "erp_rol",
+  OBSERVACIONES: "observaciones_gerencia",
   TRABAJADORES: "CV_TRABAJADORES_V2",
   PROVEEDORES: "proveedores",
   COMPRAS: "compras_directas",
@@ -812,7 +813,7 @@ export function registrarCompra(
 }
 
 // ---------------------------------------------------------------------
-// Rol activo (simulado)
+// Rol activo (según el usuario logueado)
 // ---------------------------------------------------------------------
 
 export const PERMISOS: Record<Rol, { label: string; puede: string[] }> = {
@@ -827,7 +828,7 @@ export const PERMISOS: Record<Rol, { label: string; puede: string[] }> = {
 
 export const puede = (rol: Rol, permiso: string): boolean => PERMISOS[rol].puede.includes(permiso);
 
-export function useRol(): [Rol, (r: Rol) => void] {
-  const rol = useStore<Rol>(KEYS.ROL, "GERENCIA");
-  return [rol, (r: Rol) => escribir(KEYS.ROL, r)];
+/** Rol de negocio del usuario logueado (ver lib/auth.ts). */
+export function useRol(): [Rol] {
+  return [rolNegocio(getSesion())];
 }

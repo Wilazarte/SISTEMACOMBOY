@@ -1,6 +1,15 @@
-import { redirect } from "next/navigation";
+"use client";
 
-// El Dashboard de KPIs se implementa en la siguiente fase.
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { getSesion, inicioDe } from "@/lib/auth";
+
+// El Dashboard de KPIs se implementa en la siguiente fase: por ahora lleva al primer módulo permitido.
 export default function DashboardHome() {
-  redirect("/dashboard/compras");
+  const router = useRouter();
+  useEffect(() => {
+    const sesion = getSesion();
+    router.replace(sesion ? inicioDe(sesion) : "/login");
+  }, [router]);
+  return null;
 }
