@@ -243,7 +243,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       </header>
 
       <main className="p-4 lg:p-8">
-        {!permitido ? (
+        {sesion.modulos.length === 0 ? (
+          <div className="mx-auto mt-16 max-w-md rounded-xl border border-amber-200 bg-white p-8 text-center shadow-sm">
+            <ShieldAlert size={40} className="mx-auto text-amber-500" />
+            <h1 className="mt-3 text-xl font-bold text-slate-900">Sin módulos asignados</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Su usuario ({sesion.usuario}, rol {sesion.rol}) inició sesión, pero todavía no tiene módulos habilitados. El administrador debe asignarlos en la tabla perfiles (columna modulos).
+            </p>
+          </div>
+        ) : !permitido ? (
           <div className="mx-auto mt-16 max-w-md rounded-xl border border-red-200 bg-white p-8 text-center shadow-sm">
             <ShieldAlert size={40} className="mx-auto text-red-500" />
             <h1 className="mt-3 text-xl font-bold text-slate-900">Acceso denegado</h1>

@@ -12,7 +12,8 @@ import { useEffect, useState } from "react";
 import { createClient } from "./supabase/client";
 import type { Rol } from "./types";
 
-export type RolAuth = "creador" | "tesoreria" | "almacen" | "planilla" | "gerencia";
+/** Roles con permisos definidos en el ERP. Cualquier otro rol de la tabla perfiles se trata como solo lectura. */
+export type RolAuth = "creador" | "tesoreria" | "almacen" | "planilla" | "gerencia" | "redes";
 
 /** Dominio de los correos de Supabase Auth: en el login basta con escribir "tesoreria". */
 export const DOMINIO = "comboyvid.local";
@@ -36,6 +37,7 @@ const ROL_NEGOCIO: Record<RolAuth, Rol> = {
   almacen: "ALMACEN",
   planilla: "CONTADOR",
   gerencia: "CONTADOR",
+  redes: "CONTADOR", // solo lectura en los módulos que tenga asignados en perfiles.modulos
 };
 
 const EVENTO = "erp:sesion";
@@ -126,7 +128,10 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
 
 /** Primer módulo al que entra el usuario tras el login. */
 export function inicioDe(sesion: Sesion): string {
-  return sesion.modulos.includes("*") ? "/dashboard/compras" : sesion.modulos[0] ?? "/login";
+  if (sesion.modulos.includes("*")) return "/dashboard/compras";
+  // Sin módulos asignados se queda en /dashboard (el layout muestra el aviso; evita el bucle con /login)
+  return sesion.modulos.find((m) => m.startsWith("/dashboard/")) ?? "/dashboard";
 }
 
-export const rolNegocio = (sesion: Sesion | null): Rol => (sesion ? ROL_NEGOCIO[sesion.rol] : "CONTADOR");
+/** Rol de negocio; un rol desconocido (ej. uno antiguo de la tabla) queda sin permisos de escritura. */
+export const rolNegocio = (sesion: Sesion | null): Rol => (sesion ? ROL_NEGOCIO[sesion.rol as RolAuth] ?? "CONTADOR" : "CONTADOR");
