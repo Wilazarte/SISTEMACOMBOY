@@ -8,8 +8,8 @@ npm run build    # verificación de producción
 ```
 
 ## Rutas
-- `/dashboard/almacen`  → Nuevo REQ · Lista de REQ emitidos · Ingresos por V°B°
-- `/dashboard/compras`  → Notificaciones · Antecedentes · Cotizaciones · OC · Facturas/DJ · Guías
+- `/dashboard/almacen`  → Nuevo REQ · Lista de REQ emitidos · Ingresos por V°B° · Stock
+- `/dashboard/compras`  → Registrar compra (factura/boleta → stock) · Notificaciones · Antecedentes · Cotizaciones · OC · Facturas/DJ · Guías
 - `/dashboard/planilla` → Maestro de trabajadores (fecha de ingreso, tipo de sueldo, AFP/ONP) · Planilla del periodo con asistencia del reloj
 
 ## Estructura
@@ -26,7 +26,7 @@ lib/types.ts
 ```
 
 ## localStorage keys
-reqs_almacen_pendientes · reqs_procesados_compras · cotizaciones · ordenes_compra · facturas · guias · erp_contadores · erp_rol · CV_TRABAJADORES_V2
+reqs_almacen_pendientes · reqs_procesados_compras · cotizaciones · ordenes_compra · facturas · guias · erp_contadores · erp_rol · proveedores · compras_directas · almacen_stock · CV_TRABAJADORES_V2
 
 ## Reglas implementadas
 - ACEPTAR → sale de notificaciones y queda en la lista como ACEPTADO.
@@ -36,4 +36,5 @@ reqs_almacen_pendientes · reqs_procesados_compras · cotizaciones · ordenes_co
 - Factura solo desde OC · IGV 18 % automático · alerta si difiere de la OC.
 - Guía obligatoria para factura (PDF/imagen ≤ 1.5 MB, drag & drop, vista previa).
 - Declaración Jurada: solo GERENCIA, tope TOPE_DJ (S/ 700, editable en lib/storage.ts), no requiere guía.
-- FINALIZADO solo con V°B° de Almacén (check por producto + recibido por).
+- FINALIZADO solo con V°B° de Almacén (check por producto + recibido por). El V°B° suma las cantidades de la OC al stock de la sede del REQ.
+- Registrar compra: proveedor (con RUC validado), fecha DD/MM/AAAA, N° factura/boleta, productos con cantidad y precio unitario; subtotal, IGV 18 % y total automáticos (factura: precio sin IGV + 18 %; boleta: precio con IGV incluido, base = total ÷ 1.18). Al guardar suma las cantidades al stock de la sede (mismo producto + unidad) y guarda el último costo.

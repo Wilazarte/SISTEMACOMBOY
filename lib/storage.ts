@@ -7,13 +7,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type {
+  Compra,
   Cotizacion,
   EventoHistorial,
   Factura,
   Guia,
+  ItemCompra,
   OrdenCompra,
+  Proveedor,
   Requerimiento,
   Rol,
+  StockItem,
   TipoAfp,
   TipoSueldo,
   Trabajador,
@@ -30,6 +34,9 @@ export const KEYS = {
   CONTADORES: "erp_contadores",
   ROL: "erp_rol",
   TRABAJADORES: "CV_TRABAJADORES_V2",
+  PROVEEDORES: "proveedores",
+  COMPRAS: "compras_directas",
+  STOCK: "almacen_stock",
 } as const;
 
 export type StoreKey = (typeof KEYS)[keyof typeof KEYS];
@@ -64,6 +71,16 @@ export const fechaPE = (iso: string): string => {
   if (!iso) return "-";
   const [y, m, d] = iso.slice(0, 10).split("-");
   return `${d}/${m}/${y}`;
+};
+
+/** "DD/MM/YYYY" -> "YYYY-MM-DD", o "" si la fecha no existe (ej. 31/02/2026). */
+export const parseFechaPE = (txt: string): string => {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(txt.trim());
+  if (!m) return "";
+  const [, d, mo, y] = m;
+  const f = new Date(Number(y), Number(mo) - 1, Number(d));
+  if (f.getFullYear() !== Number(y) || f.getMonth() !== Number(mo) - 1 || f.getDate() !== Number(d)) return "";
+  return `${y}-${mo}-${d}`;
 };
 
 export class ErpError extends Error {}
@@ -519,12 +536,14 @@ export function darVistoBueno(ocId: string, vb: Omit<VistoBueno, "fecha">, rol: 
   const oc = getOrdenes().find((o) => o.id === ocId);
   if (!oc || oc.estado !== "EN_GUIA") throw new ErpError("La OC no está lista para visto bueno.");
   const ahora = new Date().toISOString();
+  const sede = sedeIngresoOC(oc);
   actualizarOC(ocId, (o) => ({
     ...o,
     estado: "FINALIZADA",
     vistoBueno: { ...vb, fecha: ahora },
-    historial: [...o.historial, evento(rol, "Visto bueno de ingreso a almacén", vb.recibidoPor)],
+    historial: [...o.historial, evento(rol, "Visto bueno de ingreso a almacén", `${vb.recibidoPor} · stock de ${sede}`)],
   }));
+  ingresarStock(sede, oc.items);
   escribir(
     KEYS.GUIAS,
     getGuias().map((g) =>
@@ -680,15 +699,128 @@ export function registrarDesdeAsistencia(nuevos: { id: string; nombre: string }[
 }
 
 // ---------------------------------------------------------------------
+// COMPRAS DIRECTAS -> ingreso a STOCK de almacén
+// ---------------------------------------------------------------------
+
+export const getProveedores = () => leer<Proveedor[]>(KEYS.PROVEEDORES, []);
+export const getCompras = () => leer<Compra[]>(KEYS.COMPRAS, []);
+export const getStock = () => leer<StockItem[]>(KEYS.STOCK, []);
+
+export function crearProveedor(data: Pick<Proveedor, "razonSocial" | "ruc">): Proveedor {
+  const razonSocial = data.razonSocial.trim().toUpperCase();
+  const ruc = data.ruc.trim();
+  if (!razonSocial) throw new ErpError("Ingrese la razón social del proveedor.");
+  if (!rucValido(ruc)) throw new ErpError("RUC inválido (11 dígitos con dígito verificador correcto).");
+  const lista = getProveedores();
+  if (lista.some((p) => p.ruc === ruc)) throw new ErpError(`El RUC ${ruc} ya está registrado.`);
+  const prov: Proveedor = { id: uid(), razonSocial, ruc };
+  escribir(KEYS.PROVEEDORES, [...lista, prov].sort((a, b) => a.razonSocial.localeCompare(b.razonSocial)));
+  return prov;
+}
+
+/** Clave de producto en stock: misma sede + mismo nombre (sin mayúsculas/espacios extra) + misma unidad. */
+const claveStock = (sede: string, nombre: string, unidad: string): string =>
+  `${sede}|${nombre.trim().replace(/\s+/g, " ").toUpperCase()}|${unidad}`;
+
+/** Suma cantidades al stock de la sede (mismo producto + unidad) y actualiza el último costo sin IGV. */
+function ingresarStock(sede: string, items: { nombre: string; unidad: string; cantidad: number; precioUnit: number }[]): void {
+  const ahora = new Date().toISOString();
+  const stock = getStock();
+  items.forEach((i) => {
+    const nombre = i.nombre.trim().replace(/\s+/g, " ").toUpperCase();
+    const k = claveStock(sede, nombre, i.unidad);
+    const existente = stock.find((s) => claveStock(s.sede, s.nombre, s.unidad) === k);
+    if (existente) {
+      existente.cantidad = r2(existente.cantidad + i.cantidad);
+      existente.costoUnit = i.precioUnit;
+      existente.actualizado = ahora;
+    } else {
+      stock.push({ id: uid(), sede, nombre, unidad: i.unidad, cantidad: i.cantidad, costoUnit: i.precioUnit, actualizado: ahora });
+    }
+  });
+  escribir(KEYS.STOCK, stock);
+}
+
+/** Sede donde ingresa la mercadería de una OC: la del REQ; si no existe, el lugar de entrega. */
+export const sedeIngresoOC = (oc: OrdenCompra): string => buscarReq(oc.reqId)?.sede || oc.lugarEntrega;
+
+/**
+ * Totales de una compra. FACTURA: precios sin IGV (se suma 18 %).
+ * BOLETA: precios con IGV incluido (el total es la suma de filas y se desglosa la base).
+ */
+export function totalesCompra(tipo: Compra["tipoComprobante"], items: { cantidad: number; precioUnit: number }[]) {
+  const suma = r2(items.reduce((a, i) => a + r2((i.cantidad || 0) * (i.precioUnit || 0)), 0));
+  if (tipo === "BOLETA") {
+    const subtotal = r2(suma / (1 + IGV));
+    return { subtotal, igv: r2(suma - subtotal), total: suma };
+  }
+  const igv = r2(suma * IGV);
+  return { subtotal: suma, igv, total: r2(suma + igv) };
+}
+
+const NUM_COMPROBANTE: Record<Compra["tipoComprobante"], RegExp> = {
+  FACTURA: /^[EF][A-Z0-9]{3}-\d{1,8}$/,
+  BOLETA: /^[BE][A-Z0-9]{3}-\d{1,8}$/,
+};
+
+/** Registra la compra y suma las cantidades al stock de la sede. Valida todo antes de escribir. */
+export function registrarCompra(
+  data: Pick<Compra, "fecha" | "proveedorId" | "tipoComprobante" | "numero" | "sede"> & { items: Omit<ItemCompra, "subtotal">[] },
+  rol: Rol
+): Compra {
+  const prov = getProveedores().find((p) => p.id === data.proveedorId);
+  if (!prov) throw new ErpError("Seleccione el proveedor.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data.fecha)) throw new ErpError("Fecha de compra inválida. Use DD/MM/AAAA.");
+  if (data.fecha > hoy()) throw new ErpError("La fecha de compra no puede ser futura.");
+  if (!data.sede.trim()) throw new ErpError("Seleccione la sede / almacén de ingreso.");
+  const numero = data.numero.trim().toUpperCase();
+  if (!NUM_COMPROBANTE[data.tipoComprobante].test(numero))
+    throw new ErpError(`N° de ${data.tipoComprobante.toLowerCase()} inválido. Ej: ${data.tipoComprobante === "FACTURA" ? "F001-00001234" : "B001-00000456"}`);
+  if (getCompras().some((c) => c.numero === numero && c.ruc === prov.ruc) || getFacturas().some((f) => f.numero === numero && f.ruc === prov.ruc))
+    throw new ErpError(`El comprobante ${numero} de ${prov.razonSocial} ya fue registrado.`);
+
+  const filas = data.items.filter((i) => i.nombre.trim());
+  if (filas.length === 0) throw new ErpError("Agregue al menos un producto.");
+  if (filas.some((i) => !(i.cantidad > 0))) throw new ErpError("Todas las cantidades deben ser mayores a 0.");
+  if (filas.some((i) => !(i.precioUnit > 0))) throw new ErpError("Ingrese precio unitario > 0 en todos los productos.");
+
+  const items: ItemCompra[] = filas.map((i) => ({
+    ...i,
+    nombre: i.nombre.trim().replace(/\s+/g, " ").toUpperCase(),
+    subtotal: r2(i.cantidad * i.precioUnit),
+  }));
+  const { subtotal, igv, total } = totalesCompra(data.tipoComprobante, items);
+  const compra: Compra = {
+    id: uid(),
+    fecha: data.fecha,
+    proveedorId: prov.id,
+    proveedor: prov.razonSocial,
+    ruc: prov.ruc,
+    tipoComprobante: data.tipoComprobante,
+    numero,
+    sede: data.sede,
+    items,
+    subtotal,
+    igv,
+    total,
+    historial: [evento(rol, "Compra registrada", `${numero} · ${prov.razonSocial} · ingreso a ${data.sede}`)],
+  };
+
+  escribir(KEYS.COMPRAS, [compra, ...getCompras()]);
+  ingresarStock(data.sede, items);
+  return compra;
+}
+
+// ---------------------------------------------------------------------
 // Rol activo (simulado)
 // ---------------------------------------------------------------------
 
 export const PERMISOS: Record<Rol, { label: string; puede: string[] }> = {
   ALMACEN: { label: "Almacén", puede: ["req.crear", "req.reenviar", "vb.dar"] },
-  TESORERIA: { label: "Tesorería / Compras", puede: ["req.revisar", "coti.crear", "oc.crear", "fac.crear", "guia.crear", "fac.pagar"] },
+  TESORERIA: { label: "Tesorería / Compras", puede: ["compra.crear", "req.revisar", "coti.crear", "oc.crear", "fac.crear", "guia.crear", "fac.pagar"] },
   GERENCIA: {
     label: "Gerencia (admin)",
-    puede: ["req.crear", "req.reenviar", "req.revisar", "coti.crear", "oc.crear", "fac.crear", "guia.crear", "fac.pagar", "dj.aprobar", "vb.dar"],
+    puede: ["compra.crear", "req.crear", "req.reenviar", "req.revisar", "coti.crear", "oc.crear", "fac.crear", "guia.crear", "fac.pagar", "dj.aprobar", "vb.dar"],
   },
   CONTADOR: { label: "Contador (lectura)", puede: [] },
 };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, ClipboardList, Eye, FilePlus2, FileText, MessageSquareWarning, PackageCheck, Pencil, Plus, Send, Trash2 } from "lucide-react";
+import { Boxes, CheckCircle2, ClipboardList, Eye, FilePlus2, FileText, MessageSquareWarning, PackageCheck, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
 import { SEDES, UNIDADES } from "@/lib/empresa";
@@ -14,15 +14,16 @@ import {
   observarIngreso,
   puede,
   reenviarRequerimiento,
+  sedeIngresoOC,
   soles,
   uid,
   useRol,
   useStore,
 } from "@/lib/storage";
 import { pdfActaIngreso, pdfRequerimiento } from "@/lib/pdf";
-import type { EstadoReq, Factura, Guia, ItemReq, OrdenCompra, Requerimiento, Rol } from "@/lib/types";
+import type { EstadoReq, Factura, Guia, ItemReq, OrdenCompra, Requerimiento, Rol, StockItem } from "@/lib/types";
 
-type Tab = "nuevo" | "lista" | "ingresos";
+type Tab = "nuevo" | "lista" | "ingresos" | "stock";
 
 const itemVacio = (): ItemReq => ({ id: uid(), nombre: "", cantidad: 1, unidad: "UND", marca: "", caracteristica: "" });
 
@@ -33,6 +34,7 @@ export default function AlmacenPage() {
   const ordenes = useStore<OrdenCompra[]>(KEYS.ORDENES, []);
   const facturas = useStore<Factura[]>(KEYS.FACTURAS, []);
   const guias = useStore<Guia[]>(KEYS.GUIAS, []);
+  const stock = useStore<StockItem[]>(KEYS.STOCK, []);
   const [tab, setTab] = useState<Tab>(puede(rol, "req.crear") ? "nuevo" : "lista");
 
  const todos = [...pendientes, ...procesados].sort((a, b) => (b.numero || "").localeCompare(a.numero || ""));
@@ -59,12 +61,14 @@ export default function AlmacenPage() {
           { id: "nuevo", label: "Nuevo requerimiento", icon: <FilePlus2 size={16} /> },
           { id: "lista", label: "Requerimientos emitidos", icon: <ClipboardList size={16} />, count: observados },
           { id: "ingresos", label: "Ingresos por V°B°", icon: <PackageCheck size={16} />, count: porVB.length },
+          { id: "stock", label: "Stock", icon: <Boxes size={16} /> },
         ]}
       />
 
       {tab === "nuevo" && <NuevoReq rol={rol} onCreado={() => setTab("lista")} />}
       {tab === "lista" && <ListaReq reqs={todos} rol={rol} />}
       {tab === "ingresos" && <Ingresos rol={rol} porVB={porVB} ordenes={ordenes} facturas={facturas} guias={guias} />}
+      {tab === "stock" && <Stock stock={stock} />}
     </div>
   );
 }
@@ -412,6 +416,11 @@ function Ingresos({ rol, porVB, ordenes, facturas, guias }: { rol: Rol; porVB: O
             </label>
           ))}
         </div>
+        {vb && (
+          <p className="mb-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            Al dar el visto bueno, estas cantidades se suman al stock de <b>{sedeIngresoOC(vb)}</b>.
+          </p>
+        )}
         <div className="space-y-3">
           <Field label="Recibido por *">
             <Input value={recibido} onChange={(e) => setRecibido(e.target.value)} placeholder="Nombre del almacenero" />
@@ -452,5 +461,44 @@ function Ingresos({ rol, porVB, ordenes, facturas, guias }: { rol: Rol; porVB: O
         </div>
       </Modal>
     </div>
+  );
+}
+
+// =====================================================================
+// STOCK (alimentado por las compras registradas y por el V°B° de ingresos)
+// =====================================================================
+function Stock({ stock }: { stock: StockItem[] }) {
+  const [sede, setSede] = useState("");
+  const [q, setQ] = useState("");
+  const lista = stock
+    .filter((s) => (!sede || s.sede === sede) && (!q || s.nombre.toLowerCase().includes(q.toLowerCase())))
+    .sort((a, b) => a.sede.localeCompare(b.sede) || a.nombre.localeCompare(b.nombre));
+  const valorizado = lista.reduce((a, s) => a + s.cantidad * s.costoUnit, 0);
+  return (
+    <Card>
+      <CardHeader
+        title="Stock de almacén"
+        subtitle={`${lista.length} producto(s) · Valorizado ${soles(valorizado)} (último costo: sin IGV en factura/OC, con IGV en boleta)`}
+        action={
+          <div className="flex flex-wrap gap-2">
+            <Input placeholder="Buscar producto…" value={q} onChange={(e) => setQ(e.target.value)} className="w-48" />
+            <Select value={sede} onChange={(e) => setSede(e.target.value)} placeholder="Todas las sedes" options={SEDES.map((s) => ({ value: s, label: s }))} className="w-48" />
+          </div>
+        }
+      />
+      <Table head={["Sede", "Producto", "Unidad", "Cantidad", "Último costo", "Valorizado", "Actualizado"]} empty={lista.length === 0}>
+        {lista.map((s) => (
+          <tr key={s.id} className="hover:bg-slate-50">
+            <Td>{s.sede}</Td>
+            <Td className="font-medium text-slate-900">{s.nombre}</Td>
+            <Td>{s.unidad}</Td>
+            <Td className="text-right font-semibold">{s.cantidad}</Td>
+            <Td className="text-right">{soles(s.costoUnit)}</Td>
+            <Td className="text-right">{soles(s.cantidad * s.costoUnit)}</Td>
+            <Td>{new Date(s.actualizado).toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric" })}</Td>
+          </tr>
+        ))}
+      </Table>
+    </Card>
   );
 }
