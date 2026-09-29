@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useMemo, useState, type ReactNode } from "react";
-import { Bell, Calculator, LayoutDashboard, Menu, Search, ShoppingCart, UserCog, Users, Warehouse, X } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Bell, Calculator, Eye, LayoutDashboard, Loader2, LogOut, Menu, Search, ShieldAlert, ShoppingCart, UserCircle2, Users, Warehouse, X } from "lucide-react";
 import { Badge, Toaster, cn } from "@/components/ui";
 import { DocViewerHost, abrirDoc, type DocRef } from "@/components/doc-viewer";
-import { KEYS, PERMISOS, getCotizaciones, getFacturas, getGuias, getOrdenes, getPendientes, getProcesados, useRol, useStore } from "@/lib/storage";
-import type { Requerimiento, Rol } from "@/lib/types";
+import { ObservacionesGerencia } from "@/components/ObservacionesGerencia";
+import { inicioDe, logout, puedeVer, useSesion } from "@/lib/auth";
+import { KEYS, getCotizaciones, getFacturas, getGuias, getOrdenes, getPendientes, getProcesados, useStore } from "@/lib/storage";
+import type { Requerimiento } from "@/lib/types";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, pronto: true },
@@ -38,12 +40,34 @@ function buscar(q: string): Resultado[] {
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const path = usePathname();
-  const [rol, setRol] = useRol();
+  const router = useRouter();
+  const { sesion, listo } = useSesion();
   const pendientes = useStore<Requerimiento[]>(KEYS.REQS_PENDIENTES, []);
   const [q, setQ] = useState("");
   const [menu, setMenu] = useState(false);
   // se recalcula al escribir; los datos se leen en vivo de localStorage
   const resultados = useMemo(() => buscar(q), [q]);
+
+  useEffect(() => {
+    if (listo && !sesion) router.replace("/login");
+  }, [listo, sesion, router]);
+
+  if (!listo || !sesion)
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-400">
+        <Loader2 size={24} className="animate-spin" />
+      </div>
+    );
+
+  const nav = NAV.filter((n) => puedeVer(sesion, n.href));
+  const permitido = puedeVer(sesion, path);
+  const veCompras = puedeVer(sesion, "/dashboard/compras");
+  const buscador = veCompras || puedeVer(sesion, "/dashboard/almacen");
+  const modulo = NAV.find((n) => n.href !== "/dashboard" && (path === n.href || path.startsWith(`${n.href}/`)))?.href;
+  const salir = () => {
+    logout();
+    router.replace("/login");
+  };
 
   return (
     <div className="min-h-screen lg:pl-64">
@@ -53,14 +77,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500 font-black text-slate-900">CV</div>
           <div>
             <p className="text-sm font-bold text-white">COMBOY VID</p>
-            <p className="text-[11px] text-slate-400">ERP · Compras</p>
+            <p className="text-[11px] text-slate-400">ERP</p>
           </div>
           <button className="ml-auto lg:hidden" onClick={() => setMenu(false)} aria-label="Cerrar menú">
             <X size={18} />
           </button>
         </div>
         <nav className="space-y-1 p-3">
-          {NAV.map((n) => {
+          {nav.map((n) => {
             const activo = path === n.href;
             const Icon = n.icon;
             const contenido = (
@@ -92,16 +116,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           })}
         </nav>
         <div className="absolute inset-x-0 bottom-0 border-t border-slate-800 p-4">
-          <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            <UserCog size={13} /> Rol activo (simulado)
-          </label>
-          <select value={rol} onChange={(e) => setRol(e.target.value as Rol)} className="w-full rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-2 text-sm text-white outline-none">
-            {(Object.keys(PERMISOS) as Rol[]).map((r) => (
-              <option key={r} value={r}>
-                {PERMISOS[r].label}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2.5">
+            <UserCircle2 size={30} className="shrink-0 text-slate-500" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-white">{sesion.usuario}</p>
+              <p className="truncate text-[11px] text-slate-400">{sesion.nombre}</p>
+            </div>
+            <button onClick={salir} className="rounded-lg p-2 text-slate-400 hover:bg-white/10 hover:text-white" title="Cerrar sesión" aria-label="Cerrar sesión">
+              <LogOut size={17} />
+            </button>
+          </div>
         </div>
       </aside>
       {menu && <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={() => setMenu(false)} />}
@@ -111,7 +135,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <button className="lg:hidden" onClick={() => setMenu(true)} aria-label="Abrir menú">
           <Menu size={22} />
         </button>
-        <div className="relative max-w-md flex-1">
+        <div className={cn("relative max-w-md flex-1", !buscador && "invisible")}>
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             value={q}
@@ -146,19 +170,46 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           )}
         </div>
         <div className="ml-auto flex items-center gap-3">
-          <Link href="/dashboard/compras" className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100" title="Requerimientos por revisar">
-            <Bell size={20} />
-            {pendientes.length > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-400 px-1 text-[11px] font-bold text-slate-900">
-                {pendientes.length}
-              </span>
-            )}
-          </Link>
-          <span className="hidden rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 sm:inline">{PERMISOS[rol].label}</span>
+          {veCompras && (
+            <Link href="/dashboard/compras" className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100" title="Requerimientos por revisar">
+              <Bell size={20} />
+              {pendientes.length > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-400 px-1 text-[11px] font-bold text-slate-900">
+                  {pendientes.length}
+                </span>
+              )}
+            </Link>
+          )}
+          <span className="hidden rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 sm:inline">{sesion.nombre}</span>
         </div>
       </header>
 
-      <main className="p-4 lg:p-8">{children}</main>
+      <main className="p-4 lg:p-8">
+        {!permitido ? (
+          <div className="mx-auto mt-16 max-w-md rounded-xl border border-red-200 bg-white p-8 text-center shadow-sm">
+            <ShieldAlert size={40} className="mx-auto text-red-500" />
+            <h1 className="mt-3 text-xl font-bold text-slate-900">Acceso denegado</h1>
+            <p className="mt-1 text-sm text-slate-500">Su usuario ({sesion.usuario}) no tiene permiso para ver este módulo.</p>
+            <Link href={inicioDe(sesion)} className="mt-5 inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
+              Ir a mi módulo
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {sesion.soloLectura && (
+              <div className="mx-auto flex max-w-7xl items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-5 py-2.5 text-sm text-sky-800">
+                <Eye size={16} /> Modo solo lectura: puede revisar todo y registrar observaciones, pero no guardar, editar ni eliminar.
+              </div>
+            )}
+            {modulo && (
+              <div className="mx-auto max-w-7xl">
+                <ObservacionesGerencia modulo={modulo} sesion={sesion} />
+              </div>
+            )}
+            {children}
+          </div>
+        )}
+      </main>
       <DocViewerHost />
       <Toaster />
     </div>

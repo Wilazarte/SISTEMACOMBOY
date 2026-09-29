@@ -7,6 +7,20 @@ npm run dev      # http://localhost:3000  → /dashboard/compras
 npm run build    # verificación de producción
 ```
 
+## Usuarios y acceso
+Entrar en `/login`. La sesión se guarda en localStorage (`login`, `usuario`, `rol`).
+
+| Usuario | Módulos | Permisos |
+|---|---|---|
+| creador | todos | ver y editar todo |
+| tesoreria | /dashboard/compras, /dashboard/tesoreria | ver y editar |
+| almacen | /dashboard/almacen | ver y editar |
+| planilla | /dashboard/planilla | ver y editar |
+| gerencia | todos | solo lectura + observaciones por módulo |
+
+Contraseñas: se guardan como SHA-256 en `lib/auth.ts` (para cambiar una: `printf '%s' 'NuevaClave' | sha256sum`).
+⚠ Sin servidor, esto ordena el acceso pero no es seguridad real: quien controle el navegador puede alterar localStorage. Para producción, mover el login a un backend (ej. Supabase Auth).
+
 ## Rutas
 - `/dashboard/almacen`  → Nuevo REQ · Lista de REQ emitidos · Ingresos por V°B° · Stock
 - `/dashboard/compras`  → Registrar compra (factura/boleta → stock) · Notificaciones · Antecedentes · Cotizaciones · OC · Facturas/DJ · Guías
@@ -14,7 +28,10 @@ npm run build    # verificación de producción
 
 ## Estructura
 ```
-app/(dashboard)/layout.tsx              sidebar, buscador global, campana, rol simulado
+app/login/page.tsx                      login
+app/(dashboard)/layout.tsx              sesión, menú filtrado por usuario, acceso denegado, modo solo lectura
+components/ObservacionesGerencia.tsx    observaciones de gerencia por módulo (localStorage observaciones_gerencia)
+lib/auth.ts                             usuarios, permisos por módulo y sesión
 app/(dashboard)/dashboard/compras/page.tsx
 app/(dashboard)/dashboard/almacen/page.tsx
 components/ui.tsx                       Button, Card, Badge, Tabs, Modal, Table, Timeline, Toaster
@@ -26,7 +43,7 @@ lib/types.ts
 ```
 
 ## localStorage keys
-reqs_almacen_pendientes · reqs_procesados_compras · cotizaciones · ordenes_compra · facturas · guias · erp_contadores · erp_rol · proveedores · compras_directas · almacen_stock · CV_TRABAJADORES_V2
+reqs_almacen_pendientes · reqs_procesados_compras · cotizaciones · ordenes_compra · facturas · guias · erp_contadores · proveedores · compras_directas · almacen_stock · CV_TRABAJADORES_V2 · observaciones_gerencia · login · usuario · rol
 
 ## Reglas implementadas
 - ACEPTAR → sale de notificaciones y queda en la lista como ACEPTADO.
