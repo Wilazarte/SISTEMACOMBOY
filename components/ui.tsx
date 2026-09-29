@@ -112,6 +112,8 @@ const COLORES: Record<string, string> = {
   CONFORME: "bg-emerald-100 text-emerald-800 ring-emerald-300",
   FACTURA: "bg-slate-100 text-slate-700 ring-slate-300",
   DECLARACION_JURADA: "bg-fuchsia-100 text-fuchsia-800 ring-fuchsia-300",
+  ACTIVO: "bg-emerald-100 text-emerald-800 ring-emerald-300",
+  INACTIVO: "bg-slate-100 text-slate-500 ring-slate-300",
 };
 
 const ETIQUETA: Record<string, string> = {

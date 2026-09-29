@@ -1,228 +1,486 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
 
-type TipoSueldo = "DIARIO" | "SEMANAL" | "QUINCENAL" | "MENSUAL";
-type TipoAfp = "AFP_INTEGRA" | "AFP_PRIMA" | "AFP_HABITAT" | "AFP_PROFUTURO" | "ONP" | "SIN";
+import { useMemo, useState } from "react";
+import { AlertTriangle, Calculator, Eye, FileDown, Pencil, Plus, Power, Trash2, Upload, Users } from "lucide-react";
+import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, cn, ejecutar, toast } from "@/components/ui";
+import {
+  AFP_OPTIONS,
+  TIPOS_SUELDO,
+  cambiarEstadoTrabajador,
+  eliminarTrabajador,
+  fechaPE,
+  guardarTrabajador,
+  hoy,
+  r2,
+  registrarDesdeAsistencia,
+  soles,
+  trabajadorVacio,
+  useTrabajadores,
+} from "@/lib/storage";
+import type { TipoAfp, TipoSueldo, Trabajador } from "@/lib/types";
 
-type TrabajadorDB = {
-  id: string; // numero de huella
-  nombre: string;
-  dni: string;
-  cargo: string;
-  fechaIngreso: string;
-  sueldo: number;
-  tipoSueldo: TipoSueldo;
-  afpTipo: TipoAfp;
-  afpPorcentaje: number; // ej 13
-  activo: boolean;
-};
+type Tab = "trabajadores" | "planilla";
 
-type TrabajadorCalc = TrabajadorDB & {
+/** Marcaciones del reloj agrupadas: N° huella -> { nombre, fecha -> horas marcadas } */
+type Asistencia = Map<string, { nombre: string; fechas: Map<string, string[]> }>;
+
+type TrabajadorCalc = Trabajador & {
   dias: number;
   horas: number;
   tardanzas: number;
   bruto: number;
   descuentoAfp: number;
   neto: number;
-  detalleDias: any[];
 };
 
-const AFP_OPTIONS: Record<TipoAfp, { label: string, porc: number }> = {
-  AFP_INTEGRA: { label: "AFP Integra", porc: 13.0 },
-  AFP_PRIMA: { label: "AFP Prima", porc: 12.9 },
-  AFP_HABITAT: { label: "AFP Habitat", porc: 12.85 },
-  AFP_PROFUTURO: { label: "AFP Profuturo", porc: 12.95 },
-  ONP: { label: "ONP 13%", porc: 13.0 },
-  SIN: { label: "Sin descuento / Recibo por Honorarios", porc: 0 },
+const HORA_TARDANZA = "08:15:00";
+
+const OPC_SUELDO = (Object.keys(TIPOS_SUELDO) as TipoSueldo[]).map((k) => ({ value: k, label: TIPOS_SUELDO[k].label }));
+const OPC_AFP = (Object.keys(AFP_OPTIONS) as TipoAfp[]).map((k) => ({ value: k, label: AFP_OPTIONS[k].label }));
+
+/** "8:05" / "08:05:10" -> "08:05:00" / "08:05:10" para comparar como texto. */
+const normalizarHora = (h: string): string => {
+  const [hh = "", mm = "00", ss = "00"] = h.split(":");
+  return hh ? `${hh.padStart(2, "0")}:${mm.padStart(2, "0")}:${ss.padStart(2, "0")}` : "";
 };
+
+/** Antigüedad legible desde la fecha de ingreso. */
+function antiguedad(fechaIngreso: string): string {
+  if (!fechaIngreso) return "-";
+  const [y, m, d] = fechaIngreso.split("-").map(Number);
+  const [hy, hm, hd] = hoy().split("-").map(Number);
+  let meses = (hy - y) * 12 + (hm - m) - (hd < d ? 1 : 0);
+  if (meses < 0) meses = 0;
+  const a = Math.floor(meses / 12);
+  const r = meses % 12;
+  if (a === 0) return r === 0 ? "< 1 mes" : `${r} mes${r > 1 ? "es" : ""}`;
+  return `${a} año${a > 1 ? "s" : ""}${r ? ` ${r} m` : ""}`;
+}
+
+function calcular(t: Trabajador, asistencia: Asistencia): TrabajadorCalc {
+  const asis = asistencia.get(t.id);
+  let dias = 0;
+  let tardanzas = 0;
+  asis?.fechas.forEach((tiempos) => {
+    dias++;
+    const entrada = [...tiempos].map((x) => normalizarHora(x.split(" ")[1] ?? "")).sort()[0] ?? "";
+    if (entrada > HORA_TARDANZA) tardanzas++;
+  });
+  const bruto = r2((t.sueldo / TIPOS_SUELDO[t.tipoSueldo].divisor) * dias);
+  const descuentoAfp = r2(bruto * (t.afpPorcentaje / 100));
+  return { ...t, dias, horas: dias * 8, tardanzas, bruto, descuentoAfp, neto: r2(bruto - descuentoAfp) };
+}
 
 export default function PlanillaPage() {
-  const [trabajadoresDB, setTrabajadoresDB] = useState<TrabajadorDB[]>([]);
-  const [asistenciaMap, setAsistenciaMap] = useState<Map<string, any>>(new Map());
+  const trabajadores = useTrabajadores();
+  const [tab, setTab] = useState<Tab>("trabajadores");
+  const [asistencia, setAsistencia] = useState<Asistencia>(new Map());
   const [periodo, setPeriodo] = useState("SEMANA 14 - ABRIL 2026");
   const [boletaSel, setBoletaSel] = useState<TrabajadorCalc | null>(null);
-  const [showRegistro, setShowRegistro] = useState(false);
-  const [form, setForm] = useState<TrabajadorDB>({
-    id: "", nombre: "", dni: "", cargo: "Operario", fechaIngreso: new Date().toISOString().split("T")[0],
-    sueldo: 80, tipoSueldo: "DIARIO", afpTipo: "AFP_INTEGRA", afpPorcentaje: 13, activo: true
-  });
+  const [editando, setEditando] = useState<{ form: Trabajador; idOriginal?: string } | null>(null);
+  const [verInactivos, setVerInactivos] = useState(false);
 
-  // Cargar de localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem("CV_TRABAJADORES_V2");
-    if (saved) setTrabajadoresDB(JSON.parse(saved));
-  }, []);
-  useEffect(() => {
-    localStorage.setItem("CV_TRABAJADORES_V2", JSON.stringify(trabajadoresDB));
-  }, [trabajadoresDB]);
+  const incompletos = trabajadores.filter((t) => t.activo && !t.fechaIngreso);
+  const calculados = useMemo(
+    () => trabajadores.filter((t) => t.activo).map((t) => calcular(t, asistencia)),
+    [trabajadores, asistencia]
+  );
+  const listaMaestro = trabajadores
+    .filter((t) => verInactivos || t.activo)
+    .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
 
-  // IMPORTAR ASISTENCIA - LEE TU FORMATO N° | Nombre | Tiempo | Estado
+  // IMPORTAR ASISTENCIA — formato del reloj: N° | Nombre | Tiempo | Estado
   const importarAsistencia = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const input = e.target;
+    const file = input.files?.[0];
+    input.value = ""; // permite volver a importar el mismo archivo
     if (!file) return;
-    const XLSX = await import("xlsx");
-    const buffer = await file.arrayBuffer();
-    const wb = XLSX.read(buffer, { type: "array" });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const json: any[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
+    try {
+      const XLSX = await import("xlsx");
+      const wb = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      // raw:false + dateNF: las fechas llegan como texto "yyyy-mm-dd hh:mm:ss" aunque la celda sea tipo fecha
+      const filas = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "", raw: false, dateNF: "yyyy-mm-dd hh:mm:ss" });
 
-    const mapa = new Map<string, { nombre: string, fechas: Map<string, any[]> }>();
-    json.forEach((r: any) => {
-      const numero = String(r["Número"] || r["Numero"] || r["N°"] || "").trim();
-      const nombre = String(r["Nombre"] || "").trim();
-      const tiempo = String(r["Tiempo"] || "").trim();
-      if (!numero ||!tiempo) return;
-      if (!mapa.has(numero)) mapa.set(numero, { nombre, fechas: new Map() });
-      const fecha = tiempo.split(" ")[0];
-      const obj = mapa.get(numero)!;
-      if (!obj.fechas.has(fecha)) obj.fechas.set(fecha, []);
-      obj.fechas.get(fecha)!.push(tiempo);
-      // Si no existe en DB, crealo auto
-      if (!trabajadoresDB.find(t => t.id === numero)) {
-        setTrabajadoresDB(prev => {
-          if (prev.find(p => p.id === numero)) return prev;
-          return [...prev, { id: numero, nombre, dni: "", cargo: "Operario", fechaIngreso: new Date().toISOString().split("T")[0], sueldo: 80, tipoSueldo: "DIARIO", afpTipo: "AFP_INTEGRA", afpPorcentaje: 13, activo: true }];
-        });
+      const mapa: Asistencia = new Map();
+      filas.forEach((r) => {
+        const numero = String(r["Número"] || r["Numero"] || r["N°"] || r["No."] || "").trim();
+        const nombre = String(r["Nombre"] || "").trim();
+        const tiempo = String(r["Tiempo"] || "").trim();
+        if (!numero || !tiempo) return;
+        if (!mapa.has(numero)) mapa.set(numero, { nombre, fechas: new Map() });
+        const fecha = tiempo.split(" ")[0];
+        const obj = mapa.get(numero)!;
+        if (!obj.fechas.has(fecha)) obj.fechas.set(fecha, []);
+        obj.fechas.get(fecha)!.push(tiempo);
+      });
+      if (mapa.size === 0) {
+        toast("No se encontraron marcaciones. Verifique las columnas N° / Nombre / Tiempo.", "error");
+        return;
       }
-    });
-    setAsistenciaMap(mapa as any);
-    alert(`Asistencia importada: ${mapa.size} trabajadores`);
+      const creados = registrarDesdeAsistencia([...mapa].map(([id, v]) => ({ id, nombre: v.nombre })));
+      setAsistencia(mapa);
+      setTab("planilla");
+      toast(`Asistencia importada: ${mapa.size} trabajador(es)${creados ? ` · ${creados} nuevo(s) por completar` : ""}`);
+    } catch {
+      toast("No se pudo leer el archivo de asistencia.", "error");
+    }
   };
 
-  // CALCULO FINAL CRUZANDO DB + ASISTENCIA
-  const calculados: TrabajadorCalc[] = useMemo(() => {
-    return trabajadoresDB.filter(t=>t.activo).map(t => {
-      const asis = asistenciaMap.get(t.id);
-      const dias = asis? asis.fechas.size : 0;
-      let horas = dias * 8;
-      let tardanzas = 0;
-      const detalleDias: any[] = [];
-      if (asis) {
-        asis.fechas.forEach((tiempos: string[], fecha: string) => {
-          const entrada = tiempos.sort()[0]?.split(" ")[1] || "";
-          if (entrada > "08:15:00") tardanzas++;
-          detalleDias.push({ fecha, entrada, horas: 8 });
-        });
-      }
-
-      // LOGICA DE SUELDO SEGUN TIPO
-      let bruto = 0;
-      if (t.tipoSueldo === "DIARIO") bruto = t.sueldo * dias;
-      if (t.tipoSueldo === "SEMANAL") bruto = (t.sueldo / 6) * dias; // semanal se divide entre 6 dias laborables
-      if (t.tipoSueldo === "QUINCENAL") bruto = (t.sueldo / 15) * dias;
-      if (t.tipoSueldo === "MENSUAL") bruto = (t.sueldo / 30) * dias;
-
-      const descuentoAfp = bruto * (t.afpPorcentaje / 100);
-      const neto = bruto - descuentoAfp;
-
-      return {...t, dias, horas, tardanzas, bruto, descuentoAfp, neto, detalleDias };
-    });
-  }, [trabajadoresDB, asistenciaMap]);
-
-  const guardarTrabajador = () => {
-    if (!form.id ||!form.nombre) return alert("Falta N° y Nombre");
-    setTrabajadoresDB(prev => {
-      const existe = prev.find(p => p.id === form.id);
-      if (existe) return prev.map(p => p.id === form.id? form : p);
-      return [...prev, form];
-    });
-    setShowRegistro(false);
-    setForm({ id: "", nombre: "", dni: "", cargo: "Operario", fechaIngreso: new Date().toISOString().split("T")[0], sueldo: 80, tipoSueldo: "DIARIO", afpTipo: "AFP_INTEGRA", afpPorcentaje: 13, activo: true });
+  const guardar = () => {
+    if (!editando) return;
+    const ok = ejecutar(() => guardarTrabajador(editando.form, editando.idOriginal), editando.idOriginal ? "Trabajador actualizado" : "Trabajador registrado");
+    if (ok) setEditando(null);
   };
 
   const descargarPDF = async (t: TrabajadorCalc) => {
     const { jsPDF } = await import("jspdf");
     const doc = new jsPDF();
-    doc.setFontSize(12); doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
     doc.text("CV COMBOY VID E.I.R.L.", 20, 20);
-    doc.setFontSize(10); doc.text(`BOLETA DE PAGO - ${periodo}`, 20, 27);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-    doc.text(`Trabajador: ${t.nombre} | DNI: ${t.dni} | N°: ${t.id}`, 20, 38);
-    doc.text(`Cargo: ${t.cargo} | Ingreso: ${t.fechaIngreso} | AFP: ${AFP_OPTIONS[t.afpTipo].label} (${t.afpPorcentaje}%)`, 20, 44);
-    doc.text(`Tipo Sueldo: ${t.tipoSueldo} S/ ${t.sueldo} | Dias: ${t.dias} | Horas: ${t.horas}`, 20, 50);
+    doc.setFontSize(10);
+    doc.text(`BOLETA DE PAGO - ${periodo}`, 20, 27);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(`Trabajador: ${t.nombre} | DNI: ${t.dni || "-"} | N°: ${t.id}`, 20, 38);
+    doc.text(`Cargo: ${t.cargo} | Ingreso: ${fechaPE(t.fechaIngreso)} | ${AFP_OPTIONS[t.afpTipo].label} (${t.afpPorcentaje}%)`, 20, 44);
+    doc.text(`Tipo sueldo: ${TIPOS_SUELDO[t.tipoSueldo].label} ${soles(t.sueldo)} | Días: ${t.dias} | Horas: ${t.horas} | Tardanzas: ${t.tardanzas}`, 20, 50);
     doc.line(20, 55, 190, 55);
-    doc.text(`Bruto Calculado: S/ ${t.bruto.toFixed(2)}`, 20, 65);
-    doc.text(`Descuento ${t.afpTipo}: - S/ ${t.descuentoAfp.toFixed(2)}`, 20, 72);
-    doc.setFont("helvetica", "bold"); doc.text(`NETO A PAGAR: S/ ${t.neto.toFixed(2)}`, 20, 85);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+    doc.text(`Remuneración bruta: ${soles(t.bruto)}`, 20, 65);
+    doc.text(`Descuento ${AFP_OPTIONS[t.afpTipo].label} (${t.afpPorcentaje}%): - ${soles(t.descuentoAfp)}`, 20, 72);
+    doc.setFont("helvetica", "bold");
+    doc.text(`NETO A PAGAR: ${soles(t.neto)}`, 20, 85);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
     doc.text("Firma Trabajador _________________ Firma Empleador _________________", 20, 110);
-    doc.save(`BOLETA_${t.id}_${t.nombre}.pdf`);
+    doc.save(`BOLETA_${t.id}_${t.nombre.replace(/\s+/g, "_")}.pdf`);
   };
 
+  const importarBtn = (
+    <label className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-600">
+      <Upload size={16} /> Importar asistencia
+      <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={importarAsistencia} />
+    </label>
+  );
+
   return (
-    <div className="space-y-4 p-1">
-      <div className="flex flex-wrap justify-between gap-2">
-        <h1 className="text-xl font-black">Planilla Semanal - COMBOY VID V2</h1>
-        <div className="flex gap-2">
-          <button onClick={()=>setShowRegistro(true)} className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white">+ Registrar Trabajador</button>
-          <label className="cursor-pointer rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold">Importar Asistencia<input type="file" accept=".xlsx,.xls" className="hidden" onChange={importarAsistencia} /></label>
+    <div className="mx-auto max-w-7xl space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Planilla</h1>
+          <p className="text-sm text-slate-500">Maestro de trabajadores y cálculo de pago según asistencia del reloj</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => setEditando({ form: trabajadorVacio() })}>
+            <Plus size={16} /> Registrar trabajador
+          </Button>
+          {importarBtn}
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        <input value={periodo} onChange={e=>setPeriodo(e.target.value)} className="rounded-lg border p-2 text-sm font-bold" />
-        <div className="rounded-lg border bg-white p-2 text-sm">Trabajadores: <b>{calculados.length}</b></div>
-        <div className="rounded-lg bg-slate-900 p-2 text-sm text-white">Total Neto: <b className="text-amber-400">S/ {calculados.reduce((a,b)=>a+b.neto,0).toFixed(2)}</b></div>
-      </div>
-
-      <div className="overflow-auto rounded-xl border bg-white">
-        <table className="w-full text-[11px]">
-          <thead className="bg-slate-100 text-[10px] uppercase"><tr><th className="p-2">N°</th><th className="p-2">Trabajador / DNI</th><th className="p-2">Sueldo / Tipo</th><th className="p-2">AFP</th><th className="p-2">Dias</th><th className="p-2">Bruto</th><th className="p-2">Dscto</th><th className="p-2">Neto</th><th className="p-2">Boleta</th></tr></thead>
-          <tbody>
-            {calculados.map(t=>(
-              <tr key={t.id} className="border-t">
-                <td className="p-2 font-mono">{t.id}</td>
-                <td className="p-2"><b>{t.nombre}</b><br/><span className="text-slate-500">{t.dni} - {t.cargo}</span></td>
-                <td className="p-2"><select value={t.tipoSueldo} onChange={e=>setTrabajadoresDB(prev=>prev.map(x=>x.id===t.id?{...x,tipoSueldo:e.target.value as any}:x))} className="border text-[10px]"><option>DIARIO</option><option>SEMANAL</option><option>QUINCENAL</option><option>MENSUAL</option></select><br/><input type="number" value={t.sueldo} onChange={e=>setTrabajadoresDB(prev=>prev.map(x=>x.id===t.id?{...x,sueldo:Number(e.target.value)}:x))} className="w-16 border mt-1 p-1" /></td>
-                <td className="p-2"><select value={t.afpTipo} onChange={e=>{const tipo=e.target.value as TipoAfp; setTrabajadoresDB(prev=>prev.map(x=>x.id===t.id?{...x,afpTipo:tipo, afpPorcentaje:AFP_OPTIONS[tipo].porc}:x))}} className="border text-[10px] w-24">{Object.entries(AFP_OPTIONS).map(([k,v])=><option key={k} value={k}>{v.label}</option>)}</select><br/>{t.afpPorcentaje}%</td>
-                <td className="p-2 text-center">{t.dias}</td>
-                <td className="p-2 text-right">S/ {t.bruto.toFixed(2)}</td>
-                <td className="p-2 text-right text-red-600">- S/ {t.descuentoAfp.toFixed(2)}</td>
-                <td className="p-2 text-right font-black">S/ {t.neto.toFixed(2)}</td>
-                <td className="p-2 flex gap-1"><button onClick={()=>setBoletaSel(t)} className="rounded bg-slate-900 px-2 py-1 text-white">Ver</button><button onClick={()=>descargarPDF(t)} className="rounded bg-amber-500 px-2 py-1 font-bold">PDF</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* MODAL REGISTRO */}
-      {showRegistro && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-5">
-            <h2 className="font-black">Registrar Trabajador Completo</h2>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-              <input placeholder="N° Huella (Ej: 7)" value={form.id} onChange={e=>setForm({...form,id:e.target.value})} className="rounded border p-2" />
-              <input placeholder="DNI" value={form.dni} onChange={e=>setForm({...form,dni:e.target.value})} className="rounded border p-2" />
-              <input placeholder="Nombre Completo" value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})} className="col-span-2 rounded border p-2" />
-              <input placeholder="Cargo" value={form.cargo} onChange={e=>setForm({...form,cargo:e.target.value})} className="rounded border p-2" />
-              <input type="date" value={form.fechaIngreso} onChange={e=>setForm({...form,fechaIngreso:e.target.value})} className="rounded border p-2" />
-              <select value={form.tipoSueldo} onChange={e=>setForm({...form,tipoSueldo:e.target.value as any})} className="rounded border p-2"><option value="DIARIO">Diario</option><option value="SEMANAL">Semanal</option><option value="QUINCENAL">Quincenal</option><option value="MENSUAL">Mensual</option></select>
-              <input type="number" placeholder="Sueldo" value={form.sueldo} onChange={e=>setForm({...form,sueldo:Number(e.target.value)})} className="rounded border p-2" />
-              <select value={form.afpTipo} onChange={e=>{const tipo=e.target.value as TipoAfp; setForm({...form,afpTipo:tipo,afpPorcentaje:AFP_OPTIONS[tipo].porc})}} className="rounded border p-2"><option value="AFP_INTEGRA">AFP Integra</option><option value="AFP_PRIMA">AFP Prima</option><option value="AFP_HABITAT">AFP Habitat</option><option value="AFP_PROFUTURO">AFP Profuturo</option><option value="ONP">ONP</option><option value="SIN">SIN AFP (RxH)</option></select>
-              <input type="number" value={form.afpPorcentaje} onChange={e=>setForm({...form,afpPorcentaje:Number(e.target.value)})} className="rounded border p-2" placeholder="% AFP" />
-            </div>
-            <div className="mt-4 flex justify-end gap-2"><button onClick={()=>setShowRegistro(false)} className="rounded border px-4 py-2">Cancelar</button><button onClick={guardarTrabajador} className="rounded bg-amber-500 px-4 py-2 font-bold">Guardar</button></div>
-          </div>
-        </div>
+      {incompletos.length > 0 && (
+        <button
+          onClick={() => setTab("trabajadores")}
+          className="flex w-full items-center gap-3 rounded-xl border border-orange-300 bg-orange-50 px-5 py-3 text-left text-sm text-orange-800"
+        >
+          <AlertTriangle size={18} /> {incompletos.length} trabajador(es) sin fecha de ingreso (creados desde el reloj). Complete sus datos.
+        </button>
       )}
+
+      <Tabs<Tab>
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { id: "trabajadores", label: "Trabajadores", icon: <Users size={16} />, count: incompletos.length },
+          { id: "planilla", label: "Planilla del periodo", icon: <Calculator size={16} /> },
+        ]}
+      />
+
+      {tab === "trabajadores" && (
+        <Card>
+          <CardHeader
+            title="Maestro de trabajadores"
+            subtitle={`${trabajadores.filter((t) => t.activo).length} activo(s) · ${trabajadores.filter((t) => !t.activo).length} inactivo(s)`}
+            action={
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input type="checkbox" checked={verInactivos} onChange={(e) => setVerInactivos(e.target.checked)} /> Mostrar inactivos
+              </label>
+            }
+          />
+          {listaMaestro.length === 0 ? (
+            <div className="p-5">
+              <Empty icon={<Users size={28} />} text="Aún no hay trabajadores. Regístrelos o importe la asistencia del reloj." />
+            </div>
+          ) : (
+            <Table head={["N°", "Trabajador", "Cargo", "F. ingreso", "Tipo sueldo", "Sueldo", "Pensión", "Estado", ""]}>
+              {listaMaestro.map((t) => (
+                <tr key={t.id} className={cn(!t.activo && "opacity-50")}>
+                  <Td className="font-mono">{t.id}</Td>
+                  <Td>
+                    <p className="font-semibold text-slate-900">{t.nombre}</p>
+                    <p className="text-xs text-slate-500">DNI {t.dni || "-"}</p>
+                  </Td>
+                  <Td>{t.cargo}</Td>
+                  <Td>
+                    {t.fechaIngreso ? (
+                      <>
+                        <p>{fechaPE(t.fechaIngreso)}</p>
+                        <p className="text-xs text-slate-500">{antiguedad(t.fechaIngreso)}</p>
+                      </>
+                    ) : (
+                      <span className="text-xs font-semibold text-orange-600">Sin registrar</span>
+                    )}
+                  </Td>
+                  <Td>{TIPOS_SUELDO[t.tipoSueldo].label}</Td>
+                  <Td className="text-right">{soles(t.sueldo)}</Td>
+                  <Td>
+                    <p>{AFP_OPTIONS[t.afpTipo].label}</p>
+                    <p className="text-xs text-slate-500">{t.afpPorcentaje}%</p>
+                  </Td>
+                  <Td>
+                    <Badge estado={t.activo ? "ACTIVO" : "INACTIVO"} />
+                  </Td>
+                  <Td>
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="secondary" onClick={() => setEditando({ form: { ...t }, idOriginal: t.id })} title="Editar">
+                        <Pencil size={14} />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        title={t.activo ? "Dar de baja" : "Reactivar"}
+                        onClick={() => ejecutar(() => cambiarEstadoTrabajador(t.id, !t.activo), t.activo ? "Trabajador dado de baja" : "Trabajador reactivado")}
+                      >
+                        <Power size={14} />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        title="Eliminar"
+                        onClick={() => confirm(`¿Eliminar a ${t.nombre}? Esta acción no se puede deshacer.`) && ejecutar(() => eliminarTrabajador(t.id), "Trabajador eliminado")}
+                      >
+                        <Trash2 size={14} className="text-red-600" />
+                      </Button>
+                    </div>
+                  </Td>
+                </tr>
+              ))}
+            </Table>
+          )}
+        </Card>
+      )}
+
+      {tab === "planilla" && (
+        <>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="Periodo">
+              <Input value={periodo} onChange={(e) => setPeriodo(e.target.value)} className="font-semibold" />
+            </Field>
+            <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm">
+              Trabajadores activos: <b>{calculados.length}</b>
+              <p className="text-xs text-slate-500">{asistencia.size ? `${asistencia.size} con marcaciones` : "Sin asistencia importada"}</p>
+            </div>
+            <div className="rounded-xl bg-slate-900 p-3 text-sm text-white">
+              Total neto: <b className="text-amber-400">{soles(r2(calculados.reduce((a, b) => a + b.neto, 0)))}</b>
+            </div>
+          </div>
+
+          <Card>
+            <CardHeader title={`Planilla · ${periodo}`} subtitle="Para cambiar sueldo, tipo de sueldo o pensión edite al trabajador." action={importarBtn} />
+            {calculados.length === 0 ? (
+              <div className="p-5">
+                <Empty icon={<Calculator size={28} />} text="No hay trabajadores activos." />
+              </div>
+            ) : (
+              <Table head={["N°", "Trabajador", "F. ingreso", "Sueldo / Tipo", "Pensión", "Días", "Tard.", "Bruto", "Dscto", "Neto", "Boleta"]}>
+                {calculados.map((t) => (
+                  <tr key={t.id}>
+                    <Td className="font-mono">{t.id}</Td>
+                    <Td>
+                      <p className="font-semibold text-slate-900">{t.nombre}</p>
+                      <p className="text-xs text-slate-500">
+                        {t.dni || "-"} · {t.cargo}
+                      </p>
+                    </Td>
+                    <Td>{t.fechaIngreso ? fechaPE(t.fechaIngreso) : <span className="text-xs font-semibold text-orange-600">Sin registrar</span>}</Td>
+                    <Td>
+                      {soles(t.sueldo)}
+                      <p className="text-xs text-slate-500">{TIPOS_SUELDO[t.tipoSueldo].label}</p>
+                    </Td>
+                    <Td>
+                      {AFP_OPTIONS[t.afpTipo].label}
+                      <p className="text-xs text-slate-500">{t.afpPorcentaje}%</p>
+                    </Td>
+                    <Td className="text-center">{t.dias}</Td>
+                    <Td className={cn("text-center", t.tardanzas > 0 && "font-semibold text-orange-600")}>{t.tardanzas}</Td>
+                    <Td className="text-right">{soles(t.bruto)}</Td>
+                    <Td className="text-right text-red-600">- {soles(t.descuentoAfp)}</Td>
+                    <Td className="text-right font-bold">{soles(t.neto)}</Td>
+                    <Td>
+                      <div className="flex gap-1">
+                        <Button size="sm" onClick={() => setBoletaSel(t)} title="Ver boleta">
+                          <Eye size={14} />
+                        </Button>
+                        <Button size="sm" variant="warning" onClick={() => descargarPDF(t)} title="Descargar PDF">
+                          <FileDown size={14} />
+                        </Button>
+                      </div>
+                    </Td>
+                  </tr>
+                ))}
+              </Table>
+            )}
+          </Card>
+        </>
+      )}
+
+      {/* MODAL REGISTRO / EDICIÓN */}
+      <Modal open={!!editando} onClose={() => setEditando(null)} title={editando?.idOriginal ? `Editar trabajador N° ${editando.idOriginal}` : "Registrar trabajador"}>
+        {editando && (
+          <FormTrabajador
+            form={editando.form}
+            onChange={(form) => setEditando({ ...editando, form })}
+            onCancel={() => setEditando(null)}
+            onSave={guardar}
+          />
+        )}
+      </Modal>
 
       {/* MODAL BOLETA */}
-      {boletaSel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-xl rounded-xl bg-white p-6">
-            <div className="border-2 border-slate-900 p-4 text-xs">
-              <div className="flex justify-between border-b pb-2"><b>CV COMBOY VID - BOLETA DE PAGO {periodo}</b><span>D.S. 001-98-TR</span></div>
-              <p className="mt-2"><b>Trabajador:</b> {boletaSel.nombre} - DNI: {boletaSel.dni} - N°: {boletaSel.id}</p>
-              <p><b>Cargo:</b> {boletaSel.cargo} | <b>AFP:</b> {AFP_OPTIONS[boletaSel.afpTipo].label} {boletaSel.afpPorcentaje}% | <b>Sueldo:</b> {boletaSel.tipoSueldo} S/ {boletaSel.sueldo}</p>
-              <table className="mt-3 w-full border"><thead className="bg-slate-100"><tr><th className="p-2 text-left">Concepto</th><th className="p-2 text-right">Importe</th></tr></thead>
-                <tbody><tr className="border-t"><td className="p-2">Remuneración ({boletaSel.dias} dias) - {boletaSel.tipoSueldo}</td><td className="p-2 text-right">S/ {boletaSel.bruto.toFixed(2)}</td></tr><tr className="border-t text-red-600"><td className="p-2">Desc. {boletaSel.afpTipo} {boletaSel.afpPorcentaje}%</td><td className="p-2 text-right">- S/ {boletaSel.descuentoAfp.toFixed(2)}</td></tr><tr className="border-t bg-amber-100 font-bold"><td className="p-2">NETO A PAGAR</td><td className="p-2 text-right">S/ {boletaSel.neto.toFixed(2)}</td></tr></tbody>
+      <Modal open={!!boletaSel} onClose={() => setBoletaSel(null)} title="Boleta de pago">
+        {boletaSel && (
+          <>
+            <div className="space-y-1 border-2 border-slate-900 p-4 text-xs">
+              <div className="flex justify-between border-b pb-2">
+                <b>CV COMBOY VID - BOLETA DE PAGO {periodo}</b>
+                <span>D.S. 001-98-TR</span>
+              </div>
+              <p className="pt-1">
+                <b>Trabajador:</b> {boletaSel.nombre} · DNI: {boletaSel.dni || "-"} · N°: {boletaSel.id}
+              </p>
+              <p>
+                <b>Cargo:</b> {boletaSel.cargo} · <b>Ingreso:</b> {fechaPE(boletaSel.fechaIngreso)}
+              </p>
+              <p>
+                <b>Sueldo:</b> {TIPOS_SUELDO[boletaSel.tipoSueldo].label} {soles(boletaSel.sueldo)} · <b>Pensión:</b> {AFP_OPTIONS[boletaSel.afpTipo].label} {boletaSel.afpPorcentaje}%
+              </p>
+              <table className="mt-3 w-full border">
+                <thead className="bg-slate-100">
+                  <tr>
+                    <th className="p-2 text-left">Concepto</th>
+                    <th className="p-2 text-right">Importe</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-t">
+                    <td className="p-2">
+                      Remuneración ({boletaSel.dias} días · {TIPOS_SUELDO[boletaSel.tipoSueldo].label.toLowerCase()})
+                    </td>
+                    <td className="p-2 text-right">{soles(boletaSel.bruto)}</td>
+                  </tr>
+                  <tr className="border-t text-red-600">
+                    <td className="p-2">
+                      Desc. {AFP_OPTIONS[boletaSel.afpTipo].label} {boletaSel.afpPorcentaje}%
+                    </td>
+                    <td className="p-2 text-right">- {soles(boletaSel.descuentoAfp)}</td>
+                  </tr>
+                  <tr className="border-t bg-amber-100 font-bold">
+                    <td className="p-2">NETO A PAGAR</td>
+                    <td className="p-2 text-right">{soles(boletaSel.neto)}</td>
+                  </tr>
+                </tbody>
               </table>
             </div>
-            <div className="mt-3 flex justify-end gap-2"><button onClick={()=>setBoletaSel(null)} className="rounded border px-4 py-2">Cerrar</button><button onClick={()=>descargarPDF(boletaSel)} className="rounded bg-amber-500 px-4 py-2 font-bold">Descargar PDF</button></div>
-          </div>
-        </div>
-      )}
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setBoletaSel(null)}>
+                Cerrar
+              </Button>
+              <Button variant="warning" onClick={() => descargarPDF(boletaSel)}>
+                <FileDown size={16} /> Descargar PDF
+              </Button>
+            </div>
+          </>
+        )}
+      </Modal>
     </div>
+  );
+}
+
+function FormTrabajador({
+  form,
+  onChange,
+  onCancel,
+  onSave,
+}: {
+  form: Trabajador;
+  onChange: (t: Trabajador) => void;
+  onCancel: () => void;
+  onSave: () => void;
+}) {
+  const set = <K extends keyof Trabajador>(k: K, v: Trabajador[K]) => onChange({ ...form, [k]: v });
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave();
+      }}
+    >
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="N° huella *">
+          <Input value={form.id} onChange={(e) => set("id", e.target.value)} placeholder="Ej: 7" />
+        </Field>
+        <Field label="DNI">
+          <Input value={form.dni} onChange={(e) => set("dni", e.target.value.replace(/\D/g, "").slice(0, 8))} inputMode="numeric" placeholder="8 dígitos" />
+        </Field>
+        <Field label="Nombre completo *" className="col-span-2">
+          <Input value={form.nombre} onChange={(e) => set("nombre", e.target.value)} />
+        </Field>
+        <Field label="Cargo">
+          <Input value={form.cargo} onChange={(e) => set("cargo", e.target.value)} />
+        </Field>
+        <Field label="Fecha de ingreso *">
+          <Input type="date" value={form.fechaIngreso} max={hoy()} onChange={(e) => set("fechaIngreso", e.target.value)} />
+        </Field>
+        <Field label="Tipo de sueldo *">
+          <Select value={form.tipoSueldo} options={OPC_SUELDO} onChange={(e) => set("tipoSueldo", e.target.value as TipoSueldo)} />
+        </Field>
+        <Field label={`Sueldo ${TIPOS_SUELDO[form.tipoSueldo].label.toLowerCase()} (S/) *`}>
+          <Input type="number" min={0} step="0.01" value={form.sueldo} onChange={(e) => set("sueldo", Number(e.target.value))} />
+        </Field>
+        <Field label="Sistema de pensiones *">
+          <Select
+            value={form.afpTipo}
+            options={OPC_AFP}
+            onChange={(e) => {
+              const afpTipo = e.target.value as TipoAfp;
+              onChange({ ...form, afpTipo, afpPorcentaje: AFP_OPTIONS[afpTipo].porc });
+            }}
+          />
+        </Field>
+        <Field label="% descuento">
+          <Input
+            type="number"
+            min={0}
+            max={100}
+            step="0.01"
+            value={form.afpPorcentaje}
+            disabled={form.afpTipo === "SIN"}
+            onChange={(e) => set("afpPorcentaje", Number(e.target.value))}
+          />
+        </Field>
+        <label className="col-span-2 flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" checked={form.activo} onChange={(e) => set("activo", e.target.checked)} /> Trabajador activo
+        </label>
+      </div>
+      <div className="mt-5 flex justify-end gap-2">
+        <Button type="button" variant="secondary" onClick={onCancel}>
+          Cancelar
+        </Button>
+        <Button type="submit" variant="warning">
+          Guardar
+        </Button>
+      </div>
+    </form>
   );
 }

@@ -5,7 +5,7 @@
 // aquí para que migrar a Supabase sea reemplazar este archivo.
 // =====================================================================
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   Cotizacion,
   EventoHistorial,
@@ -14,6 +14,9 @@ import type {
   OrdenCompra,
   Requerimiento,
   Rol,
+  TipoAfp,
+  TipoSueldo,
+  Trabajador,
   VistoBueno,
 } from "./types";
 
@@ -26,6 +29,7 @@ export const KEYS = {
   GUIAS: "guias",
   CONTADORES: "erp_contadores",
   ROL: "erp_rol",
+  TRABAJADORES: "CV_TRABAJADORES_V2",
 } as const;
 
 export type StoreKey = (typeof KEYS)[keyof typeof KEYS];
@@ -552,6 +556,127 @@ export function observarIngreso(ocId: string, motivo: string, rol: Rol): void {
         : g
     )
   );
+}
+
+// ---------------------------------------------------------------------
+// PLANILLA: maestro de trabajadores
+// ---------------------------------------------------------------------
+
+export const TIPOS_SUELDO: Record<TipoSueldo, { label: string; divisor: number }> = {
+  DIARIO: { label: "Diario", divisor: 1 },
+  SEMANAL: { label: "Semanal", divisor: 6 }, // 6 días laborables
+  QUINCENAL: { label: "Quincenal", divisor: 15 },
+  MENSUAL: { label: "Mensual", divisor: 30 },
+};
+
+export const AFP_OPTIONS: Record<TipoAfp, { label: string; porc: number }> = {
+  AFP_INTEGRA: { label: "AFP Integra", porc: 13.0 },
+  AFP_PRIMA: { label: "AFP Prima", porc: 12.9 },
+  AFP_HABITAT: { label: "AFP Habitat", porc: 12.85 },
+  AFP_PROFUTURO: { label: "AFP Profuturo", porc: 12.95 },
+  ONP: { label: "ONP 13%", porc: 13.0 },
+  SIN: { label: "Sin descuento / Recibo por Honorarios", porc: 0 },
+};
+
+export const trabajadorVacio = (): Trabajador => ({
+  id: "",
+  nombre: "",
+  dni: "",
+  cargo: "Operario",
+  fechaIngreso: hoy(),
+  sueldo: 80,
+  tipoSueldo: "DIARIO",
+  afpTipo: "AFP_INTEGRA",
+  afpPorcentaje: AFP_OPTIONS.AFP_INTEGRA.porc,
+  activo: true,
+});
+
+const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Completa registros antiguos (sin fechaIngreso / afpTipo / tipoSueldo) para que no rompan la UI. */
+function normalizarTrabajador(t: Partial<Trabajador>): Trabajador {
+  const base = trabajadorVacio();
+  const tipoSueldo = t.tipoSueldo && t.tipoSueldo in TIPOS_SUELDO ? t.tipoSueldo : base.tipoSueldo;
+  const afpTipo = t.afpTipo && t.afpTipo in AFP_OPTIONS ? t.afpTipo : base.afpTipo;
+  const afpPorcentaje = Number(t.afpPorcentaje);
+  const sueldo = Number(t.sueldo);
+  return {
+    id: String(t.id ?? "").trim(),
+    nombre: String(t.nombre ?? "").trim(),
+    dni: String(t.dni ?? "").trim(),
+    cargo: String(t.cargo ?? "").trim() || base.cargo,
+    fechaIngreso: typeof t.fechaIngreso === "string" && FECHA_RE.test(t.fechaIngreso) ? t.fechaIngreso : "",
+    sueldo: Number.isFinite(sueldo) && sueldo >= 0 ? sueldo : base.sueldo,
+    tipoSueldo,
+    afpTipo,
+    afpPorcentaje: Number.isFinite(afpPorcentaje) && afpPorcentaje >= 0 ? afpPorcentaje : AFP_OPTIONS[afpTipo].porc,
+    activo: t.activo !== false,
+  };
+}
+
+export const getTrabajadores = (): Trabajador[] =>
+  leer<Partial<Trabajador>[]>(KEYS.TRABAJADORES, []).map(normalizarTrabajador).filter((t) => t.id);
+
+/** Hook reactivo del maestro de trabajadores, siempre normalizado. */
+export function useTrabajadores(): Trabajador[] {
+  const raw = useStore<Partial<Trabajador>[]>(KEYS.TRABAJADORES, []);
+  return useMemo(() => raw.map(normalizarTrabajador).filter((t) => t.id), [raw]);
+}
+
+function validarTrabajador(t: Trabajador): void {
+  if (!t.id) throw new ErpError("Ingrese el N° de huella.");
+  if (!t.nombre) throw new ErpError("Ingrese el nombre completo.");
+  if (t.dni && !/^\d{8}$/.test(t.dni)) throw new ErpError("DNI inválido (8 dígitos).");
+  if (!t.fechaIngreso || !FECHA_RE.test(t.fechaIngreso)) throw new ErpError("Ingrese la fecha de ingreso.");
+  if (t.fechaIngreso > hoy()) throw new ErpError("La fecha de ingreso no puede ser futura.");
+  if (!(t.tipoSueldo in TIPOS_SUELDO)) throw new ErpError("Seleccione el tipo de sueldo.");
+  if (!(t.sueldo > 0)) throw new ErpError("El sueldo debe ser mayor a 0.");
+  if (!(t.afpTipo in AFP_OPTIONS)) throw new ErpError("Seleccione el sistema de pensiones.");
+  if (!(t.afpPorcentaje >= 0 && t.afpPorcentaje <= 100)) throw new ErpError("El % de descuento debe estar entre 0 y 100.");
+}
+
+/**
+ * Crea o actualiza un trabajador. `idOriginal` es el N° de huella antes de editar
+ * (permite corregirlo sin duplicar el registro).
+ */
+export function guardarTrabajador(data: Trabajador, idOriginal?: string): Trabajador {
+  const t = normalizarTrabajador({ ...data, nombre: data.nombre.toUpperCase() });
+  if (t.afpTipo === "SIN") t.afpPorcentaje = 0;
+  validarTrabajador(t);
+  const lista = getTrabajadores();
+  const otros = lista.filter((x) => x.id !== (idOriginal ?? t.id));
+  if (otros.some((x) => x.id === t.id)) throw new ErpError(`El N° de huella ${t.id} ya está asignado a otro trabajador.`);
+  if (t.dni && otros.some((x) => x.dni === t.dni)) throw new ErpError(`El DNI ${t.dni} ya está registrado.`);
+  const i = lista.findIndex((x) => x.id === (idOriginal ?? t.id));
+  if (i >= 0) lista[i] = t;
+  else lista.push(t);
+  escribir(KEYS.TRABAJADORES, lista);
+  return t;
+}
+
+/** Alta / baja sin revalidar el resto de datos (permite dar de baja a un trabajador incompleto). */
+export function cambiarEstadoTrabajador(id: string, activo: boolean): void {
+  const lista = getTrabajadores();
+  if (!lista.some((t) => t.id === id)) throw new ErpError("Trabajador no encontrado.");
+  escribir(KEYS.TRABAJADORES, lista.map((t) => (t.id === id ? { ...t, activo } : t)));
+}
+
+export function eliminarTrabajador(id: string): void {
+  escribir(KEYS.TRABAJADORES, getTrabajadores().filter((t) => t.id !== id));
+}
+
+/** Registra en bloque los N° de huella que llegan del reloj y aún no existen. Devuelve cuántos se crearon. */
+export function registrarDesdeAsistencia(nuevos: { id: string; nombre: string }[]): number {
+  const lista = getTrabajadores();
+  let n = 0;
+  nuevos.forEach(({ id, nombre }) => {
+    if (!id || lista.some((t) => t.id === id)) return;
+    // fechaIngreso vacía: se completa al editar el trabajador
+    lista.push({ ...trabajadorVacio(), id, nombre: nombre.toUpperCase() || `TRABAJADOR ${id}`, fechaIngreso: "" });
+    n++;
+  });
+  if (n > 0) escribir(KEYS.TRABAJADORES, lista);
+  return n;
 }
 
 // ---------------------------------------------------------------------
