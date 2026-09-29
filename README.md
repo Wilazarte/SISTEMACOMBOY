@@ -2,23 +2,21 @@
 
 ## Puesta en marcha (Supabase, una sola vez)
 1. **Tablas:** Supabase → SQL Editor → pegar `supabase_tables.sql` → *Run*. Crea las tablas, las políticas RLS, la numeración y activa Realtime. Se puede ejecutar varias veces.
-2. **Usuarios y perfiles:** desde la raíz del proyecto:
+2. **Usuarios:** desde la raíz del proyecto, con `SUPABASE_SERVICE_ROLE_KEY` en `.env.local` (Supabase → Project Settings → API Keys → `service_role` / secret):
    ```bash
-   npm install                  # si aún no se instaló
-   node setup_usuarios.js
+   npm install
+   node --env-file=.env.local scripts/crear-usuarios.mjs
    ```
-   Crea en Supabase Auth (si no existen) `creador`, `tesoreria`, `almacen`, `planilla` y `gerencia` `@comboyvid.local`, con email confirmado y contraseña inicial **`Comboy2024*`**, y crea/actualiza sus perfiles en `public.perfiles`. Si un usuario ya existe, no cambia su contraseña. Se puede ejecutar varias veces.
+   Crea con la Admin API de Supabase los 5 usuarios `creador`, `tesoreria`, `almacen`, `planilla` y `gerencia` `@comboyvid.local`, con correo confirmado y contraseña **`123456`**. Si un usuario ya existe, lo **borra y lo vuelve a crear** (su id cambia).
+   `--env-file` carga `.env.local` (Node 20.6 o superior). Alternativa: definir las dos variables en la terminal y correr `node scripts/crear-usuarios.mjs`.
+3. **Perfiles:** Supabase → SQL Editor → pegar `supabase/perfiles.sql` → *Run*. Asigna rol y módulos a cada usuario con su id real (hay que volver a correrlo cada vez que se ejecute el paso 2). Debe listar 5 filas.
 
-   Necesita la **service role key** en `.env.local` (Supabase → Project Settings → API Keys → `service_role` / secret):
-   ```
-   SUPABASE_SERVICE_ROLE_KEY=...
-   ```
-   ⚠ Esa clave salta todas las políticas de seguridad: solo en `.env.local` de la PC del administrador, **nunca** con prefijo `NEXT_PUBLIC_` ni subida a git. Después de crear los usuarios se puede borrar de `.env.local`.
+   ⛔ **Nunca crear usuarios con `INSERT` directo en `auth.users`**: Supabase Cloud no los reconoce en el login ("Usuario o contraseña incorrectos"). Usar siempre el script (Admin API) o Authentication → Users → *Add user*.
 
-   ⚠ La contraseña inicial es la misma para los 5 usuarios: cámbiela en Supabase → Authentication → Users → usuario → *Update user* antes de usar el ERP en serio. (Para otra contraseña inicial: `SETUP_PASSWORD=MiClave node setup_usuarios.js`.)
+   ⚠ La service role key salta todas las políticas de seguridad: solo en `.env.local` de la PC del administrador, **nunca** con prefijo `NEXT_PUBLIC_` ni subida a git. Después de crear los usuarios se puede borrar de `.env.local`.
 
-   *Alternativa solo con SQL (sin service role key):* pegar `supabase_usuarios.sql` en el SQL Editor → *Run*. Crea los 5 usuarios (contraseña inicial `123456`, correo confirmado, con su identidad de login) y sus perfiles; se puede ejecutar varias veces.
-3. **Datos anteriores:** entrar con `creador` en cada PC que tenía datos y pulsar **"Subir datos de este navegador"** (menú lateral). Se combinan por id, sin duplicar.
+   ⚠ `123456` es la misma contraseña para los 5: cambiarla en Supabase → Authentication → Users antes de usar el ERP en producción.
+4. **Datos anteriores:** entrar con `creador` en cada PC que tenía datos y pulsar **"Subir datos de este navegador"** (menú lateral). Se combinan por id, sin duplicar.
 
 ## Instalar y correr (en cada PC)
 ```bash
@@ -29,7 +27,7 @@ npm run build    # verificación de producción
 ```
 
 ## Usuarios y acceso
-Entrar en `/login` con el usuario (sin `@comboyvid.local`). El login es de Supabase Auth; el rol y los módulos de cada usuario están en la tabla `perfiles`.
+Entrar en `/login` con el usuario (sin `@comboyvid.local`) y la contraseña `123456`. El login es de Supabase Auth; el rol y los módulos de cada usuario están en la tabla `perfiles`.
 
 | Usuario | Módulos | Permisos |
 |---|---|---|

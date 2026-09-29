@@ -6,12 +6,10 @@
 -- existía con otra estructura, se le AGREGAN las columnas que faltan (no se
 -- borran datos ni columnas existentes).
 --
--- USUARIOS: después de ejecutar este archivo, correr `node setup_usuarios.js`
--- (crea los 5 usuarios en Auth y sus perfiles). O crearlos a mano en
--- Authentication → Users → Add user ("Auto Confirm User"):
---   creador@comboyvid.local    tesoreria@comboyvid.local   almacen@comboyvid.local
---   planilla@comboyvid.local   gerencia@comboyvid.local
--- y volver a ejecutar este archivo para generar sus perfiles.
+-- USUARIOS: después de ejecutar este archivo:
+--   1. node --env-file=.env.local scripts/crear-usuarios.mjs   (crea los 5 usuarios con la Admin API)
+--   2. supabase/perfiles.sql en el SQL Editor                   (crea sus perfiles)
+-- NUNCA crear usuarios con INSERT directo en auth.users.
 -- (en el login se escribe solo "creador", "tesoreria", etc.)
 -- =====================================================================
 
@@ -217,8 +215,8 @@ begin
   end loop;
 end $$;
 
--- perfiles: cada usuario lee solo el suyo
-create policy perfiles_select on public.perfiles for select to authenticated using (id = auth.uid());
+-- perfiles: el usuario logueado puede leer perfiles (el login lee su rol y módulos)
+create policy "allow_select" on public.perfiles for select to authenticated using (true);
 
 -- compras: la ven Compras y Almacén (Almacén necesita REQ, OC, facturas y guías para el V°B°)
 create policy compras_select on public.compras for select to authenticated
