@@ -132,16 +132,21 @@ drop policy if exists compras_select on public.compras;
 create policy compras_select on public.compras for select to authenticated
   using (public.puede_ver('/dashboard/compras') or public.puede_ver('/dashboard/almacen'));
 
--- escriben: creador y tesorería todo; almacén solo sus documentos (REQ, V°B° de OC/guía, numeración)
+-- escriben: creador y tesorería todo; almacén solo sus documentos (REQ, V°B° de OC/guía).
+-- La numeración (tipo 'contador') no se escribe directo: solo con siguiente_numero() (ver abajo).
 drop policy if exists compras_escribir on public.compras;
 create policy compras_escribir on public.compras for all to authenticated
   using (
-    public.mi_rol() in ('creador', 'tesoreria')
-    or (public.mi_rol() = 'almacen' and tipo in ('req_pendiente', 'req_procesado', 'orden', 'guia', 'contador'))
+    tipo <> 'contador' and (
+      public.mi_rol() in ('creador', 'tesoreria')
+      or (public.mi_rol() = 'almacen' and tipo in ('req_pendiente', 'req_procesado', 'orden', 'guia'))
+    )
   )
   with check (
-    public.mi_rol() in ('creador', 'tesoreria')
-    or (public.mi_rol() = 'almacen' and tipo in ('req_pendiente', 'req_procesado', 'orden', 'guia', 'contador'))
+    tipo <> 'contador' and (
+      public.mi_rol() in ('creador', 'tesoreria')
+      or (public.mi_rol() = 'almacen' and tipo in ('req_pendiente', 'req_procesado', 'orden', 'guia'))
+    )
   );
 
 -- almacen (stock): lo ven Almacén y Compras; lo mueven compras directas (tesorería) y V°B° (almacén)
@@ -180,6 +185,59 @@ create policy observaciones_update on public.observaciones for update to authent
 drop policy if exists observaciones_delete on public.observaciones;
 create policy observaciones_delete on public.observaciones for delete to authenticated
   using (public.mi_rol() in ('gerencia', 'creador'));
+
+-- ---------------------------------------------------------------------
+-- NUMERACIÓN atómica (REQ-ALM-001, OC-2026-0001, DJ-001)
+-- El UPDATE bloquea la fila del contador: si dos PCs piden número a la vez,
+-- la segunda espera a la primera y nunca se repite un correlativo.
+-- ---------------------------------------------------------------------
+create or replace function public.siguiente_numero(serie text) returns integer
+language plpgsql security definer set search_path = public as $$
+declare
+  rol text := public.mi_rol();
+  n integer;
+begin
+  if serie = 'REQ' and rol not in ('creador', 'almacen') then
+    raise exception 'Su usuario no puede emitir requerimientos' using errcode = '42501';
+  elsif serie = 'OC' and rol not in ('creador', 'tesoreria') then
+    raise exception 'Su usuario no puede emitir órdenes de compra' using errcode = '42501';
+  elsif serie = 'DJ' and rol is distinct from 'creador' then
+    raise exception 'Su usuario no puede aprobar declaraciones juradas' using errcode = '42501';
+  elsif serie not in ('REQ', 'OC', 'DJ') or rol is null then
+    raise exception 'Serie inválida: %', serie using errcode = '22023';
+  end if;
+
+  insert into public.compras (tipo, id, data)
+  values ('contador', 'principal', jsonb_build_object(serie, 1))
+  on conflict (tipo, id) do update
+    set data = public.compras.data || jsonb_build_object(serie, coalesce((public.compras.data ->> serie)::integer, 0) + 1)
+  returning (data ->> serie)::integer into n;
+  return n;
+end $$;
+
+-- Migración: sube el contador a "minimo" si está por debajo (nunca lo baja). Solo el creador.
+create or replace function public.asegurar_numero_minimo(serie text, minimo integer) returns integer
+language plpgsql security definer set search_path = public as $$
+declare n integer;
+begin
+  if public.mi_rol() is distinct from 'creador' then
+    raise exception 'Solo el creador puede ajustar la numeración' using errcode = '42501';
+  end if;
+  if serie not in ('REQ', 'OC', 'DJ') then
+    raise exception 'Serie inválida: %', serie using errcode = '22023';
+  end if;
+  insert into public.compras (tipo, id, data)
+  values ('contador', 'principal', jsonb_build_object(serie, greatest(minimo, 0)))
+  on conflict (tipo, id) do update
+    set data = public.compras.data || jsonb_build_object(serie, greatest(coalesce((public.compras.data ->> serie)::integer, 0), minimo))
+  returning (data ->> serie)::integer into n;
+  return n;
+end $$;
+
+revoke all on function public.siguiente_numero(text) from public, anon;
+revoke all on function public.asegurar_numero_minimo(text, integer) from public, anon;
+grant execute on function public.siguiente_numero(text) to authenticated;
+grant execute on function public.asegurar_numero_minimo(text, integer) to authenticated;
 
 -- ---------------------------------------------------------------------
 -- REALTIME: los cambios de una PC llegan al instante a las demás

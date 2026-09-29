@@ -6,7 +6,7 @@
 // subir desde varias PCs no duplica nada. Al terminar se borran del navegador.
 // =====================================================================
 
-import { KEYS, escribir, esperarGuardado, leer, type StoreKey } from "./storage";
+import { KEYS, asegurarNumeroMinimo, escribir, esperarGuardado, leer, type StoreKey } from "./storage";
 
 const SESION_ANTIGUA = ["login", "usuario", "rol", "erp_rol"];
 
@@ -43,17 +43,18 @@ export async function subirDatosLocales(): Promise<number> {
   await esperarGuardado(); // descarta errores de antes
   let agregados = 0;
   const subidas: string[] = [];
+  // Numeración: se sube al número más alto con una función atómica (nunca retrocede)
+  const contadores = local(KEYS.CONTADORES) as Record<string, number> | undefined;
+  if (contadores) {
+    for (const [serie, n] of Object.entries(contadores)) {
+      if (["REQ", "OC", "DJ"].includes(serie) && Number(n) > 0) await asegurarNumeroMinimo(serie as "REQ" | "OC" | "DJ", Number(n));
+    }
+    subidas.push(KEYS.CONTADORES);
+  }
   (Object.values(KEYS) as StoreKey[]).forEach((k) => {
     const v = local(k);
-    if (v === undefined) return;
-    if (k === KEYS.CONTADORES) {
-      // numeración: se conserva el número más alto para no repetir correlativos
-      const s = leer<Record<string, number>>(k, {});
-      const l = v as Record<string, number>;
-      const r = { ...s };
-      Object.entries(l).forEach(([serie, n]) => (r[serie] = Math.max(s[serie] ?? 0, Number(n) || 0)));
-      escribir(k, r);
-    } else if (k === KEYS.OBSERVACIONES) {
+    if (v === undefined || k === KEYS.CONTADORES) return;
+    if (k === KEYS.OBSERVACIONES) {
       const s = leer<Record<string, { id: string }[]>>(k, {});
       const l = v as Record<string, { id: string }[]>;
       const r = { ...s };

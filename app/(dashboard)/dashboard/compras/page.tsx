@@ -20,7 +20,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar, toast } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
 import {
   IGV,
@@ -741,8 +741,12 @@ function Ordenes({
   const competidoras = coti ? todasCotis.filter((c) => c.reqId === coti.reqId) : [];
   const minimo = competidoras.length ? Math.min(...competidoras.map((c) => c.total)) : 0;
 
-  const guardar = () => {
-    if (ejecutar(() => crearOrdenCompra({ cotizacionId: cotiId, fecha, formaPago, tiempoEntrega: tiempo, lugarEntrega: lugar }, rol), "Orden de compra emitida")) {
+  const [enviando, setEnviando] = useState(false);
+  const guardar = async () => {
+    setEnviando(true);
+    const ok = await ejecutarAsync(() => crearOrdenCompra({ cotizacionId: cotiId, fecha, formaPago, tiempoEntrega: tiempo, lugarEntrega: lugar }, rol), "Orden de compra emitida");
+    setEnviando(false);
+    if (ok) {
       setCotiId("");
       setTiempo("");
     }
@@ -798,8 +802,8 @@ function Ordenes({
             </>
           )}
           <div className="flex justify-end border-t border-slate-100 px-5 py-4">
-            <Button onClick={guardar} disabled={!cotiId}>
-              <ShoppingBag size={16} /> Emitir OC
+            <Button onClick={guardar} disabled={!cotiId || enviando}>
+              <ShoppingBag size={16} /> {enviando ? "Emitiendo…" : "Emitir OC"}
             </Button>
           </div>
         </Card>
@@ -885,14 +889,17 @@ function Facturas({
     }
   }, [oc, fecha]);
 
-  const guardar = () => {
+  const [enviando, setEnviando] = useState(false);
+  const guardar = async () => {
+    setEnviando(true);
     const ok =
       modo === "FACTURA"
         ? ejecutar(() => crearFactura({ ocId, numero, fecha, fechaVencimiento: venc, subtotal }, rol), "Factura registrada")
-        : ejecutar(
+        : await ejecutarAsync(
             () => crearDeclaracionJurada({ ocId, fecha, dniVendedor: dni, nombreVendedor: vendedor, motivoSinComprobante: motivoDJ, aprobadoPor: aprobador }, rol),
             "Declaración jurada registrada"
           );
+    setEnviando(false);
     if (ok) {
       setOcId("");
       setNumero("");
@@ -989,7 +996,7 @@ function Facturas({
             )}
           </div>
           <div className="flex justify-end border-t border-slate-100 px-5 py-4">
-            <Button onClick={guardar} disabled={!ocId || (modo === "DJ" && rol !== "GERENCIA")}>
+            <Button onClick={guardar} disabled={!ocId || enviando || (modo === "DJ" && rol !== "GERENCIA")}>
               <Receipt size={16} /> {modo === "FACTURA" ? "Registrar factura" : "Aprobar declaración jurada"}
             </Button>
           </div>

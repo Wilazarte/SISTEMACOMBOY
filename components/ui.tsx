@@ -254,6 +254,18 @@ export function ejecutar(fn: () => void, ok: string): boolean {
   }
 }
 
+/** Igual que ejecutar(), para acciones que esperan al servidor (ej. numeración en Supabase). */
+export async function ejecutarAsync(fn: () => Promise<unknown>, ok: string): Promise<boolean> {
+  try {
+    await fn();
+    toast(ok, "ok");
+    return true;
+  } catch (e) {
+    toast(e instanceof Error ? e.message : "Error inesperado", "error");
+    return false;
+  }
+}
+
 export function Toaster() {
   const [items, setItems] = useState<Toast[]>([]);
   useEffect(() => {

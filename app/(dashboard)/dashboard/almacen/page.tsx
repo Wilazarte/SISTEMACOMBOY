@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Boxes, CheckCircle2, ClipboardList, Eye, FilePlus2, FileText, MessageSquareWarning, PackageCheck, Pencil, Plus, Send, Trash2 } from "lucide-react";
-import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar, ejecutarAsync } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
 import { SEDES, UNIDADES } from "@/lib/empresa";
 import {
@@ -142,17 +142,20 @@ function NuevoReq({ rol, onCreado }: { rol: Rol; onCreado: () => void }) {
   const [fecha, setFecha] = useState(hoy());
   const [motivo, setMotivo] = useState("");
   const [items, setItems] = useState<ItemReq[]>([itemVacio()]);
+  const [enviando, setEnviando] = useState(false);
   const contadores = useStore<Record<string, number>>(KEYS.CONTADORES, {});
   const proximo = `REQ-ALM-${String((contadores.REQ ?? 0) + 1).padStart(3, "0")}`;
 
   if (!puede(rol, "req.crear"))
     return <Empty icon={<FilePlus2 size={28} />} text="Su rol no puede emitir requerimientos. Cambie a ALMACÉN o GERENCIA." />;
 
-  const guardar = () => {
+  const guardar = async () => {
+    setEnviando(true);
     let numero = "";
-    const ok = ejecutar(() => {
-      numero = crearRequerimiento({ sede, solicitante, fecha, motivo, items }, rol).numero;
+    const ok = await ejecutarAsync(async () => {
+      numero = (await crearRequerimiento({ sede, solicitante, fecha, motivo, items }, rol)).numero;
     }, "Requerimiento enviado a Tesorería");
+    setEnviando(false);
     if (ok) {
       setMotivo("");
       setItems([itemVacio()]);
@@ -162,7 +165,7 @@ function NuevoReq({ rol, onCreado }: { rol: Rol; onCreado: () => void }) {
 
   return (
     <Card>
-      <CardHeader title="Nuevo requerimiento de almacén" subtitle="Al guardar se notifica automáticamente a Tesorería." action={<span className="rounded-lg bg-slate-100 px-3 py-1.5 font-mono text-sm font-bold text-slate-700">{proximo}</span>} />
+      <CardHeader title="Nuevo requerimiento de almacén" subtitle="Al guardar se notifica automáticamente a Tesorería." action={<span className="rounded-lg bg-slate-100 px-3 py-1.5 font-mono text-sm font-bold text-slate-700" title="Número probable: el definitivo se asigna al guardar">{proximo}</span>} />
       <div className="grid gap-4 p-5 md:grid-cols-4">
         <Field label="Sede *">
           <Select value={sede} onChange={(e) => setSede(e.target.value)} placeholder="Seleccione…" options={SEDES.map((s) => ({ value: s, label: s }))} />
@@ -179,8 +182,8 @@ function NuevoReq({ rol, onCreado }: { rol: Rol; onCreado: () => void }) {
       </div>
       <ItemsEditor items={items} onChange={setItems} />
       <div className="flex justify-end border-t border-slate-100 px-5 py-4">
-        <Button onClick={guardar}>
-          <Send size={16} /> Emitir y notificar a Tesorería
+        <Button onClick={guardar} disabled={enviando}>
+          <Send size={16} /> {enviando ? "Emitiendo…" : "Emitir y notificar a Tesorería"}
         </Button>
       </div>
     </Card>

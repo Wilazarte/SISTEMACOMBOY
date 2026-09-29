@@ -32,6 +32,7 @@ Para cambiar una contraseña: Supabase → Authentication → Users → usuario 
 - Tablas: `compras` (REQ, cotizaciones, OC, facturas, guías, proveedores, compras directas, numeración), `almacen` (stock), `planilla` (trabajadores), `observaciones`, `perfiles`. Cada documento se guarda como `jsonb` en `data`.
 - `lib/storage.ts` mantiene una caché en memoria: al guardar, la pantalla cambia al instante y se envían a Supabase solo las filas modificadas (upsert/delete). Si Supabase rechaza el cambio, se muestra el error y se vuelve a lo que hay en el servidor.
 - Realtime (`supabase.channel("erp-cambios")`): lo que hace una PC aparece en las otras sin recargar. Al reconectarse tras un corte, se recarga todo.
+- Numeración (REQ, OC, DJ): la asigna la función `siguiente_numero(serie)` en Supabase, que bloquea el contador mientras lo incrementa; dos PCs emitiendo a la vez nunca reciben el mismo número. El contador no se puede escribir directo (RLS). El número que muestra el formulario antes de guardar es referencial.
 
 ## Rutas
 - `/dashboard/almacen`  → Nuevo REQ · Lista de REQ emitidos · Ingresos por V°B° · Stock

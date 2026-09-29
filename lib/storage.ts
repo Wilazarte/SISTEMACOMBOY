@@ -379,19 +379,49 @@ function evento(usuario: Rol, accion: string, detalle?: string): EventoHistorial
   return { fecha: new Date().toISOString(), usuario, accion, detalle };
 }
 
-function siguiente(serie: "REQ" | "OC" | "DJ"): number {
+type Serie = "REQ" | "OC" | "DJ";
+
+/** Actualiza la caché de contadores sin enviarla: el servidor ya tiene el valor. */
+function fijarContador(serie: Serie, n: number): void {
   const c = leer<Record<string, number>>(KEYS.CONTADORES, {});
-  const n = (c[serie] ?? 0) + 1;
-  escribir(KEYS.CONTADORES, { ...c, [serie]: n });
+  if ((c[serie] ?? 0) >= n) return;
+  const nuevo = { ...c, [serie]: n };
+  cache.set(KEYS.CONTADORES, nuevo);
+  servidor.set(KEYS.CONTADORES, new Map(aFilas(KEYS.CONTADORES, nuevo).map((f) => [f.id, firma(f)])));
+  avisar(KEYS.CONTADORES);
+}
+
+/**
+ * Siguiente correlativo, reservado en Supabase con siguiente_numero() (atómico):
+ * dos PCs emitiendo a la vez nunca reciben el mismo número.
+ */
+async function siguiente(serie: Serie): Promise<number> {
+  const { data, error } = await createClient().rpc("siguiente_numero", { serie });
+  if (error) {
+    if (error.code === "42501") throw new ErpError(error.message);
+    if (error.code === "PGRST202" || /could not find the function/i.test(error.message))
+      throw new ErpError("Falta la función de numeración en Supabase: vuelva a ejecutar supabase_tables.sql.");
+    throw new ErpError(`No se pudo obtener el número: ${error.message}`);
+  }
+  const n = Number(data);
+  fijarContador(serie, n);
   return n;
 }
 
-export function previewNumero(serie: "REQ" | "OC" | "DJ"): string {
+/** Sube un contador a un mínimo (migración de datos antiguos). Nunca lo baja. */
+export async function asegurarNumeroMinimo(serie: Serie, minimo: number): Promise<void> {
+  const { data, error } = await createClient().rpc("asegurar_numero_minimo", { serie, minimo });
+  if (error) throw new ErpError(`No se pudo ajustar la numeración ${serie}: ${error.message}`);
+  fijarContador(serie, Number(data));
+}
+
+/** Número probable (referencial): el definitivo lo asigna Supabase al guardar. */
+export function previewNumero(serie: Serie): string {
   const c = leer<Record<string, number>>(KEYS.CONTADORES, {});
   return formatear(serie, (c[serie] ?? 0) + 1);
 }
 
-function formatear(serie: "REQ" | "OC" | "DJ", n: number): string {
+function formatear(serie: Serie, n: number): string {
   if (serie === "REQ") return `REQ-ALM-${String(n).padStart(3, "0")}`;
   if (serie === "OC") return `OC-${new Date().getFullYear()}-${String(n).padStart(4, "0")}`;
   return `DJ-${String(n).padStart(3, "0")}`;
@@ -432,10 +462,10 @@ function actualizarOC(id: string, fn: (o: OrdenCompra) => OrdenCompra): void {
 // 1. ALMACÉN: crea requerimiento
 // ---------------------------------------------------------------------
 
-export function crearRequerimiento(
+export async function crearRequerimiento(
   data: Omit<Requerimiento, "id" | "numero" | "estado" | "historial">,
   rol: Rol
-): Requerimiento {
+): Promise<Requerimiento> {
   if (!data.sede.trim()) throw new ErpError("Seleccione la sede.");
   if (!data.solicitante.trim()) throw new ErpError("Ingrese el solicitante.");
   if (!data.motivo.trim()) throw new ErpError("Ingrese el motivo del requerimiento.");
@@ -447,7 +477,7 @@ export function crearRequerimiento(
     ...data,
     items,
     id: uid(),
-    numero: formatear("REQ", siguiente("REQ")),
+    numero: formatear("REQ", await siguiente("REQ")),
     estado: "PENDIENTE",
     historial: [evento(rol, "Requerimiento emitido", `${items.length} producto(s) · Sede ${data.sede}`)],
   };
@@ -580,21 +610,29 @@ export function crearCotizacion(
 // 4. ORDEN DE COMPRA (vinculada a COTIZACIÓN)
 // ---------------------------------------------------------------------
 
-export function crearOrdenCompra(
-  data: Pick<OrdenCompra, "fecha" | "cotizacionId" | "formaPago" | "tiempoEntrega" | "lugarEntrega">,
-  rol: Rol
-): OrdenCompra {
+function validarOrdenCompra(data: Pick<OrdenCompra, "cotizacionId" | "tiempoEntrega">): Cotizacion {
   const coti = getCotizaciones().find((c) => c.id === data.cotizacionId);
   if (!coti) throw new ErpError("Seleccione una cotización.");
   if (coti.estado === "CON_OC") throw new ErpError("Esta cotización ya tiene Orden de Compra.");
   if (getOrdenes().some((o) => o.reqId === coti.reqId))
     throw new ErpError(`El ${coti.reqNumero} ya tiene una Orden de Compra emitida con otra cotización.`);
   if (!data.tiempoEntrega.trim()) throw new ErpError("Indique el tiempo de entrega.");
+  return coti;
+}
+
+export async function crearOrdenCompra(
+  data: Pick<OrdenCompra, "fecha" | "cotizacionId" | "formaPago" | "tiempoEntrega" | "lugarEntrega">,
+  rol: Rol
+): Promise<OrdenCompra> {
+  validarOrdenCompra(data);
+  const numero = formatear("OC", await siguiente("OC"));
+  // Se revalida con los datos al día: otra PC pudo emitir OC para el mismo REQ mientras tanto
+  const coti = validarOrdenCompra(data);
 
   const oc: OrdenCompra = {
     ...data,
     id: uid(),
-    numero: formatear("OC", siguiente("OC")),
+    numero,
     cotizacionNumero: coti.numero,
     reqId: coti.reqId,
     reqNumero: coti.reqNumero,
@@ -666,10 +704,10 @@ export function crearFactura(
   return fac;
 }
 
-export function crearDeclaracionJurada(
+export async function crearDeclaracionJurada(
   data: Pick<Factura, "fecha" | "ocId" | "motivoSinComprobante" | "aprobadoPor"> & { dniVendedor: string; nombreVendedor: string },
   rol: Rol
-): Factura {
+): Promise<Factura> {
   if (rol !== "GERENCIA") throw new ErpError("Solo GERENCIA puede aprobar una Declaración Jurada.");
   const oc = getOrdenes().find((o) => o.id === data.ocId);
   if (!oc) throw new ErpError("Seleccione una Orden de Compra.");
@@ -683,7 +721,7 @@ export function crearDeclaracionJurada(
   const dj: Factura = {
     id: uid(),
     tipo: "DECLARACION_JURADA",
-    numero: formatear("DJ", siguiente("DJ")),
+    numero: formatear("DJ", await siguiente("DJ")),
     fecha: data.fecha,
     fechaVencimiento: data.fecha,
     ocId: oc.id,
