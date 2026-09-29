@@ -536,12 +536,14 @@ export function darVistoBueno(ocId: string, vb: Omit<VistoBueno, "fecha">, rol: 
   const oc = getOrdenes().find((o) => o.id === ocId);
   if (!oc || oc.estado !== "EN_GUIA") throw new ErpError("La OC no está lista para visto bueno.");
   const ahora = new Date().toISOString();
+  const sede = sedeIngresoOC(oc);
   actualizarOC(ocId, (o) => ({
     ...o,
     estado: "FINALIZADA",
     vistoBueno: { ...vb, fecha: ahora },
-    historial: [...o.historial, evento(rol, "Visto bueno de ingreso a almacén", vb.recibidoPor)],
+    historial: [...o.historial, evento(rol, "Visto bueno de ingreso a almacén", `${vb.recibidoPor} · stock de ${sede}`)],
   }));
+  ingresarStock(sede, oc.items);
   escribir(
     KEYS.GUIAS,
     getGuias().map((g) =>
@@ -720,6 +722,28 @@ export function crearProveedor(data: Pick<Proveedor, "razonSocial" | "ruc">): Pr
 const claveStock = (sede: string, nombre: string, unidad: string): string =>
   `${sede}|${nombre.trim().replace(/\s+/g, " ").toUpperCase()}|${unidad}`;
 
+/** Suma cantidades al stock de la sede (mismo producto + unidad) y actualiza el último costo sin IGV. */
+function ingresarStock(sede: string, items: { nombre: string; unidad: string; cantidad: number; precioUnit: number }[]): void {
+  const ahora = new Date().toISOString();
+  const stock = getStock();
+  items.forEach((i) => {
+    const nombre = i.nombre.trim().replace(/\s+/g, " ").toUpperCase();
+    const k = claveStock(sede, nombre, i.unidad);
+    const existente = stock.find((s) => claveStock(s.sede, s.nombre, s.unidad) === k);
+    if (existente) {
+      existente.cantidad = r2(existente.cantidad + i.cantidad);
+      existente.costoUnit = i.precioUnit;
+      existente.actualizado = ahora;
+    } else {
+      stock.push({ id: uid(), sede, nombre, unidad: i.unidad, cantidad: i.cantidad, costoUnit: i.precioUnit, actualizado: ahora });
+    }
+  });
+  escribir(KEYS.STOCK, stock);
+}
+
+/** Sede donde ingresa la mercadería de una OC: la del REQ; si no existe, el lugar de entrega. */
+export const sedeIngresoOC = (oc: OrdenCompra): string => buscarReq(oc.reqId)?.sede || oc.lugarEntrega;
+
 const NUM_COMPROBANTE: Record<Compra["tipoComprobante"], RegExp> = {
   FACTURA: /^[EF][A-Z0-9]{3}-\d{1,8}$/,
   BOLETA: /^[BE][A-Z0-9]{3}-\d{1,8}$/,
@@ -769,23 +793,8 @@ export function registrarCompra(
     historial: [evento(rol, "Compra registrada", `${numero} · ${prov.razonSocial} · ingreso a ${data.sede}`)],
   };
 
-  // Ingreso a stock (suma cantidades; actualiza el último costo)
-  const ahora = new Date().toISOString();
-  const stock = getStock();
-  items.forEach((i) => {
-    const k = claveStock(data.sede, i.nombre, i.unidad);
-    const existente = stock.find((s) => claveStock(s.sede, s.nombre, s.unidad) === k);
-    if (existente) {
-      existente.cantidad = r2(existente.cantidad + i.cantidad);
-      existente.costoUnit = i.precioUnit;
-      existente.actualizado = ahora;
-    } else {
-      stock.push({ id: uid(), sede: data.sede, nombre: i.nombre, unidad: i.unidad, cantidad: i.cantidad, costoUnit: i.precioUnit, actualizado: ahora });
-    }
-  });
-
   escribir(KEYS.COMPRAS, [compra, ...getCompras()]);
-  escribir(KEYS.STOCK, stock);
+  ingresarStock(data.sede, items);
   return compra;
 }
 

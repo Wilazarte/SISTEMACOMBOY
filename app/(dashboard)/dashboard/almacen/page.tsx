@@ -14,6 +14,7 @@ import {
   observarIngreso,
   puede,
   reenviarRequerimiento,
+  sedeIngresoOC,
   soles,
   uid,
   useRol,
@@ -415,6 +416,11 @@ function Ingresos({ rol, porVB, ordenes, facturas, guias }: { rol: Rol; porVB: O
             </label>
           ))}
         </div>
+        {vb && (
+          <p className="mb-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            Al dar el visto bueno, estas cantidades se suman al stock de <b>{sedeIngresoOC(vb)}</b>.
+          </p>
+        )}
         <div className="space-y-3">
           <Field label="Recibido por *">
             <Input value={recibido} onChange={(e) => setRecibido(e.target.value)} placeholder="Nombre del almacenero" />
@@ -459,7 +465,7 @@ function Ingresos({ rol, porVB, ordenes, facturas, guias }: { rol: Rol; porVB: O
 }
 
 // =====================================================================
-// STOCK (alimentado por las compras registradas en Tesorería / Compras)
+// STOCK (alimentado por las compras registradas y por el V°B° de ingresos)
 // =====================================================================
 function Stock({ stock }: { stock: StockItem[] }) {
   const [sede, setSede] = useState("");
