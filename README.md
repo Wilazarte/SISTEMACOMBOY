@@ -1,9 +1,23 @@
 # ERP COMBOY VID — Módulo de Compras (Fase 2)
 
 ## Puesta en marcha (Supabase, una sola vez)
-1. **Usuarios:** en Supabase → Authentication → Users → *Add user* → *Create new user*, marcar **Auto Confirm User**, crear:
-   `creador@comboyvid.local`, `tesoreria@comboyvid.local`, `almacen@comboyvid.local`, `planilla@comboyvid.local`, `gerencia@comboyvid.local` con sus contraseñas.
-2. **Tablas:** Supabase → SQL Editor → pegar `supabase_tables.sql` → *Run*. Crea las tablas, las políticas RLS, activa Realtime y genera los perfiles. La consulta final debe listar los 5 usuarios.
+1. **Tablas:** Supabase → SQL Editor → pegar `supabase_tables.sql` → *Run*. Crea las tablas, las políticas RLS, la numeración y activa Realtime. Se puede ejecutar varias veces.
+2. **Usuarios y perfiles:** desde la raíz del proyecto:
+   ```bash
+   npm install                  # si aún no se instaló
+   node setup_usuarios.js
+   ```
+   Crea en Supabase Auth (si no existen) `creador`, `tesoreria`, `almacen`, `planilla` y `gerencia` `@comboyvid.local`, con email confirmado y contraseña inicial **`Comboy2024*`**, y crea/actualiza sus perfiles en `public.perfiles`. Si un usuario ya existe, no cambia su contraseña. Se puede ejecutar varias veces.
+
+   Necesita la **service role key** en `.env.local` (Supabase → Project Settings → API Keys → `service_role` / secret):
+   ```
+   SUPABASE_SERVICE_ROLE_KEY=...
+   ```
+   ⚠ Esa clave salta todas las políticas de seguridad: solo en `.env.local` de la PC del administrador, **nunca** con prefijo `NEXT_PUBLIC_` ni subida a git. Después de crear los usuarios se puede borrar de `.env.local`.
+
+   ⚠ La contraseña inicial es la misma para los 5 usuarios: cámbiela en Supabase → Authentication → Users → usuario → *Update user* antes de usar el ERP en serio. (Para otra contraseña inicial: `SETUP_PASSWORD=MiClave node setup_usuarios.js`.)
+
+   *Alternativa manual:* crear los 5 usuarios en Authentication → Users → *Add user* (marcar **Auto Confirm User**) y volver a ejecutar `supabase_tables.sql`, que genera los perfiles.
 3. **Datos anteriores:** entrar con `creador` en cada PC que tenía datos y pulsar **"Subir datos de este navegador"** (menú lateral). Se combinan por id, sin duplicar.
 
 ## Instalar y correr (en cada PC)

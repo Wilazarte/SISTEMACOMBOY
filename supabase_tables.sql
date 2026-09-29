@@ -6,12 +6,13 @@
 -- existía con otra estructura, se le AGREGAN las columnas que faltan (no se
 -- borran datos ni columnas existentes).
 --
--- ANTES: crear los 5 usuarios en Authentication → Users → Add user →
--- "Create new user" (marcar "Auto Confirm User"):
+-- USUARIOS: después de ejecutar este archivo, correr `node setup_usuarios.js`
+-- (crea los 5 usuarios en Auth y sus perfiles). O crearlos a mano en
+-- Authentication → Users → Add user ("Auto Confirm User"):
 --   creador@comboyvid.local    tesoreria@comboyvid.local   almacen@comboyvid.local
 --   planilla@comboyvid.local   gerencia@comboyvid.local
+-- y volver a ejecutar este archivo para generar sus perfiles.
 -- (en el login se escribe solo "creador", "tesoreria", etc.)
--- Si se crean después, volver a ejecutar este archivo para generar sus perfiles.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
