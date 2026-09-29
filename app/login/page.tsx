@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Eye, EyeOff, Loader2, Lock, LogIn, ShieldCheck, User } from "lucide-react";
 import { EMPRESA } from "@/lib/empresa";
-import { getSesion, login } from "@/lib/auth";
+import { login, useSesion } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { sesion } = useSesion();
   const [usuario, setUsuario] = useState("");
   const [pass, setPass] = useState("");
   const [ver, setVer] = useState(false);
@@ -16,10 +17,10 @@ export default function LoginPage() {
 
   // Si ya hay sesión, no mostrar el login
   useEffect(() => {
-    if (getSesion()) router.replace("/dashboard");
-  }, [router]);
+    if (sesion) router.replace("/dashboard");
+  }, [sesion, router]);
 
-  const entrar = (e: React.FormEvent) => {
+  const entrar = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (!usuario.trim() || !pass) {
@@ -27,12 +28,13 @@ export default function LoginPage() {
       return;
     }
     setEnviando(true);
-    if (login(usuario, pass)) {
+    const r = await login(usuario, pass);
+    if (r.sesion) {
       router.replace("/dashboard");
     } else {
       setEnviando(false);
       setPass("");
-      setError("Usuario o contraseña incorrectos.");
+      setError(r.error ?? "Usuario o contraseña incorrectos.");
     }
   };
 

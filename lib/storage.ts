@@ -1,12 +1,14 @@
 "use client";
 
 // =====================================================================
-// Capa de persistencia (localStorage). Toda la lógica de negocio pasa por
-// aquí para que migrar a Supabase sea reemplazar este archivo.
+// Capa de datos (Supabase + Realtime). Toda la lógica de negocio pasa por
+// aquí; las páginas solo usan useStore / get* / las acciones exportadas.
 // =====================================================================
 
 import { useEffect, useMemo, useState } from "react";
+import type { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { getSesion, rolNegocio } from "./auth";
+import { createClient } from "./supabase/client";
 import type {
   Compra,
   Cotizacion,
@@ -86,53 +88,288 @@ export const parseFechaPE = (txt: string): string => {
 
 export class ErpError extends Error {}
 
-export function leer<T>(key: StoreKey, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (raw === null) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    // Dato corrupto: se descarta para no romper la app
-    window.localStorage.removeItem(key);
-    return fallback;
+// ---------------------------------------------------------------------
+// Persistencia en Supabase + Realtime
+//
+// La lógica de negocio sigue siendo síncrona: lee de una caché en memoria
+// (cargada al iniciar sesión) y, al escribir, se envían a Supabase solo las
+// filas que cambiaron (upsert / delete). Realtime aplica en la caché lo que
+// hacen las otras PCs y refresca la pantalla al instante.
+// ---------------------------------------------------------------------
+
+type TablaDoc = "compras" | "almacen" | "planilla";
+type Destino =
+  | { tabla: TablaDoc; tipo: string; forma: "lista" | "objeto" }
+  | { tabla: "observaciones"; forma: "observaciones" };
+
+const DESTINOS: Record<StoreKey, Destino> = {
+  [KEYS.REQS_PENDIENTES]: { tabla: "compras", tipo: "req_pendiente", forma: "lista" },
+  [KEYS.REQS_PROCESADOS]: { tabla: "compras", tipo: "req_procesado", forma: "lista" },
+  [KEYS.COTIZACIONES]: { tabla: "compras", tipo: "cotizacion", forma: "lista" },
+  [KEYS.ORDENES]: { tabla: "compras", tipo: "orden", forma: "lista" },
+  [KEYS.FACTURAS]: { tabla: "compras", tipo: "factura", forma: "lista" },
+  [KEYS.GUIAS]: { tabla: "compras", tipo: "guia", forma: "lista" },
+  [KEYS.PROVEEDORES]: { tabla: "compras", tipo: "proveedor", forma: "lista" },
+  [KEYS.COMPRAS]: { tabla: "compras", tipo: "compra_directa", forma: "lista" },
+  [KEYS.CONTADORES]: { tabla: "compras", tipo: "contador", forma: "objeto" },
+  [KEYS.STOCK]: { tabla: "almacen", tipo: "stock", forma: "lista" },
+  [KEYS.TRABAJADORES]: { tabla: "planilla", tipo: "trabajador", forma: "lista" },
+  [KEYS.OBSERVACIONES]: { tabla: "observaciones", forma: "observaciones" },
+};
+const TABLAS = ["compras", "almacen", "planilla", "observaciones"] as const;
+const ID_OBJETO = "principal"; // fila única de las claves tipo "objeto" (contadores)
+
+type Fila = Record<string, unknown> & { id: string };
+interface FilaObs {
+  id: string;
+  modulo: string;
+  texto: string;
+  usuario: string;
+  fecha: string;
+}
+
+const cache = new Map<StoreKey, unknown>();
+/** Última versión conocida en el servidor: clave -> (id -> JSON de la fila). */
+const servidor = new Map<StoreKey, Map<string, string>>();
+const pendientes = new Map<StoreKey, number>(); // escrituras en curso por clave
+const sucias = new Set<StoreKey>(); // recibieron Realtime mientras se escribía: recargar al terminar
+let cola: Promise<void> = Promise.resolve();
+let canal: RealtimeChannel | null = null;
+let carga: Promise<void> | null = null;
+
+const clonar = <T,>(v: T): T => (typeof structuredClone === "function" ? structuredClone(v) : JSON.parse(JSON.stringify(v)));
+const avisar = (key: StoreKey) => window.dispatchEvent(new CustomEvent(EVENTO, { detail: key }));
+const avisarError = (msg: string) => window.dispatchEvent(new CustomEvent("erp:toast", { detail: { msg, tipo: "error" } }));
+
+/** Valor de la app -> filas de la tabla. */
+function aFilas(key: StoreKey, valor: unknown): Fila[] {
+  const d = DESTINOS[key];
+  if (d.forma === "observaciones") {
+    return Object.entries((valor ?? {}) as Record<string, Omit<FilaObs, "modulo">[]>).flatMap(([modulo, lista]) =>
+      lista.map((o) => ({ id: o.id, modulo, texto: o.texto, usuario: o.usuario, fecha: o.fecha }))
+    );
+  }
+  if (d.forma === "objeto") return [{ tipo: d.tipo, id: ID_OBJETO, data: valor ?? {} }];
+  return ((valor ?? []) as { id: string }[]).map((item) => ({ tipo: d.tipo, id: String(item.id), data: item }));
+}
+
+/** Filas de la tabla (más nuevas primero) -> valor de la app. */
+function deFilas(key: StoreKey, filas: Fila[]): unknown {
+  const d = DESTINOS[key];
+  if (d.forma === "observaciones") {
+    const r: Record<string, Omit<FilaObs, "modulo">[]> = {};
+    [...(filas as unknown as FilaObs[])]
+      .sort((a, b) => b.fecha.localeCompare(a.fecha))
+      .forEach(({ modulo, ...o }) => (r[modulo] ??= []).push(o));
+    return r;
+  }
+  if (d.forma === "objeto") return filas[0]?.data ?? {};
+  return filas.map((f) => f.data);
+}
+
+/** Claves ordenadas: jsonb no conserva el orden original y no debe contar como cambio. */
+const ordenar = (v: unknown): unknown =>
+  Array.isArray(v)
+    ? v.map(ordenar)
+    : v && typeof v === "object"
+      ? Object.fromEntries(Object.keys(v as object).sort().map((k) => [k, ordenar((v as Record<string, unknown>)[k])]))
+      : v;
+const firma = (f: Fila) => JSON.stringify(ordenar(f));
+
+function claveDeFila(tabla: string, tipo: unknown): StoreKey | undefined {
+  return (Object.keys(DESTINOS) as StoreKey[]).find((k) => {
+    const d = DESTINOS[k];
+    return d.tabla === tabla && (d.forma === "observaciones" || d.tipo === tipo);
+  });
+}
+
+const COLUMNAS_SERVIDOR = ["created_at", "updated_at", "updated_by", "created_by"];
+
+function fijarDesdeServidor(key: StoreKey, filas: Fila[]): void {
+  const limpias = filas.map((f) => {
+    const r = Object.fromEntries(Object.entries(f).filter(([k]) => !COLUMNAS_SERVIDOR.includes(k))) as Fila;
+    // timestamptz vuelve como "+00:00": se deja en el mismo formato ISO que genera la app
+    if (typeof r.fecha === "string" && DESTINOS[key].forma === "observaciones") r.fecha = new Date(r.fecha).toISOString();
+    return r;
+  });
+  cache.set(key, deFilas(key, limpias));
+  servidor.set(key, new Map(aFilas(key, cache.get(key)).map((f) => [f.id, firma(f)])));
+  avisar(key);
+}
+
+/** Descarga todas las filas de una clave (paginado: PostgREST devuelve máx. 1000 por consulta). */
+async function descargar(key: StoreKey): Promise<Fila[]> {
+  const d = DESTINOS[key];
+  const sb = createClient();
+  const filas: Fila[] = [];
+  for (let desde = 0; ; desde += 1000) {
+    let q = sb.from(d.tabla).select("*");
+    q = d.forma === "observaciones" ? q.order("fecha", { ascending: false }) : q.eq("tipo", d.tipo).order("created_at", { ascending: false });
+    const { data, error } = await q.range(desde, desde + 999);
+    if (error) throw error;
+    filas.push(...((data ?? []) as Fila[]));
+    if (!data || data.length < 1000) return filas;
   }
 }
 
+async function recargar(key: StoreKey): Promise<void> {
+  try {
+    fijarDesdeServidor(key, await descargar(key));
+  } catch (e) {
+    avisarError(`No se pudo actualizar desde el servidor: ${(e as Error).message}`);
+  }
+}
+
+/** Aplica un cambio de Realtime (de otra PC o el eco de uno propio). */
+async function aplicarCambio(tabla: string, p: RealtimePostgresChangesPayload<Fila>): Promise<void> {
+  const nuevo = p.new as Partial<Fila>;
+  const viejo = p.old as Partial<Fila>;
+  const key = claveDeFila(tabla, nuevo?.tipo ?? viejo?.tipo);
+  if (!key) return;
+  if ((pendientes.get(key) ?? 0) > 0) {
+    sucias.add(key); // hay escrituras propias en curso: se recarga al terminar
+    return;
+  }
+  // Se relee la clave completa: evita depender del tamaño del mensaje (guías con archivo)
+  // y mantiene el orden correcto de la lista.
+  await recargar(key);
+}
+
+/** Carga todos los datos permitidos para el usuario y se suscribe a Realtime. */
+export function iniciarDatos(): Promise<void> {
+  carga ??= (async () => {
+    const claves = Object.keys(DESTINOS) as StoreKey[];
+    const resultados = await Promise.all(claves.map((k) => descargar(k).then((f) => [k, f] as const)));
+    resultados.forEach(([k, f]) => fijarDesdeServidor(k, f));
+
+    const sb = createClient();
+    let primera = true;
+    canal = TABLAS.reduce(
+      (c, tabla) => c.on("postgres_changes", { event: "*", schema: "public", table: tabla }, (p) => void aplicarCambio(tabla, p as RealtimePostgresChangesPayload<Fila>)),
+      sb.channel("erp-cambios")
+    ).subscribe((estado) => {
+      if (estado !== "SUBSCRIBED") return;
+      // Al reconectar se recarga todo por si se perdieron cambios sin conexión
+      if (!primera) claves.forEach((k) => void recargar(k));
+      primera = false;
+    });
+  })().catch((e) => {
+    carga = null;
+    const err = e as { code?: string; message?: string };
+    if (err.code === "42P01" || err.code === "PGRST205" || /does not exist|schema cache/i.test(err.message ?? ""))
+      throw new ErpError("Faltan las tablas en Supabase: ejecute supabase_tables.sql en el SQL Editor.");
+    throw new ErpError(`No se pudo conectar con Supabase: ${err.message ?? e}`);
+  });
+  return carga;
+}
+
+/** Al cerrar sesión: corta Realtime y vacía la caché. */
+export async function detenerDatos(): Promise<void> {
+  if (canal) await createClient().removeChannel(canal);
+  canal = null;
+  carga = null;
+  cache.clear();
+  servidor.clear();
+  sucias.clear();
+}
+
+/** Hook del layout: carga los datos cuando hay sesión. */
+export function useDatos(activo: boolean): { listo: boolean; error: string } {
+  const [estado, setEstado] = useState({ listo: false, error: "" });
+  const [intento, setIntento] = useState(0);
+  useEffect(() => {
+    if (!activo) return;
+    let vivo = true;
+    setEstado({ listo: false, error: "" });
+    iniciarDatos()
+      .then(() => vivo && setEstado({ listo: true, error: "" }))
+      .catch((e) => vivo && setEstado({ listo: false, error: (e as Error).message }));
+    return () => {
+      vivo = false;
+    };
+  }, [activo, intento]);
+  useEffect(() => {
+    const reintentar = () => setIntento((n) => n + 1);
+    window.addEventListener("erp:reintentar", reintentar);
+    return () => window.removeEventListener("erp:reintentar", reintentar);
+  }, []);
+  return estado;
+}
+
+export function leer<T>(key: StoreKey, fallback: T): T {
+  if (typeof window === "undefined" || !cache.has(key)) return fallback;
+  return clonar(cache.get(key) as T);
+}
+
+/**
+ * Guarda en la caché (la pantalla se actualiza al instante) y envía a Supabase
+ * solo las filas nuevas, modificadas o eliminadas.
+ */
 export function escribir<T>(key: StoreKey, value: T): void {
   if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch (e) {
-    if (e instanceof DOMException && (e.name === "QuotaExceededError" || e.code === 22)) {
-      throw new ErpError(
-        "Almacenamiento lleno. Elimine guías antiguas o use archivos más livianos (máx. 1.5 MB)."
+  const d = DESTINOS[key];
+  const filas = aFilas(key, value);
+  const antes = servidor.get(key) ?? new Map<string, string>();
+  const cambios = filas.filter((f) => antes.get(f.id) !== firma(f));
+  const ids = new Set(filas.map((f) => f.id));
+  const borrados = Array.from(antes.keys()).filter((id) => !ids.has(id));
+
+  cache.set(key, clonar(value));
+  servidor.set(key, new Map(filas.map((f) => [f.id, firma(f)])));
+  avisar(key);
+  if (cambios.length === 0 && borrados.length === 0) return;
+
+  pendientes.set(key, (pendientes.get(key) ?? 0) + 1);
+  cola = cola.then(async () => {
+    const sb = createClient();
+    try {
+      if (cambios.length) {
+        const conflicto = d.forma === "observaciones" ? "id" : "tipo,id";
+        const { error } = await sb.from(d.tabla).upsert(cambios, { onConflict: conflicto });
+        if (error) throw error;
+      }
+      if (borrados.length) {
+        let q = sb.from(d.tabla).delete().in("id", borrados);
+        if (d.forma !== "observaciones") q = q.eq("tipo", d.tipo);
+        const { error } = await q;
+        if (error) throw error;
+      }
+    } catch (e) {
+      const err = e as { code?: string; message?: string };
+      errorEscritura ??= err.message ?? String(e);
+      avisarError(
+        err.code === "42501" ? "Su usuario no tiene permiso para guardar este cambio." : `No se guardó en el servidor: ${err.message ?? e}`
       );
+      sucias.add(key); // se vuelve a lo que realmente hay en el servidor
+    } finally {
+      const n = (pendientes.get(key) ?? 1) - 1;
+      pendientes.set(key, n);
+      if (n === 0 && sucias.delete(key)) await recargar(key);
     }
-    throw e;
-  }
-  window.dispatchEvent(new CustomEvent(EVENTO, { detail: key }));
+  });
 }
 
-/** Hook reactivo: se actualiza cuando cualquier módulo (o pestaña) escribe la key. */
+let errorEscritura: string | undefined;
+
+/** Espera a que Supabase confirme las escrituras en curso. Devuelve el primer error desde la última llamada. */
+export async function esperarGuardado(): Promise<string | undefined> {
+  await cola;
+  const e = errorEscritura;
+  errorEscritura = undefined;
+  return e;
+}
+
+/** Hook reactivo: se actualiza cuando se escribe la clave en esta PC o llega un cambio de otra. */
 export function useStore<T>(key: StoreKey, fallback: T): T {
-  const [value, setValue] = useState<T>(fallback);
+  const [value, setValue] = useState<T>(() => leer<T>(key, fallback));
   useEffect(() => {
     const cargar = () => setValue(leer<T>(key, fallback));
     cargar();
-    const onLocal = (e: Event) => {
-      const k = (e as CustomEvent<string>).detail;
-      if (k === key) cargar();
+    const onCambio = (e: Event) => {
+      if ((e as CustomEvent<string>).detail === key) cargar();
     };
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === key) cargar();
-    };
-    window.addEventListener(EVENTO, onLocal);
-    window.addEventListener("storage", onStorage);
-    return () => {
-      window.removeEventListener(EVENTO, onLocal);
-      window.removeEventListener("storage", onStorage);
-    };
+    window.addEventListener(EVENTO, onCambio);
+    return () => window.removeEventListener(EVENTO, onCambio);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
   return value;

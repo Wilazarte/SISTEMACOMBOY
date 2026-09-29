@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Bell, Calculator, Eye, LayoutDashboard, Loader2, LogOut, Menu, Search, ShieldAlert, ShoppingCart, UserCircle2, Users, Warehouse, X } from "lucide-react";
-import { Badge, Toaster, cn } from "@/components/ui";
+import { AlertTriangle, Bell, Calculator, CloudUpload, Eye, LayoutDashboard, Loader2, LogOut, Menu, Search, ShieldAlert, ShoppingCart, UserCircle2, Users, Warehouse, X } from "lucide-react";
+import { Badge, Toaster, cn, toast } from "@/components/ui";
 import { DocViewerHost, abrirDoc, type DocRef } from "@/components/doc-viewer";
 import { ObservacionesGerencia } from "@/components/ObservacionesGerencia";
 import { inicioDe, logout, puedeVer, useSesion } from "@/lib/auth";
-import { KEYS, getCotizaciones, getFacturas, getGuias, getOrdenes, getPendientes, getProcesados, useStore } from "@/lib/storage";
+import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
+import { KEYS, detenerDatos, getCotizaciones, getFacturas, getGuias, getOrdenes, getPendientes, getProcesados, useDatos, useStore } from "@/lib/storage";
 import type { Requerimiento } from "@/lib/types";
 
 const NAV = [
@@ -42,32 +43,78 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const path = usePathname();
   const router = useRouter();
   const { sesion, listo } = useSesion();
+  const datos = useDatos(!!sesion);
   const pendientes = useStore<Requerimiento[]>(KEYS.REQS_PENDIENTES, []);
   const [q, setQ] = useState("");
   const [menu, setMenu] = useState(false);
-  // se recalcula al escribir; los datos se leen en vivo de localStorage
+  const [locales, setLocales] = useState(0);
+  const [subiendo, setSubiendo] = useState(false);
+  // se recalcula al escribir; los datos se leen de la caché sincronizada con Supabase
   const resultados = useMemo(() => buscar(q), [q]);
 
   useEffect(() => {
-    if (listo && !sesion) router.replace("/login");
+    if (listo && !sesion) {
+      void detenerDatos();
+      router.replace("/login");
+    }
   }, [listo, sesion, router]);
 
-  if (!listo || !sesion)
+  useEffect(() => {
+    if (datos.listo && sesion?.rol === "creador") setLocales(contarDatosLocales());
+  }, [datos.listo, sesion]);
+
+  const salir = async () => {
+    await detenerDatos();
+    await logout();
+    router.replace("/login");
+  };
+
+  if (!listo || !sesion || (!datos.listo && !datos.error))
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-400">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-50 text-slate-400">
         <Loader2 size={24} className="animate-spin" />
+        {sesion && <p className="text-sm">Cargando datos…</p>}
       </div>
     );
+
+  if (datos.error)
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
+        <div className="max-w-md rounded-xl border border-red-200 bg-white p-8 text-center shadow-sm">
+          <AlertTriangle size={36} className="mx-auto text-red-500" />
+          <h1 className="mt-3 text-lg font-bold text-slate-900">No se pudieron cargar los datos</h1>
+          <p className="mt-1 text-sm text-slate-600">{datos.error}</p>
+          <div className="mt-5 flex justify-center gap-2">
+            <button onClick={() => window.dispatchEvent(new Event("erp:reintentar"))} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
+              Reintentar
+            </button>
+            <button onClick={salir} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+
+  const subirLocales = async () => {
+    if (!confirm(`Se subirán a Supabase ${locales} registro(s) guardados en este navegador (sin duplicar los que ya existen). ¿Continuar?`)) return;
+    setSubiendo(true);
+    try {
+      const n = await subirDatosLocales();
+      toast(`Datos subidos: ${n} registro(s) nuevo(s). Ya se ven en todas las PCs.`);
+      setLocales(0);
+    } catch (e) {
+      toast((e as Error).message, "error");
+    } finally {
+      setSubiendo(false);
+    }
+  };
 
   const nav = NAV.filter((n) => puedeVer(sesion, n.href));
   const permitido = puedeVer(sesion, path);
   const veCompras = puedeVer(sesion, "/dashboard/compras");
   const buscador = veCompras || puedeVer(sesion, "/dashboard/almacen");
   const modulo = NAV.find((n) => n.href !== "/dashboard" && (path === n.href || path.startsWith(`${n.href}/`)))?.href;
-  const salir = () => {
-    logout();
-    router.replace("/login");
-  };
 
   return (
     <div className="min-h-screen lg:pl-64">
@@ -116,6 +163,17 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           })}
         </nav>
         <div className="absolute inset-x-0 bottom-0 border-t border-slate-800 p-4">
+          {locales > 0 && (
+            <button
+              onClick={subirLocales}
+              disabled={subiendo}
+              className="mb-3 flex w-full items-center gap-2 rounded-lg bg-amber-500/15 px-3 py-2 text-left text-xs font-medium text-amber-300 hover:bg-amber-500/25 disabled:opacity-60"
+              title="Sube a Supabase los datos que este navegador tenía de la versión anterior"
+            >
+              {subiendo ? <Loader2 size={15} className="animate-spin" /> : <CloudUpload size={15} />}
+              Subir datos de este navegador ({locales})
+            </button>
+          )}
           <div className="flex items-center gap-2.5">
             <UserCircle2 size={30} className="shrink-0 text-slate-500" />
             <div className="min-w-0 flex-1">

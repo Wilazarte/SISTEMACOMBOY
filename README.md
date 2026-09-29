@@ -1,14 +1,21 @@
 # ERP COMBOY VID — Módulo de Compras (Fase 2)
 
-## Instalar y correr
+## Puesta en marcha (Supabase, una sola vez)
+1. **Usuarios:** en Supabase → Authentication → Users → *Add user* → *Create new user*, marcar **Auto Confirm User**, crear:
+   `creador@comboyvid.local`, `tesoreria@comboyvid.local`, `almacen@comboyvid.local`, `planilla@comboyvid.local`, `gerencia@comboyvid.local` con sus contraseñas.
+2. **Tablas:** Supabase → SQL Editor → pegar `supabase_tables.sql` → *Run*. Crea las tablas, las políticas RLS, activa Realtime y genera los perfiles. La consulta final debe listar los 5 usuarios.
+3. **Datos anteriores:** entrar con `creador` en cada PC que tenía datos y pulsar **"Subir datos de este navegador"** (menú lateral). Se combinan por id, sin duplicar.
+
+## Instalar y correr (en cada PC)
 ```bash
+copy .env.example .env.local     # Windows (en Linux/Mac: cp)
 npm install
-npm run dev      # http://localhost:3000  → /dashboard/compras
+npm run dev      # http://localhost:3000  → /login
 npm run build    # verificación de producción
 ```
 
 ## Usuarios y acceso
-Entrar en `/login`. La sesión se guarda en localStorage (`login`, `usuario`, `rol`).
+Entrar en `/login` con el usuario (sin `@comboyvid.local`). El login es de Supabase Auth; el rol y los módulos de cada usuario están en la tabla `perfiles`.
 
 | Usuario | Módulos | Permisos |
 |---|---|---|
@@ -18,8 +25,13 @@ Entrar en `/login`. La sesión se guarda en localStorage (`login`, `usuario`, `r
 | planilla | /dashboard/planilla | ver y editar |
 | gerencia | todos | solo lectura + observaciones por módulo |
 
-Contraseñas: se guardan como SHA-256 en `lib/auth.ts` (para cambiar una: `printf '%s' 'NuevaClave' | sha256sum`).
-⚠ Sin servidor, esto ordena el acceso pero no es seguridad real: quien controle el navegador puede alterar localStorage. Para producción, mover el login a un backend (ej. Supabase Auth).
+Los mismos permisos se aplican en la base de datos con RLS (`supabase_tables.sql`): aunque alguien use la API directamente, gerencia no puede escribir, almacén no ve planilla, etc.
+Para cambiar una contraseña: Supabase → Authentication → Users → usuario → *Reset password* / *Update user*.
+
+## Datos y tiempo real
+- Tablas: `compras` (REQ, cotizaciones, OC, facturas, guías, proveedores, compras directas, numeración), `almacen` (stock), `planilla` (trabajadores), `observaciones`, `perfiles`. Cada documento se guarda como `jsonb` en `data`.
+- `lib/storage.ts` mantiene una caché en memoria: al guardar, la pantalla cambia al instante y se envían a Supabase solo las filas modificadas (upsert/delete). Si Supabase rechaza el cambio, se muestra el error y se vuelve a lo que hay en el servidor.
+- Realtime (`supabase.channel("erp-cambios")`): lo que hace una PC aparece en las otras sin recargar. Al reconectarse tras un corte, se recarga todo.
 
 ## Rutas
 - `/dashboard/almacen`  → Nuevo REQ · Lista de REQ emitidos · Ingresos por V°B° · Stock
@@ -30,20 +42,20 @@ Contraseñas: se guardan como SHA-256 en `lib/auth.ts` (para cambiar una: `print
 ```
 app/login/page.tsx                      login
 app/(dashboard)/layout.tsx              sesión, menú filtrado por usuario, acceso denegado, modo solo lectura
-components/ObservacionesGerencia.tsx    observaciones de gerencia por módulo (localStorage observaciones_gerencia)
-lib/auth.ts                             usuarios, permisos por módulo y sesión
+components/ObservacionesGerencia.tsx    observaciones de gerencia por módulo (tabla observaciones)
+lib/auth.ts                             login Supabase Auth, perfiles y permisos por módulo
+lib/supabase/client.ts · server.ts      clientes de Supabase (navegador / servidor)
+lib/migracion.ts                        sube a Supabase los datos antiguos del navegador
+supabase_tables.sql                     tablas, RLS, Realtime y perfiles
 app/(dashboard)/dashboard/compras/page.tsx
 app/(dashboard)/dashboard/almacen/page.tsx
 components/ui.tsx                       Button, Card, Badge, Tabs, Modal, Table, Timeline, Toaster
 components/doc-viewer.tsx               visor de documento + historial (timeline)
-lib/storage.ts                          TODA la lógica de negocio + localStorage (reemplazar por Supabase)
+lib/storage.ts                          TODA la lógica de negocio + sincronización con Supabase y Realtime
 lib/pdf.ts                              PDFs jsPDF (REQ, Cotización, OC, Factura/DJ, Acta de ingreso)
 lib/empresa.ts                          ← RUC, dirección, logo base64, sedes, unidades
 lib/types.ts
 ```
-
-## localStorage keys
-reqs_almacen_pendientes · reqs_procesados_compras · cotizaciones · ordenes_compra · facturas · guias · erp_contadores · proveedores · compras_directas · almacen_stock · CV_TRABAJADORES_V2 · observaciones_gerencia · login · usuario · rol
 
 ## Reglas implementadas
 - ACEPTAR → sale de notificaciones y queda en la lista como ACEPTADO.
