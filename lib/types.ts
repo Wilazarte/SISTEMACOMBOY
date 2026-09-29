@@ -140,3 +140,24 @@ export interface VistoBueno {
 }
 
 export type TipoDoc = "REQ" | "COTI" | "OC" | "FACTURA" | "GUIA";
+
+// =====================================================================
+// Módulo de Planilla — Trabajadores
+// =====================================================================
+
+export type TipoSueldo = "DIARIO" | "SEMANAL" | "QUINCENAL" | "MENSUAL";
+
+export type TipoAfp = "AFP_INTEGRA" | "AFP_PRIMA" | "AFP_HABITAT" | "AFP_PROFUTURO" | "ONP" | "SIN";
+
+export interface Trabajador {
+  id: string; // N° de huella del reloj biométrico
+  nombre: string;
+  dni: string;
+  cargo: string;
+  fechaIngreso: string; // YYYY-MM-DD
+  sueldo: number; // monto según tipoSueldo
+  tipoSueldo: TipoSueldo;
+  afpTipo: TipoAfp;
+  afpPorcentaje: number; // ej. 13
+  activo: boolean;
+}

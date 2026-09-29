@@ -10,6 +10,7 @@ npm run build    # verificación de producción
 ## Rutas
 - `/dashboard/almacen`  → Nuevo REQ · Lista de REQ emitidos · Ingresos por V°B°
 - `/dashboard/compras`  → Notificaciones · Antecedentes · Cotizaciones · OC · Facturas/DJ · Guías
+- `/dashboard/planilla` → Maestro de trabajadores (fecha de ingreso, tipo de sueldo, AFP/ONP) · Planilla del periodo con asistencia del reloj
 
 ## Estructura
 ```
@@ -25,7 +26,7 @@ lib/types.ts
 ```
 
 ## localStorage keys
-reqs_almacen_pendientes · reqs_procesados_compras · cotizaciones · ordenes_compra · facturas · guias · erp_contadores · erp_rol
+reqs_almacen_pendientes · reqs_procesados_compras · cotizaciones · ordenes_compra · facturas · guias · erp_contadores · erp_rol · CV_TRABAJADORES_V2
 
 ## Reglas implementadas
 - ACEPTAR → sale de notificaciones y queda en la lista como ACEPTADO.
