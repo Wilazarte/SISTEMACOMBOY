@@ -1,7 +1,10 @@
 -- =====================================================================
--- ERP COMBOY VID — Tablas, seguridad (RLS) y Realtime en Supabase
+-- ERP COMBOY VID — Tablas, seguridad (RLS), numeración y Realtime en Supabase
 -- Ejecutar en: Supabase → SQL Editor → New query → pegar todo → Run.
--- Se puede ejecutar varias veces sin romper nada.
+--
+-- Se puede ejecutar varias veces seguidas sin error. Si alguna tabla ya
+-- existía con otra estructura, se le AGREGAN las columnas que faltan (no se
+-- borran datos ni columnas existentes).
 --
 -- ANTES: crear los 5 usuarios en Authentication → Users → Add user →
 -- "Create new user" (marcar "Auto Confirm User"):
@@ -12,67 +15,142 @@
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
--- PERFILES: rol y módulos permitidos de cada usuario de Supabase Auth
+-- 1. PERFILES: rol y módulos permitidos de cada usuario de Supabase Auth
 -- ---------------------------------------------------------------------
 create table if not exists public.perfiles (
-  id uuid primary key references auth.users (id) on delete cascade,
-  usuario text not null unique,
-  rol text not null check (rol in ('creador', 'tesoreria', 'almacen', 'planilla', 'gerencia')),
-  nombre text not null,
-  modulos text[] not null default '{}',
-  solo_lectura boolean not null default false,
-  created_at timestamptz not null default now()
+  id uuid primary key references auth.users (id) on delete cascade
 );
 
+alter table public.perfiles
+  add column if not exists id uuid,
+  add column if not exists usuario text,
+  add column if not exists rol text,
+  add column if not exists nombre text,
+  add column if not exists modulos text[] not null default '{}',
+  add column if not exists solo_lectura boolean not null default false,
+  add column if not exists created_at timestamptz not null default now();
+
+create unique index if not exists perfiles_id_uidx on public.perfiles (id);
+create unique index if not exists perfiles_usuario_uidx on public.perfiles (usuario);
+
+-- Roles del ERP (si la tabla ya tenía otra regla sobre "rol", se reemplaza)
+do $$
+declare c record;
+begin
+  for c in
+    select con.conname
+    from pg_constraint con
+    join pg_attribute a on a.attrelid = con.conrelid and a.attnum = any (con.conkey)
+    where con.conrelid = 'public.perfiles'::regclass and con.contype = 'c' and a.attname = 'rol'
+  loop
+    execute format('alter table public.perfiles drop constraint %I', c.conname);
+  end loop;
+  alter table public.perfiles
+    add constraint perfiles_rol_check check (rol in ('creador', 'tesoreria', 'almacen', 'planilla', 'gerencia')) not valid;
+end $$;
+
 -- ---------------------------------------------------------------------
--- DOCUMENTOS. Cada fila es un documento del ERP guardado como JSON:
+-- 2. DOCUMENTOS. Cada fila es un documento del ERP guardado como JSON:
 --   compras  -> tipo: req_pendiente, req_procesado, cotizacion, orden, factura,
 --               guia, proveedor, compra_directa, contador
 --   almacen  -> tipo: stock
 --   planilla -> tipo: trabajador
 -- ---------------------------------------------------------------------
-create table if not exists public.compras (
-  tipo text not null,
-  id text not null,
-  data jsonb not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  updated_by uuid default auth.uid(),
-  primary key (tipo, id)
-);
+create table if not exists public.compras (tipo text not null, id text not null, primary key (tipo, id));
+create table if not exists public.almacen (tipo text not null, id text not null, primary key (tipo, id));
+create table if not exists public.planilla (tipo text not null, id text not null, primary key (tipo, id));
 
-create table if not exists public.almacen (
-  tipo text not null,
-  id text not null,
-  data jsonb not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  updated_by uuid default auth.uid(),
-  primary key (tipo, id)
-);
+do $$
+declare
+  t text;
+  col record;
+begin
+  foreach t in array array['compras', 'almacen', 'planilla'] loop
+    execute format(
+      'alter table public.%I
+         add column if not exists tipo text,
+         add column if not exists id text,
+         add column if not exists data jsonb not null default ''{}''::jsonb,
+         add column if not exists created_at timestamptz not null default now(),
+         add column if not exists updated_at timestamptz not null default now(),
+         add column if not exists updated_by uuid default auth.uid()', t);
 
-create table if not exists public.planilla (
-  tipo text not null,
-  id text not null,
-  data jsonb not null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  updated_by uuid default auth.uid(),
-  primary key (tipo, id)
-);
+    -- Los ids del ERP son texto ("7", "principal", uuid...): si la tabla tenía id numérico o uuid, se pasa a texto
+    select c.data_type, c.is_identity into col
+    from information_schema.columns c
+    where c.table_schema = 'public' and c.table_name = t and c.column_name = 'id';
+    if col.data_type not in ('text', 'character varying') then
+      if col.is_identity = 'YES' then
+        execute format('alter table public.%I alter column id drop identity if exists', t);
+      end if;
+      execute format('alter table public.%I alter column id drop default', t);
+      execute format('alter table public.%I alter column id type text using id::text', t);
+    end if;
 
-create table if not exists public.observaciones (
-  id text primary key,
-  modulo text not null,
-  texto text not null,
-  usuario text not null,
-  fecha timestamptz not null default now(),
-  created_by uuid default auth.uid()
-);
+    -- Clave usada al guardar (upsert por tipo + id)
+    execute format('create unique index if not exists %I on public.%I (tipo, id)', t || '_tipo_id_uidx', t);
+  end loop;
+end $$;
 
+-- ---------------------------------------------------------------------
+-- 3. OBSERVACIONES de gerencia por módulo
+-- ---------------------------------------------------------------------
+create table if not exists public.observaciones (id text primary key);
+
+alter table public.observaciones
+  add column if not exists id text,
+  add column if not exists modulo text,
+  add column if not exists texto text,
+  add column if not exists usuario text,
+  add column if not exists fecha timestamptz not null default now(),
+  add column if not exists created_by uuid default auth.uid();
+
+do $$
+declare col record;
+begin
+  select c.data_type, c.is_identity into col
+  from information_schema.columns c
+  where c.table_schema = 'public' and c.table_name = 'observaciones' and c.column_name = 'id';
+  if col.data_type not in ('text', 'character varying') then
+    if col.is_identity = 'YES' then
+      alter table public.observaciones alter column id drop identity if exists;
+    end if;
+    alter table public.observaciones alter column id drop default;
+    alter table public.observaciones alter column id type text using id::text;
+  end if;
+end $$;
+
+create unique index if not exists observaciones_id_uidx on public.observaciones (id);
 create index if not exists observaciones_modulo_idx on public.observaciones (modulo);
 
--- updated_at automático
+-- ---------------------------------------------------------------------
+-- 4. Columnas antiguas obligatorias: si una tabla ya existía con columnas
+--    NOT NULL que el ERP no usa, se vuelven opcionales para poder guardar.
+-- ---------------------------------------------------------------------
+do $$
+declare c record;
+begin
+  for c in
+    select table_name, column_name
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name in ('perfiles', 'compras', 'almacen', 'planilla', 'observaciones')
+      and is_nullable = 'NO'
+      and column_default is null
+      and is_identity = 'NO'
+      and column_name not in ('id', 'tipo', 'data', 'modulos', 'solo_lectura', 'created_at', 'updated_at', 'fecha')
+      and (table_name, column_name) not in (
+        select tc.table_name, kcu.column_name
+        from information_schema.table_constraints tc
+        join information_schema.key_column_usage kcu on kcu.constraint_name = tc.constraint_name and kcu.table_schema = tc.table_schema
+        where tc.table_schema = 'public' and tc.constraint_type = 'PRIMARY KEY'
+      )
+  loop
+    execute format('alter table public.%I alter column %I drop not null', c.table_name, c.column_name);
+  end loop;
+end $$;
+
+-- updated_at / updated_by automáticos
 create or replace function public.tocar_updated_at() returns trigger
 language plpgsql as $$
 begin
@@ -91,7 +169,7 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
--- Funciones de permisos (security definer: leen perfiles sin pasar por RLS)
+-- 5. Funciones de permisos (security definer: leen perfiles sin pasar por RLS)
 -- ---------------------------------------------------------------------
 create or replace function public.mi_rol() returns text
 language sql stable security definer set search_path = public as $$
@@ -115,7 +193,8 @@ grant select, insert, update, delete on public.compras, public.almacen, public.p
 revoke all on public.perfiles, public.compras, public.almacen, public.planilla, public.observaciones from anon;
 
 -- ---------------------------------------------------------------------
--- RLS
+-- 6. RLS. Se eliminan las políticas que hubiera en estas 5 tablas (por
+--    ejemplo un "permitir todo" antiguo) y se crean las del ERP.
 -- ---------------------------------------------------------------------
 alter table public.perfiles enable row level security;
 alter table public.compras enable row level security;
@@ -123,18 +202,26 @@ alter table public.almacen enable row level security;
 alter table public.planilla enable row level security;
 alter table public.observaciones enable row level security;
 
+do $$
+declare p record;
+begin
+  for p in
+    select schemaname, tablename, policyname from pg_policies
+    where schemaname = 'public' and tablename in ('perfiles', 'compras', 'almacen', 'planilla', 'observaciones')
+  loop
+    execute format('drop policy %I on %I.%I', p.policyname, p.schemaname, p.tablename);
+  end loop;
+end $$;
+
 -- perfiles: cada usuario lee solo el suyo
-drop policy if exists perfiles_select on public.perfiles;
 create policy perfiles_select on public.perfiles for select to authenticated using (id = auth.uid());
 
 -- compras: la ven Compras y Almacén (Almacén necesita REQ, OC, facturas y guías para el V°B°)
-drop policy if exists compras_select on public.compras;
 create policy compras_select on public.compras for select to authenticated
   using (public.puede_ver('/dashboard/compras') or public.puede_ver('/dashboard/almacen'));
 
 -- escriben: creador y tesorería todo; almacén solo sus documentos (REQ, V°B° de OC/guía).
 -- La numeración (tipo 'contador') no se escribe directo: solo con siguiente_numero() (ver abajo).
-drop policy if exists compras_escribir on public.compras;
 create policy compras_escribir on public.compras for all to authenticated
   using (
     tipo <> 'contador' and (
@@ -150,44 +237,36 @@ create policy compras_escribir on public.compras for all to authenticated
   );
 
 -- almacen (stock): lo ven Almacén y Compras; lo mueven compras directas (tesorería) y V°B° (almacén)
-drop policy if exists almacen_select on public.almacen;
 create policy almacen_select on public.almacen for select to authenticated
   using (public.puede_ver('/dashboard/almacen') or public.puede_ver('/dashboard/compras'));
 
-drop policy if exists almacen_escribir on public.almacen;
 create policy almacen_escribir on public.almacen for all to authenticated
   using (public.mi_rol() in ('creador', 'tesoreria', 'almacen'))
   with check (public.mi_rol() in ('creador', 'tesoreria', 'almacen'));
 
 -- planilla: la ven quienes tienen el módulo; la editan creador y planilla
-drop policy if exists planilla_select on public.planilla;
 create policy planilla_select on public.planilla for select to authenticated
   using (public.puede_ver('/dashboard/planilla'));
 
-drop policy if exists planilla_escribir on public.planilla;
 create policy planilla_escribir on public.planilla for all to authenticated
   using (public.mi_rol() in ('creador', 'planilla'))
   with check (public.mi_rol() in ('creador', 'planilla'));
 
 -- observaciones: las leen todos; las escribe gerencia (y el creador, que administra todo); las borran gerencia y creador
-drop policy if exists observaciones_select on public.observaciones;
 create policy observaciones_select on public.observaciones for select to authenticated
   using (public.mi_rol() is not null);
 
-drop policy if exists observaciones_insert on public.observaciones;
 create policy observaciones_insert on public.observaciones for insert to authenticated
   with check (public.mi_rol() in ('gerencia', 'creador'));
 
-drop policy if exists observaciones_update on public.observaciones;
 create policy observaciones_update on public.observaciones for update to authenticated
   using (public.mi_rol() in ('gerencia', 'creador')) with check (public.mi_rol() in ('gerencia', 'creador'));
 
-drop policy if exists observaciones_delete on public.observaciones;
 create policy observaciones_delete on public.observaciones for delete to authenticated
   using (public.mi_rol() in ('gerencia', 'creador'));
 
 -- ---------------------------------------------------------------------
--- NUMERACIÓN atómica (REQ-ALM-001, OC-2026-0001, DJ-001)
+-- 7. NUMERACIÓN atómica (REQ-ALM-001, OC-2026-0001, DJ-001)
 -- El UPDATE bloquea la fila del contador: si dos PCs piden número a la vez,
 -- la segunda espera a la primera y nunca se repite un correlativo.
 -- ---------------------------------------------------------------------
@@ -240,7 +319,7 @@ grant execute on function public.siguiente_numero(text) to authenticated;
 grant execute on function public.asegurar_numero_minimo(text, integer) to authenticated;
 
 -- ---------------------------------------------------------------------
--- REALTIME: los cambios de una PC llegan al instante a las demás
+-- 8. REALTIME: los cambios de una PC llegan al instante a las demás
 -- ---------------------------------------------------------------------
 do $$
 declare t text;
@@ -256,7 +335,7 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
--- PERFILES de los 5 usuarios (deben existir en Authentication → Users)
+-- 9. PERFILES de los 5 usuarios (deben existir en Authentication → Users)
 -- ---------------------------------------------------------------------
 insert into public.perfiles (id, usuario, rol, nombre, modulos, solo_lectura)
 select u.id, v.usuario, v.rol, v.nombre, v.modulos, v.solo_lectura
@@ -277,4 +356,7 @@ on conflict (id) do update
       solo_lectura = excluded.solo_lectura;
 
 -- Verificación: debe listar los 5 usuarios
-select usuario, rol, modulos, solo_lectura from public.perfiles order by usuario;
+select p.usuario, p.rol, p.modulos, p.solo_lectura
+from public.perfiles p
+where p.usuario in ('creador', 'tesoreria', 'almacen', 'planilla', 'gerencia')
+order by p.usuario;
