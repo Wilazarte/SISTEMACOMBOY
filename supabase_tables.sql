@@ -77,7 +77,7 @@ begin
          add column if not exists updated_at timestamptz not null default now(),
          add column if not exists updated_by uuid default auth.uid()', t);
 
-    -- Los ids del ERP son texto ("7", "principal", uuid...): si la tabla tenía id numérico o uuid, se pasa a texto
+    -- Los ids del ERP son texto ("7", uuid...): si la tabla tenía id numérico o uuid, se pasa a texto
     select c.data_type, c.is_identity into col
     from information_schema.columns c
     where c.table_schema = 'public' and c.table_name = t and c.column_name = 'id';
@@ -269,6 +269,25 @@ create policy observaciones_delete on public.observaciones for delete to authent
 
 -- ---------------------------------------------------------------------
 -- 7. NUMERACIÓN atómica (REQ-ALM-001, OC-2026-0001, DJ-001)
+-- El contador vive en compras (tipo 'contador', id '00000000-0000-0000-0000-000000000001':
+-- un UUID fijo para que sirva aunque compras.id sea de tipo uuid).
+-- Si existe el contador antiguo con id 'principal', se une al nuevo (conserva el número más alto).
+do $$
+declare viejo jsonb;
+begin
+  select data into viejo from public.compras where tipo = 'contador' and id::text = 'principal';
+  if viejo is not null then
+    insert into public.compras (tipo, id, data)
+    values ('contador', '00000000-0000-0000-0000-000000000001', viejo)
+    on conflict (tipo, id) do update
+      set data = (
+        select coalesce(jsonb_object_agg(k, greatest(coalesce((public.compras.data ->> k)::integer, 0), coalesce((viejo ->> k)::integer, 0))), '{}'::jsonb)
+        from (select jsonb_object_keys(public.compras.data) as k union select jsonb_object_keys(viejo)) claves
+      );
+    delete from public.compras where tipo = 'contador' and id::text = 'principal';
+  end if;
+end $$;
+
 -- El UPDATE bloquea la fila del contador: si dos PCs piden número a la vez,
 -- la segunda espera a la primera y nunca se repite un correlativo.
 -- ---------------------------------------------------------------------
@@ -289,7 +308,7 @@ begin
   end if;
 
   insert into public.compras (tipo, id, data)
-  values ('contador', 'principal', jsonb_build_object(serie, 1))
+  values ('contador', '00000000-0000-0000-0000-000000000001', jsonb_build_object(serie, 1))
   on conflict (tipo, id) do update
     set data = public.compras.data || jsonb_build_object(serie, coalesce((public.compras.data ->> serie)::integer, 0) + 1)
   returning (data ->> serie)::integer into n;
@@ -308,7 +327,7 @@ begin
     raise exception 'Serie inválida: %', serie using errcode = '22023';
   end if;
   insert into public.compras (tipo, id, data)
-  values ('contador', 'principal', jsonb_build_object(serie, greatest(minimo, 0)))
+  values ('contador', '00000000-0000-0000-0000-000000000001', jsonb_build_object(serie, greatest(minimo, 0)))
   on conflict (tipo, id) do update
     set data = public.compras.data || jsonb_build_object(serie, greatest(coalesce((public.compras.data ->> serie)::integer, 0), minimo))
   returning (data ->> serie)::integer into n;

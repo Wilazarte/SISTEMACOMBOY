@@ -117,7 +117,11 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.OBSERVACIONES]: { tabla: "observaciones", forma: "observaciones" },
 };
 const TABLAS = ["compras", "almacen", "planilla", "observaciones"] as const;
-const ID_OBJETO = "principal"; // fila única de las claves tipo "objeto" (contadores)
+/**
+ * Fila única de las claves tipo "objeto" (contadores). Es un UUID fijo para que funcione
+ * aunque la columna id de la tabla sea de tipo uuid (antes era "principal").
+ */
+const ID_OBJETO = "00000000-0000-0000-0000-000000000001";
 
 type Fila = Record<string, unknown> & { id: string };
 interface FilaObs {
@@ -163,7 +167,16 @@ function deFilas(key: StoreKey, filas: Fila[]): unknown {
       .forEach(({ modulo, ...o }) => (r[modulo] ??= []).push(o));
     return r;
   }
-  if (d.forma === "objeto") return filas[0]?.data ?? {};
+  if (d.forma === "objeto") {
+    // Si quedara también la fila antigua ("principal"), se toma el número más alto de cada serie
+    const r: Record<string, unknown> = {};
+    filas.forEach((f) =>
+      Object.entries((f.data ?? {}) as Record<string, unknown>).forEach(([k, v]) => {
+        r[k] = typeof v === "number" && typeof r[k] === "number" ? Math.max(v, r[k] as number) : r[k] ?? v;
+      })
+    );
+    return r;
+  }
   return filas.map((f) => f.data);
 }
 
