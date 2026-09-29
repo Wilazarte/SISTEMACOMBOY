@@ -1,0 +1,995 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import {
+  AlertTriangle,
+  Bell,
+  Check,
+  Eye,
+  FileCheck2,
+  FileSpreadsheet,
+  FileText,
+  History,
+  MessageSquareWarning,
+  Receipt,
+  ShoppingBag,
+  Truck,
+  Upload,
+  X,
+} from "lucide-react";
+import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar, toast } from "@/components/ui";
+import { abrirDoc } from "@/components/doc-viewer";
+import {
+  IGV,
+  KEYS,
+  MAX_ARCHIVO,
+  TOPE_DJ,
+  aceptarRequerimiento,
+  crearCotizacion,
+  crearDeclaracionJurada,
+  crearFactura,
+  crearGuia,
+  crearOrdenCompra,
+  fechaPE,
+  hoy,
+  marcarPago,
+  observarRequerimiento,
+  puede,
+  r2,
+  rechazarRequerimiento,
+  rucValido,
+  soles,
+  useRol,
+  useStore,
+} from "@/lib/storage";
+import { pdfCotizacion, pdfFactura, pdfOrdenCompra, pdfRequerimiento } from "@/lib/pdf";
+import type { Cotizacion, Factura, FormaPago, Guia, ItemPrecio, OrdenCompra, Requerimiento, Rol } from "@/lib/types";
+
+type Tab = "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias";
+
+const FORMAS_PAGO: FormaPago[] = ["CONTADO", "CREDITO 15 DIAS", "CREDITO 30 DIAS", "CREDITO 60 DIAS", "ADELANTO 50%"];
+const DIAS_CREDITO: Record<FormaPago, number> = {
+  CONTADO: 0,
+  "CREDITO 15 DIAS": 15,
+  "CREDITO 30 DIAS": 30,
+  "CREDITO 60 DIAS": 60,
+  "ADELANTO 50%": 0,
+};
+
+const sumarDias = (iso: string, d: number): string => {
+  const f = new Date(`${iso}T12:00:00`);
+  f.setDate(f.getDate() + d);
+  return f.toISOString().slice(0, 10);
+};
+
+// =====================================================================
+export default function ComprasPage() {
+  const [rol] = useRol();
+  const pendientes = useStore<Requerimiento[]>(KEYS.REQS_PENDIENTES, []);
+  const procesados = useStore<Requerimiento[]>(KEYS.REQS_PROCESADOS, []);
+  const cotizaciones = useStore<Cotizacion[]>(KEYS.COTIZACIONES, []);
+  const ordenes = useStore<OrdenCompra[]>(KEYS.ORDENES, []);
+  const facturas = useStore<Factura[]>(KEYS.FACTURAS, []);
+  const guias = useStore<Guia[]>(KEYS.GUIAS, []);
+
+  const [tab, setTab] = useState<Tab>("antecedentes");
+  const [pre, setPre] = useState<{ req?: string; coti?: string; oc?: string; fac?: string }>({});
+
+  const ir = (t: Tab, p: typeof pre = {}) => {
+    setPre(p);
+    setTab(t);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const cotizables = procesados.filter((r) => r.estado === "ACEPTADO" || r.estado === "COTIZADO");
+  const cotisSinOC = cotizaciones.filter((c) => c.estado === "REGISTRADA" && !ordenes.some((o) => o.reqId === c.reqId));
+  const ocsSinFactura = ordenes.filter((o) => o.estado === "EMITIDA");
+  const facturasSinGuia = facturas.filter((f) => f.tipo === "FACTURA" && (!guias.some((g) => g.facturaId === f.id) || guias.some((g) => g.facturaId === f.id && g.estado === "OBSERVADA")));
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Tesorería / Compras</h1>
+          <p className="text-sm text-slate-500">Requerimiento → Cotización → Orden de Compra → Factura → Guía → V°B° Almacén</p>
+        </div>
+        {!puede(rol, "req.revisar") && (
+          <span className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600">Modo lectura para su rol</span>
+        )}
+      </div>
+
+      <Notificaciones pendientes={pendientes} rol={rol} />
+
+      <Tabs<Tab>
+        value={tab}
+        onChange={(t) => ir(t)}
+        tabs={[
+          { id: "antecedentes", label: "Antecedentes", icon: <History size={16} /> },
+          { id: "cotizaciones", label: "Cotizaciones", icon: <FileSpreadsheet size={16} />, count: cotizables.filter((r) => r.estado === "ACEPTADO").length },
+          { id: "ordenes", label: "Órdenes de compra", icon: <ShoppingBag size={16} />, count: cotisSinOC.length },
+          { id: "facturas", label: "Facturas", icon: <Receipt size={16} />, count: ocsSinFactura.length },
+          { id: "guias", label: "Guías de remisión", icon: <Truck size={16} />, count: facturasSinGuia.length },
+        ]}
+      />
+
+      {tab === "antecedentes" && <Antecedentes reqs={procesados} ordenes={ordenes} rol={rol} onCotizar={(id) => ir("cotizaciones", { req: id })} />}
+      {tab === "cotizaciones" && (
+        <Cotizaciones key={pre.req ?? "c"} rol={rol} reqs={cotizables} cotizaciones={cotizaciones} preReq={pre.req} onOC={(id) => ir("ordenes", { coti: id })} />
+      )}
+      {tab === "ordenes" && (
+        <Ordenes key={pre.coti ?? "o"} rol={rol} cotis={cotisSinOC} todasCotis={cotizaciones} ordenes={ordenes} reqs={procesados} preCoti={pre.coti} onFacturar={(id) => ir("facturas", { oc: id })} />
+      )}
+      {tab === "facturas" && <Facturas key={pre.oc ?? "f"} rol={rol} ocs={ocsSinFactura} ordenes={ordenes} facturas={facturas} preOc={pre.oc} onGuia={(id) => ir("guias", { fac: id })} />}
+      {tab === "guias" && <Guias key={pre.fac ?? "g"} rol={rol} facturas={facturasSinGuia} guias={guias} preFac={pre.fac} />}
+    </div>
+  );
+}
+
+// =====================================================================
+// NOTIFICACIONES (cards amarillas)
+// =====================================================================
+function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol: Rol }) {
+  const [rechazo, setRechazo] = useState<Requerimiento | null>(null);
+  const [obs, setObs] = useState<Requerimiento | null>(null);
+  const [motivo, setMotivo] = useState("");
+  const habilitado = puede(rol, "req.revisar");
+
+  if (pendientes.length === 0)
+    return (
+      <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
+        <Check size={18} /> No hay requerimientos pendientes de revisión.
+      </div>
+    );
+
+  return (
+    <section>
+      <div className="mb-3 flex items-center gap-2">
+        <Bell size={18} className="text-amber-600" />
+        <h2 className="font-semibold text-slate-900">Requerimientos por revisar</h2>
+        <span className="rounded-full bg-amber-400 px-2 text-xs font-bold text-slate-900">{pendientes.length}</span>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {pendientes.map((r) => (
+          <div key={r.id} className="flex flex-col rounded-xl border-2 border-amber-300 bg-amber-50 p-4 shadow-sm">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="font-bold text-slate-900">{r.numero}</p>
+                <p className="text-xs text-slate-600">
+                  {fechaPE(r.fecha)} · {r.sede}
+                </p>
+              </div>
+              <Badge estado="PENDIENTE" />
+            </div>
+            <p className="mt-2 text-sm text-slate-700">
+              <span className="font-medium">{r.solicitante}:</span> {r.motivo}
+            </p>
+            <ul className="mt-2 space-y-0.5 text-xs text-slate-600">
+              {r.items.slice(0, 3).map((i) => (
+                <li key={i.id}>
+                  • {i.cantidad} {i.unidad} — {i.nombre} {i.marca && `(${i.marca})`}
+                </li>
+              ))}
+              {r.items.length > 3 && <li className="font-medium">+ {r.items.length - 3} producto(s) más</li>}
+            </ul>
+            <div className="mt-auto flex flex-wrap gap-1.5 pt-3">
+              <Button size="sm" variant="secondary" onClick={() => abrirDoc({ tipo: "REQ", id: r.id })}>
+                <Eye size={14} /> Ver
+              </Button>
+              <Button size="sm" variant="success" disabled={!habilitado} onClick={() => ejecutar(() => aceptarRequerimiento(r.id, rol), `${r.numero} ACEPTADO`)}>
+                <Check size={14} /> Aceptar
+              </Button>
+              <Button size="sm" variant="warning" disabled={!habilitado} onClick={() => { setMotivo(""); setObs(r); }}>
+                <MessageSquareWarning size={14} /> Observar
+              </Button>
+              <Button size="sm" variant="danger" disabled={!habilitado} onClick={() => setRechazo(r)}>
+                <X size={14} /> Rechazar
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Modal open={!!rechazo} onClose={() => setRechazo(null)} title={`Rechazar ${rechazo?.numero ?? ""}`}>
+        <div className="flex gap-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">
+          <AlertTriangle size={20} className="shrink-0" />
+          El requerimiento se <b>eliminará de todo el sistema</b> (notificaciones y lista). Esta acción no se puede deshacer.
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setRechazo(null)}>Cancelar</Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              if (rechazo && ejecutar(() => rechazarRequerimiento(rechazo.id), `${rechazo.numero} rechazado y eliminado`)) setRechazo(null);
+            }}
+          >
+            Rechazar y eliminar
+          </Button>
+        </div>
+      </Modal>
+
+      <Modal open={!!obs} onClose={() => setObs(null)} title={`Observar ${obs?.numero ?? ""}`}>
+        <Field label="Motivo de la observación" hint="Almacén verá esta observación y podrá corregir y reenviar.">
+          <Textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej: Especificar medida del rodamiento y marca aceptada" autoFocus />
+        </Field>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setObs(null)}>Cancelar</Button>
+          <Button
+            variant="warning"
+            onClick={() => {
+              if (obs && ejecutar(() => observarRequerimiento(obs.id, motivo, rol), `${obs.numero} OBSERVADO`)) setObs(null);
+            }}
+          >
+            Enviar observación
+          </Button>
+        </div>
+      </Modal>
+    </section>
+  );
+}
+
+// =====================================================================
+// ANTECEDENTES
+// =====================================================================
+function Antecedentes({ reqs, ordenes, rol, onCotizar }: { reqs: Requerimiento[]; ordenes: OrdenCompra[]; rol: Rol; onCotizar: (id: string) => void }) {
+  const [estado, setEstado] = useState("");
+  const [q, setQ] = useState("");
+  const lista = reqs.filter(
+    (r) => (!estado || r.estado === estado) && (!q || `${r.numero} ${r.sede} ${r.solicitante} ${r.motivo}`.toLowerCase().includes(q.toLowerCase()))
+  );
+  return (
+    <Card>
+      <CardHeader
+        title="Antecedentes de requerimientos"
+        subtitle="Histórico de REQ aceptados, observados y en proceso de compra"
+        action={
+          <div className="flex flex-wrap gap-2">
+            <Input placeholder="Buscar…" value={q} onChange={(e) => setQ(e.target.value)} className="w-48" />
+            <Select
+              value={estado}
+              onChange={(e) => setEstado(e.target.value)}
+              placeholder="Todos los estados"
+              options={["ACEPTADO", "OBSERVADO", "COTIZADO", "COMPRADO", "FINALIZADO"].map((s) => ({ value: s, label: s }))}
+              className="w-44"
+            />
+          </div>
+        }
+      />
+      <Table head={["Nro REQ", "Fecha", "Sede", "Solicitante", "Items", "Estado", "OC", "Acciones"]} empty={lista.length === 0}>
+        {lista.map((r) => {
+          const oc = ordenes.find((o) => o.reqId === r.id);
+          return (
+            <tr key={r.id} className="hover:bg-slate-50">
+              <Td className="font-semibold text-slate-900">{r.numero}</Td>
+              <Td>{fechaPE(r.fecha)}</Td>
+              <Td>{r.sede}</Td>
+              <Td>{r.solicitante}</Td>
+              <Td>{(r.items || []).length}</Td>
+              <Td>
+                <Badge estado={r.estado} />
+                {r.estado === "OBSERVADO" && <p className="mt-1 max-w-[200px] truncate text-xs text-orange-700" title={r.observacion}>{r.observacion}</p>}
+              </Td>
+              <Td>{oc ? oc.numero : "-"}</Td>
+              <Td>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "REQ", id: r.id })} title="Ver e historial">
+                    <Eye size={15} />
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => pdfRequerimiento(r)} title="PDF">
+                    <FileText size={15} />
+                  </Button>
+                  {(r.estado === "ACEPTADO" || r.estado === "COTIZADO") && puede(rol, "coti.crear") && (
+                    <Button size="sm" variant="secondary" onClick={() => onCotizar(r.id)}>
+                      Cotizar
+                    </Button>
+                  )}
+                </div>
+              </Td>
+            </tr>
+          );
+        })}
+      </Table>
+    </Card>
+  );
+}
+
+// =====================================================================
+// COTIZACIONES
+// =====================================================================
+function Cotizaciones({
+  rol,
+  reqs,
+  cotizaciones,
+  preReq,
+  onOC,
+}: {
+  rol: Rol;
+  reqs: Requerimiento[];
+  cotizaciones: Cotizacion[];
+  preReq?: string;
+  onOC: (id: string) => void;
+}) {
+  const [reqId, setReqId] = useState(preReq ?? "");
+  const [proveedor, setProveedor] = useState("");
+  const [ruc, setRuc] = useState("");
+  const [numero, setNumero] = useState("");
+  const [fecha, setFecha] = useState(hoy());
+  const [items, setItems] = useState<ItemPrecio[]>([]);
+  const habilitado = puede(rol, "coti.crear");
+
+  useEffect(() => {
+    const req = reqs.find((r) => r.id === reqId);
+    setItems(
+      req
+        ? req.items.map((i) => ({ itemReqId: i.id, nombre: i.nombre, cantidad: i.cantidad, unidad: i.unidad, marca: i.marca, precioUnit: 0, subtotal: 0 }))
+        : []
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reqId]);
+
+  const subtotal = r2(items.reduce((a, i) => a + i.cantidad * (i.precioUnit || 0), 0));
+  const igv = r2(subtotal * IGV);
+
+  const guardar = () => {
+    const ok = ejecutar(() => crearCotizacion({ reqId, proveedor, ruc, numero, fechaEmision: fecha, items }, rol), "Cotización registrada");
+    if (ok) {
+      setProveedor("");
+      setRuc("");
+      setNumero("");
+      setItems((p) => p.map((i) => ({ ...i, precioUnit: 0, subtotal: 0 })));
+    }
+  };
+
+  // Menor total por REQ para comparativo
+  const minPorReq = useMemo(() => {
+    const m: Record<string, number> = {};
+    cotizaciones.forEach((c) => (m[c.reqId] = Math.min(m[c.reqId] ?? Infinity, c.total)));
+    return m;
+  }, [cotizaciones]);
+
+  return (
+    <div className="space-y-6">
+      {habilitado && (
+        <Card>
+          <CardHeader title="Registrar cotización" subtitle="Vinculada a un requerimiento ACEPTADO. Puede registrar varias cotizaciones por REQ para comparar." />
+          <div className="grid gap-4 p-5 md:grid-cols-3">
+            <Field label="Requerimiento">
+              <Select
+                value={reqId}
+                onChange={(e) => setReqId(e.target.value)}
+                placeholder={reqs.length ? "Seleccione REQ…" : "No hay REQ aceptados"}
+                options={reqs.map((r) => ({ value: r.id, label: `${r.numero} · ${r.sede} · ${r.estado}` }))}
+              />
+            </Field>
+            <Field label="Nro cotización">
+              <Input value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="COT-000123" />
+            </Field>
+            <Field label="Fecha de emisión">
+              <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+            </Field>
+            <Field label="Proveedor" className="md:col-span-2">
+              <Input value={proveedor} onChange={(e) => setProveedor(e.target.value)} placeholder="Razón social" />
+            </Field>
+            <Field label="RUC" hint={ruc.length === 11 && !rucValido(ruc) ? "⚠ Dígito verificador inválido" : undefined}>
+              <Input
+                value={ruc}
+                maxLength={11}
+                inputMode="numeric"
+                onChange={(e) => setRuc(e.target.value.replace(/\D/g, ""))}
+                className={cn(ruc.length === 11 && (rucValido(ruc) ? "border-emerald-400" : "border-red-400"))}
+                placeholder="20XXXXXXXXX"
+              />
+            </Field>
+          </div>
+          {items.length > 0 && (
+            <>
+              <Table head={["Producto", "Marca", "Cant.", "Und.", "P. Unit. (sin IGV)", "Subtotal"]}>
+                {items.map((i, k) => (
+                  <tr key={i.itemReqId}>
+                    <Td className="font-medium">{i.nombre}</Td>
+                    <Td>{i.marca || "-"}</Td>
+                    <Td>{i.cantidad}</Td>
+                    <Td>{i.unidad}</Td>
+                    <Td>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={i.precioUnit || ""}
+                        onChange={(e) => {
+                          const v = parseFloat(e.target.value) || 0;
+                          setItems((p) => p.map((x, j) => (j === k ? { ...x, precioUnit: v, subtotal: r2(v * x.cantidad) } : x)));
+                        }}
+                        className="w-32 text-right"
+                      />
+                    </Td>
+                    <Td className="text-right font-medium">{soles(r2(i.cantidad * (i.precioUnit || 0)))}</Td>
+                  </tr>
+                ))}
+              </Table>
+              <Totales subtotal={subtotal} igv={igv} />
+            </>
+          )}
+          <div className="flex justify-end border-t border-slate-100 px-5 py-4">
+            <Button onClick={guardar} disabled={!reqId}>
+              <FileCheck2 size={16} /> Guardar cotización
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader title="Cotizaciones registradas" subtitle="★ = menor precio del requerimiento" />
+        <Table head={["Fecha", "Nro Coti", "Nro REQ", "Proveedor", "RUC", "Monto total", "Estado", "Acciones"]} empty={cotizaciones.length === 0}>
+          {cotizaciones.map((c) => (
+            <tr key={c.id} className="hover:bg-slate-50">
+              <Td>{fechaPE(c.fechaEmision)}</Td>
+              <Td className="font-semibold text-slate-900">{c.numero}</Td>
+              <Td>{c.reqNumero}</Td>
+              <Td>{c.proveedor}</Td>
+              <Td>{c.ruc}</Td>
+              <Td className="text-right font-semibold">
+                {minPorReq[c.reqId] === c.total && <span className="mr-1 text-amber-500">★</span>}
+                {soles(c.total)}
+              </Td>
+              <Td>
+                <Badge estado={c.estado} />
+              </Td>
+              <Td>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "COTI", id: c.id })}>
+                    <Eye size={15} />
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => pdfCotizacion(c)}>
+                    <FileText size={14} /> Ver PDF
+                  </Button>
+                  {c.estado === "REGISTRADA" && puede(rol, "oc.crear") && (
+                    <Button size="sm" onClick={() => onOC(c.id)}>
+                      Generar OC
+                    </Button>
+                  )}
+                </div>
+              </Td>
+            </tr>
+          ))}
+        </Table>
+      </Card>
+    </div>
+  );
+}
+
+function Totales({ subtotal, igv }: { subtotal: number; igv: number }) {
+  return (
+    <div className="flex justify-end px-5 py-3">
+      <dl className="w-72 space-y-1 text-sm">
+        <div className="flex justify-between text-slate-600">
+          <dt>Subtotal</dt>
+          <dd>{soles(subtotal)}</dd>
+        </div>
+        <div className="flex justify-between text-slate-600">
+          <dt>IGV 18%</dt>
+          <dd>{soles(igv)}</dd>
+        </div>
+        <div className="flex justify-between rounded-lg bg-slate-900 px-3 py-2 font-bold text-white">
+          <dt>TOTAL</dt>
+          <dd>{soles(r2(subtotal + igv))}</dd>
+        </div>
+      </dl>
+    </div>
+  );
+}
+
+// =====================================================================
+// ÓRDENES DE COMPRA
+// =====================================================================
+function Ordenes({
+  rol,
+  cotis,
+  todasCotis,
+  ordenes,
+  reqs,
+  preCoti,
+  onFacturar,
+}: {
+  rol: Rol;
+  cotis: Cotizacion[];
+  todasCotis: Cotizacion[];
+  ordenes: OrdenCompra[];
+  reqs: Requerimiento[];
+  preCoti?: string;
+  onFacturar: (id: string) => void;
+}) {
+  const [cotiId, setCotiId] = useState(preCoti ?? "");
+  const [fecha, setFecha] = useState(hoy());
+  const [formaPago, setFormaPago] = useState<FormaPago>("CREDITO 30 DIAS");
+  const [tiempo, setTiempo] = useState("");
+  const [lugar, setLugar] = useState("");
+  const coti = cotis.find((c) => c.id === cotiId);
+  const habilitado = puede(rol, "oc.crear");
+
+  useEffect(() => {
+    const sede = reqs.find((r) => r.id === coti?.reqId)?.sede;
+    if (sede) setLugar(sede);
+  }, [coti, reqs]);
+
+  const competidoras = coti ? todasCotis.filter((c) => c.reqId === coti.reqId) : [];
+  const minimo = competidoras.length ? Math.min(...competidoras.map((c) => c.total)) : 0;
+
+  const guardar = () => {
+    if (ejecutar(() => crearOrdenCompra({ cotizacionId: cotiId, fecha, formaPago, tiempoEntrega: tiempo, lugarEntrega: lugar }, rol), "Orden de compra emitida")) {
+      setCotiId("");
+      setTiempo("");
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {habilitado && (
+        <Card>
+          <CardHeader title="Emitir orden de compra" subtitle="Se genera desde una COTIZACIÓN (no directamente desde el REQ)." />
+          <div className="grid gap-4 p-5 md:grid-cols-3">
+            <Field label="Cotización" className="md:col-span-3">
+              <Select
+                value={cotiId}
+                onChange={(e) => setCotiId(e.target.value)}
+                placeholder={cotis.length ? "Seleccione Nro de cotización…" : "No hay cotizaciones disponibles"}
+                options={cotis.map((c) => ({ value: c.id, label: `${c.numero} · ${c.proveedor} · ${c.reqNumero} · ${soles(c.total)}` }))}
+              />
+            </Field>
+            <Field label="Fecha OC">
+              <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+            </Field>
+            <Field label="Forma de pago">
+              <Select value={formaPago} onChange={(e) => setFormaPago(e.target.value as FormaPago)} options={FORMAS_PAGO.map((f) => ({ value: f, label: f }))} />
+            </Field>
+            <Field label="Tiempo de entrega">
+              <Input value={tiempo} onChange={(e) => setTiempo(e.target.value)} placeholder="Ej: 5 días hábiles" />
+            </Field>
+            <Field label="Lugar de entrega" className="md:col-span-3">
+              <Input value={lugar} onChange={(e) => setLugar(e.target.value)} />
+            </Field>
+          </div>
+          {coti && (
+            <>
+              {competidoras.length > 1 && coti.total > minimo && (
+                <div className="mx-5 mb-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  <AlertTriangle size={16} /> Existe una cotización más barata para {coti.reqNumero} ({soles(minimo)}).
+                </div>
+              )}
+              <Table head={["Producto", "Marca", "Cant.", "Und.", "P. Unit.", "Subtotal"]}>
+                {coti.items.map((i) => (
+                  <tr key={i.itemReqId}>
+                    <Td className="font-medium">{i.nombre}</Td>
+                    <Td>{i.marca || "-"}</Td>
+                    <Td>{i.cantidad}</Td>
+                    <Td>{i.unidad}</Td>
+                    <Td className="text-right">{soles(i.precioUnit)}</Td>
+                    <Td className="text-right">{soles(i.subtotal)}</Td>
+                  </tr>
+                ))}
+              </Table>
+              <Totales subtotal={coti.subtotal} igv={coti.igv} />
+            </>
+          )}
+          <div className="flex justify-end border-t border-slate-100 px-5 py-4">
+            <Button onClick={guardar} disabled={!cotiId}>
+              <ShoppingBag size={16} /> Emitir OC
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader title="Órdenes de compra" />
+        <Table head={["Nro OC", "Fecha", "Proveedor", "Cotización", "REQ", "Forma pago", "Total", "Estado", "Acciones"]} empty={ordenes.length === 0}>
+          {ordenes.map((o) => (
+            <tr key={o.id} className="hover:bg-slate-50">
+              <Td className="font-semibold text-slate-900">{o.numero}</Td>
+              <Td>{fechaPE(o.fecha)}</Td>
+              <Td>{o.proveedor}</Td>
+              <Td>{o.cotizacionNumero}</Td>
+              <Td>{o.reqNumero}</Td>
+              <Td>{o.formaPago}</Td>
+              <Td className="text-right font-semibold">{soles(o.total)}</Td>
+              <Td>
+                <Badge estado={o.estado} />
+              </Td>
+              <Td>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "OC", id: o.id })}>
+                    <Eye size={15} />
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => pdfOrdenCompra(o)}>
+                    <FileText size={14} /> Ver PDF
+                  </Button>
+                  {o.estado === "EMITIDA" && puede(rol, "fac.crear") && (
+                    <Button size="sm" onClick={() => onFacturar(o.id)}>
+                      Registrar factura
+                    </Button>
+                  )}
+                </div>
+              </Td>
+            </tr>
+          ))}
+        </Table>
+      </Card>
+    </div>
+  );
+}
+
+// =====================================================================
+// FACTURAS + DECLARACIÓN JURADA
+// =====================================================================
+function Facturas({
+  rol,
+  ocs,
+  ordenes,
+  facturas,
+  preOc,
+  onGuia,
+}: {
+  rol: Rol;
+  ocs: OrdenCompra[];
+  ordenes: OrdenCompra[];
+  facturas: Factura[];
+  preOc?: string;
+  onGuia: (id: string) => void;
+}) {
+  const [modo, setModo] = useState<"FACTURA" | "DJ">("FACTURA");
+  const [ocId, setOcId] = useState(preOc ?? "");
+  const [numero, setNumero] = useState("");
+  const [fecha, setFecha] = useState(hoy());
+  const [venc, setVenc] = useState(hoy());
+  const [subtotal, setSubtotal] = useState(0);
+  // DJ
+  const [dni, setDni] = useState("");
+  const [vendedor, setVendedor] = useState("");
+  const [motivoDJ, setMotivoDJ] = useState("");
+  const [aprobador, setAprobador] = useState("");
+  const [filtroPago, setFiltroPago] = useState("");
+
+  const oc = ocs.find((o) => o.id === ocId);
+  const igv = r2(subtotal * IGV);
+  const difiere = oc && Math.abs(subtotal - oc.subtotal) > 0.01;
+
+  useEffect(() => {
+    if (oc) {
+      setSubtotal(oc.subtotal);
+      setVenc(sumarDias(fecha, DIAS_CREDITO[oc.formaPago]));
+    }
+  }, [oc, fecha]);
+
+  const guardar = () => {
+    const ok =
+      modo === "FACTURA"
+        ? ejecutar(() => crearFactura({ ocId, numero, fecha, fechaVencimiento: venc, subtotal }, rol), "Factura registrada")
+        : ejecutar(
+            () => crearDeclaracionJurada({ ocId, fecha, dniVendedor: dni, nombreVendedor: vendedor, motivoSinComprobante: motivoDJ, aprobadoPor: aprobador }, rol),
+            "Declaración jurada registrada"
+          );
+    if (ok) {
+      setOcId("");
+      setNumero("");
+      setDni("");
+      setVendedor("");
+      setMotivoDJ("");
+    }
+  };
+
+  const ocsDJ = ocs.filter((o) => o.subtotal <= TOPE_DJ);
+  const lista = facturas.filter((f) => !filtroPago || f.estadoPago === filtroPago);
+  const porPagar = r2(facturas.filter((f) => f.estadoPago === "POR_PAGAR").reduce((a, f) => a + f.total, 0));
+
+  return (
+    <div className="space-y-6">
+      {puede(rol, "fac.crear") && (
+        <Card>
+          <CardHeader
+            title={modo === "FACTURA" ? "Registrar factura" : "Declaración jurada de compra"}
+            subtitle={modo === "FACTURA" ? "Vinculada a una Orden de Compra. IGV y total se calculan automáticamente." : `Excepción: compras sin comprobante, tope ${soles(TOPE_DJ)}, requiere aprobación de Gerencia.`}
+            action={
+              <div className="flex rounded-lg bg-slate-100 p-0.5 text-sm">
+                {(["FACTURA", "DJ"] as const).map((m) => (
+                  <button key={m} onClick={() => { setModo(m); setOcId(""); }} className={cn("rounded-md px-3 py-1.5 font-medium", modo === m ? "bg-white shadow" : "text-slate-500")}>
+                    {m === "FACTURA" ? "Factura" : "Decl. Jurada"}
+                  </button>
+                ))}
+              </div>
+            }
+          />
+          <div className="grid gap-4 p-5 md:grid-cols-3">
+            <Field label="Orden de compra" className="md:col-span-3">
+              <Select
+                value={ocId}
+                onChange={(e) => setOcId(e.target.value)}
+                placeholder={(modo === "FACTURA" ? ocs : ocsDJ).length ? "Seleccione Nro OC…" : "No hay OC pendientes de comprobante"}
+                options={(modo === "FACTURA" ? ocs : ocsDJ).map((o) => ({ value: o.id, label: `${o.numero} · ${o.proveedor} · ${soles(o.total)} · ${o.formaPago}` }))}
+              />
+            </Field>
+            {modo === "FACTURA" ? (
+              <>
+                <Field label="Nro factura">
+                  <Input value={numero} onChange={(e) => setNumero(e.target.value.toUpperCase())} placeholder="F001-00001234" />
+                </Field>
+                <Field label="Fecha emisión">
+                  <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+                </Field>
+                <Field label="Fecha vencimiento" hint={oc ? `Según forma de pago: ${oc.formaPago}` : undefined}>
+                  <Input type="date" value={venc} onChange={(e) => setVenc(e.target.value)} />
+                </Field>
+                <Field label="Proveedor">
+                  <Input value={oc ? `${oc.proveedor} (${oc.ruc})` : ""} disabled />
+                </Field>
+                <Field label="Subtotal (base imponible)" hint={difiere ? `⚠ Difiere de la OC (${soles(oc!.subtotal)})` : undefined}>
+                  <Input type="number" step="0.01" value={subtotal || ""} onChange={(e) => setSubtotal(parseFloat(e.target.value) || 0)} className={cn("text-right", difiere && "border-amber-400")} />
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="IGV 18%">
+                    <Input value={soles(igv)} disabled className="text-right" />
+                  </Field>
+                  <Field label="Total">
+                    <Input value={soles(r2(subtotal + igv))} disabled className="text-right font-bold" />
+                  </Field>
+                </div>
+              </>
+            ) : (
+              <>
+                {rol !== "GERENCIA" && (
+                  <div className="flex items-center gap-2 rounded-lg bg-fuchsia-50 px-3 py-2 text-sm text-fuchsia-800 md:col-span-3">
+                    <AlertTriangle size={16} /> Solo el rol GERENCIA puede aprobar una declaración jurada. Cambie de rol en el menú lateral.
+                  </div>
+                )}
+                <Field label="DNI vendedor">
+                  <Input value={dni} maxLength={8} inputMode="numeric" onChange={(e) => setDni(e.target.value.replace(/\D/g, ""))} />
+                </Field>
+                <Field label="Nombre del vendedor" className="md:col-span-2">
+                  <Input value={vendedor} onChange={(e) => setVendedor(e.target.value)} />
+                </Field>
+                <Field label="Fecha">
+                  <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+                </Field>
+                <Field label="Aprobado por" className="md:col-span-2">
+                  <Input value={aprobador} onChange={(e) => setAprobador(e.target.value)} placeholder="Nombre del gerente" />
+                </Field>
+                <Field label="Motivo (¿por qué no hay comprobante?)" className="md:col-span-3">
+                  <Textarea value={motivoDJ} onChange={(e) => setMotivoDJ(e.target.value)} placeholder="Ej: compra en zona rural a persona natural sin RUC" />
+                </Field>
+                {oc && (
+                  <p className="text-sm text-slate-600 md:col-span-3">
+                    Monto a declarar: <b>{soles(oc.subtotal)}</b> (sin IGV, sin crédito fiscal)
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+          <div className="flex justify-end border-t border-slate-100 px-5 py-4">
+            <Button onClick={guardar} disabled={!ocId || (modo === "DJ" && rol !== "GERENCIA")}>
+              <Receipt size={16} /> {modo === "FACTURA" ? "Registrar factura" : "Aprobar declaración jurada"}
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader
+          title="Facturas y comprobantes"
+          subtitle={`Total por pagar: ${soles(porPagar)}`}
+          action={
+            <Select
+              value={filtroPago}
+              onChange={(e) => setFiltroPago(e.target.value)}
+              placeholder="Todos"
+              options={[
+                { value: "POR_PAGAR", label: "Por pagar" },
+                { value: "PAGADA", label: "Pagadas" },
+              ]}
+              className="w-40"
+            />
+          }
+        />
+        <Table head={["Tipo", "Nro", "Fecha", "Vence", "Proveedor", "OC", "Subtotal", "IGV", "Total", "Pago", "Acciones"]} empty={lista.length === 0}>
+          {lista.map((f) => {
+            const vencida = f.estadoPago === "POR_PAGAR" && f.fechaVencimiento < hoy();
+            return (
+              <tr key={f.id} className="hover:bg-slate-50">
+                <Td>
+                  <Badge estado={f.tipo} />
+                </Td>
+                <Td className="font-semibold text-slate-900">{f.numero}</Td>
+                <Td>{fechaPE(f.fecha)}</Td>
+                <Td className={cn(vencida && "font-semibold text-red-600")}>{fechaPE(f.fechaVencimiento)}</Td>
+                <Td>{f.proveedor}</Td>
+                <Td>{f.ocNumero}</Td>
+                <Td className="text-right">{soles(f.subtotal)}</Td>
+                <Td className="text-right">{soles(f.igv)}</Td>
+                <Td className="text-right font-semibold">{soles(f.total)}</Td>
+                <Td>
+                  <button
+                    disabled={!puede(rol, "fac.pagar")}
+                    onClick={() => ejecutar(() => marcarPago(f.id, f.estadoPago === "POR_PAGAR", rol), f.estadoPago === "POR_PAGAR" ? `${f.numero} marcada como pagada` : `${f.numero} revertida a por pagar`)}
+                    title="Cambiar estado de pago"
+                    className="disabled:cursor-not-allowed"
+                  >
+                    <Badge estado={f.estadoPago} />
+                  </button>
+                </Td>
+                <Td>
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "FACTURA", id: f.id })}>
+                      <Eye size={15} />
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => pdfFactura(f, ordenes.find((o) => o.id === f.ocId))}>
+                      <FileText size={14} /> PDF
+                    </Button>
+                    {f.tipo === "FACTURA" && ordenes.find((o) => o.id === f.ocId)?.estado === "FACTURADA" && puede(rol, "guia.crear") && (
+                      <Button size="sm" onClick={() => onGuia(f.id)}>
+                        Subir guía
+                      </Button>
+                    )}
+                  </div>
+                </Td>
+              </tr>
+            );
+          })}
+        </Table>
+      </Card>
+    </div>
+  );
+}
+
+// =====================================================================
+// GUÍAS DE REMISIÓN (drag & drop)
+// =====================================================================
+function Guias({ rol, facturas, guias, preFac }: { rol: Rol; facturas: Factura[]; guias: Guia[]; preFac?: string }) {
+  const [facId, setFacId] = useState(preFac ?? "");
+  const [numero, setNumero] = useState("");
+  const [fecha, setFecha] = useState(hoy());
+  const [archivo, setArchivo] = useState<{ nombre: string; tipo: string; url: string } | null>(null);
+  const [drag, setDrag] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const fac = facturas.find((f) => f.id === facId);
+  const observada = guias.find((g) => g.facturaId === facId && g.estado === "OBSERVADA");
+
+  const cargar = (file: File | undefined) => {
+    if (!file) return;
+    if (!/^(image\/(png|jpe?g|webp)|application\/pdf)$/.test(file.type)) {
+      toast("Formato no permitido. Use PDF, JPG, PNG o WEBP.", "error");
+      return;
+    }
+    if (file.size > MAX_ARCHIVO) {
+      toast(`El archivo pesa ${(file.size / 1048576).toFixed(1)} MB. Máximo 1.5 MB (comprima o escanee en menor resolución).`, "error");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setArchivo({ nombre: file.name, tipo: file.type, url: String(reader.result) });
+    reader.readAsDataURL(file);
+  };
+
+  const onDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDrag(false);
+    cargar(e.dataTransfer.files[0]);
+  };
+
+  const guardar = () => {
+    const ok = ejecutar(
+      () =>
+        crearGuia(
+          { facturaId: facId, numero, fecha, archivoNombre: archivo?.nombre ?? "", archivoTipo: archivo?.tipo ?? "", archivoDataUrl: archivo?.url ?? "" },
+          rol
+        ),
+      "Guía cargada. Almacén ya puede dar el visto bueno."
+    );
+    if (ok) {
+      setFacId("");
+      setNumero("");
+      setArchivo(null);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {puede(rol, "guia.crear") && (
+        <Card>
+          <CardHeader title="Cargar guía de remisión" subtitle="Suba la guía escaneada (PDF o imagen) vinculada a la factura / OC." />
+          <div className="grid gap-5 p-5 lg:grid-cols-2">
+            <div className="space-y-4">
+              <Field label="Factura / OC">
+                <Select
+                  value={facId}
+                  onChange={(e) => setFacId(e.target.value)}
+                  placeholder={facturas.length ? "Seleccione factura…" : "No hay facturas pendientes de guía"}
+                  options={facturas.map((f) => ({ value: f.id, label: `${f.numero} · ${f.ocNumero} · ${f.proveedor}` }))}
+                />
+              </Field>
+              {observada && (
+                <div className="rounded-lg bg-orange-50 px-3 py-2 text-sm text-orange-800">
+                  Guía {observada.numero} fue OBSERVADA por almacén: {observada.historial[observada.historial.length - 1]?.detalle}. Cargue la guía corregida.
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Nro guía">
+                  <Input value={numero} onChange={(e) => setNumero(e.target.value.toUpperCase())} placeholder="T001-000123" />
+                </Field>
+                <Field label="Fecha">
+                  <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+                </Field>
+              </div>
+              {fac && (
+                <p className="text-sm text-slate-600">
+                  Proveedor: <b>{fac.proveedor}</b> · Total factura: <b>{soles(fac.total)}</b>
+                </p>
+              )}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDrag(true);
+                }}
+                onDragLeave={() => setDrag(false)}
+                onDrop={onDrop}
+                onClick={() => inputRef.current?.click()}
+                className={cn(
+                  "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-10 text-center transition",
+                  drag ? "border-slate-900 bg-slate-100" : "border-slate-300 hover:border-slate-400 hover:bg-slate-50"
+                )}
+              >
+                <Upload size={28} className="text-slate-400" />
+                <p className="text-sm font-medium text-slate-700">{archivo ? archivo.nombre : "Arrastre aquí la guía o haga clic"}</p>
+                <p className="text-xs text-slate-400">PDF, JPG, PNG · máx. 1.5 MB</p>
+                <input ref={inputRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={(e) => cargar(e.target.files?.[0])} />
+              </div>
+            </div>
+            <div className="min-h-[300px] overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+              {!archivo ? (
+                <div className="flex h-full items-center justify-center text-sm text-slate-400">Vista previa</div>
+              ) : archivo.tipo.startsWith("image/") ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={archivo.url} alt="Vista previa guía" className="h-full max-h-[460px] w-full object-contain" />
+              ) : (
+                <iframe src={archivo.url} title="Vista previa guía" className="h-[460px] w-full" />
+              )}
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
+            {archivo && (
+              <Button variant="secondary" onClick={() => setArchivo(null)}>
+                Quitar archivo
+              </Button>
+            )}
+            <Button onClick={guardar} disabled={!facId || !archivo}>
+              <Truck size={16} /> Guardar guía
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader title="Guías de remisión" />
+        {guias.length === 0 ? (
+          <div className="p-5">
+            <Empty icon={<Truck size={28} />} text="Aún no se cargan guías" />
+          </div>
+        ) : (
+          <Table head={["Nro guía", "Fecha", "Factura", "OC", "Archivo", "Estado", ""]}>
+            {guias.map((g) => (
+              <tr key={g.id} className="hover:bg-slate-50">
+                <Td className="font-semibold text-slate-900">{g.numero}</Td>
+                <Td>{fechaPE(g.fecha)}</Td>
+                <Td>{g.facturaNumero}</Td>
+                <Td>{g.ocNumero}</Td>
+                <Td className="max-w-[200px] truncate">{g.archivoNombre}</Td>
+                <Td>
+                  <Badge estado={g.estado} />
+                </Td>
+                <Td>
+                  <Button size="sm" variant="secondary" onClick={() => abrirDoc({ tipo: "GUIA", id: g.id })}>
+                    <Eye size={14} /> Ver
+                  </Button>
+                </Td>
+              </tr>
+            ))}
+          </Table>
+        )}
+      </Card>
+    </div>
+  );
+}

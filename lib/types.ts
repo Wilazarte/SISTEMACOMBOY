@@ -1,0 +1,142 @@
+// =====================================================================
+// ERP COMBOY VID — Tipos del módulo de Compras
+// =====================================================================
+
+export type Rol = "ALMACEN" | "TESORERIA" | "GERENCIA" | "CONTADOR";
+
+export type EstadoReq =
+  | "PENDIENTE"
+  | "ACEPTADO"
+  | "OBSERVADO"
+  | "COTIZADO"
+  | "COMPRADO"
+  | "FINALIZADO";
+
+export interface EventoHistorial {
+  fecha: string; // ISO
+  accion: string;
+  usuario: Rol;
+  detalle?: string;
+}
+
+export interface ItemReq {
+  id: string;
+  nombre: string;
+  cantidad: number;
+  unidad: string;
+  marca: string;
+  caracteristica: string;
+}
+
+export interface Requerimiento {
+  id: string;
+  numero: string; // REQ-ALM-001
+  fecha: string; // YYYY-MM-DD
+  sede: string;
+  solicitante: string;
+  motivo: string;
+  items: ItemReq[];
+  estado: EstadoReq;
+  observacion?: string;
+  historial: EventoHistorial[];
+}
+
+export interface ItemPrecio {
+  itemReqId: string;
+  nombre: string;
+  cantidad: number;
+  unidad: string;
+  marca: string;
+  precioUnit: number; // valor unitario SIN IGV
+  subtotal: number;
+}
+
+export interface Cotizacion {
+  id: string;
+  numero: string; // Nro de cotización del proveedor
+  fechaEmision: string;
+  reqId: string;
+  reqNumero: string;
+  proveedor: string;
+  ruc: string;
+  items: ItemPrecio[];
+  subtotal: number;
+  igv: number;
+  total: number;
+  estado: "REGISTRADA" | "CON_OC";
+  historial: EventoHistorial[];
+}
+
+export type FormaPago = "CONTADO" | "CREDITO 15 DIAS" | "CREDITO 30 DIAS" | "CREDITO 60 DIAS" | "ADELANTO 50%";
+
+export type EstadoOC = "EMITIDA" | "FACTURADA" | "EN_GUIA" | "FINALIZADA";
+
+export interface OrdenCompra {
+  id: string;
+  numero: string; // OC-2026-0001
+  fecha: string;
+  cotizacionId: string;
+  cotizacionNumero: string;
+  reqId: string;
+  reqNumero: string;
+  proveedor: string;
+  ruc: string;
+  formaPago: FormaPago;
+  tiempoEntrega: string;
+  lugarEntrega: string;
+  items: ItemPrecio[];
+  subtotal: number;
+  igv: number;
+  total: number;
+  estado: EstadoOC;
+  vistoBueno?: VistoBueno;
+  historial: EventoHistorial[];
+}
+
+export type TipoComprobante = "FACTURA" | "DECLARACION_JURADA";
+
+export interface Factura {
+  id: string;
+  tipo: TipoComprobante;
+  numero: string; // F001-00001234 o DJ-001
+  fecha: string;
+  fechaVencimiento: string;
+  ocId: string;
+  ocNumero: string;
+  reqId: string;
+  reqNumero: string;
+  proveedor: string;
+  ruc: string; // en DJ: DNI del vendedor
+  subtotal: number;
+  igv: number;
+  total: number;
+  estadoPago: "POR_PAGAR" | "PAGADA";
+  // Solo DJ
+  motivoSinComprobante?: string;
+  aprobadoPor?: string;
+  historial: EventoHistorial[];
+}
+
+export interface Guia {
+  id: string;
+  numero: string; // T001-000123
+  fecha: string;
+  facturaId: string;
+  facturaNumero: string;
+  ocId: string;
+  ocNumero: string;
+  reqId: string;
+  archivoNombre: string;
+  archivoTipo: string;
+  archivoDataUrl: string;
+  estado: "PENDIENTE_VB" | "OBSERVADA" | "CONFORME";
+  historial: EventoHistorial[];
+}
+
+export interface VistoBueno {
+  fecha: string;
+  recibidoPor: string;
+  observaciones: string;
+}
+
+export type TipoDoc = "REQ" | "COTI" | "OC" | "FACTURA" | "GUIA";
