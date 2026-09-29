@@ -11,8 +11,11 @@ import {
   FileText,
   History,
   MessageSquareWarning,
+  PackagePlus,
+  Plus,
   Receipt,
   ShoppingBag,
+  Trash2,
   Truck,
   Upload,
   X,
@@ -30,22 +33,27 @@ import {
   crearFactura,
   crearGuia,
   crearOrdenCompra,
+  crearProveedor,
   fechaPE,
   hoy,
   marcarPago,
   observarRequerimiento,
+  parseFechaPE,
   puede,
   r2,
   rechazarRequerimiento,
+  registrarCompra,
   rucValido,
   soles,
+  uid,
   useRol,
   useStore,
 } from "@/lib/storage";
+import { SEDES, UNIDADES } from "@/lib/empresa";
 import { pdfCotizacion, pdfFactura, pdfOrdenCompra, pdfRequerimiento } from "@/lib/pdf";
-import type { Cotizacion, Factura, FormaPago, Guia, ItemPrecio, OrdenCompra, Requerimiento, Rol } from "@/lib/types";
+import type { Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, Proveedor, Requerimiento, Rol, StockItem, TipoComprobanteCompra } from "@/lib/types";
 
-type Tab = "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias";
+type Tab = "registrar" | "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias";
 
 const FORMAS_PAGO: FormaPago[] = ["CONTADO", "CREDITO 15 DIAS", "CREDITO 30 DIAS", "CREDITO 60 DIAS", "ADELANTO 50%"];
 const DIAS_CREDITO: Record<FormaPago, number> = {
@@ -71,8 +79,11 @@ export default function ComprasPage() {
   const ordenes = useStore<OrdenCompra[]>(KEYS.ORDENES, []);
   const facturas = useStore<Factura[]>(KEYS.FACTURAS, []);
   const guias = useStore<Guia[]>(KEYS.GUIAS, []);
+  const proveedores = useStore<Proveedor[]>(KEYS.PROVEEDORES, []);
+  const compras = useStore<Compra[]>(KEYS.COMPRAS, []);
+  const stock = useStore<StockItem[]>(KEYS.STOCK, []);
 
-  const [tab, setTab] = useState<Tab>("antecedentes");
+  const [tab, setTab] = useState<Tab>(puede(rol, "compra.crear") ? "registrar" : "antecedentes");
   const [pre, setPre] = useState<{ req?: string; coti?: string; oc?: string; fac?: string }>({});
 
   const ir = (t: Tab, p: typeof pre = {}) => {
@@ -104,6 +115,7 @@ export default function ComprasPage() {
         value={tab}
         onChange={(t) => ir(t)}
         tabs={[
+          { id: "registrar", label: "Registrar compra", icon: <PackagePlus size={16} /> },
           { id: "antecedentes", label: "Antecedentes", icon: <History size={16} /> },
           { id: "cotizaciones", label: "Cotizaciones", icon: <FileSpreadsheet size={16} />, count: cotizables.filter((r) => r.estado === "ACEPTADO").length },
           { id: "ordenes", label: "Órdenes de compra", icon: <ShoppingBag size={16} />, count: cotisSinOC.length },
@@ -112,6 +124,7 @@ export default function ComprasPage() {
         ]}
       />
 
+      {tab === "registrar" && <RegistrarCompra rol={rol} proveedores={proveedores} compras={compras} stock={stock} />}
       {tab === "antecedentes" && <Antecedentes reqs={procesados} ordenes={ordenes} rol={rol} onCotizar={(id) => ir("cotizaciones", { req: id })} />}
       {tab === "cotizaciones" && (
         <Cotizaciones key={pre.req ?? "c"} rol={rol} reqs={cotizables} cotizaciones={cotizaciones} preReq={pre.req} onOC={(id) => ir("ordenes", { coti: id })} />
@@ -224,6 +237,218 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
         </div>
       </Modal>
     </section>
+  );
+}
+
+// =====================================================================
+// REGISTRAR COMPRA (proveedor + comprobante + productos -> stock)
+// =====================================================================
+type FilaCompra = Omit<ItemCompra, "subtotal">;
+const filaVacia = (): FilaCompra => ({ id: uid(), nombre: "", unidad: "UND", cantidad: 1, precioUnit: 0 });
+
+/** Máscara DD/MM/AAAA mientras se escribe: solo dígitos y barras automáticas. */
+const mascaraFecha = (v: string): string => {
+  const d = v.replace(/\D/g, "").slice(0, 8);
+  return [d.slice(0, 2), d.slice(2, 4), d.slice(4, 8)].filter(Boolean).join("/");
+};
+
+function RegistrarCompra({ rol, proveedores, compras, stock }: { rol: Rol; proveedores: Proveedor[]; compras: Compra[]; stock: StockItem[] }) {
+  const [proveedorId, setProveedorId] = useState("");
+  const [nuevoProv, setNuevoProv] = useState<{ razonSocial: string; ruc: string } | null>(null);
+  const [fechaTxt, setFechaTxt] = useState(fechaPE(hoy()));
+  const [tipo, setTipo] = useState<TipoComprobanteCompra>("FACTURA");
+  const [numero, setNumero] = useState("");
+  const [sede, setSede] = useState(SEDES[0]);
+  const [filas, setFilas] = useState<FilaCompra[]>([filaVacia()]);
+  const habilitado = puede(rol, "compra.crear");
+
+  const fechaISO = parseFechaPE(fechaTxt);
+  const fechaError = fechaTxt.length === 10 && !fechaISO ? "Fecha inexistente" : fechaISO > hoy() ? "La fecha no puede ser futura" : undefined;
+  const subtotal = r2(filas.reduce((a, i) => a + r2((i.cantidad || 0) * (i.precioUnit || 0)), 0));
+  const igv = r2(subtotal * IGV);
+  const prov = proveedores.find((p) => p.id === proveedorId);
+  const set = (id: string, campo: keyof FilaCompra, v: string | number) => setFilas((p) => p.map((i) => (i.id === id ? { ...i, [campo]: v } : i)));
+  const productosStock = useMemo(() => Array.from(new Set(stock.map((s) => s.nombre))).sort(), [stock]);
+
+  const guardarProveedor = () => {
+    if (!nuevoProv) return;
+    let creado: Proveedor | undefined;
+    if (ejecutar(() => (creado = crearProveedor(nuevoProv)), "Proveedor registrado")) {
+      setProveedorId(creado!.id);
+      setNuevoProv(null);
+    }
+  };
+
+  const guardar = () => {
+    const ok = ejecutar(
+      () => registrarCompra({ proveedorId, fecha: fechaISO, tipoComprobante: tipo, numero, sede, items: filas }, rol),
+      `Compra registrada · stock de ${sede} actualizado`
+    );
+    if (ok) {
+      setNumero("");
+      setFilas([filaVacia()]);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {habilitado && (
+        <Card>
+          <CardHeader title="Registrar compra" subtitle="Compra con factura o boleta. Al guardar, los productos ingresan al stock del almacén seleccionado." />
+          <div className="grid gap-4 p-5 md:grid-cols-3">
+            <Field label="Proveedor" className="md:col-span-2" hint={prov ? `RUC ${prov.ruc}` : undefined}>
+              <div className="flex gap-2">
+                <Select
+                  value={proveedorId}
+                  onChange={(e) => setProveedorId(e.target.value)}
+                  placeholder={proveedores.length ? "Seleccione proveedor…" : "Registre un proveedor →"}
+                  options={proveedores.map((p) => ({ value: p.id, label: `${p.razonSocial} · ${p.ruc}` }))}
+                />
+                <Button type="button" variant="secondary" onClick={() => setNuevoProv({ razonSocial: "", ruc: "" })} title="Nuevo proveedor">
+                  <Plus size={16} />
+                </Button>
+              </div>
+            </Field>
+            <Field label="Fecha de compra" hint={fechaError ? `⚠ ${fechaError}` : "DD/MM/AAAA"}>
+              <Input
+                value={fechaTxt}
+                inputMode="numeric"
+                placeholder="DD/MM/AAAA"
+                maxLength={10}
+                onChange={(e) => setFechaTxt(mascaraFecha(e.target.value))}
+                className={cn(fechaError && "border-red-400")}
+              />
+            </Field>
+            <Field label="Comprobante">
+              <Select value={tipo} onChange={(e) => setTipo(e.target.value as TipoComprobanteCompra)} options={[{ value: "FACTURA", label: "Factura" }, { value: "BOLETA", label: "Boleta de venta" }]} />
+            </Field>
+            <Field label={`N° ${tipo === "FACTURA" ? "factura" : "boleta"}`}>
+              <Input value={numero} onChange={(e) => setNumero(e.target.value.toUpperCase())} placeholder={tipo === "FACTURA" ? "F001-00001234" : "B001-00000456"} />
+            </Field>
+            <Field label="Ingresa a almacén">
+              <Select value={sede} onChange={(e) => setSede(e.target.value)} options={SEDES.map((x) => ({ value: x, label: x }))} />
+            </Field>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="w-8 px-3 py-2 text-left">#</th>
+                  <th className="px-2 py-2 text-left">Producto *</th>
+                  <th className="w-28 px-2 py-2 text-left">Unidad</th>
+                  <th className="w-28 px-2 py-2 text-left">Cantidad *</th>
+                  <th className="w-36 px-2 py-2 text-left">P. Unit. (sin IGV) *</th>
+                  <th className="w-32 px-2 py-2 text-right">Subtotal</th>
+                  <th className="w-10" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filas.map((i, k) => (
+                  <tr key={i.id}>
+                    <td className="px-3 py-1.5 text-slate-400">{k + 1}</td>
+                    <td className="px-2 py-1.5">
+                      <Input value={i.nombre} list="productos-stock" onChange={(e) => set(i.id, "nombre", e.target.value)} placeholder="Ej: Rodamiento 6205" />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <Select value={i.unidad} onChange={(e) => set(i.id, "unidad", e.target.value)} options={UNIDADES.map((u) => ({ value: u, label: u }))} />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <Input type="number" min={0} step="any" value={i.cantidad || ""} onChange={(e) => set(i.id, "cantidad", parseFloat(e.target.value) || 0)} className="text-right" />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <Input type="number" min={0} step="0.01" value={i.precioUnit || ""} onChange={(e) => set(i.id, "precioUnit", parseFloat(e.target.value) || 0)} className="text-right" />
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-medium">{soles(r2((i.cantidad || 0) * (i.precioUnit || 0)))}</td>
+                    <td className="px-2 py-1.5">
+                      <button
+                        onClick={() => setFilas((p) => (p.length > 1 ? p.filter((x) => x.id !== i.id) : [filaVacia()]))}
+                        className="rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                        aria-label="Eliminar fila"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <datalist id="productos-stock">
+              {productosStock.map((n) => (
+                <option key={n} value={n} />
+              ))}
+            </datalist>
+          </div>
+          <div className="px-5 pt-3">
+            <Button size="sm" variant="secondary" onClick={() => setFilas((p) => [...p, filaVacia()])}>
+              <Plus size={14} /> Agregar producto
+            </Button>
+          </div>
+          <Totales subtotal={subtotal} igv={igv} />
+          <div className="flex justify-end border-t border-slate-100 px-5 py-4">
+            <Button onClick={guardar} disabled={!proveedorId || !fechaISO}>
+              <PackagePlus size={16} /> Guardar compra e ingresar a stock
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader title="Compras registradas" subtitle={`${compras.length} compra(s) · Total ${soles(r2(compras.reduce((a, c) => a + c.total, 0)))}`} />
+        <Table head={["Fecha", "Comprobante", "Proveedor", "RUC", "Almacén", "Items", "Subtotal", "IGV", "Total"]} empty={compras.length === 0}>
+          {compras.map((c) => (
+            <tr key={c.id} className="hover:bg-slate-50">
+              <Td>{fechaPE(c.fecha)}</Td>
+              <Td>
+                <span className="font-semibold text-slate-900">{c.numero}</span>
+                <p className="text-xs text-slate-500">{c.tipoComprobante === "FACTURA" ? "Factura" : "Boleta"}</p>
+              </Td>
+              <Td>{c.proveedor}</Td>
+              <Td>{c.ruc}</Td>
+              <Td>{c.sede}</Td>
+              <Td>
+                <span title={c.items.map((i) => `${i.cantidad} ${i.unidad} ${i.nombre}`).join("\n")}>{c.items.length}</span>
+              </Td>
+              <Td className="text-right">{soles(c.subtotal)}</Td>
+              <Td className="text-right">{soles(c.igv)}</Td>
+              <Td className="text-right font-semibold">{soles(c.total)}</Td>
+            </tr>
+          ))}
+        </Table>
+      </Card>
+
+      <Modal open={!!nuevoProv} onClose={() => setNuevoProv(null)} title="Nuevo proveedor">
+        {nuevoProv && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              guardarProveedor();
+            }}
+            className="space-y-4"
+          >
+            <Field label="Razón social">
+              <Input value={nuevoProv.razonSocial} onChange={(e) => setNuevoProv({ ...nuevoProv, razonSocial: e.target.value })} autoFocus />
+            </Field>
+            <Field label="RUC" hint={nuevoProv.ruc.length === 11 && !rucValido(nuevoProv.ruc) ? "⚠ Dígito verificador inválido" : undefined}>
+              <Input
+                value={nuevoProv.ruc}
+                maxLength={11}
+                inputMode="numeric"
+                onChange={(e) => setNuevoProv({ ...nuevoProv, ruc: e.target.value.replace(/\D/g, "") })}
+                className={cn(nuevoProv.ruc.length === 11 && (rucValido(nuevoProv.ruc) ? "border-emerald-400" : "border-red-400"))}
+                placeholder="20XXXXXXXXX"
+              />
+            </Field>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={() => setNuevoProv(null)}>
+                Cancelar
+              </Button>
+              <Button type="submit">Guardar proveedor</Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+    </div>
   );
 }
 

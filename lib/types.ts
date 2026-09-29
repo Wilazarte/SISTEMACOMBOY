@@ -161,3 +161,50 @@ export interface Trabajador {
   afpPorcentaje: number; // ej. 13
   activo: boolean;
 }
+
+// =====================================================================
+// Compras directas y stock de almacén
+// =====================================================================
+
+export interface Proveedor {
+  id: string;
+  razonSocial: string;
+  ruc: string;
+}
+
+export type TipoComprobanteCompra = "FACTURA" | "BOLETA";
+
+export interface ItemCompra {
+  id: string;
+  nombre: string;
+  unidad: string;
+  cantidad: number;
+  precioUnit: number; // valor unitario SIN IGV
+  subtotal: number;
+}
+
+export interface Compra {
+  id: string;
+  fecha: string; // YYYY-MM-DD (se muestra DD/MM/YYYY)
+  proveedorId: string;
+  proveedor: string;
+  ruc: string;
+  tipoComprobante: TipoComprobanteCompra;
+  numero: string; // F001-00001234 / B001-00000456
+  sede: string; // almacén donde ingresa
+  items: ItemCompra[];
+  subtotal: number;
+  igv: number;
+  total: number;
+  historial: EventoHistorial[];
+}
+
+export interface StockItem {
+  id: string;
+  sede: string;
+  nombre: string;
+  unidad: string;
+  cantidad: number;
+  costoUnit: number; // último costo de compra sin IGV
+  actualizado: string; // ISO
+}
