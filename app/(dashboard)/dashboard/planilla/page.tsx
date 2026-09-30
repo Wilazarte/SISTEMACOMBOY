@@ -1,34 +1,41 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, Calculator, Eye, FileDown, Pencil, Plus, Power, Trash2, Upload, Users } from "lucide-react";
+import { AlertTriangle, Calculator, Eye, FileDown, Lock, Pencil, Plus, Power, Trash2, Upload, Users } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, cn, ejecutar, toast } from "@/components/ui";
 import {
   AFP_OPTIONS,
+  KEYS,
+  MSG_ASISTENCIA_BLOQUEADA,
   TIPOS_SUELDO,
   cambiarEstadoTrabajador,
   eliminarTrabajador,
   fechaPE,
   guardarTrabajador,
   hoy,
+  idAsistencia,
+  importarAsistenciaReloj,
+  normalizarPeriodo,
   r2,
   registrarDesdeAsistencia,
   soles,
   trabajadorVacio,
+  useStore,
   useTrabajadores,
 } from "@/lib/storage";
 import { getSesion } from "@/lib/auth";
-import type { TipoAfp, TipoSueldo, Trabajador } from "@/lib/types";
+import type { AsistenciaPeriodo, TipoAfp, TipoSueldo, Trabajador } from "@/lib/types";
 
 type Tab = "trabajadores" | "planilla";
 
 /** Marcaciones del reloj agrupadas: N° huella -> { nombre, fecha -> horas marcadas } */
-type Asistencia = Map<string, { nombre: string; fechas: Map<string, string[]> }>;
+type Marcaciones = Map<string, { nombre: string; fechas: Map<string, string[]> }>;
 
 type TrabajadorCalc = Trabajador & {
   dias: number;
   horas: number;
   tardanzas: number;
+  origen?: AsistenciaPeriodo["origen_edicion"];
   bruto: number;
   descuentoAfp: number;
   neto: number;
@@ -58,34 +65,58 @@ function antiguedad(fechaIngreso: string): string {
   return `${a} año${a > 1 ? "s" : ""}${r ? ` ${r} m` : ""}`;
 }
 
-function calcular(t: Trabajador, asistencia: Asistencia): TrabajadorCalc {
-  const asis = asistencia.get(t.id);
+/** Resume las marcaciones de un trabajador: días con marcación y días con entrada después de las 08:15. */
+function resumir(fechas: Map<string, string[]>): { dias: number; tardanzas: number } {
   let dias = 0;
   let tardanzas = 0;
-  asis?.fechas.forEach((tiempos) => {
+  fechas.forEach((tiempos) => {
     dias++;
     const entrada = [...tiempos].map((x) => normalizarHora(x.split(" ")[1] ?? "")).sort()[0] ?? "";
     if (entrada > HORA_TARDANZA) tardanzas++;
   });
+  return { dias, tardanzas };
+}
+
+/** BRUTO, DSCTO y NETO se calculan siempre desde DÍAS (no se editan a mano). */
+function calcular(t: Trabajador, registro?: AsistenciaPeriodo): TrabajadorCalc {
+  const dias = registro?.dias ?? 0;
+  const tardanzas = registro?.tardanzas ?? 0;
   const bruto = r2((t.sueldo / TIPOS_SUELDO[t.tipoSueldo].divisor) * dias);
   const descuentoAfp = r2(bruto * (t.afpPorcentaje / 100));
-  return { ...t, dias, horas: dias * 8, tardanzas, bruto, descuentoAfp, neto: r2(bruto - descuentoAfp) };
+  return { ...t, dias, horas: dias * 8, tardanzas, bruto, descuentoAfp, neto: r2(bruto - descuentoAfp), origen: registro?.origen_edicion };
+}
+
+/** DÍAS / TARD.: solo lectura en esta vista (se editan en Importar asistencia o el Módulo Creador). */
+function CampoBloqueado({ valor, alerta }: { valor: number; alerta?: boolean }) {
+  return (
+    <span className={cn("readonly-field", alerta && "text-orange-600")} title={MSG_ASISTENCIA_BLOQUEADA} aria-readonly="true" contentEditable={false}>
+      <Lock size={11} aria-hidden="true" />
+      {valor}
+    </span>
+  );
 }
 
 export default function PlanillaPage() {
   const trabajadores = useTrabajadores();
   const soloLectura = !!getSesion()?.soloLectura; // Gerencia: ver sin editar
   const [tab, setTab] = useState<Tab>("trabajadores");
-  const [asistencia, setAsistencia] = useState<Asistencia>(new Map());
+  const asistencia = useStore<AsistenciaPeriodo[]>(KEYS.ASISTENCIA, []);
   const [periodo, setPeriodo] = useState("SEMANA 14 - ABRIL 2026");
+  const [importando, setImportando] = useState(false);
   const [boletaSel, setBoletaSel] = useState<TrabajadorCalc | null>(null);
   const [editando, setEditando] = useState<{ form: Trabajador; idOriginal?: string } | null>(null);
   const [verInactivos, setVerInactivos] = useState(false);
 
   const incompletos = trabajadores.filter((t) => t.activo && !t.fechaIngreso);
+  // Asistencia guardada en Supabase para el periodo elegido
+  const delPeriodo = useMemo(() => {
+    const m = new Map<string, AsistenciaPeriodo>();
+    asistencia.filter((a) => a.periodo === normalizarPeriodo(periodo)).forEach((a) => m.set(a.id, a));
+    return m;
+  }, [asistencia, periodo]);
   const calculados = useMemo(
-    () => trabajadores.filter((t) => t.activo).map((t) => calcular(t, asistencia)),
-    [trabajadores, asistencia]
+    () => trabajadores.filter((t) => t.activo).map((t) => calcular(t, delPeriodo.get(idAsistencia(periodo, t.id)))),
+    [trabajadores, delPeriodo, periodo]
   );
   const listaMaestro = trabajadores
     .filter((t) => verInactivos || t.activo)
@@ -97,6 +128,7 @@ export default function PlanillaPage() {
     const file = input.files?.[0];
     input.value = ""; // permite volver a importar el mismo archivo
     if (!file) return;
+    setImportando(true);
     try {
       const XLSX = await import("xlsx");
       const wb = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
@@ -104,7 +136,7 @@ export default function PlanillaPage() {
       // raw:false + dateNF: las fechas llegan como texto "yyyy-mm-dd hh:mm:ss" aunque la celda sea tipo fecha
       const filas = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "", raw: false, dateNF: "yyyy-mm-dd hh:mm:ss" });
 
-      const mapa: Asistencia = new Map();
+      const mapa: Marcaciones = new Map();
       filas.forEach((r) => {
         const numero = String(r["Número"] || r["Numero"] || r["N°"] || r["No."] || "").trim();
         const nombre = String(r["Nombre"] || "").trim();
@@ -121,11 +153,17 @@ export default function PlanillaPage() {
         return;
       }
       const creados = registrarDesdeAsistencia([...mapa].map(([id, v]) => ({ id, nombre: v.nombre })));
-      setAsistencia(mapa);
+      // DÍAS / TARD. se guardan en Supabase con origen RELOJ (única vía además del Módulo Creador)
+      const n = await importarAsistenciaReloj(
+        periodo,
+        [...mapa].map(([trabajador, v]) => ({ trabajador, ...resumir(v.fechas) }))
+      );
       setTab("planilla");
-      toast(`Asistencia importada: ${mapa.size} trabajador(es)${creados ? ` · ${creados} nuevo(s) por completar` : ""}`);
-    } catch {
-      toast("No se pudo leer el archivo de asistencia.", "error");
+      toast(`Asistencia importada en ${normalizarPeriodo(periodo)}: ${n} trabajador(es)${creados ? ` · ${creados} nuevo(s) por completar` : ""}`);
+    } catch (err) {
+      toast(err instanceof Error && err.name !== "SyntaxError" ? err.message : "No se pudo leer el archivo de asistencia.", "error");
+    } finally {
+      setImportando(false);
     }
   };
 
@@ -160,9 +198,15 @@ export default function PlanillaPage() {
   };
 
   const importarBtn = soloLectura ? null : (
-    <label className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-600">
-      <Upload size={16} /> Importar asistencia
-      <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={importarAsistencia} />
+    <label
+      className={cn(
+        "inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-600",
+        importando && "pointer-events-none opacity-60"
+      )}
+      title={`Guarda DÍAS y TARD. en el periodo ${normalizarPeriodo(periodo)}`}
+    >
+      <Upload size={16} /> {importando ? "Importando…" : "Importar asistencia"}
+      <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={importarAsistencia} disabled={importando} />
     </label>
   );
 
@@ -283,7 +327,7 @@ export default function PlanillaPage() {
             </Field>
             <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm">
               Trabajadores activos: <b>{calculados.length}</b>
-              <p className="text-xs text-slate-500">{asistencia.size ? `${asistencia.size} con marcaciones` : "Sin asistencia importada"}</p>
+              <p className="text-xs text-slate-500">{delPeriodo.size ? `${delPeriodo.size} con asistencia en el periodo` : "Sin asistencia en este periodo"}</p>
             </div>
             <div className="rounded-xl bg-slate-900 p-3 text-sm text-white">
               Total neto: <b className="text-amber-400">{soles(r2(calculados.reduce((a, b) => a + b.neto, 0)))}</b>
@@ -291,13 +335,17 @@ export default function PlanillaPage() {
           </div>
 
           <Card>
-            <CardHeader title={`Planilla · ${periodo}`} subtitle="Para cambiar sueldo, tipo de sueldo o pensión edite al trabajador." action={importarBtn} />
+            <CardHeader
+              title={`Planilla · ${normalizarPeriodo(periodo)}`}
+              subtitle="Para cambiar sueldo, tipo de sueldo o pensión edite al trabajador. DÍAS y TARD. 🔒: solo editables desde Módulo Creador / Importar Asistencia."
+              action={importarBtn}
+            />
             {calculados.length === 0 ? (
               <div className="p-5">
                 <Empty icon={<Calculator size={28} />} text="No hay trabajadores activos." />
               </div>
             ) : (
-              <Table head={["N°", "Trabajador", "F. ingreso", "Sueldo / Tipo", "Pensión", "Días", "Tard.", "Bruto", "Dscto", "Neto", "Boleta"]}>
+              <Table head={["N°", "Trabajador", "F. ingreso", "Sueldo / Tipo", "Pensión", "Días 🔒", "Tard. 🔒", "Bruto", "Dscto", "Neto", "Boleta"]}>
                 {calculados.map((t) => (
                   <tr key={t.id}>
                     <Td className="font-mono">{t.id}</Td>
@@ -316,8 +364,13 @@ export default function PlanillaPage() {
                       {AFP_OPTIONS[t.afpTipo].label}
                       <p className="text-xs text-slate-500">{t.afpPorcentaje}%</p>
                     </Td>
-                    <Td className="text-center">{t.dias}</Td>
-                    <Td className={cn("text-center", t.tardanzas > 0 && "font-semibold text-orange-600")}>{t.tardanzas}</Td>
+                    <Td className="text-center">
+                      <CampoBloqueado valor={t.dias} />
+                      {t.origen === "CREADOR" && <p className="text-[10px] font-semibold text-violet-600" title="Corregido a mano en el Módulo Creador">CREADOR</p>}
+                    </Td>
+                    <Td className="text-center">
+                      <CampoBloqueado valor={t.tardanzas} alerta={t.tardanzas > 0} />
+                    </Td>
                     <Td className="text-right">{soles(t.bruto)}</Td>
                     <Td className="text-right text-red-600">- {soles(t.descuentoAfp)}</Td>
                     <Td className="text-right font-bold">{soles(t.neto)}</Td>

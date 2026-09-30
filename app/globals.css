@@ -4,3 +4,8 @@
 
 body { @apply bg-slate-100 text-slate-900 antialiased; }
 input[type="number"]::-webkit-inner-spin-button { opacity: 0.4; }
+
+/* Campo de solo lectura (DÍAS / TARD. en Planilla del periodo): no se puede clickear ni editar */
+.readonly-field {
+  @apply inline-flex cursor-not-allowed select-none items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 font-mono text-sm font-semibold text-slate-600;
+}

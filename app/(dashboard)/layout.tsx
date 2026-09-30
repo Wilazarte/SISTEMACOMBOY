@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { AlertTriangle, Bell, Calculator, CloudUpload, Eye, LayoutDashboard, Loader2, LogOut, Menu, Search, ShieldAlert, ShoppingCart, UserCircle2, Users, Warehouse, X } from "lucide-react";
+import { AlertTriangle, Bell, Calculator, CloudUpload, Eye, KeyRound, LayoutDashboard, Loader2, LogOut, Menu, Search, ShieldAlert, ShoppingCart, UserCircle2, Users, Warehouse, X } from "lucide-react";
 import { Badge, Toaster, cn, toast } from "@/components/ui";
 import { DocViewerHost, abrirDoc, type DocRef } from "@/components/doc-viewer";
 import { ObservacionesGerencia } from "@/components/ObservacionesGerencia";
@@ -18,6 +18,8 @@ const NAV = [
   { href: "/dashboard/compras", label: "Tesorería / Compras", icon: ShoppingCart },
   { href: "/dashboard/contable", label: "Contable", icon: Calculator, pronto: true },
   { href: "/dashboard/planilla", label: "Planilla", icon: Users },
+  // Solo creador / admin (ver puedeVer en lib/auth.ts)
+  { href: "/dashboard/creador", label: "Módulo Creador", icon: KeyRound },
 ];
 
 interface Resultado extends DocRef {
