@@ -10,6 +10,7 @@ import type { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/
 import { getSesion, rolNegocio } from "./auth";
 import { createClient } from "./supabase/client";
 import type {
+  AsistenciaPeriodo,
   Compra,
   Cotizacion,
   EventoHistorial,
@@ -40,6 +41,7 @@ export const KEYS = {
   PROVEEDORES: "proveedores",
   COMPRAS: "compras_directas",
   STOCK: "almacen_stock",
+  ASISTENCIA: "planilla_asistencia",
 } as const;
 
 export type StoreKey = (typeof KEYS)[keyof typeof KEYS];
@@ -114,6 +116,7 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.CONTADORES]: { tabla: "compras", tipo: "contador", forma: "objeto" },
   [KEYS.STOCK]: { tabla: "almacen", tipo: "stock", forma: "lista" },
   [KEYS.TRABAJADORES]: { tabla: "planilla", tipo: "trabajador", forma: "lista" },
+  [KEYS.ASISTENCIA]: { tabla: "planilla", tipo: "asistencia", forma: "lista" },
   [KEYS.OBSERVACIONES]: { tabla: "observaciones", forma: "observaciones" },
 };
 const TABLAS = ["compras", "almacen", "planilla", "observaciones"] as const;
@@ -320,6 +323,8 @@ export function leer<T>(key: StoreKey, fallback: T): T {
  */
 export function escribir<T>(key: StoreKey, value: T): void {
   if (typeof window === "undefined") return;
+  // DÍAS / TARD.: nunca se escriben directo (la base también lo rechaza con RLS)
+  if (key === KEYS.ASISTENCIA) throw new ErpError(MSG_ASISTENCIA_BLOQUEADA);
   const d = DESTINOS[key];
   const filas = aFilas(key, value);
   const antes = servidor.get(key) ?? new Map<string, string>();
@@ -985,6 +990,59 @@ export function registrarDesdeAsistencia(nuevos: { id: string; nombre: string }[
   });
   if (n > 0) escribir(KEYS.TRABAJADORES, lista);
   return n;
+}
+
+// ---------------------------------------------------------------------
+// PLANILLA: asistencia por periodo (DÍAS / TARD.)
+// Solo se modifica con dos funciones de Supabase (security definer):
+//   importar_asistencia()        -> origen_edicion = 'RELOJ'   (Importar asistencia)
+//   editar_asistencia_creador()  -> origen_edicion = 'CREADOR' (Módulo Creador, rol creador/admin)
+// Escribir la tabla directamente está bloqueado por RLS (error 42501).
+// ---------------------------------------------------------------------
+
+export const MSG_ASISTENCIA_BLOQUEADA = "Solo editable desde Módulo Creador / Importar Asistencia";
+
+/** "  semana 14 -  abril 2026 " -> "SEMANA 14 - ABRIL 2026" (igual que en SQL). */
+export const normalizarPeriodo = (p: string): string => p.trim().replace(/\s+/g, " ").toUpperCase();
+
+export const idAsistencia = (periodo: string, trabajador: string): string => `${normalizarPeriodo(periodo)}|${trabajador.trim()}`;
+
+export const getAsistencia = () => leer<AsistenciaPeriodo[]>(KEYS.ASISTENCIA, []);
+
+function errorAsistencia(error: { code?: string; message: string }): ErpError {
+  if (error.code === "PGRST202" || /could not find the function/i.test(error.message))
+    return new ErpError("Falta la función de asistencia en Supabase: ejecute supabase/fix_asistencia.sql.");
+  return new ErpError(error.message);
+}
+
+/** Importar asistencia (reloj): guarda DÍAS y TARD. del periodo con origen RELOJ. */
+export async function importarAsistenciaReloj(
+  periodo: string,
+  filas: { trabajador: string; dias: number; tardanzas: number }[]
+): Promise<number> {
+  const p = normalizarPeriodo(periodo);
+  if (!p) throw new ErpError("Indique el periodo antes de importar.");
+  if (filas.length === 0) throw new ErpError("No hay asistencia para guardar.");
+  const { data, error } = await createClient().rpc("importar_asistencia", { p_periodo: p, p_filas: filas });
+  if (error) throw errorAsistencia(error);
+  await recargar(KEYS.ASISTENCIA);
+  return Number(data);
+}
+
+/** Módulo Creador: edición manual de DÍAS y TARD. (la base valida que el rol sea creador / admin). */
+export async function editarAsistenciaCreador(periodo: string, trabajador: string, dias: number, tardanzas: number): Promise<void> {
+  const p = normalizarPeriodo(periodo);
+  if (!p) throw new ErpError("Indique el periodo.");
+  if (!Number.isInteger(dias) || dias < 0 || dias > 31) throw new ErpError("Días debe ser un entero entre 0 y 31.");
+  if (!Number.isInteger(tardanzas) || tardanzas < 0 || tardanzas > dias) throw new ErpError("Tardanzas debe ser un entero entre 0 y los días trabajados.");
+  const { error } = await createClient().rpc("editar_asistencia_creador", {
+    p_periodo: p,
+    p_trabajador: trabajador,
+    p_dias: dias,
+    p_tardanzas: tardanzas,
+  });
+  if (error) throw errorAsistencia(error);
+  await recargar(KEYS.ASISTENCIA);
 }
 
 // ---------------------------------------------------------------------

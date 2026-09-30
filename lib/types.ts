@@ -208,3 +208,22 @@ export interface StockItem {
   costoUnit: number; // último costo: sin IGV (factura / OC) o con IGV (boleta, sin crédito fiscal)
   actualizado: string; // ISO
 }
+
+// =====================================================================
+// Asistencia por periodo (DÍAS / TARD. de la planilla)
+// Solo se escribe con Importar asistencia (RELOJ) o el Módulo Creador (CREADOR).
+// =====================================================================
+
+export type OrigenEdicion = "RELOJ" | "CREADOR" | "SISTEMA";
+
+export interface AsistenciaPeriodo {
+  id: string; // `${periodo}|${trabajador}`
+  periodo: string; // normalizado: "SEMANA 14 - ABRIL 2026"
+  trabajador: string; // N° de huella
+  dias: number;
+  tardanzas: number; // días con entrada después de las 08:15
+  origen_edicion: OrigenEdicion;
+  updated_by: string | null; // usuario (auth.uid) que hizo el último cambio
+  updated_by_creator_id: string | null; // solo en ediciones manuales del creador
+  fecha: string; // ISO
+}

@@ -119,9 +119,23 @@ export function useSesion(): { sesion: Sesion | null; listo: boolean } {
   return estado;
 }
 
+/**
+ * Permiso "editar_asistencia_creador": edición manual de DÍAS / TARD. en el Módulo Creador.
+ * Roles: creador y admin (ADMINISTRADORA). La base aplica la misma regla en editar_asistencia_creador().
+ */
+export const PERMISO_EDITAR_ASISTENCIA = "editar_asistencia_creador";
+const ROLES_EDITAR_ASISTENCIA = ["creador", "admin"];
+export const RUTA_CREADOR = "/dashboard/creador";
+
+export function puedeEditarAsistencia(sesion: Sesion | null): boolean {
+  return !!sesion && !sesion.soloLectura && ROLES_EDITAR_ASISTENCIA.includes(sesion.rol);
+}
+
 export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
   if (!sesion) return false;
   if (ruta === "/dashboard") return true; // solo redirige al primer módulo permitido
+  // Módulo Creador: por rol, no por módulos (gerencia tiene "*" pero no debe entrar)
+  if (ruta === RUTA_CREADOR || ruta.startsWith(`${RUTA_CREADOR}/`)) return puedeEditarAsistencia(sesion);
   return sesion.modulos.some((m) => m === "*" || ruta === m || ruta.startsWith(`${m}/`));
 }
 
