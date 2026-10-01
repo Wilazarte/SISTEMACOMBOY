@@ -6,9 +6,10 @@
 
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import QRCode from "qrcode";
 import { EMPRESA } from "./empresa";
 import { fechaPE, soles } from "./storage";
-import type { Cotizacion, Factura, Guia, OrdenCompra, Requerimiento } from "./types";
+import type { ComprobanteVenta, Cotizacion, Factura, Guia, LineaVenta, NotaPedido, OrdenCompra, OrdenDespacho, Requerimiento } from "./types";
 
 type RGB = [number, number, number];
 const AZUL: RGB = [15, 42, 82];
@@ -25,7 +26,20 @@ interface Bloque {
   alinearDerecha?: number[];
   totales?: [string, string][];
   notas?: string[];
+  /** Texto del código QR (se dibuja abajo a la izquierda) y líneas que van a su lado. */
+  qr?: string;
+  qrTexto?: string[];
   firmas: string[];
+}
+
+/** Dibuja un QR con rectángulos (síncrono: no bloquea la ventana del PDF). */
+function dibujarQR(doc: jsPDF, texto: string, x: number, y: number, lado: number): void {
+  const qr = QRCode.create(texto, { errorCorrectionLevel: "M" });
+  const n = qr.modules.size;
+  const m = lado / n;
+  doc.setFillColor(0, 0, 0);
+  for (let r = 0; r < n; r++)
+    for (let c = 0; c < n; c++) if (qr.modules.get(r, c)) doc.rect(x + c * m, y + r * m, m + 0.02, m + 0.02, "F");
 }
 
 function finalY(doc: jsPDF): number {
@@ -195,6 +209,21 @@ function construir(b: Bloque): jsPDF {
     });
   }
 
+  if (b.qr) {
+    const H = doc.internal.pageSize.getHeight();
+    if (y + 34 > H - 45) {
+      doc.addPage();
+      y = 20;
+    }
+    y += 3;
+    dibujarQR(doc, b.qr, 14, y, 28);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(30, 41, 59);
+    (b.qrTexto ?? []).forEach((t, i) => doc.text(t, 46, y + 4 + i * 4.2));
+    y += 31;
+  }
+
   firmas(doc, y, b.firmas);
   pie(doc);
   return doc;
@@ -348,5 +377,206 @@ export function pdfActaIngreso(o: OrdenCompra, f?: Factura, g?: Guia): void {
       firmas: ["Entregado por (Proveedor)", "Recibido: Almacén", "V°B° Jefe de Almacén"],
     }),
     `ACTA-${o.numero}`
+  );
+}
+
+// =====================================================================
+// VENTAS
+// =====================================================================
+
+const lineasCuentas = (): string[] =>
+  EMPRESA.cuentas.map((c) => `${c.banco} ${c.moneda}: ${c.numero}  ·  CCI: ${c.cci}`);
+
+const medida = (l: LineaVenta) => (l.ancho > 0 && l.alto > 0 ? `${l.ancho} × ${l.alto} m` : "-");
+
+const cuerpoVenta = (items: LineaVenta[]) =>
+  items.map((l, k) => [
+    k + 1,
+    l.descripcion,
+    medida(l),
+    l.cantidad,
+    l.m2 > 0 ? l.m2.toFixed(2) : "-",
+    soles(l.precio) + (l.m2 > 0 ? "/m²" : ""),
+    soles(l.total),
+  ]);
+
+/** Código SUNAT del tipo de documento del cliente: 6 RUC, 1 DNI, 4 CE. */
+const tipoDocSunat = (doc: string) => (doc.startsWith("RUC") ? "6" : doc.startsWith("DNI") ? "1" : "4");
+
+export function pdfNotaPedido(n: NotaPedido): void {
+  const vence = new Date(`${n.fecha}T12:00:00`);
+  vence.setDate(vence.getDate() + n.validezDias);
+  abrir(
+    construir({
+      titulo: "NOTA DE PEDIDO / COTIZACIÓN",
+      numero: n.numero,
+      estado: n.estado,
+      datos: [
+        ["Cliente", n.cliente],
+        ["Documento", n.clienteDoc],
+        ["Fecha", fechaPE(n.fecha)],
+        ["Válida hasta", `${fechaPE(vence.toISOString())} (${n.validezDias} días)`],
+        ["Lugar de obra", n.lugarObra || "-"],
+        ["Fecha entrega", n.fechaEntrega ? fechaPE(n.fechaEntrega) : "A coordinar"],
+        ["Cond. de pago", n.condPagoNombre],
+        ["Vendedor", n.vendedor],
+      ],
+      head: ["#", "Descripción", "Medidas", "Cant.", "m²", "Precio", "Total"],
+      body: cuerpoVenta(n.items),
+      alinearDerecha: [3, 4, 5, 6],
+      totales: [
+        ...(n.descuento > 0 ? ([["Descuento", `- ${soles(n.descuento)}`]] as [string, string][]) : []),
+        [n.conIgv ? "Subtotal" : "Subtotal (sin IGV)", soles(n.subtotal)],
+        ...(n.conIgv ? ([["IGV 18%", soles(n.igv)]] as [string, string][]) : []),
+        ["TOTAL", soles(n.total)],
+      ],
+      notas: [
+        ...(n.observaciones ? [`Observaciones: ${n.observaciones}`] : []),
+        `Condiciones: precios en soles${n.conIgv ? " incluyen IGV" : " no incluyen IGV"}. Oferta válida ${n.validezDias} días. Medidas en metros; el m² se calcula ancho × alto × cantidad. Plazo de entrega sujeto a confirmación del pedido.`,
+      ],
+      qr: `${EMPRESA.ruc}|NP|${n.numero}|${n.total.toFixed(2)}|${n.fecha}|${n.clienteDoc}`,
+      qrTexto: ["Pagos a nombre de " + EMPRESA.razonSocial + ":", ...lineasCuentas(), `Enviar constancia indicando la ${n.numero}.`],
+      firmas: [`Vendedor: ${n.vendedor}`, "Aceptado: Cliente"],
+    }),
+    n.numero
+  );
+}
+
+function qrSunat(c: ComprobanteVenta): string {
+  const [doc, num] = c.clienteDoc.split(" ");
+  return [EMPRESA.ruc, c.tipo === "FACTURA" ? "01" : "03", c.serie, c.numero.split("-")[1] ?? "", c.igv.toFixed(2), c.total.toFixed(2), c.fecha, tipoDocSunat(doc), num, ""].join("|");
+}
+
+export function pdfComprobanteVenta(c: ComprobanteVenta): void {
+  const titulo = c.tipo === "FACTURA" ? "FACTURA ELECTRÓNICA" : "BOLETA DE VENTA ELECTRÓNICA";
+  abrir(
+    construir({
+      titulo,
+      numero: c.numero || "BORRADOR",
+      estado: c.estado === "EMITIDO" ? (c.saldo > 0 ? "EMITIDO · POR COBRAR" : "EMITIDO · COBRADO") : c.estado,
+      datos: [
+        ["Cliente", c.cliente],
+        ["Documento", c.clienteDoc],
+        ["Dirección", c.clienteDireccion || "-"],
+        ["Fecha emisión", fechaPE(c.fecha)],
+        ["Forma de pago", c.formaPago === "CONTADO" ? "Contado" : `${c.condPagoNombre} · vence ${fechaPE(c.fechaVenc)}`],
+        ["Nota de pedido", c.npNumero ?? "-"],
+        ["Orden despacho", c.odNumero ?? "-"],
+        ["Moneda", "Soles (PEN)"],
+      ],
+      head: ["#", "Descripción", "Medidas", "Cant.", "m²", "V. unit.", "Valor venta"],
+      body: cuerpoVenta(c.items),
+      alinearDerecha: [3, 4, 5, 6],
+      totales: [
+        ...(c.descuento > 0 ? ([["Descuento", `- ${soles(c.descuento)}`]] as [string, string][]) : []),
+        [c.conIgv ? "Op. gravada" : "Op. inafecta", soles(c.base)],
+        ["IGV 18%", soles(c.igv)],
+        ["IMPORTE TOTAL", soles(c.total)],
+      ],
+      notas: [
+        ...(c.cuotas.length
+          ? [`Cuotas: ${c.cuotas.map((q) => `N°${q.n} ${fechaPE(q.fecha)} ${soles(q.monto)}`).join(" · ")}${c.inicial > 0 ? ` · Inicial ${soles(c.inicial)}` : ""}`]
+          : []),
+        "Representación impresa del comprobante. Estado SUNAT: NO ENVIADO (el ERP aún no está conectado a un OSE/PSE de facturación electrónica).",
+      ],
+      qr: qrSunat(c),
+      qrTexto: [`${titulo} ${c.numero}`, `Total ${soles(c.total)} · IGV ${soles(c.igv)}`, ...lineasCuentas()],
+      firmas: ["Emisor", "Recibí conforme: Cliente"],
+    }),
+    c.numero || "borrador"
+  );
+}
+
+/** Ticket 80 mm con IGV discriminado. */
+export function pdfTicketVenta(c: ComprobanteVenta): void {
+  const alto = 150 + c.items.length * 10;
+  const doc = new jsPDF({ unit: "mm", format: [80, alto] });
+  const cx = 40;
+  let y = 8;
+  const linea = (t: string, size = 7.5, bold = false, align: "center" | "left" = "center") => {
+    doc.setFont("helvetica", bold ? "bold" : "normal");
+    doc.setFontSize(size);
+    const l = doc.splitTextToSize(t, 72) as string[];
+    doc.text(l, align === "center" ? cx : 4, y, { align });
+    y += l.length * (size * 0.45);
+  };
+  const sep = () => {
+    doc.setDrawColor(150);
+    doc.setLineDashPattern([1, 1], 0);
+    doc.line(4, y, 76, y);
+    doc.setLineDashPattern([], 0);
+    y += 3.5;
+  };
+  const fila = (k: string, v: string, bold = false) => {
+    doc.setFont("helvetica", bold ? "bold" : "normal");
+    doc.setFontSize(bold ? 9 : 7.5);
+    doc.text(k, 4, y);
+    doc.text(v, 76, y, { align: "right" });
+    y += bold ? 5 : 4;
+  };
+  linea(EMPRESA.razonSocial, 10, true);
+  linea(`RUC ${EMPRESA.ruc}`, 8, true);
+  linea(EMPRESA.direccion);
+  linea(EMPRESA.telefono);
+  y += 1;
+  sep();
+  linea(c.tipo === "FACTURA" ? "FACTURA ELECTRÓNICA" : "BOLETA DE VENTA ELECTRÓNICA", 8.5, true);
+  linea(c.numero || "BORRADOR", 10, true);
+  sep();
+  linea(`Fecha: ${fechaPE(c.fecha)}`, 7.5, false, "left");
+  linea(`Cliente: ${c.cliente}`, 7.5, false, "left");
+  linea(c.clienteDoc, 7.5, false, "left");
+  linea(`Pago: ${c.formaPago === "CONTADO" ? "Contado" : `${c.condPagoNombre} (vence ${fechaPE(c.fechaVenc)})`}`, 7.5, false, "left");
+  sep();
+  c.items.forEach((l) => {
+    linea(`${l.cantidad} x ${l.descripcion}${l.m2 > 0 ? ` (${l.ancho}x${l.alto} m = ${l.m2.toFixed(2)} m²)` : ""}`, 7.5, false, "left");
+    fila(`   ${soles(l.precio)}${l.m2 > 0 ? "/m²" : ""}`, soles(l.total));
+  });
+  sep();
+  if (c.descuento > 0) fila("Descuento", `- ${soles(c.descuento)}`);
+  fila(c.conIgv ? "Op. gravada" : "Op. inafecta", soles(c.base));
+  fila("IGV 18%", soles(c.igv));
+  fila("TOTAL", soles(c.total), true);
+  sep();
+  dibujarQR(doc, qrSunat(c), cx - 14, y, 28);
+  y += 31;
+  linea("Representación impresa. Estado SUNAT: NO ENVIADO.", 6.5);
+  linea("¡Gracias por su compra!", 8, true);
+  abrir(doc, `${c.numero || "borrador"}-ticket`);
+}
+
+export function pdfOrdenDespacho(o: OrdenDespacho): void {
+  const ultimo = o.despachos[o.despachos.length - 1];
+  abrir(
+    construir({
+      titulo: "ORDEN DE DESPACHO",
+      numero: o.numero,
+      estado: o.estado.replace("_", " "),
+      datos: [
+        ["Cliente", o.cliente],
+        ["Comprobante", o.comprobanteNumero],
+        ["Fecha OD", fechaPE(o.fecha)],
+        ["Lugar entrega", o.lugarEntrega || "-"],
+        ["Último despacho", ultimo ? `${new Date(ultimo.fecha).toLocaleString("es-PE")} · ${ultimo.responsable}` : "-"],
+        ["Guía remisión", ultimo?.guiaRemision || "-"],
+      ],
+      head: ["#", "Descripción", "Medidas (m)", "Piezas", "Und.", "Solicitado", "Despachado", "Pendiente"],
+      body: o.items.map((l, k) => [
+        k + 1,
+        l.descripcion + (l.productoNombre ? "" : " (servicio)"),
+        l.ancho > 0 ? `${l.ancho} × ${l.alto}` : "-",
+        l.cantidadPiezas,
+        l.unidad,
+        l.solicitado,
+        l.despachado,
+        Math.round((l.solicitado - l.despachado) * 100) / 100,
+      ]),
+      alinearDerecha: [3, 5, 6, 7],
+      notas: o.despachos.map(
+        (d, i) => `Despacho ${i + 1}: ${new Date(d.fecha).toLocaleString("es-PE")} · ${d.responsable} · ${d.sede}${d.guiaRemision ? ` · GR ${d.guiaRemision}` : ""}${d.observacion ? ` · ${d.observacion}` : ""}`
+      ),
+      firmas: ["Despachado por: Almacén", "Transportista", "Recibí conforme: Cliente"],
+    }),
+    o.numero
   );
 }

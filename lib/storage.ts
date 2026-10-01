@@ -42,6 +42,13 @@ export const KEYS = {
   COMPRAS: "compras_directas",
   STOCK: "almacen_stock",
   ASISTENCIA: "planilla_asistencia",
+  CLIENTES: "ventas_clientes",
+  COND_PAGO: "ventas_condiciones_pago",
+  NOTAS_PEDIDO: "ventas_notas_pedido",
+  COMPROBANTES: "ventas_comprobantes",
+  COBROS: "ventas_cobros",
+  ASIENTOS: "ventas_asientos",
+  DESPACHOS: "almacen_despachos",
 } as const;
 
 export type StoreKey = (typeof KEYS)[keyof typeof KEYS];
@@ -99,7 +106,7 @@ export class ErpError extends Error {}
 // hacen las otras PCs y refresca la pantalla al instante.
 // ---------------------------------------------------------------------
 
-type TablaDoc = "compras" | "almacen" | "planilla";
+type TablaDoc = "compras" | "almacen" | "planilla" | "ventas";
 type Destino =
   | { tabla: TablaDoc; tipo: string; forma: "lista" | "objeto" }
   | { tabla: "observaciones"; forma: "observaciones" };
@@ -117,9 +124,16 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.STOCK]: { tabla: "almacen", tipo: "stock", forma: "lista" },
   [KEYS.TRABAJADORES]: { tabla: "planilla", tipo: "trabajador", forma: "lista" },
   [KEYS.ASISTENCIA]: { tabla: "planilla", tipo: "asistencia", forma: "lista" },
+  [KEYS.CLIENTES]: { tabla: "ventas", tipo: "cliente", forma: "lista" },
+  [KEYS.COND_PAGO]: { tabla: "ventas", tipo: "condicion_pago", forma: "lista" },
+  [KEYS.NOTAS_PEDIDO]: { tabla: "ventas", tipo: "nota_pedido", forma: "lista" },
+  [KEYS.COMPROBANTES]: { tabla: "ventas", tipo: "comprobante", forma: "lista" },
+  [KEYS.COBROS]: { tabla: "ventas", tipo: "cobro", forma: "lista" },
+  [KEYS.ASIENTOS]: { tabla: "ventas", tipo: "asiento", forma: "lista" },
+  [KEYS.DESPACHOS]: { tabla: "almacen", tipo: "despacho", forma: "lista" },
   [KEYS.OBSERVACIONES]: { tabla: "observaciones", forma: "observaciones" },
 };
-const TABLAS = ["compras", "almacen", "planilla", "observaciones"] as const;
+const TABLAS = ["compras", "almacen", "planilla", "ventas", "observaciones"] as const;
 /**
  * Fila única de las claves tipo "objeto" (contadores). Es un UUID fijo para que funcione
  * aunque la columna id de la tabla sea de tipo uuid (antes era "principal").
@@ -251,16 +265,40 @@ async function aplicarCambio(tabla: string, p: RealtimePostgresChangesPayload<Fi
   await recargar(key);
 }
 
+/** Tablas de módulos nuevos: si aún no existen en Supabase, su módulo queda vacío en vez de bloquear todo. */
+const TABLAS_OPCIONALES: string[] = ["ventas"];
+
+const esTablaFaltante = (e: unknown): boolean => {
+  const err = e as { code?: string; message?: string };
+  return err?.code === "42P01" || err?.code === "PGRST205" || /does not exist|schema cache/i.test(err?.message ?? "");
+};
+
 /** Carga todos los datos permitidos para el usuario y se suscribe a Realtime. */
 export function iniciarDatos(): Promise<void> {
   carga ??= (async () => {
     const claves = Object.keys(DESTINOS) as StoreKey[];
-    const resultados = await Promise.all(claves.map((k) => descargar(k).then((f) => [k, f] as const)));
+    // Una tabla opcional que aún no existe (ej. ventas antes de correr fix_ventas.sql) no bloquea el resto del ERP
+    const faltantes = new Set<string>();
+    const resultados = await Promise.all(
+      claves.map((k) =>
+        descargar(k)
+          .catch((e) => {
+            const tabla = DESTINOS[k].tabla;
+            if (TABLAS_OPCIONALES.includes(tabla) && esTablaFaltante(e)) {
+              faltantes.add(tabla);
+              return [] as Fila[];
+            }
+            throw e;
+          })
+          .then((f) => [k, f] as const)
+      )
+    );
     resultados.forEach(([k, f]) => fijarDesdeServidor(k, f));
+    if (faltantes.has("ventas")) avisarError("Falta la tabla de Ventas en Supabase: ejecute supabase/fix_ventas.sql. El resto del ERP funciona normal.");
 
     const sb = createClient();
     let primera = true;
-    canal = TABLAS.reduce(
+    canal = TABLAS.filter((t) => !faltantes.has(t)).reduce(
       (c, tabla) => c.on("postgres_changes", { event: "*", schema: "public", table: tabla }, (p) => void aplicarCambio(tabla, p as RealtimePostgresChangesPayload<Fila>)),
       sb.channel("erp-cambios")
     ).subscribe((estado) => {
@@ -272,8 +310,7 @@ export function iniciarDatos(): Promise<void> {
   })().catch((e) => {
     carga = null;
     const err = e as { code?: string; message?: string };
-    if (err.code === "42P01" || err.code === "PGRST205" || /does not exist|schema cache/i.test(err.message ?? ""))
-      throw new ErpError("Faltan las tablas en Supabase: ejecute supabase_tables.sql en el SQL Editor.");
+    if (esTablaFaltante(err)) throw new ErpError("Faltan las tablas en Supabase: ejecute supabase_tables.sql en el SQL Editor.");
     throw new ErpError(`No se pudo conectar con Supabase: ${err.message ?? e}`);
   });
   return carga;
@@ -396,8 +433,10 @@ export function useStore<T>(key: StoreKey, fallback: T): T {
 function evento(usuario: Rol, accion: string, detalle?: string): EventoHistorial {
   return { fecha: new Date().toISOString(), usuario, accion, detalle };
 }
+export const nuevoEvento = evento;
 
-type Serie = "REQ" | "OC" | "DJ";
+/** Series con correlativo atómico en Supabase (siguiente_numero). */
+export type Serie = "REQ" | "OC" | "DJ" | "NP" | "F001" | "B001" | "OD";
 
 /** Actualiza la caché de contadores sin enviarla: el servidor ya tiene el valor. */
 function fijarContador(serie: Serie, n: number): void {
@@ -442,7 +481,13 @@ export function previewNumero(serie: Serie): string {
 function formatear(serie: Serie, n: number): string {
   if (serie === "REQ") return `REQ-ALM-${String(n).padStart(3, "0")}`;
   if (serie === "OC") return `OC-${new Date().getFullYear()}-${String(n).padStart(4, "0")}`;
-  return `DJ-${String(n).padStart(3, "0")}`;
+  if (serie === "DJ") return `DJ-${String(n).padStart(3, "0")}`;
+  return `${serie}-${String(n).padStart(4, "0")}`; // NP-0001, F001-0001, B001-0001, OD-0001
+}
+
+/** Número formateado reservado en Supabase (para ventas y despachos). */
+export async function siguienteNumero(serie: Serie): Promise<string> {
+  return formatear(serie, await siguiente(serie));
 }
 
 // ---------------------------------------------------------------------
@@ -1088,6 +1133,32 @@ function ingresarStock(sede: string, items: { nombre: string; unidad: string; ca
   escribir(KEYS.STOCK, stock);
 }
 
+/** Cantidad disponible de un producto en una sede. */
+export function stockDisponible(sede: string, nombre: string, unidad: string): number {
+  const k = claveStock(sede, nombre, unidad);
+  return getStock().find((s) => claveStock(s.sede, s.nombre, s.unidad) === k)?.cantidad ?? 0;
+}
+
+/** Salida de stock (despacho). Valida todo antes de escribir: si falta stock no descuenta nada. */
+export function descontarStock(sede: string, items: { nombre: string; unidad: string; cantidad: number }[]): void {
+  const stock = getStock();
+  const ahora = new Date().toISOString();
+  for (const i of items) {
+    const k = claveStock(sede, i.nombre, i.unidad);
+    const existente = stock.find((s) => claveStock(s.sede, s.nombre, s.unidad) === k);
+    const disp = existente?.cantidad ?? 0;
+    if (disp + 1e-9 < i.cantidad)
+      throw new ErpError(`Stock insuficiente de ${i.nombre} (${i.unidad}) en ${sede}: hay ${disp}, se requiere ${i.cantidad}.`);
+  }
+  items.forEach((i) => {
+    const k = claveStock(sede, i.nombre, i.unidad);
+    const existente = stock.find((s) => claveStock(s.sede, s.nombre, s.unidad) === k)!;
+    existente.cantidad = r2(existente.cantidad - i.cantidad);
+    existente.actualizado = ahora;
+  });
+  escribir(KEYS.STOCK, stock);
+}
+
 /** Sede donde ingresa la mercadería de una OC: la del REQ; si no existe, el lugar de entrega. */
 export const sedeIngresoOC = (oc: OrdenCompra): string => buscarReq(oc.reqId)?.sede || oc.lugarEntrega;
 
@@ -1163,11 +1234,17 @@ export function registrarCompra(
 // ---------------------------------------------------------------------
 
 export const PERMISOS: Record<Rol, { label: string; puede: string[] }> = {
-  ALMACEN: { label: "Almacén", puede: ["req.crear", "req.reenviar", "vb.dar"] },
-  TESORERIA: { label: "Tesorería / Compras", puede: ["compra.crear", "req.revisar", "coti.crear", "oc.crear", "fac.crear", "guia.crear", "fac.pagar"] },
+  ALMACEN: { label: "Almacén", puede: ["req.crear", "req.reenviar", "vb.dar", "despacho.dar"] },
+  TESORERIA: {
+    label: "Tesorería / Compras",
+    puede: ["compra.crear", "req.revisar", "coti.crear", "oc.crear", "fac.crear", "guia.crear", "fac.pagar", "venta.gestionar", "venta.cobrar"],
+  },
   GERENCIA: {
     label: "Gerencia (admin)",
-    puede: ["compra.crear", "req.crear", "req.reenviar", "req.revisar", "coti.crear", "oc.crear", "fac.crear", "guia.crear", "fac.pagar", "dj.aprobar", "vb.dar"],
+    puede: [
+      "compra.crear", "req.crear", "req.reenviar", "req.revisar", "coti.crear", "oc.crear", "fac.crear", "guia.crear", "fac.pagar", "dj.aprobar", "vb.dar",
+      "venta.gestionar", "venta.cobrar", "despacho.dar",
+    ],
   },
   CONTADOR: { label: "Contador (lectura)", puede: [] },
 };

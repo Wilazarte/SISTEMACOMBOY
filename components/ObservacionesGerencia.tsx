@@ -20,6 +20,7 @@ const NOMBRES: Record<string, string> = {
   "/dashboard/compras": "Tesorería / Compras",
   "/dashboard/tesoreria": "Tesorería",
   "/dashboard/almacen": "Almacén",
+  "/dashboard/ventas": "Ventas",
   "/dashboard/planilla": "Planilla",
 };
 

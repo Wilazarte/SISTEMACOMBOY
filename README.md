@@ -46,6 +46,19 @@ Para cambiar una contraseña: Supabase → Authentication → Users → usuario 
 - Realtime (`supabase.channel("erp-cambios")`): lo que hace una PC aparece en las otras sin recargar. Al reconectarse tras un corte, se recarga todo.
 - Numeración (REQ, OC, DJ): la asigna la función `siguiente_numero(serie)` en Supabase, que bloquea el contador mientras lo incrementa; dos PCs emitiendo a la vez nunca reciben el mismo número. El contador no se puede escribir directo (RLS). El número que muestra el formulario antes de guardar es referencial.
 
+## Ventas (COMBOY VID · RUC 20613238566)
+Flujo: **Nota de pedido → Aprobada → Factura / Boleta → Orden de despacho (Almacén) → Cobro**.
+
+- **Activar en Supabase:** SQL Editor → `supabase/fix_ventas.sql` (o volver a correr `supabase_tables.sql`). Crea/adapta la tabla `ventas`, permisos, numeración NP / F001 / B001 / OD, Realtime, 8 condiciones de pago iniciales y da a tesorería el módulo Ventas. Mientras no se ejecute, Ventas aparece vacío y el resto del ERP funciona normal.
+- `/dashboard/ventas`: Notas de pedido · Comprobantes · Condiciones de pago · Clientes · Cuentas por cobrar.
+- `/dashboard/almacen` → pestaña **Órdenes de despacho** (también en `/dashboard/almacen/despacho`).
+- Al **emitir** un comprobante: número F001/B001 atómico, asiento contable (1212 / 40111 / 70121), orden de despacho PENDIENTE y cobro (contado) o saldo en Cuentas por Cobrar (crédito).
+- Al **despachar**: se elige la sede, se valida y descuenta stock (m² para vidrio con medidas; los servicios no mueven stock) y el comprobante pasa a ENTREGADO.
+- Permisos: creador y tesorería gestionan ventas y cobros; almacén despacha; gerencia solo ve.
+- Datos: documentos JSON en `public.ventas` (tipo `cliente`, `condicion_pago`, `nota_pedido`, `comprobante`, `cobro`, `asiento`) y `public.almacen` (tipo `despacho`).
+- ⚠ **SUNAT:** los comprobantes quedan con estado SUNAT "NO ENVIADO" (falta integrar un OSE/PSE). El autocompletado de RUC/DNI tampoco está conectado: los datos del cliente se ingresan a mano.
+- ⚠ Reemplazar en `lib/empresa.ts` la dirección, teléfono, email y la cuenta BCP / CCI (hoy son de ejemplo).
+
 ## Rutas
 - `/dashboard/almacen`  → Nuevo REQ · Lista de REQ emitidos · Ingresos por V°B° · Stock
 - `/dashboard/compras`  → Registrar compra (factura/boleta → stock) · Notificaciones · Antecedentes · Cotizaciones · OC · Facturas/DJ · Guías

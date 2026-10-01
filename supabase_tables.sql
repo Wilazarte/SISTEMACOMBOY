@@ -61,13 +61,16 @@ end $$;
 create table if not exists public.compras (tipo text not null, id text not null, primary key (tipo, id));
 create table if not exists public.almacen (tipo text not null, id text not null, primary key (tipo, id));
 create table if not exists public.planilla (tipo text not null, id text not null, primary key (tipo, id));
+-- ventas -> tipo: cliente, condicion_pago, nota_pedido, comprobante, cobro, asiento
+-- (si la tabla ventas ya existía con otra estructura, se le agregan las columnas; sus filas se conservan)
+create table if not exists public.ventas (tipo text not null, id text not null, primary key (tipo, id));
 
 do $$
 declare
   t text;
   col record;
 begin
-  foreach t in array array['compras', 'almacen', 'planilla'] loop
+  foreach t in array array['compras', 'almacen', 'planilla', 'ventas'] loop
     execute format(
       'alter table public.%I
          add column if not exists tipo text,
@@ -136,7 +139,7 @@ begin
     select table_name, column_name
     from information_schema.columns
     where table_schema = 'public'
-      and table_name in ('perfiles', 'compras', 'almacen', 'planilla', 'observaciones')
+      and table_name in ('perfiles', 'compras', 'almacen', 'planilla', 'ventas', 'observaciones')
       and is_nullable = 'NO'
       and column_default is null
       and is_identity = 'NO'
@@ -164,7 +167,7 @@ end $$;
 do $$
 declare t text;
 begin
-  foreach t in array array['compras', 'almacen', 'planilla'] loop
+  foreach t in array array['compras', 'almacen', 'planilla', 'ventas'] loop
     execute format('drop trigger if exists %I on public.%I', t || '_updated_at', t);
     execute format('create trigger %I before update on public.%I for each row execute function public.tocar_updated_at()', t || '_updated_at', t);
   end loop;
@@ -190,9 +193,9 @@ grant usage on schema public to authenticated;
 grant execute on function public.mi_rol() to authenticated;
 grant execute on function public.puede_ver(text) to authenticated;
 grant select on public.perfiles to authenticated;
-grant select, insert, update, delete on public.compras, public.almacen, public.planilla, public.observaciones to authenticated;
+grant select, insert, update, delete on public.compras, public.almacen, public.planilla, public.ventas, public.observaciones to authenticated;
 -- Sin sesión (anon) no se accede a nada
-revoke all on public.perfiles, public.compras, public.almacen, public.planilla, public.observaciones from anon;
+revoke all on public.perfiles, public.compras, public.almacen, public.planilla, public.ventas, public.observaciones from anon;
 
 -- ---------------------------------------------------------------------
 -- 6. RLS. Se eliminan las políticas que hubiera en estas 5 tablas (por
@@ -202,6 +205,7 @@ alter table public.perfiles enable row level security;
 alter table public.compras enable row level security;
 alter table public.almacen enable row level security;
 alter table public.planilla enable row level security;
+alter table public.ventas enable row level security;
 alter table public.observaciones enable row level security;
 
 do $$
@@ -209,7 +213,7 @@ declare p record;
 begin
   for p in
     select schemaname, tablename, policyname from pg_policies
-    where schemaname = 'public' and tablename in ('perfiles', 'compras', 'almacen', 'planilla', 'observaciones')
+    where schemaname = 'public' and tablename in ('perfiles', 'compras', 'almacen', 'planilla', 'ventas', 'observaciones')
   loop
     execute format('drop policy %I on %I.%I', p.policyname, p.schemaname, p.tablename);
   end loop;
@@ -238,9 +242,10 @@ create policy compras_escribir on public.compras for all to authenticated
     )
   );
 
--- almacen (stock): lo ven Almacén y Compras; lo mueven compras directas (tesorería) y V°B° (almacén)
+-- almacen (stock y órdenes de despacho): lo ven Almacén, Compras y Ventas; lo mueven compras directas y
+-- ventas (tesorería: crea la orden de despacho al emitir) y V°B° / despachos (almacén)
 create policy almacen_select on public.almacen for select to authenticated
-  using (public.puede_ver('/dashboard/almacen') or public.puede_ver('/dashboard/compras'));
+  using (public.puede_ver('/dashboard/almacen') or public.puede_ver('/dashboard/compras') or public.puede_ver('/dashboard/ventas'));
 
 create policy almacen_escribir on public.almacen for all to authenticated
   using (public.mi_rol() in ('creador', 'tesoreria', 'almacen'))
@@ -255,6 +260,14 @@ create policy planilla_select on public.planilla for select to authenticated
 create policy planilla_escribir on public.planilla for all to authenticated
   using (tipo <> 'asistencia' and public.mi_rol() in ('creador', 'planilla'))
   with check (tipo <> 'asistencia' and public.mi_rol() in ('creador', 'planilla'));
+
+-- ventas: la ven quienes tienen el módulo Ventas; la editan creador y tesorería (la numeración va por siguiente_numero)
+create policy ventas_select on public.ventas for select to authenticated
+  using (public.puede_ver('/dashboard/ventas'));
+
+create policy ventas_escribir on public.ventas for all to authenticated
+  using (tipo <> 'contador' and public.mi_rol() in ('creador', 'tesoreria'))
+  with check (tipo <> 'contador' and public.mi_rol() in ('creador', 'tesoreria'));
 
 -- observaciones: las leen todos; las escribe gerencia (y el creador, que administra todo); las borran gerencia y creador
 create policy observaciones_select on public.observaciones for select to authenticated
@@ -305,7 +318,9 @@ begin
     raise exception 'Su usuario no puede emitir órdenes de compra' using errcode = '42501';
   elsif serie = 'DJ' and rol is distinct from 'creador' then
     raise exception 'Su usuario no puede aprobar declaraciones juradas' using errcode = '42501';
-  elsif serie not in ('REQ', 'OC', 'DJ') or rol is null then
+  elsif serie in ('NP', 'F001', 'B001', 'OD') and rol not in ('creador', 'tesoreria') then
+    raise exception 'Su usuario no puede emitir documentos de venta' using errcode = '42501';
+  elsif serie not in ('REQ', 'OC', 'DJ', 'NP', 'F001', 'B001', 'OD') or rol is null then
     raise exception 'Serie inválida: %', serie using errcode = '22023';
   end if;
 
@@ -418,12 +433,33 @@ grant execute on function public.importar_asistencia(text, jsonb) to authenticat
 grant execute on function public.editar_asistencia_creador(text, text, integer, integer) to authenticated;
 
 -- ---------------------------------------------------------------------
+-- 7c. VENTAS: condiciones de pago iniciales (editables en Ventas › Condiciones de pago)
+-- ids fijos: se pueden ejecutar varias veces sin duplicar
+-- ---------------------------------------------------------------------
+insert into public.ventas (tipo, id, data)
+select 'condicion_pago', v.id, jsonb_build_object(
+  'id', v.id, 'codigo', v.codigo, 'nombre', v.nombre, 'dias', v.dias,
+  'porcentajeInicial', v.inicial, 'contraentrega', v.contraentrega, 'activo', true)
+from (
+  values
+    ('c0000000-0000-4000-8000-000000000001', 'CONTADO',   'Contado',                           0,  0,  false),
+    ('c0000000-0000-4000-8000-000000000007', 'CRED07',    'Crédito 7 días',                    7,  0,  false),
+    ('c0000000-0000-4000-8000-000000000015', 'CRED15',    'Crédito 15 días',                   15, 0,  false),
+    ('c0000000-0000-4000-8000-000000000030', 'CRED30',    'Crédito 30 días',                   30, 0,  false),
+    ('c0000000-0000-4000-8000-000000000045', 'CRED45',    'Crédito 45 días',                   45, 0,  false),
+    ('c0000000-0000-4000-8000-000000000060', 'CRED60',    'Crédito 60 días',                   60, 0,  false),
+    ('c0000000-0000-4000-8000-000000000100', 'CONTRAENT', 'Contraentrega',                     0,  0,  true),
+    ('c0000000-0000-4000-8000-000000000050', 'ADEL50',    '50% adelanto · 50% contraentrega',  0,  50, true)
+) as v (id, codigo, nombre, dias, inicial, contraentrega)
+on conflict (tipo, id) do nothing;
+
+-- ---------------------------------------------------------------------
 -- 8. REALTIME: los cambios de una PC llegan al instante a las demás
 -- ---------------------------------------------------------------------
 do $$
 declare t text;
 begin
-  foreach t in array array['compras', 'almacen', 'planilla', 'observaciones'] loop
+  foreach t in array array['compras', 'almacen', 'planilla', 'ventas', 'observaciones'] loop
     if not exists (
       select 1 from pg_publication_tables
       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
@@ -441,7 +477,7 @@ select u.id, v.usuario, v.rol, v.nombre, v.modulos, v.solo_lectura
 from (
   values
     ('creador',   'creador',   'Creador (administrador)', array['*'],                                          false),
-    ('tesoreria', 'tesoreria', 'Tesorería / Compras',     array['/dashboard/compras', '/dashboard/tesoreria'], false),
+    ('tesoreria', 'tesoreria', 'Tesorería / Compras',     array['/dashboard/compras', '/dashboard/tesoreria', '/dashboard/ventas'], false),
     ('almacen',   'almacen',   'Almacén',                 array['/dashboard/almacen'],                         false),
     ('planilla',  'planilla',  'Planilla',                array['/dashboard/planilla'],                        false),
     ('gerencia',  'gerencia',  'Gerencia (solo lectura)', array['*'],                                          true)
