@@ -12,7 +12,7 @@ alter table public.perfiles add constraint perfiles_rol_check check (rol in ('cr
 insert into public.perfiles (id, usuario, rol, nombre, modulos, solo_lectura)
 select u.id, v.usuario, v.rol, v.nombre, v.modulos, v.solo_lectura from (values
   ('creador','creador','Creador (admin)',array['*'],false),
-  ('tesoreria','tesoreria','Tesorería',array['/dashboard/compras','/dashboard/tesoreria'],false),
+  ('tesoreria','tesoreria','Tesorería',array['/dashboard/compras','/dashboard/tesoreria','/dashboard/ventas'],false),
   ('almacen','almacen','Almacén',array['/dashboard/almacen'],false),
   ('planilla','planilla','Planilla',array['/dashboard/planilla'],false),
   ('gerencia','gerencia','Gerencia',array['*'],true)

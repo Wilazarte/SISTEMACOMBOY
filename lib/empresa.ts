@@ -2,10 +2,14 @@
 export const EMPRESA = {
   razonSocial: "COMBOY VID E.I.R.L.",
   nombreComercial: "VID COMBOY Soluciones Industriales",
-  ruc: "20000000000", // <-- reemplazar por el RUC real
+  ruc: "20613238566",
   direccion: "Dirección fiscal, Lima - Perú", // <-- reemplazar
   telefono: "+51 900 000 000", // <-- reemplazar
   email: "compras@comboyvid.com", // <-- reemplazar
+  /** Cuentas para pagos (Nota de Pedido y comprobantes). */
+  cuentas: [
+    { banco: "BCP", moneda: "Soles", numero: "000-0000000-0-00", cci: "002-000-000000000000-00" }, // <-- reemplazar
+  ],
   /** Logo opcional en base64 (data:image/png;base64,...). Si queda vacío se dibuja un isotipo. */
   logoDataUrl: "",
 };

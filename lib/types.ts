@@ -227,3 +227,183 @@ export interface AsistenciaPeriodo {
   updated_by_creator_id: string | null; // solo en ediciones manuales del creador
   fecha: string; // ISO
 }
+
+// =====================================================================
+// VENTAS: Nota de Pedido -> Aprobada -> Factura/Boleta -> Orden de Despacho -> Cobro
+// (documentos JSON en la tabla public.ventas; despachos en public.almacen)
+// =====================================================================
+
+export type TipoDocCliente = "DNI" | "RUC" | "CE";
+
+export interface Cliente {
+  id: string;
+  tipoDoc: TipoDocCliente;
+  numDoc: string;
+  razonSocial: string;
+  direccionFiscal: string;
+  direccionesEntrega: string[]; // obras / puntos de entrega
+  telefono: string;
+  email: string;
+  contacto: string;
+  condPagoId: string; // condición de pago por defecto
+  lineaCredito: number; // S/ (0 = sin línea)
+  estado: "ACTIVO" | "INACTIVO";
+  created_at: string;
+}
+
+export interface CondicionPago {
+  id: string;
+  codigo: string; // CONTADO, CRED30, ...
+  nombre: string;
+  dias: number; // días de crédito (0 = contado)
+  porcentajeInicial: number; // % a pagar al emitir (adelanto)
+  contraentrega: boolean;
+  activo: boolean;
+}
+
+/** Línea de venta: con medidas se calcula por m² (ancho × alto × cantidad); sin medidas, por unidad. */
+export interface LineaVenta {
+  id: string;
+  productoNombre: string; // de Almacén (stock) o libre
+  descripcion: string; // "Vidrio templado incoloro 8mm"
+  unidad: string; // M2, UND, ...
+  ancho: number; // metros
+  alto: number; // metros
+  m2: number; // ancho × alto × cantidad (0 si no tiene medidas)
+  cantidad: number;
+  precio: number; // por m² si tiene medidas, si no por unidad (sin IGV)
+  total: number; // sin IGV
+}
+
+export type EstadoNP = "PENDIENTE" | "APROBADA" | "FACTURADA" | "ANULADA";
+
+export interface NotaPedido {
+  id: string;
+  numero: string; // NP-0001
+  fecha: string;
+  clienteId: string;
+  cliente: string;
+  clienteDoc: string;
+  condPagoId: string;
+  condPagoNombre: string;
+  validezDias: number;
+  fechaEntrega: string;
+  lugarObra: string;
+  vendedor: string; // usuario logueado
+  items: LineaVenta[];
+  conIgv: boolean;
+  descuento: number; // S/ sobre el subtotal
+  subtotal: number;
+  igv: number;
+  total: number;
+  estado: EstadoNP;
+  observaciones: string;
+  comprobanteId?: string;
+  historial: EventoHistorial[];
+}
+
+export type TipoComprobanteVenta = "FACTURA" | "BOLETA" | "NOTA_CREDITO" | "NOTA_DEBITO";
+export type FormaPagoVenta = "CONTADO" | "CREDITO" | "CREDITO_CUOTAS";
+
+export interface Cuota {
+  n: number;
+  fecha: string;
+  monto: number;
+}
+
+export interface ComprobanteVenta {
+  id: string;
+  tipo: TipoComprobanteVenta;
+  serie: string; // F001 / B001
+  numero: string; // F001-0001 ("" mientras es borrador)
+  fecha: string;
+  clienteId: string;
+  cliente: string;
+  clienteDoc: string;
+  clienteDireccion: string;
+  npId?: string;
+  npNumero?: string;
+  items: LineaVenta[];
+  conIgv: boolean;
+  descuento: number;
+  base: number;
+  igv: number;
+  total: number;
+  formaPago: FormaPagoVenta;
+  condPagoId: string;
+  condPagoNombre: string;
+  diasCredito: number;
+  fechaVenc: string;
+  inicial: number;
+  cuotas: Cuota[];
+  saldo: number; // por cobrar
+  estado: "BORRADOR" | "EMITIDO" | "ANULADO";
+  estadoSunat: "NO_ENVIADO";
+  lugarEntrega: string;
+  odId?: string;
+  odNumero?: string;
+  asientoId?: string;
+  vendedor: string;
+  historial: EventoHistorial[];
+}
+
+export interface CobroVenta {
+  id: string;
+  comprobanteId: string;
+  comprobanteNumero: string;
+  cliente: string;
+  fecha: string;
+  monto: number;
+  medio: "CAJA" | "BANCO";
+  cuenta: string; // Caja principal / BCP / Interbank / Yape ...
+  referencia: string; // N° operación
+  usuario: string;
+  created_at: string;
+}
+
+export interface AsientoContable {
+  id: string;
+  fecha: string;
+  glosa: string;
+  comprobanteId: string;
+  lineas: { cuenta: string; nombre: string; debe: number; haber: number }[];
+}
+
+export type EstadoOD = "PENDIENTE" | "EN_PREPARACION" | "DESPACHADO_PARCIAL" | "DESPACHADO_TOTAL" | "ANULADO";
+
+export interface LineaDespacho {
+  id: string;
+  productoNombre: string; // nombre en Almacén (vacío = servicio, no mueve stock)
+  descripcion: string;
+  unidad: string;
+  ancho: number;
+  alto: number;
+  cantidadPiezas: number;
+  solicitado: number; // en la unidad de stock (m² si unidad M2)
+  despachado: number;
+}
+
+export interface MovimientoDespacho {
+  fecha: string;
+  responsable: string;
+  sede: string;
+  guiaRemision: string;
+  observacion: string;
+  foto?: { nombre: string; tipo: string; url: string };
+  lineas: { lineaId: string; cantidad: number }[];
+}
+
+export interface OrdenDespacho {
+  id: string;
+  numero: string; // OD-0001
+  fecha: string;
+  comprobanteId: string;
+  comprobanteNumero: string;
+  clienteId: string;
+  cliente: string;
+  lugarEntrega: string;
+  items: LineaDespacho[];
+  estado: EstadoOD;
+  despachos: MovimientoDespacho[];
+  historial: EventoHistorial[];
+}

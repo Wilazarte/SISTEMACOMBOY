@@ -113,6 +113,22 @@ const COLORES: Record<string, string> = {
   FACTURA: "bg-slate-100 text-slate-700 ring-slate-300",
   DECLARACION_JURADA: "bg-fuchsia-100 text-fuchsia-800 ring-fuchsia-300",
   ACTIVO: "bg-emerald-100 text-emerald-800 ring-emerald-300",
+  APROBADA: "bg-emerald-100 text-emerald-800 ring-emerald-300",
+  ANULADA: "bg-slate-200 text-slate-500 ring-slate-300",
+  ANULADO: "bg-slate-200 text-slate-500 ring-slate-300",
+  BORRADOR: "bg-slate-100 text-slate-600 ring-slate-300",
+  EMITIDO: "bg-sky-100 text-sky-800 ring-sky-300",
+  PAGADO: "bg-emerald-100 text-emerald-800 ring-emerald-300",
+  VENCIDO: "bg-red-100 text-red-800 ring-red-300",
+  EN_PREPARACION: "bg-sky-100 text-sky-800 ring-sky-300",
+  DESPACHADO_PARCIAL: "bg-violet-100 text-violet-800 ring-violet-300",
+  DESPACHADO_TOTAL: "bg-slate-800 text-white ring-slate-800",
+  ENTREGADO: "bg-slate-800 text-white ring-slate-800",
+  PARCIAL: "bg-violet-100 text-violet-800 ring-violet-300",
+  NO_ENVIADO: "bg-amber-50 text-amber-700 ring-amber-200",
+  CONTADO: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+  CREDITO: "bg-orange-50 text-orange-700 ring-orange-200",
+  CREDITO_CUOTAS: "bg-orange-50 text-orange-700 ring-orange-200",
   INACTIVO: "bg-slate-100 text-slate-500 ring-slate-300",
 };
 
@@ -122,6 +138,12 @@ const ETIQUETA: Record<string, string> = {
   POR_PAGAR: "POR PAGAR",
   PENDIENTE_VB: "PEND. V°B°",
   DECLARACION_JURADA: "DECL. JURADA",
+  EN_PREPARACION: "EN PREPARACIÓN",
+  DESPACHADO_PARCIAL: "DESP. PARCIAL",
+  DESPACHADO_TOTAL: "DESP. TOTAL",
+  NO_ENVIADO: "NO ENVIADO",
+  CREDITO: "CRÉDITO",
+  CREDITO_CUOTAS: "CRÉDITO CUOTAS",
 };
 
 export function Badge({ estado }: { estado: string }) {

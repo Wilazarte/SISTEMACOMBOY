@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Boxes, CheckCircle2, ClipboardList, Eye, FilePlus2, FileText, MessageSquareWarning, PackageCheck, Pencil, Plus, Send, Trash2 } from "lucide-react";
+import { Boxes, CheckCircle2, Truck, ClipboardList, Eye, FilePlus2, FileText, MessageSquareWarning, PackageCheck, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar, ejecutarAsync } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
 import { SEDES, UNIDADES } from "@/lib/empresa";
@@ -21,9 +21,10 @@ import {
   useStore,
 } from "@/lib/storage";
 import { pdfActaIngreso, pdfRequerimiento } from "@/lib/pdf";
-import type { EstadoReq, Factura, Guia, ItemReq, OrdenCompra, Requerimiento, Rol, StockItem } from "@/lib/types";
+import type { EstadoReq, Factura, Guia, ItemReq, OrdenCompra, OrdenDespacho, Requerimiento, Rol, StockItem } from "@/lib/types";
+import { OrdenesDespacho } from "./despacho";
 
-type Tab = "nuevo" | "lista" | "ingresos" | "stock";
+type Tab = "nuevo" | "lista" | "ingresos" | "stock" | "despacho";
 
 const itemVacio = (): ItemReq => ({ id: uid(), nombre: "", cantidad: 1, unidad: "UND", marca: "", caracteristica: "" });
 
@@ -35,6 +36,7 @@ export default function AlmacenPage() {
   const facturas = useStore<Factura[]>(KEYS.FACTURAS, []);
   const guias = useStore<Guia[]>(KEYS.GUIAS, []);
   const stock = useStore<StockItem[]>(KEYS.STOCK, []);
+  const despachos = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, []);
   const [tab, setTab] = useState<Tab>(puede(rol, "req.crear") ? "nuevo" : "lista");
 
  const todos = [...pendientes, ...procesados].sort((a, b) => (b.numero || "").localeCompare(a.numero || ""));
@@ -62,6 +64,12 @@ export default function AlmacenPage() {
           { id: "lista", label: "Requerimientos emitidos", icon: <ClipboardList size={16} />, count: observados },
           { id: "ingresos", label: "Ingresos por V°B°", icon: <PackageCheck size={16} />, count: porVB.length },
           { id: "stock", label: "Stock", icon: <Boxes size={16} /> },
+          {
+            id: "despacho",
+            label: "Órdenes de despacho",
+            icon: <Truck size={16} />,
+            count: despachos.filter((o) => o.estado === "PENDIENTE" || o.estado === "EN_PREPARACION").length,
+          },
         ]}
       />
 
@@ -69,6 +77,7 @@ export default function AlmacenPage() {
       {tab === "lista" && <ListaReq reqs={todos} rol={rol} />}
       {tab === "ingresos" && <Ingresos rol={rol} porVB={porVB} ordenes={ordenes} facturas={facturas} guias={guias} />}
       {tab === "stock" && <Stock stock={stock} />}
+      {tab === "despacho" && <OrdenesDespacho />}
     </div>
   );
 }
