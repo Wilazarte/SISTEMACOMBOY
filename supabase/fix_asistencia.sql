@@ -26,6 +26,7 @@ declare
   trab text;
   d integer;
   t integer;
+  hr numeric;
   n integer := 0;
 begin
   if rol is null or rol not in ('creador', 'planilla', 'admin') then
@@ -41,12 +42,14 @@ begin
     trab := btrim(f ->> 'trabajador');
     d := (f ->> 'dias')::integer;
     t := (f ->> 'tardanzas')::integer;
-    if trab is null or trab = '' or d is null or t is null or d < 0 or d > 31 or t < 0 or t > d then
+    hr := nullif(f ->> 'horas', '')::numeric; -- opcional: horas trabajadas según el reloj
+    if trab is null or trab = '' or d is null or t is null or d < 0 or d > 31 or t < 0 or t > d
+       or (hr is not null and (hr < 0 or hr > d * 24)) then
       raise exception 'Fila de asistencia inválida: %', f using errcode = '22023';
     end if;
     insert into public.planilla (tipo, id, data)
     values ('asistencia', per || '|' || trab, jsonb_build_object(
-      'id', per || '|' || trab, 'periodo', per, 'trabajador', trab, 'dias', d, 'tardanzas', t,
+      'id', per || '|' || trab, 'periodo', per, 'trabajador', trab, 'dias', d, 'horas', hr, 'tardanzas', t,
       'origen_edicion', 'RELOJ', 'updated_by', auth.uid(), 'updated_by_creator_id', null, 'fecha', now()))
     on conflict (tipo, id) do update set data = excluded.data;
     n := n + 1;

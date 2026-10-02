@@ -24,33 +24,34 @@ import {
   useTrabajadores,
 } from "@/lib/storage";
 import { getSesion } from "@/lib/auth";
+import { HORAS_DIA, HORA_TARDANZA, leerMarcaciones, resumirAsistencia, textoCsv, type AsistenciaMap } from "@/lib/asistencia";
 import type { AsistenciaPeriodo, TipoAfp, TipoSueldo, Trabajador } from "@/lib/types";
 
 type Tab = "trabajadores" | "planilla";
-
-/** Marcaciones del reloj agrupadas: N° huella -> { nombre, fecha -> horas marcadas } */
-type Marcaciones = Map<string, { nombre: string; fechas: Map<string, string[]> }>;
 
 type TrabajadorCalc = Trabajador & {
   dias: number;
   horas: number;
   tardanzas: number;
   origen?: AsistenciaPeriodo["origen_edicion"];
+  valorHora: number;
   bruto: number;
   descuentoAfp: number;
   neto: number;
 };
 
-const HORA_TARDANZA = "08:15:00";
+/** Excel importado en esta sesión: se muestra completo, sin filtrar por periodo ni por fechas. */
+type ExcelImportado = { asistencia: AsistenciaMap; desde: string; hasta: string };
 
 const OPC_SUELDO = (Object.keys(TIPOS_SUELDO) as TipoSueldo[]).map((k) => ({ value: k, label: TIPOS_SUELDO[k].label }));
 const OPC_AFP = (Object.keys(AFP_OPTIONS) as TipoAfp[]).map((k) => ({ value: k, label: AFP_OPTIONS[k].label }));
 
-/** "8:05" / "08:05:10" -> "08:05:00" / "08:05:10" para comparar como texto. */
-const normalizarHora = (h: string): string => {
-  const [hh = "", mm = "00", ss = "00"] = h.split(":");
-  return hh ? `${hh.padStart(2, "0")}:${mm.padStart(2, "0")}:${ss.padStart(2, "0")}` : "";
-};
+// Datos antiguos pueden traer un tipo de sueldo / pensión que ya no existe: no romper la pantalla.
+const sueldoDe = (t: Trabajador) => TIPOS_SUELDO[t.tipoSueldo as TipoSueldo] ?? TIPOS_SUELDO.DIARIO;
+const afpLabel = (t: Trabajador): string => AFP_OPTIONS[t.afpTipo as TipoAfp]?.label ?? String(t.afpTipo ?? "-");
+const horasTxt = (h: number) => h.toLocaleString("es-PE", { maximumFractionDigits: 2 });
+// 4 decimales: 130 / 9 = 14.4444 (con 2 decimales la boleta no cuadraría al multiplicar a mano)
+const valorHoraTxt = (v: number) => `S/ ${v.toFixed(4)}`;
 
 /** Antigüedad legible desde la fecha de ingreso. */
 function antiguedad(fechaIngreso: string): string {
@@ -65,25 +66,30 @@ function antiguedad(fechaIngreso: string): string {
   return `${a} año${a > 1 ? "s" : ""}${r ? ` ${r} m` : ""}`;
 }
 
-/** Resume las marcaciones de un trabajador: días con marcación y días con entrada después de las 08:15. */
-function resumir(fechas: Map<string, string[]>): { dias: number; tardanzas: number } {
-  let dias = 0;
-  let tardanzas = 0;
-  fechas.forEach((tiempos) => {
-    dias++;
-    const entrada = [...tiempos].map((x) => normalizarHora(x.split(" ")[1] ?? "")).sort()[0] ?? "";
-    if (entrada > HORA_TARDANZA) tardanzas++;
-  });
-  return { dias, tardanzas };
-}
-
-/** BRUTO, DSCTO y NETO se calculan siempre desde DÍAS (no se editan a mano). */
-function calcular(t: Trabajador, registro?: AsistenciaPeriodo): TrabajadorCalc {
-  const dias = registro?.dias ?? 0;
-  const tardanzas = registro?.tardanzas ?? 0;
-  const bruto = r2((t.sueldo / TIPOS_SUELDO[t.tipoSueldo].divisor) * dias);
-  const descuentoAfp = r2(bruto * (t.afpPorcentaje / 100));
-  return { ...t, dias, horas: dias * 8, tardanzas, bruto, descuentoAfp, neto: r2(bruto - descuentoAfp), origen: registro?.origen_edicion };
+/**
+ * Pago por HORAS: 1 día = 9 h. valorHora = sueldo diario / 9; bruto = valorHora × totalHoras.
+ * Si hay Excel importado se lee TODO su Map (todas las fechas, sin filtrar por periodo);
+ * si no, se usa lo guardado en Supabase para el periodo (sin horas guardadas: días × 9).
+ */
+function calcular(t: Trabajador, asistenciaExterna?: AsistenciaMap | null, registro?: AsistenciaPeriodo): TrabajadorCalc {
+  const fechas = asistenciaExterna?.get(t.id);
+  const { dias, horas, tardanzas } = fechas
+    ? resumirAsistencia(fechas)
+    : { dias: registro?.dias ?? 0, horas: registro?.horas ?? (registro?.dias ?? 0) * HORAS_DIA, tardanzas: registro?.tardanzas ?? 0 };
+  const valorHora = t.sueldo / sueldoDe(t).divisor / HORAS_DIA;
+  const bruto = r2(valorHora * horas);
+  const descuentoAfp = r2(bruto * ((t.afpPorcentaje || 0) / 100));
+  return {
+    ...t,
+    dias,
+    horas,
+    tardanzas,
+    valorHora,
+    bruto,
+    descuentoAfp,
+    neto: r2(bruto - descuentoAfp),
+    origen: fechas ? "RELOJ" : registro?.origen_edicion,
+  };
 }
 
 /** DÍAS / TARD.: solo lectura en esta vista (se editan en Importar asistencia o el Módulo Creador). */
@@ -103,6 +109,7 @@ export default function PlanillaPage() {
   const asistencia = useStore<AsistenciaPeriodo[]>(KEYS.ASISTENCIA, []);
   const [periodo, setPeriodo] = useState("SEMANA 14 - ABRIL 2026");
   const [importando, setImportando] = useState(false);
+  const [excel, setExcel] = useState<ExcelImportado | null>(null);
   const [boletaSel, setBoletaSel] = useState<TrabajadorCalc | null>(null);
   const [editando, setEditando] = useState<{ form: Trabajador; idOriginal?: string } | null>(null);
   const [verInactivos, setVerInactivos] = useState(false);
@@ -115,14 +122,14 @@ export default function PlanillaPage() {
     return m;
   }, [asistencia, periodo]);
   const calculados = useMemo(
-    () => trabajadores.filter((t) => t.activo).map((t) => calcular(t, delPeriodo.get(idAsistencia(periodo, t.id)))),
-    [trabajadores, delPeriodo, periodo]
+    () => trabajadores.filter((t) => t.activo).map((t) => calcular(t, excel?.asistencia, delPeriodo.get(idAsistencia(periodo, t.id)))),
+    [trabajadores, excel, delPeriodo, periodo]
   );
   const listaMaestro = trabajadores
     .filter((t) => verInactivos || t.activo)
     .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
 
-  // IMPORTAR ASISTENCIA — formato del reloj: N° | Nombre | Tiempo | Estado
+  // IMPORTAR ASISTENCIA — formato del reloj: N° | Nombre | Tiempo (DD/MM/YYYY HH:mm:ss) | Estado
   const importarAsistencia = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target;
     const file = input.files?.[0];
@@ -131,35 +138,33 @@ export default function PlanillaPage() {
     setImportando(true);
     try {
       const XLSX = await import("xlsx");
-      const wb = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
+      // raw: el CSV se lee como texto (sin convertir "05/10/2026" a mes/día); las celdas fecha de Excel llegan como número de serie.
+      // El CSV se decodifica aparte para no leer "N°" como "NÂ°".
+      const datos = await file.arrayBuffer();
+      const wb = /\.(csv|txt)$/i.test(file.name)
+        ? XLSX.read(textoCsv(datos), { type: "string", raw: true })
+        : XLSX.read(datos, { type: "array", raw: true });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      // raw:false + dateNF: las fechas llegan como texto "yyyy-mm-dd hh:mm:ss" aunque la celda sea tipo fecha
-      const filas = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "", raw: false, dateNF: "yyyy-mm-dd hh:mm:ss" });
+      const filas = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "", raw: true });
 
-      const mapa: Marcaciones = new Map();
-      filas.forEach((r) => {
-        const numero = String(r["Número"] || r["Numero"] || r["N°"] || r["No."] || "").trim();
-        const nombre = String(r["Nombre"] || "").trim();
-        const tiempo = String(r["Tiempo"] || "").trim();
-        if (!numero || !tiempo) return;
-        if (!mapa.has(numero)) mapa.set(numero, { nombre, fechas: new Map() });
-        const fecha = tiempo.split(" ")[0];
-        const obj = mapa.get(numero)!;
-        if (!obj.fechas.has(fecha)) obj.fechas.set(fecha, []);
-        obj.fechas.get(fecha)!.push(tiempo);
-      });
+      // Agrupa por trabajador y por fecha (DD/MM/YYYY HH:mm:ss -> fecha + "HH:mm"); lee TODO el archivo
+      const { asistencia: mapa, nombres, desde, hasta } = leerMarcaciones(filas);
       if (mapa.size === 0) {
-        toast("No se encontraron marcaciones. Verifique las columnas N° / Nombre / Tiempo.", "error");
+        toast("No se encontraron marcaciones. Verifique las columnas N° / Nombre / Tiempo (DD/MM/YYYY HH:mm:ss).", "error");
         return;
       }
-      const creados = registrarDesdeAsistencia([...mapa].map(([id, v]) => ({ id, nombre: v.nombre })));
-      // DÍAS / TARD. se guardan en Supabase con origen RELOJ (única vía además del Módulo Creador)
+      const creados = registrarDesdeAsistencia([...nombres].map(([id, nombre]) => ({ id, nombre })));
+      // DÍAS / HORAS / TARD. se guardan en Supabase con origen RELOJ (única vía además del Módulo Creador)
       const n = await importarAsistenciaReloj(
         periodo,
-        [...mapa].map(([trabajador, v]) => ({ trabajador, ...resumir(v.fechas) }))
+        [...mapa].map(([trabajador, fechas]) => ({ trabajador, ...resumirAsistencia(fechas) }))
       );
+      // La planilla se calcula con calcular(t, asistenciaMap): todas las fechas del Excel
+      setExcel({ asistencia: mapa, desde, hasta });
       setTab("planilla");
-      toast(`Asistencia importada en ${normalizarPeriodo(periodo)}: ${n} trabajador(es)${creados ? ` · ${creados} nuevo(s) por completar` : ""}`);
+      toast(
+        `Asistencia del ${fechaPE(desde)} al ${fechaPE(hasta)} importada en ${normalizarPeriodo(periodo)}: ${n} trabajador(es)${creados ? ` · ${creados} nuevo(s) por completar` : ""}`
+      );
     } catch (err) {
       toast(err instanceof Error && err.name !== "SyntaxError" ? err.message : "No se pudo leer el archivo de asistencia.", "error");
     } finally {
@@ -184,11 +189,11 @@ export default function PlanillaPage() {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.text(`Trabajador: ${t.nombre} | DNI: ${t.dni || "-"} | N°: ${t.id}`, 20, 38);
-    doc.text(`Cargo: ${t.cargo} | Ingreso: ${fechaPE(t.fechaIngreso)} | ${AFP_OPTIONS[t.afpTipo].label} (${t.afpPorcentaje}%)`, 20, 44);
-    doc.text(`Tipo sueldo: ${TIPOS_SUELDO[t.tipoSueldo].label} ${soles(t.sueldo)} | Días: ${t.dias} | Horas: ${t.horas} | Tardanzas: ${t.tardanzas}`, 20, 50);
+    doc.text(`Cargo: ${t.cargo} | Ingreso: ${fechaPE(t.fechaIngreso)} | ${afpLabel(t)} (${t.afpPorcentaje}%)`, 20, 44);
+    doc.text(`Tipo sueldo: ${sueldoDe(t).label} ${soles(t.sueldo)} | Días: ${t.dias} | Horas: ${horasTxt(t.horas)} | Valor hora: ${valorHoraTxt(t.valorHora)} | Tardanzas: ${t.tardanzas}`, 20, 50);
     doc.line(20, 55, 190, 55);
     doc.text(`Remuneración bruta: ${soles(t.bruto)}`, 20, 65);
-    doc.text(`Descuento ${AFP_OPTIONS[t.afpTipo].label} (${t.afpPorcentaje}%): - ${soles(t.descuentoAfp)}`, 20, 72);
+    doc.text(`Descuento ${afpLabel(t)} (${t.afpPorcentaje}%): - ${soles(t.descuentoAfp)}`, 20, 72);
     doc.setFont("helvetica", "bold");
     doc.text(`NETO A PAGAR: ${soles(t.neto)}`, 20, 85);
     doc.setFont("helvetica", "normal");
@@ -203,7 +208,7 @@ export default function PlanillaPage() {
         "inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-600",
         importando && "pointer-events-none opacity-60"
       )}
-      title={`Guarda DÍAS y TARD. en el periodo ${normalizarPeriodo(periodo)}`}
+      title={`Guarda DÍAS, HORAS y TARD. en el periodo ${normalizarPeriodo(periodo)}`}
     >
       <Upload size={16} /> {importando ? "Importando…" : "Importar asistencia"}
       <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={importarAsistencia} disabled={importando} />
@@ -278,10 +283,10 @@ export default function PlanillaPage() {
                       <span className="text-xs font-semibold text-orange-600">Sin registrar</span>
                     )}
                   </Td>
-                  <Td>{TIPOS_SUELDO[t.tipoSueldo].label}</Td>
+                  <Td>{sueldoDe(t).label}</Td>
                   <Td className="text-right">{soles(t.sueldo)}</Td>
                   <Td>
-                    <p>{AFP_OPTIONS[t.afpTipo].label}</p>
+                    <p>{afpLabel(t)}</p>
                     <p className="text-xs text-slate-500">{t.afpPorcentaje}%</p>
                   </Td>
                   <Td>
@@ -327,7 +332,13 @@ export default function PlanillaPage() {
             </Field>
             <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm">
               Trabajadores activos: <b>{calculados.length}</b>
-              <p className="text-xs text-slate-500">{delPeriodo.size ? `${delPeriodo.size} con asistencia en el periodo` : "Sin asistencia en este periodo"}</p>
+              <p className="text-xs text-slate-500">
+                {excel
+                  ? `Excel del ${fechaPE(excel.desde)} al ${fechaPE(excel.hasta)} · ${excel.asistencia.size} trabajador(es)`
+                  : delPeriodo.size
+                    ? `${delPeriodo.size} con asistencia en el periodo`
+                    : "Sin asistencia en este periodo"}
+              </p>
             </div>
             <div className="rounded-xl bg-slate-900 p-3 text-sm text-white">
               Total neto: <b className="text-amber-400">{soles(r2(calculados.reduce((a, b) => a + b.neto, 0)))}</b>
@@ -337,7 +348,7 @@ export default function PlanillaPage() {
           <Card>
             <CardHeader
               title={`Planilla · ${normalizarPeriodo(periodo)}`}
-              subtitle="Para cambiar sueldo, tipo de sueldo o pensión edite al trabajador. DÍAS y TARD. 🔒: solo editables desde Módulo Creador / Importar Asistencia."
+              subtitle={`Pago por horas: 1 día = ${HORAS_DIA} h · valor hora = sueldo diario / ${HORAS_DIA} · tardanza: entrada después de las ${HORA_TARDANZA}. DÍAS y TARD. 🔒: solo editables desde Módulo Creador / Importar Asistencia.`}
               action={importarBtn}
             />
             {calculados.length === 0 ? (
@@ -345,7 +356,7 @@ export default function PlanillaPage() {
                 <Empty icon={<Calculator size={28} />} text="No hay trabajadores activos." />
               </div>
             ) : (
-              <Table head={["N°", "Trabajador", "F. ingreso", "Sueldo / Tipo", "Pensión", "Días 🔒", "Tard. 🔒", "Bruto", "Dscto", "Neto", "Boleta"]}>
+              <Table head={["N°", "Trabajador", "F. ingreso", "Sueldo / Tipo", "Pensión", "Días 🔒", "Horas", "Tard. 🔒", "Bruto", "Dscto", "Neto", "Boleta"]}>
                 {calculados.map((t) => (
                   <tr key={t.id}>
                     <Td className="font-mono">{t.id}</Td>
@@ -358,15 +369,19 @@ export default function PlanillaPage() {
                     <Td>{t.fechaIngreso ? fechaPE(t.fechaIngreso) : <span className="text-xs font-semibold text-orange-600">Sin registrar</span>}</Td>
                     <Td>
                       {soles(t.sueldo)}
-                      <p className="text-xs text-slate-500">{TIPOS_SUELDO[t.tipoSueldo].label}</p>
+                      <p className="text-xs text-slate-500">{sueldoDe(t).label}</p>
                     </Td>
                     <Td>
-                      {AFP_OPTIONS[t.afpTipo].label}
+                      {afpLabel(t)}
                       <p className="text-xs text-slate-500">{t.afpPorcentaje}%</p>
                     </Td>
                     <Td className="text-center">
                       <CampoBloqueado valor={t.dias} />
                       {t.origen === "CREADOR" && <p className="text-[10px] font-semibold text-violet-600" title="Corregido a mano en el Módulo Creador">CREADOR</p>}
+                    </Td>
+                    <Td className="text-center font-semibold">
+                      {horasTxt(t.horas)}
+                      <p className="text-[10px] font-normal text-slate-500">{valorHoraTxt(t.valorHora)}/h</p>
                     </Td>
                     <Td className="text-center">
                       <CampoBloqueado valor={t.tardanzas} alerta={t.tardanzas > 0} />
@@ -420,7 +435,7 @@ export default function PlanillaPage() {
                 <b>Cargo:</b> {boletaSel.cargo} · <b>Ingreso:</b> {fechaPE(boletaSel.fechaIngreso)}
               </p>
               <p>
-                <b>Sueldo:</b> {TIPOS_SUELDO[boletaSel.tipoSueldo].label} {soles(boletaSel.sueldo)} · <b>Pensión:</b> {AFP_OPTIONS[boletaSel.afpTipo].label} {boletaSel.afpPorcentaje}%
+                <b>Sueldo:</b> {sueldoDe(boletaSel).label} {soles(boletaSel.sueldo)} · <b>Pensión:</b> {afpLabel(boletaSel)} {boletaSel.afpPorcentaje}%
               </p>
               <table className="mt-3 w-full border">
                 <thead className="bg-slate-100">
@@ -432,13 +447,13 @@ export default function PlanillaPage() {
                 <tbody>
                   <tr className="border-t">
                     <td className="p-2">
-                      Remuneración ({boletaSel.dias} días · {TIPOS_SUELDO[boletaSel.tipoSueldo].label.toLowerCase()})
+                      Remuneración ({boletaSel.dias} días · {horasTxt(boletaSel.horas)} h × {valorHoraTxt(boletaSel.valorHora)})
                     </td>
                     <td className="p-2 text-right">{soles(boletaSel.bruto)}</td>
                   </tr>
                   <tr className="border-t text-red-600">
                     <td className="p-2">
-                      Desc. {AFP_OPTIONS[boletaSel.afpTipo].label} {boletaSel.afpPorcentaje}%
+                      Desc. {afpLabel(boletaSel)} {boletaSel.afpPorcentaje}%
                     </td>
                     <td className="p-2 text-right">- {soles(boletaSel.descuentoAfp)}</td>
                   </tr>
@@ -502,7 +517,7 @@ function FormTrabajador({
         <Field label="Tipo de sueldo *">
           <Select value={form.tipoSueldo} options={OPC_SUELDO} onChange={(e) => set("tipoSueldo", e.target.value as TipoSueldo)} />
         </Field>
-        <Field label={`Sueldo ${TIPOS_SUELDO[form.tipoSueldo].label.toLowerCase()} (S/) *`}>
+        <Field label={`Sueldo ${sueldoDe(form).label.toLowerCase()} (S/) *`}>
           <Input type="number" min={0} step="0.01" value={form.sueldo} onChange={(e) => set("sueldo", Number(e.target.value))} />
         </Field>
         <Field label="Sistema de pensiones *">

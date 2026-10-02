@@ -1136,10 +1136,10 @@ function errorAsistencia(error: { code?: string; message: string }): ErpError {
   return new ErpError(error.message);
 }
 
-/** Importar asistencia (reloj): guarda DÍAS y TARD. del periodo con origen RELOJ. */
+/** Importar asistencia (reloj): guarda DÍAS, HORAS y TARD. del periodo con origen RELOJ. */
 export async function importarAsistenciaReloj(
   periodo: string,
-  filas: { trabajador: string; dias: number; tardanzas: number }[]
+  filas: { trabajador: string; dias: number; horas: number; tardanzas: number }[]
 ): Promise<number> {
   const p = normalizarPeriodo(periodo);
   if (!p) throw new ErpError("Indique el periodo antes de importar.");

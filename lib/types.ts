@@ -230,7 +230,8 @@ export interface AsistenciaPeriodo {
   periodo: string; // normalizado: "SEMANA 14 - ABRIL 2026"
   trabajador: string; // N° de huella
   dias: number;
-  tardanzas: number; // días con entrada después de las 08:15
+  horas?: number; // horas trabajadas según el reloj (sin dato: dias × 9)
+  tardanzas: number; // días con entrada después de las 08:20
   origen_edicion: OrigenEdicion;
   updated_by: string | null; // usuario (auth.uid) que hizo el último cambio
   updated_by_creator_id: string | null; // solo en ediciones manuales del creador
