@@ -52,6 +52,11 @@ Para cambiar una contraseña: Supabase → Authentication → Users → usuario 
 - Se guarda en el documento de la OC (`compras`, tipo `orden`): `cuentaOrigenPago` (`caja_general` / `caja_chica` / `fondo_reserva`), `voucherUrl` (ruta `vouchers/<id>.<ext>` en el bucket), `voucherMonto`.
 - Solo tesorería y creador emiten OC y suben bauchers; los demás perfiles con acceso ven el formulario deshabilitado y abren el baucher en modo lectura (enlace temporal de 5 min).
 
+## Condiciones de pago (Ventas)
+- **Activar en Supabase:** SQL Editor → `supabase/condiciones_pago.sql` (o volver a correr `supabase_tables.sql`). Crea `public.condiciones_pago` con Efectivo, Transferencia bancaria, Depósito, Yape, Plin, Tarjeta, Crédito 7/15/30/45/60 días y Personalizado; copia las condiciones que ya existían (mismo id).
+- Nota de pedido: guarda el **id** de la condición. Crédito pide días (propone los de la condición) y calcula la **fecha de vencimiento**; Personalizado pide días y un detalle libre. Al facturar se usan esos días.
+- Nuevas condiciones: Ventas › **Configuración**, o el botón **+** junto al select de la nota de pedido. Las editan creador y tesorería.
+
 ## Historial de planilla
 - **Activar en Supabase:** SQL Editor → `supabase/historial_planilla.sql` (o volver a correr `supabase_tables.sql`). Crea `planilla_historial`, `planilla_historial_detalle`, la función `cerrar_planilla()` y su Realtime.
 - Planilla › *Planilla del periodo* → **Cerrar semana y guardar en historial**: guarda una copia (no una referencia) de lo que se ve en pantalla, cabecera + detalle en una sola transacción. Un periodo se cierra una sola vez; el historial no se puede editar ni borrar.

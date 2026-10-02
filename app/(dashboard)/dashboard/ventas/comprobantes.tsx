@@ -71,8 +71,9 @@ export function Comprobantes({ preNp, onListo }: { preNp?: string; onListo: () =
       conIgv: cliente?.tipoDoc === "RUC" ? true : np.conIgv,
       descuento: np.descuento,
       condPagoId: np.condPagoId,
-      formaPago: formaDeCondicion(cond),
-      diasCredito: cond?.dias ?? 0,
+      // Los días que se pactaron en la nota de pedido (crédito / personalizado)
+      formaPago: formaDeCondicion(cond, np.diasCredito ?? cond?.dias ?? 0),
+      diasCredito: np.diasCredito ?? cond?.dias ?? 0,
       lugarEntrega: np.lugarObra,
     };
   };

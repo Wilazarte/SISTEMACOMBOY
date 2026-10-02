@@ -10,6 +10,7 @@ import type { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/
 import { getSesion, rolNegocio } from "./auth";
 import { createClient } from "./supabase/client";
 import type {
+  CondicionPago,
   AsistenciaPeriodo,
   CuentaOrigenPago,
   Compra,
@@ -110,7 +111,8 @@ export class ErpError extends Error {}
 type TablaDoc = "compras" | "almacen" | "planilla" | "ventas";
 type Destino =
   | { tabla: TablaDoc; tipo: string; forma: "lista" | "objeto" }
-  | { tabla: "observaciones"; forma: "observaciones" };
+  | { tabla: "observaciones"; forma: "observaciones" }
+  | { tabla: "condiciones_pago"; forma: "condiciones" }; // tabla con columnas propias
 
 const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.REQS_PENDIENTES]: { tabla: "compras", tipo: "req_pendiente", forma: "lista" },
@@ -126,7 +128,7 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.TRABAJADORES]: { tabla: "planilla", tipo: "trabajador", forma: "lista" },
   [KEYS.ASISTENCIA]: { tabla: "planilla", tipo: "asistencia", forma: "lista" },
   [KEYS.CLIENTES]: { tabla: "ventas", tipo: "cliente", forma: "lista" },
-  [KEYS.COND_PAGO]: { tabla: "ventas", tipo: "condicion_pago", forma: "lista" },
+  [KEYS.COND_PAGO]: { tabla: "condiciones_pago", forma: "condiciones" },
   [KEYS.NOTAS_PEDIDO]: { tabla: "ventas", tipo: "nota_pedido", forma: "lista" },
   [KEYS.COMPROBANTES]: { tabla: "ventas", tipo: "comprobante", forma: "lista" },
   [KEYS.COBROS]: { tabla: "ventas", tipo: "cobro", forma: "lista" },
@@ -134,7 +136,7 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.DESPACHOS]: { tabla: "almacen", tipo: "despacho", forma: "lista" },
   [KEYS.OBSERVACIONES]: { tabla: "observaciones", forma: "observaciones" },
 };
-const TABLAS = ["compras", "almacen", "planilla", "ventas", "observaciones"] as const;
+const TABLAS = ["compras", "almacen", "planilla", "ventas", "observaciones", "condiciones_pago"] as const;
 /**
  * Fila única de las claves tipo "objeto" (contadores). Es un UUID fijo para que funcione
  * aunque la columna id de la tabla sea de tipo uuid (antes era "principal").
@@ -163,9 +165,42 @@ const clonar = <T,>(v: T): T => (typeof structuredClone === "function" ? structu
 const avisar = (key: StoreKey) => window.dispatchEvent(new CustomEvent(EVENTO, { detail: key }));
 const avisarError = (msg: string) => window.dispatchEvent(new CustomEvent("erp:toast", { detail: { msg, tipo: "error" } }));
 
+const RANGO_TIPO: Record<string, number> = { CONTADO: 0, CREDITO: 1, PERSONALIZADO: 2 };
+
+/** Fila de public.condiciones_pago <-> CondicionPago. */
+function condicionDeFila(f: Fila): CondicionPago {
+  const dias = Number(f.dias) || 0;
+  const tipo = (["CONTADO", "CREDITO", "PERSONALIZADO"].includes(String(f.tipo)) ? f.tipo : dias > 0 ? "CREDITO" : "CONTADO") as CondicionPago["tipo"];
+  return {
+    id: String(f.id),
+    codigo: String(f.codigo ?? ""),
+    nombre: String(f.nombre ?? ""),
+    tipo,
+    ...(f.medio ? { medio: String(f.medio) } : {}),
+    dias,
+    porcentajeInicial: Number(f.porcentaje_inicial) || 0,
+    contraentrega: !!f.contraentrega,
+    activo: f.activo !== false,
+    orden: Number(f.orden ?? 100),
+  };
+}
+const filaDeCondicion = (c: CondicionPago): Fila => ({
+  id: c.id,
+  codigo: c.codigo,
+  nombre: c.nombre,
+  tipo: c.tipo,
+  medio: c.medio ?? null,
+  dias: c.dias,
+  porcentaje_inicial: c.porcentajeInicial,
+  contraentrega: c.contraentrega,
+  activo: c.activo,
+  orden: c.orden ?? 100,
+});
+
 /** Valor de la app -> filas de la tabla. */
 function aFilas(key: StoreKey, valor: unknown): Fila[] {
   const d = DESTINOS[key];
+  if (d.forma === "condiciones") return ((valor ?? []) as CondicionPago[]).map(filaDeCondicion);
   if (d.forma === "observaciones") {
     return Object.entries((valor ?? {}) as Record<string, Omit<FilaObs, "modulo">[]>).flatMap(([modulo, lista]) =>
       lista.map((o) => ({ id: o.id, modulo, texto: o.texto, usuario: o.usuario, fecha: o.fecha }))
@@ -178,6 +213,11 @@ function aFilas(key: StoreKey, valor: unknown): Fila[] {
 /** Filas de la tabla (más nuevas primero) -> valor de la app. */
 function deFilas(key: StoreKey, filas: Fila[]): unknown {
   const d = DESTINOS[key];
+  if (d.forma === "condiciones")
+    // Contado, luego crédito (por días) y al final personalizado
+    return filas
+      .map(condicionDeFila)
+      .sort((a, b) => RANGO_TIPO[a.tipo] - RANGO_TIPO[b.tipo] || a.dias - b.dias || (a.orden ?? 100) - (b.orden ?? 100) || a.nombre.localeCompare(b.nombre));
   if (d.forma === "observaciones") {
     const r: Record<string, Omit<FilaObs, "modulo">[]> = {};
     [...(filas as unknown as FilaObs[])]
@@ -210,7 +250,7 @@ const firma = (f: Fila) => JSON.stringify(ordenar(f));
 function claveDeFila(tabla: string, tipo: unknown): StoreKey | undefined {
   return (Object.keys(DESTINOS) as StoreKey[]).find((k) => {
     const d = DESTINOS[k];
-    return d.tabla === tabla && (d.forma === "observaciones" || d.tipo === tipo);
+    return d.tabla === tabla && (d.forma === "observaciones" || d.forma === "condiciones" || d.tipo === tipo);
   });
 }
 
@@ -235,7 +275,12 @@ async function descargar(key: StoreKey): Promise<Fila[]> {
   const filas: Fila[] = [];
   for (let desde = 0; ; desde += 1000) {
     let q = sb.from(d.tabla).select("*");
-    q = d.forma === "observaciones" ? q.order("fecha", { ascending: false }) : q.eq("tipo", d.tipo).order("created_at", { ascending: false });
+    q =
+      d.forma === "observaciones"
+        ? q.order("fecha", { ascending: false })
+        : d.forma === "condiciones"
+          ? q.order("id")
+          : q.eq("tipo", d.tipo).order("created_at", { ascending: false });
     const { data, error } = await q.range(desde, desde + 999);
     if (error) throw error;
     filas.push(...((data ?? []) as Fila[]));
@@ -267,7 +312,7 @@ async function aplicarCambio(tabla: string, p: RealtimePostgresChangesPayload<Fi
 }
 
 /** Tablas de módulos nuevos: si aún no existen en Supabase, su módulo queda vacío en vez de bloquear todo. */
-const TABLAS_OPCIONALES: string[] = ["ventas"];
+const TABLAS_OPCIONALES: string[] = ["ventas", "condiciones_pago"];
 
 const esTablaFaltante = (e: unknown): boolean => {
   const err = e as { code?: string; message?: string };
@@ -296,6 +341,8 @@ export function iniciarDatos(): Promise<void> {
     );
     resultados.forEach(([k, f]) => fijarDesdeServidor(k, f));
     if (faltantes.has("ventas")) avisarError("Falta la tabla de Ventas en Supabase: ejecute supabase/fix_ventas.sql. El resto del ERP funciona normal.");
+    if (faltantes.has("condiciones_pago"))
+      avisarError("Falta la tabla condiciones_pago en Supabase: ejecute supabase/condiciones_pago.sql. El resto del ERP funciona normal.");
 
     const sb = createClient();
     let primera = true;
@@ -380,13 +427,13 @@ export function escribir<T>(key: StoreKey, value: T): void {
     const sb = createClient();
     try {
       if (cambios.length) {
-        const conflicto = d.forma === "observaciones" ? "id" : "tipo,id";
+        const conflicto = d.forma === "observaciones" || d.forma === "condiciones" ? "id" : "tipo,id";
         const { error } = await sb.from(d.tabla).upsert(cambios, { onConflict: conflicto });
         if (error) throw error;
       }
       if (borrados.length) {
         let q = sb.from(d.tabla).delete().in("id", borrados);
-        if (d.forma !== "observaciones") q = q.eq("tipo", d.tipo);
+        if (d.forma !== "observaciones" && d.forma !== "condiciones") q = q.eq("tipo", d.tipo);
         const { error } = await q;
         if (error) throw error;
       }

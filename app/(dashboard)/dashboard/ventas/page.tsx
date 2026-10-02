@@ -38,7 +38,7 @@ export default function VentasPage() {
         tabs={[
           { id: "notas", label: "Notas de pedido", icon: <ClipboardList size={16} />, count: notas.filter((n) => n.estado === "APROBADA").length },
           { id: "comprobantes", label: "Comprobantes", icon: <Receipt size={16} />, count: comprobantes.filter((c) => c.estado === "BORRADOR").length },
-          { id: "condiciones", label: "Condiciones de pago", icon: <Settings2 size={16} /> },
+          { id: "condiciones", label: "Configuración", icon: <Settings2 size={16} /> },
           { id: "clientes", label: "Clientes", icon: <Contact size={16} /> },
           { id: "cobrar", label: "Cuentas por cobrar", icon: <Wallet size={16} />, count: vencidos },
         ]}

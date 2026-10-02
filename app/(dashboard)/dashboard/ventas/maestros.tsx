@@ -2,29 +2,94 @@
 
 import { useState } from "react";
 import { Pencil, Plus, Trash2, Upload } from "lucide-react";
-import { Badge, Button, Card, CardHeader, Field, Input, Modal, Table, Td, cn, ejecutar, toast } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, cn, ejecutar, toast } from "@/components/ui";
 import { puede, soles, useRol } from "@/lib/storage";
-import { clienteVacio, eliminarCliente, eliminarCondicion, guardarCliente, guardarCondicion, importarClientes, saldoCliente } from "@/lib/ventas";
+import { MEDIOS_PAGO, TIPOS_CONDICION, clienteVacio, eliminarCliente, eliminarCondicion, guardarCliente, guardarCondicion, importarClientes, saldoCliente } from "@/lib/ventas";
 import type { Cliente, CondicionPago } from "@/lib/types";
 import { FormCliente, useVentas } from "./comun";
 
 // =====================================================================
-// CONDICIONES DE PAGO
+// CONFIGURACIÓN · CONDICIONES DE PAGO (tabla public.condiciones_pago)
 // =====================================================================
-const condVacia = (): CondicionPago => ({ id: "", codigo: "", nombre: "", dias: 0, porcentajeInicial: 0, contraentrega: false, activo: true });
+export const condVacia = (tipo: CondicionPago["tipo"] = "CONTADO"): CondicionPago => ({
+  id: "",
+  codigo: "",
+  nombre: "",
+  tipo,
+  dias: tipo === "CREDITO" ? 30 : 0,
+  porcentajeInicial: 0,
+  contraentrega: false,
+  activo: true,
+});
+
+/** Formulario de una condición (Configuración y "+" de la nota de pedido). */
+export function FormCondicion({ form, onChange, onCancel, onSave }: { form: CondicionPago; onChange: (c: CondicionPago) => void; onCancel: () => void; onSave: () => void }) {
+  const set = <K extends keyof CondicionPago>(k: K, v: CondicionPago[K]) => onChange({ ...form, [k]: v });
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave();
+      }}
+      className="grid gap-3 sm:grid-cols-2"
+    >
+      <Field label="Tipo *" className="sm:col-span-2">
+        <Select
+          value={form.tipo}
+          onChange={(e) => {
+            const tipo = e.target.value as CondicionPago["tipo"];
+            onChange({ ...form, tipo, dias: tipo === "CONTADO" ? 0 : tipo === "CREDITO" && form.dias < 1 ? 30 : form.dias, medio: tipo === "CONTADO" ? form.medio : undefined });
+          }}
+          options={(Object.keys(TIPOS_CONDICION) as CondicionPago["tipo"][]).map((t) => ({ value: t, label: TIPOS_CONDICION[t] }))}
+        />
+      </Field>
+      <Field label="Código *">
+        <Input value={form.codigo} onChange={(e) => set("codigo", e.target.value.toUpperCase())} placeholder={form.tipo === "CREDITO" ? "CRED90" : "BBVA"} />
+      </Field>
+      <Field label="Nombre *">
+        <Input value={form.nombre} onChange={(e) => set("nombre", e.target.value)} placeholder={form.tipo === "CREDITO" ? "Crédito 90 días" : "Transferencia BBVA"} />
+      </Field>
+      {form.tipo === "CONTADO" ? (
+        <Field label="Medio de pago">
+          <Select value={form.medio ?? ""} onChange={(e) => set("medio", e.target.value || undefined)} placeholder="—" options={MEDIOS_PAGO.map((m) => ({ value: m, label: m }))} />
+        </Field>
+      ) : (
+        <Field label={form.tipo === "CREDITO" ? "Días de crédito *" : "Días por defecto"} hint="En la nota de pedido se pueden cambiar; el vencimiento se calcula solo.">
+          <Input type="number" min={form.tipo === "CREDITO" ? 1 : 0} max={365} value={form.dias} onChange={(e) => set("dias", parseInt(e.target.value) || 0)} />
+        </Field>
+      )}
+      <Field label="% inicial (adelanto)">
+        <Input type="number" min={0} max={100} value={form.porcentajeInicial} onChange={(e) => set("porcentajeInicial", parseFloat(e.target.value) || 0)} />
+      </Field>
+      <label className="flex items-center gap-2 text-sm text-slate-700">
+        <input type="checkbox" checked={form.contraentrega} onChange={(e) => set("contraentrega", e.target.checked)} /> Saldo contraentrega
+      </label>
+      <label className="flex items-center gap-2 text-sm text-slate-700">
+        <input type="checkbox" checked={form.activo} onChange={(e) => set("activo", e.target.checked)} /> Activa
+      </label>
+      <div className="flex justify-end gap-2 sm:col-span-2">
+        <Button type="button" variant="secondary" onClick={onCancel}>
+          Cancelar
+        </Button>
+        <Button type="submit" variant="warning">
+          Guardar
+        </Button>
+      </div>
+    </form>
+  );
+}
 
 export function CondicionesPago() {
   const [rol] = useRol();
   const { condiciones } = useVentas();
   const [form, setForm] = useState<CondicionPago | null>(null);
   const habilitado = puede(rol, "venta.gestionar");
-  const lista = [...condiciones].sort((a, b) => a.dias - b.dias || a.nombre.localeCompare(b.nombre));
 
   return (
     <Card>
       <CardHeader
-        title="Condiciones de pago"
-        subtitle="Se usan en notas de pedido, comprobantes y como condición por defecto de cada cliente."
+        title="Configuración · Condiciones de pago"
+        subtitle="Se usan en notas de pedido, comprobantes y como condición por defecto de cada cliente. Crédito y personalizado piden días y calculan el vencimiento."
         action={
           habilitado && (
             <Button variant="warning" onClick={() => setForm(condVacia())}>
@@ -33,12 +98,13 @@ export function CondicionesPago() {
           )
         }
       />
-      <Table head={["Código", "Nombre", "Días", "% Inicial", "Contraentrega", "Estado", ""]} empty={lista.length === 0}>
-        {lista.map((c) => (
+      <Table head={["Código", "Nombre", "Tipo", "Medio / Días", "% Inicial", "Contraentrega", "Estado", ""]} empty={condiciones.length === 0}>
+        {condiciones.map((c) => (
           <tr key={c.id} className={cn("hover:bg-slate-50", !c.activo && "opacity-50")}>
             <Td className="font-mono font-semibold">{c.codigo}</Td>
             <Td>{c.nombre}</Td>
-            <Td className="text-right">{c.dias}</Td>
+            <Td>{TIPOS_CONDICION[c.tipo]}</Td>
+            <Td>{c.tipo === "CONTADO" ? c.medio || "-" : `${c.dias} días`}</Td>
             <Td className="text-right">{c.porcentajeInicial}%</Td>
             <Td>{c.contraentrega ? "Sí" : "No"}</Td>
             <Td>
@@ -61,40 +127,12 @@ export function CondicionesPago() {
       </Table>
       <Modal open={!!form} onClose={() => setForm(null)} title={form?.id ? "Editar condición de pago" : "Nueva condición de pago"}>
         {form && (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (ejecutar(() => guardarCondicion(form), "Condición guardada")) setForm(null);
-            }}
-            className="grid gap-3 sm:grid-cols-2"
-          >
-            <Field label="Código *">
-              <Input value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value.toUpperCase() })} placeholder="CRED30" />
-            </Field>
-            <Field label="Nombre *">
-              <Input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Crédito 30 días" />
-            </Field>
-            <Field label="Días de crédito" hint="0 = contado">
-              <Input type="number" min={0} value={form.dias} onChange={(e) => setForm({ ...form, dias: parseInt(e.target.value) || 0 })} />
-            </Field>
-            <Field label="% inicial (adelanto)">
-              <Input type="number" min={0} max={100} value={form.porcentajeInicial} onChange={(e) => setForm({ ...form, porcentajeInicial: parseFloat(e.target.value) || 0 })} />
-            </Field>
-            <label className="flex items-center gap-2 text-sm text-slate-700">
-              <input type="checkbox" checked={form.contraentrega} onChange={(e) => setForm({ ...form, contraentrega: e.target.checked })} /> Saldo contraentrega
-            </label>
-            <label className="flex items-center gap-2 text-sm text-slate-700">
-              <input type="checkbox" checked={form.activo} onChange={(e) => setForm({ ...form, activo: e.target.checked })} /> Activa
-            </label>
-            <div className="flex justify-end gap-2 sm:col-span-2">
-              <Button type="button" variant="secondary" onClick={() => setForm(null)}>
-                Cancelar
-              </Button>
-              <Button type="submit" variant="warning">
-                Guardar
-              </Button>
-            </div>
-          </form>
+          <FormCondicion
+            form={form}
+            onChange={setForm}
+            onCancel={() => setForm(null)}
+            onSave={() => ejecutar(() => guardarCondicion(form), "Condición guardada") && setForm(null)}
+          />
         )}
       </Modal>
     </Card>

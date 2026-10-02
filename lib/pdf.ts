@@ -460,7 +460,10 @@ export function pdfNotaPedido(n: NotaPedido): void {
         ["Válida hasta", `${fechaPE(vence.toISOString())} (${n.validezDias} días)`],
         ["Lugar de obra", n.lugarObra || "-"],
         ["Fecha entrega", n.fechaEntrega ? fechaPE(n.fechaEntrega) : "A coordinar"],
-        ["Cond. de pago", n.condPagoNombre],
+        [
+          "Cond. de pago",
+          `${n.condPagoNombre}${n.fechaVencimiento ? ` · ${n.diasCredito} días · vence ${fechaPE(n.fechaVencimiento)}` : ""}${n.condPagoDetalle ? ` · ${n.condPagoDetalle}` : ""}`,
+        ],
         ["Vendedor", n.vendedor],
       ],
       head: ["#", "Descripción", "Medidas", "Cant.", "m²", "Precio", "Total"],

@@ -261,14 +261,21 @@ export interface Cliente {
   created_at: string;
 }
 
+/** CONTADO (efectivo, transferencia, Yape...), CREDITO (pide días y calcula el vencimiento), PERSONALIZADO (días y detalle libres). */
+export type TipoCondicionPago = "CONTADO" | "CREDITO" | "PERSONALIZADO";
+
+/** Tabla public.condiciones_pago. */
 export interface CondicionPago {
   id: string;
-  codigo: string; // CONTADO, CRED30, ...
+  codigo: string; // EFECTIVO, CRED30, ...
   nombre: string;
-  dias: number; // días de crédito (0 = contado)
+  tipo: TipoCondicionPago;
+  medio?: string; // EFECTIVO, TRANSFERENCIA, DEPOSITO, YAPE, PLIN, TARJETA
+  dias: number; // días de crédito por defecto (0 = contado)
   porcentajeInicial: number; // % a pagar al emitir (adelanto)
   contraentrega: boolean;
   activo: boolean;
+  orden?: number;
 }
 
 /** Línea de venta: con medidas se calcula por m² (ancho × alto × cantidad); sin medidas, por unidad. */
@@ -294,8 +301,11 @@ export interface NotaPedido {
   clienteId: string;
   cliente: string;
   clienteDoc: string;
-  condPagoId: string;
+  condPagoId: string; // id de public.condiciones_pago
   condPagoNombre: string;
+  diasCredito?: number; // crédito / personalizado
+  fechaVencimiento?: string; // fecha + días de crédito (automática)
+  condPagoDetalle?: string; // personalizado: "50% adelanto, saldo contra entrega"...
   validezDias: number;
   fechaEntrega: string;
   lugarObra: string;

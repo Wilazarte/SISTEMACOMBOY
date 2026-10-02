@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Ban, Check, Copy, FileText, Plus, Receipt } from "lucide-react";
+import { Ban, CalendarClock, Check, Copy, FileText, Plus, Receipt } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, Textarea, ejecutar, ejecutarAsync } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { pdfNotaPedido } from "@/lib/pdf";
 import { KEYS, fechaPE, hoy, puede, soles, useRol, useStore } from "@/lib/storage";
-import { anularNP, aprobarNP, clienteVacio, clonarNP, crearNotaPedido, guardarCliente, lineaVacia, type DatosNP } from "@/lib/ventas";
-import type { Cliente, NotaPedido } from "@/lib/types";
+import { anularNP, aprobarNP, clienteVacio, clonarNP, crearNotaPedido, getCondicionesPago, guardarCliente, guardarCondicion, lineaVacia, pideDias, sumarDias, type DatosNP } from "@/lib/ventas";
+import type { Cliente, CondicionPago, NotaPedido } from "@/lib/types";
 import { FormCliente, LineasEditor, SelectorCliente, TotalesVenta, useVentas } from "./comun";
+import { FormCondicion, condVacia } from "./maestros";
 
 const npVacia = (): DatosNP => ({
   fecha: hoy(),
@@ -29,6 +30,7 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
   const { clientes, condiciones, stock } = useVentas();
   const [form, setForm] = useState<DatosNP | null>(null);
   const [clienteRapido, setClienteRapido] = useState<Cliente | null>(null);
+  const [condRapida, setCondRapida] = useState<CondicionPago | null>(null);
   const [anular, setAnular] = useState<NotaPedido | null>(null);
   const [motivo, setMotivo] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -37,9 +39,28 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
   const vendedor = getSesion()?.usuario ?? "";
   const lista = notas.filter((n) => !filtro || n.estado === filtro);
 
+  /** Al cambiar la condición se proponen sus días (crédito) y se limpia el detalle (personalizado). */
+  const conCondicion = (f: DatosNP, condPagoId: string): DatosNP => {
+    const c = getCondicionesPago().find((x) => x.id === condPagoId);
+    return { ...f, condPagoId, diasCredito: pideDias(c) ? c!.dias : undefined, condPagoDetalle: undefined };
+  };
+
   const elegirCliente = (id: string) => {
     const c = clientes.find((x) => x.id === id);
-    setForm((f) => f && { ...f, clienteId: id, condPagoId: c?.condPagoId || f.condPagoId, lugarObra: f.lugarObra || c?.direccionesEntrega[0] || "" });
+    setForm((f) => {
+      if (!f) return f;
+      const conCliente = { ...f, clienteId: id, lugarObra: f.lugarObra || c?.direccionesEntrega[0] || "" };
+      return c?.condPagoId && c.condPagoId !== f.condPagoId ? conCondicion(conCliente, c.condPagoId) : conCliente;
+    });
+  };
+
+  const guardarCondRapida = () => {
+    if (!condRapida) return;
+    if (ejecutar(() => guardarCondicion(condRapida), "Condición de pago creada")) {
+      const nueva = getCondicionesPago().find((c) => c.codigo === condRapida.codigo.trim().toUpperCase().replace(/\s+/g, ""));
+      setCondRapida(null);
+      if (nueva) setForm((f) => f && conCondicion(f, nueva.id));
+    }
   };
 
   const guardar = async () => {
@@ -60,6 +81,8 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
   };
 
   const cliente = clientes.find((c) => c.id === form?.clienteId);
+  const cond = condiciones.find((c) => c.id === form?.condPagoId);
+  const diasNP = form?.diasCredito ?? cond?.dias ?? 0;
 
   return (
     <Card>
@@ -93,7 +116,15 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
               <p className="text-xs text-slate-500">{n.clienteDoc}</p>
             </Td>
             <Td className="text-right font-semibold">{soles(n.total)}</Td>
-            <Td>{n.condPagoNombre}</Td>
+            <Td>
+              {n.condPagoNombre}
+              {n.fechaVencimiento && (
+                <p className="text-xs text-slate-500">
+                  {n.diasCredito} días · vence {fechaPE(n.fechaVencimiento)}
+                </p>
+              )}
+              {n.condPagoDetalle && <p className="max-w-[200px] truncate text-xs text-slate-500" title={n.condPagoDetalle}>{n.condPagoDetalle}</p>}
+            </Td>
             <Td>
               <Badge estado={n.estado} />
             </Td>
@@ -157,13 +188,46 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
                 </datalist>
               </Field>
               <Field label="Condición de pago *">
-                <Select
-                  value={form.condPagoId}
-                  onChange={(e) => setForm({ ...form, condPagoId: e.target.value })}
-                  placeholder={condiciones.length ? "Seleccione…" : "Configure condiciones de pago"}
-                  options={condiciones.filter((c) => c.activo).map((c) => ({ value: c.id, label: c.nombre }))}
-                />
+                <div className="flex gap-2">
+                  <Select
+                    value={form.condPagoId}
+                    onChange={(e) => setForm(conCondicion(form, e.target.value))}
+                    placeholder={condiciones.length ? "Seleccione…" : "Configure condiciones de pago"}
+                    options={condiciones.filter((c) => c.activo).map((c) => ({ value: c.id, label: c.nombre }))}
+                  />
+                  <Button type="button" variant="secondary" onClick={() => setCondRapida(condVacia())} title="Nueva condición de pago">
+                    <Plus size={16} />
+                  </Button>
+                </div>
               </Field>
+              {pideDias(cond) && (
+                <>
+                  <Field label={cond?.tipo === "CREDITO" ? "Días de crédito *" : "Días de plazo"} hint={cond?.tipo === "PERSONALIZADO" ? "0 = sin plazo" : undefined}>
+                    <Input
+                      type="number"
+                      min={cond?.tipo === "CREDITO" ? 1 : 0}
+                      max={365}
+                      value={form.diasCredito ?? ""}
+                      onChange={(e) => setForm({ ...form, diasCredito: e.target.value === "" ? undefined : parseInt(e.target.value) })}
+                    />
+                  </Field>
+                  <Field label="Fecha de vencimiento" hint="Automática: fecha + días">
+                    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">
+                      <CalendarClock size={16} className="text-amber-500" />
+                      {form.fecha && diasNP >= 0 ? fechaPE(sumarDias(form.fecha, diasNP)) : "-"}
+                    </div>
+                  </Field>
+                  {cond?.tipo === "PERSONALIZADO" && (
+                    <Field label="Detalle de la condición" className="md:col-span-3">
+                      <Input
+                        value={form.condPagoDetalle ?? ""}
+                        onChange={(e) => setForm({ ...form, condPagoDetalle: e.target.value })}
+                        placeholder="Ej: 50% adelanto, saldo a 20 días con letra"
+                      />
+                    </Field>
+                  )}
+                </>
+              )}
             </div>
             <LineasEditor items={form.items} onChange={(items) => setForm({ ...form, items })} stock={stock} />
             <div className="flex flex-wrap items-start gap-4">
@@ -190,6 +254,10 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal open={!!condRapida} onClose={() => setCondRapida(null)} title="Nueva condición de pago">
+        {condRapida && <FormCondicion form={condRapida} onChange={setCondRapida} onCancel={() => setCondRapida(null)} onSave={guardarCondRapida} />}
       </Modal>
 
       <Modal open={!!clienteRapido} onClose={() => setClienteRapido(null)} title="Registro rápido de cliente">

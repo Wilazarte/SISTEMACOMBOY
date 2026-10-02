@@ -195,15 +195,38 @@ export function importarClientes(filas: Record<string, unknown>[]): { creados: n
 // Condiciones de pago
 // ---------------------------------------------------------------------
 
+export const TIPOS_CONDICION: Record<CondicionPago["tipo"], string> = {
+  CONTADO: "Contado",
+  CREDITO: "Crédito (pide días)",
+  PERSONALIZADO: "Personalizado",
+};
+
+export const MEDIOS_PAGO = ["EFECTIVO", "TRANSFERENCIA", "DEPOSITO", "YAPE", "PLIN", "TARJETA"] as const;
+
+/** Crédito o personalizado: la nota de pedido pide días y calcula la fecha de vencimiento. */
+export const pideDias = (c?: CondicionPago): boolean => !!c && (c.tipo === "CREDITO" || c.tipo === "PERSONALIZADO");
+
 export function guardarCondicion(data: CondicionPago): void {
-  const codigo = data.codigo.trim().toUpperCase();
+  const codigo = data.codigo.trim().toUpperCase().replace(/\s+/g, "");
   if (!codigo) throw new ErpError("Ingrese el código.");
   if (!data.nombre.trim()) throw new ErpError("Ingrese el nombre.");
-  if (!(data.dias >= 0 && Number.isInteger(Number(data.dias)))) throw new ErpError("Los días deben ser un entero mayor o igual a 0.");
+  if (!(data.tipo in TIPOS_CONDICION)) throw new ErpError("Seleccione el tipo de condición.");
+  const dias = data.tipo === "CONTADO" ? 0 : Number(data.dias);
+  if (!(Number.isInteger(dias) && dias >= 0 && dias <= 365)) throw new ErpError("Los días deben ser un entero entre 0 y 365.");
+  if (data.tipo === "CREDITO" && dias < 1) throw new ErpError("Una condición de crédito necesita días (mayor a 0).");
   if (!(data.porcentajeInicial >= 0 && data.porcentajeInicial <= 100)) throw new ErpError("El % inicial debe estar entre 0 y 100.");
   const lista = getCondicionesPago();
   if (lista.some((c) => c.codigo === codigo && c.id !== data.id)) throw new ErpError(`El código ${codigo} ya existe.`);
-  const c: CondicionPago = { ...data, id: data.id || uid(), codigo, nombre: data.nombre.trim(), dias: Number(data.dias), porcentajeInicial: Number(data.porcentajeInicial) };
+  const c: CondicionPago = {
+    ...data,
+    id: data.id || uid(),
+    codigo,
+    nombre: data.nombre.trim(),
+    dias,
+    medio: data.tipo === "CONTADO" ? data.medio || undefined : undefined,
+    porcentajeInicial: Number(data.porcentajeInicial),
+    orden: data.orden ?? 100,
+  };
   const i = lista.findIndex((x) => x.id === c.id);
   if (i >= 0) lista[i] = c;
   else lista.push(c);
@@ -217,10 +240,26 @@ export function eliminarCondicion(id: string): void {
   escribir(KEYS.COND_PAGO, getCondicionesPago().filter((c) => c.id !== id));
 }
 
-/** Forma de pago del comprobante según la condición. */
-export function formaDeCondicion(c?: CondicionPago): FormaPagoVenta {
-  if (!c || (c.dias === 0 && c.porcentajeInicial === 0 && !c.contraentrega)) return "CONTADO";
+/** Forma de pago del comprobante según la condición (y los días elegidos en la nota de pedido). */
+export function formaDeCondicion(c?: CondicionPago, dias = c?.dias ?? 0): FormaPagoVenta {
+  if (!c || (dias === 0 && c.porcentajeInicial === 0 && !c.contraentrega)) return "CONTADO";
   return "CREDITO";
+}
+
+/**
+ * Días y vencimiento de la nota de pedido según la condición:
+ * contado -> sin días; crédito -> días > 0 (por defecto los de la condición); personalizado -> días ≥ 0 y detalle libre.
+ */
+export function plazoNP(cond: CondicionPago, fecha: string, dias?: number, detalle?: string): Pick<NotaPedido, "diasCredito" | "fechaVencimiento" | "condPagoDetalle"> {
+  if (!pideDias(cond)) return { diasCredito: 0, fechaVencimiento: undefined, condPagoDetalle: undefined };
+  const d = dias === undefined || Number.isNaN(dias) ? cond.dias : Number(dias);
+  if (!Number.isInteger(d) || d < 0 || d > 365) throw new ErpError("Los días de crédito deben ser un entero entre 0 y 365.");
+  if (cond.tipo === "CREDITO" && d < 1) throw new ErpError("Indique los días de crédito (mayor a 0).");
+  return {
+    diasCredito: d,
+    fechaVencimiento: sumarDias(fecha, d),
+    condPagoDetalle: cond.tipo === "PERSONALIZADO" ? detalle?.trim() || undefined : undefined,
+  };
 }
 
 // ---------------------------------------------------------------------
@@ -230,7 +269,8 @@ export function formaDeCondicion(c?: CondicionPago): FormaPagoVenta {
 export type DatosNP = Pick<
   NotaPedido,
   "fecha" | "clienteId" | "condPagoId" | "validezDias" | "fechaEntrega" | "lugarObra" | "items" | "conIgv" | "descuento" | "observaciones"
->;
+> &
+  Partial<Pick<NotaPedido, "diasCredito" | "condPagoDetalle">>;
 
 function prepararLineas(items: LineaVenta[]): LineaVenta[] {
   const lineas = items.map(calcularLinea).filter((l) => l.descripcion.trim() || l.productoNombre.trim());
@@ -246,6 +286,8 @@ export async function crearNotaPedido(data: DatosNP, vendedor: string, rol: Rol)
   if (!cliente) throw new ErpError("Seleccione el cliente.");
   const cond = getCondicionesPago().find((c) => c.id === data.condPagoId);
   if (!cond) throw new ErpError("Seleccione la condición de pago.");
+  if (!cond.activo) throw new ErpError(`La condición ${cond.nombre} está desactivada.`);
+  const plazo = plazoNP(cond, data.fecha, data.diasCredito, data.condPagoDetalle);
   if (!(data.validezDias > 0)) throw new ErpError("La validez de la oferta debe ser mayor a 0 días.");
   const items = prepararLineas(data.items);
   const t = totalesVenta(items, data.conIgv, data.descuento);
@@ -258,6 +300,7 @@ export async function crearNotaPedido(data: DatosNP, vendedor: string, rol: Rol)
     cliente: cliente.razonSocial,
     clienteDoc: `${cliente.tipoDoc} ${cliente.numDoc}`,
     condPagoNombre: cond.nombre,
+    ...plazo,
     vendedor,
     items,
     descuento: t.descuento,
