@@ -84,7 +84,7 @@ export default function ComprasPage() {
   const compras = useStore<Compra[]>(KEYS.COMPRAS, []);
   const stock = useStore<StockItem[]>(KEYS.STOCK, []);
 
-  const [tab, setTab] = useState<Tab>(puede(rol, "compra.crear") ? "registrar" : "antecedentes");
+  const [tab, setTab] = useState<Tab>(puede(rol, "compra.crear")? "registrar" : "antecedentes");
   const [pre, setPre] = useState<{ req?: string; coti?: string; oc?: string; fac?: string }>({});
 
   const ir = (t: Tab, p: typeof pre = {}) => {
@@ -94,7 +94,7 @@ export default function ComprasPage() {
   };
 
   const cotizables = procesados.filter((r) => r.estado === "ACEPTADO" || r.estado === "COTIZADO");
-  const cotisSinOC = cotizaciones.filter((c) => c.estado === "REGISTRADA" && !ordenes.some((o) => o.reqId === c.reqId));
+  const cotisSinOC = cotizaciones.filter((c) => c.estado === "REGISTRADA" &&!ordenes.some((o) => o.reqId === c.reqId));
   const ocsSinFactura = ordenes.filter((o) => o.estado === "EMITIDA");
   const facturasSinGuia = facturas.filter((f) => f.tipo === "FACTURA" && (!guias.some((g) => g.facturaId === f.id) || guias.some((g) => g.facturaId === f.id && g.estado === "OBSERVADA")));
 
@@ -128,13 +128,13 @@ export default function ComprasPage() {
       {tab === "registrar" && <RegistrarCompra rol={rol} proveedores={proveedores} compras={compras} stock={stock} />}
       {tab === "antecedentes" && <Antecedentes reqs={procesados} ordenes={ordenes} rol={rol} onCotizar={(id) => ir("cotizaciones", { req: id })} />}
       {tab === "cotizaciones" && (
-        <Cotizaciones key={pre.req ?? "c"} rol={rol} reqs={cotizables} cotizaciones={cotizaciones} preReq={pre.req} onOC={(id) => ir("ordenes", { coti: id })} />
+        <Cotizaciones key={pre.req?? "c"} rol={rol} reqs={cotizables} cotizaciones={cotizaciones} preReq={pre.req} onOC={(id) => ir("ordenes", { coti: id })} />
       )}
       {tab === "ordenes" && (
-        <Ordenes key={pre.coti ?? "o"} rol={rol} cotis={cotisSinOC} todasCotis={cotizaciones} ordenes={ordenes} reqs={procesados} preCoti={pre.coti} onFacturar={(id) => ir("facturas", { oc: id })} />
+        <Ordenes key={pre.coti?? "o"} rol={rol} cotis={cotisSinOC} todasCotis={cotizaciones} ordenes={ordenes} reqs={procesados} preCoti={pre.coti} onFacturar={(id) => ir("facturas", { oc: id })} />
       )}
-      {tab === "facturas" && <Facturas key={pre.oc ?? "f"} rol={rol} ocs={ocsSinFactura} ordenes={ordenes} facturas={facturas} preOc={pre.oc} onGuia={(id) => ir("guias", { fac: id })} />}
-      {tab === "guias" && <Guias key={pre.fac ?? "g"} rol={rol} facturas={facturasSinGuia} guias={guias} preFac={pre.fac} />}
+      {tab === "facturas" && <Facturas key={pre.oc?? "f"} rol={rol} ocs={ocsSinFactura} ordenes={ordenes} facturas={facturas} preOc={pre.oc} onGuia={(id) => ir("guias", { fac: id })} />}
+      {tab === "guias" && <Guias key={pre.fac?? "g"} rol={rol} facturas={facturasSinGuia} guias={guias} preFac={pre.fac} />}
     </div>
   );
 }
@@ -203,7 +203,7 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
         ))}
       </div>
 
-      <Modal open={!!rechazo} onClose={() => setRechazo(null)} title={`Rechazar ${rechazo?.numero ?? ""}`}>
+      <Modal open={!!rechazo} onClose={() => setRechazo(null)} title={`Rechazar ${rechazo?.numero?? ""}`}>
         <div className="flex gap-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">
           <AlertTriangle size={20} className="shrink-0" />
           El requerimiento se <b>eliminará de todo el sistema</b> (notificaciones y lista). Esta acción no se puede deshacer.
@@ -221,7 +221,7 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
         </div>
       </Modal>
 
-      <Modal open={!!obs} onClose={() => setObs(null)} title={`Observar ${obs?.numero ?? ""}`}>
+      <Modal open={!!obs} onClose={() => setObs(null)} title={`Observar ${obs?.numero?? ""}`}>
         <Field label="Motivo de la observación" hint="Almacén verá esta observación y podrá corregir y reenviar.">
           <Textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej: Especificar medida del rodamiento y marca aceptada" autoFocus />
         </Field>
@@ -264,11 +264,11 @@ function RegistrarCompra({ rol, proveedores, compras, stock }: { rol: Rol; prove
   const habilitado = puede(rol, "compra.crear");
 
   const fechaISO = parseFechaPE(fechaTxt);
-  const fechaError = fechaTxt.length === 10 && !fechaISO ? "Fecha inexistente" : fechaISO > hoy() ? "La fecha no puede ser futura" : undefined;
+  const fechaError = fechaTxt.length === 10 &&!fechaISO? "Fecha inexistente" : fechaISO > hoy()? "La fecha no puede ser futura" : undefined;
   const { subtotal, igv, total } = totalesCompra(tipo, filas);
   const conIgv = tipo === "BOLETA";
   const prov = proveedores.find((p) => p.id === proveedorId);
-  const set = (id: string, campo: keyof FilaCompra, v: string | number) => setFilas((p) => p.map((i) => (i.id === id ? { ...i, [campo]: v } : i)));
+  const set = (id: string, campo: keyof FilaCompra, v: string | number) => setFilas((p) => p.map((i) => (i.id === id? {...i, [campo]: v } : i)));
   const productosStock = useMemo(() => Array.from(new Set(stock.map((s) => s.nombre))).sort(), [stock]);
 
   const guardarProveedor = () => {
@@ -297,12 +297,12 @@ function RegistrarCompra({ rol, proveedores, compras, stock }: { rol: Rol; prove
         <Card>
           <CardHeader title="Registrar compra" subtitle="Factura: precios sin IGV (se suma 18 %). Boleta: precios con IGV incluido. Al guardar, los productos ingresan al stock del almacén seleccionado." />
           <div className="grid gap-4 p-5 md:grid-cols-3">
-            <Field label="Proveedor" className="md:col-span-2" hint={prov ? `RUC ${prov.ruc}` : undefined}>
+            <Field label="Proveedor" className="md:col-span-2" hint={prov? `RUC ${prov.ruc}` : undefined}>
               <div className="flex gap-2">
                 <Select
                   value={proveedorId}
                   onChange={(e) => setProveedorId(e.target.value)}
-                  placeholder={proveedores.length ? "Seleccione proveedor…" : "Registre un proveedor →"}
+                  placeholder={proveedores.length? "Seleccione proveedor…" : "Registre un proveedor →"}
                   options={proveedores.map((p) => ({ value: p.id, label: `${p.razonSocial} · ${p.ruc}` }))}
                 />
                 <Button type="button" variant="secondary" onClick={() => setNuevoProv({ razonSocial: "", ruc: "" })} title="Nuevo proveedor">
@@ -310,7 +310,7 @@ function RegistrarCompra({ rol, proveedores, compras, stock }: { rol: Rol; prove
                 </Button>
               </div>
             </Field>
-            <Field label="Fecha de compra" hint={fechaError ? `⚠ ${fechaError}` : "DD/MM/AAAA"}>
+            <Field label="Fecha de compra" hint={fechaError? `⚠ ${fechaError}` : "DD/MM/AAAA"}>
               <Input
                 value={fechaTxt}
                 inputMode="numeric"
@@ -323,8 +323,8 @@ function RegistrarCompra({ rol, proveedores, compras, stock }: { rol: Rol; prove
             <Field label="Comprobante">
               <Select value={tipo} onChange={(e) => setTipo(e.target.value as TipoComprobanteCompra)} options={[{ value: "FACTURA", label: "Factura" }, { value: "BOLETA", label: "Boleta de venta" }]} />
             </Field>
-            <Field label={`N° ${tipo === "FACTURA" ? "factura" : "boleta"}`}>
-              <Input value={numero} onChange={(e) => setNumero(e.target.value.toUpperCase())} placeholder={tipo === "FACTURA" ? "F001-00001234" : "B001-00000456"} />
+            <Field label={`N° ${tipo === "FACTURA"? "factura" : "boleta"}`}>
+              <Input value={numero} onChange={(e) => setNumero(e.target.value.toUpperCase())} placeholder={tipo === "FACTURA"? "F001-00001234" : "B001-00000456"} />
             </Field>
             <Field label="Ingresa a almacén">
               <Select value={sede} onChange={(e) => setSede(e.target.value)} options={SEDES.map((x) => ({ value: x, label: x }))} />
@@ -339,7 +339,7 @@ function RegistrarCompra({ rol, proveedores, compras, stock }: { rol: Rol; prove
                   <th className="px-2 py-2 text-left">Producto *</th>
                   <th className="w-28 px-2 py-2 text-left">Unidad</th>
                   <th className="w-28 px-2 py-2 text-left">Cantidad *</th>
-                  <th className="w-36 px-2 py-2 text-left">P. Unit. ({conIgv ? "con" : "sin"} IGV) *</th>
+                  <th className="w-36 px-2 py-2 text-left">P. Unit. ({conIgv? "con" : "sin"} IGV) *</th>
                   <th className="w-32 px-2 py-2 text-right">Subtotal</th>
                   <th className="w-10" />
                 </tr>
@@ -363,7 +363,7 @@ function RegistrarCompra({ rol, proveedores, compras, stock }: { rol: Rol; prove
                     <td className="px-2 py-1.5 text-right font-medium">{soles(r2((i.cantidad || 0) * (i.precioUnit || 0)))}</td>
                     <td className="px-2 py-1.5">
                       <button
-                        onClick={() => setFilas((p) => (p.length > 1 ? p.filter((x) => x.id !== i.id) : [filaVacia()]))}
+                        onClick={() => setFilas((p) => (p.length > 1? p.filter((x) => x.id!== i.id) : [filaVacia()]))}
                         className="rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
                         aria-label="Eliminar fila"
                       >
@@ -388,7 +388,7 @@ function RegistrarCompra({ rol, proveedores, compras, stock }: { rol: Rol; prove
           {conIgv && <p className="px-5 pt-3 text-right text-xs text-slate-500">Boleta: los precios incluyen IGV; la base imponible se obtiene dividiendo el total entre 1.18.</p>}
           <Totales subtotal={subtotal} igv={igv} total={total} />
           <div className="flex justify-end border-t border-slate-100 px-5 py-4">
-            <Button onClick={guardar} disabled={!proveedorId || !fechaISO}>
+            <Button onClick={guardar} disabled={!proveedorId ||!fechaISO}>
               <PackagePlus size={16} /> Guardar compra e ingresar a stock
             </Button>
           </div>
@@ -403,7 +403,7 @@ function RegistrarCompra({ rol, proveedores, compras, stock }: { rol: Rol; prove
               <Td>{fechaPE(c.fecha)}</Td>
               <Td>
                 <span className="font-semibold text-slate-900">{c.numero}</span>
-                <p className="text-xs text-slate-500">{c.tipoComprobante === "FACTURA" ? "Factura" : "Boleta"}</p>
+                <p className="text-xs text-slate-500">{c.tipoComprobante === "FACTURA"? "Factura" : "Boleta"}</p>
               </Td>
               <Td>{c.proveedor}</Td>
               <Td>{c.ruc}</Td>
@@ -429,15 +429,15 @@ function RegistrarCompra({ rol, proveedores, compras, stock }: { rol: Rol; prove
             className="space-y-4"
           >
             <Field label="Razón social">
-              <Input value={nuevoProv.razonSocial} onChange={(e) => setNuevoProv({ ...nuevoProv, razonSocial: e.target.value })} autoFocus />
+              <Input value={nuevoProv.razonSocial} onChange={(e) => setNuevoProv({...nuevoProv, razonSocial: e.target.value })} autoFocus />
             </Field>
-            <Field label="RUC" hint={nuevoProv.ruc.length === 11 && !rucValido(nuevoProv.ruc) ? "⚠ Dígito verificador inválido" : undefined}>
+            <Field label="RUC" hint={nuevoProv.ruc.length === 11 &&!rucValido(nuevoProv.ruc)? "⚠ Dígito verificador inválido" : undefined}>
               <Input
                 value={nuevoProv.ruc}
                 maxLength={11}
                 inputMode="numeric"
-                onChange={(e) => setNuevoProv({ ...nuevoProv, ruc: e.target.value.replace(/\D/g, "") })}
-                className={cn(nuevoProv.ruc.length === 11 && (rucValido(nuevoProv.ruc) ? "border-emerald-400" : "border-red-400"))}
+                onChange={(e) => setNuevoProv({...nuevoProv, ruc: e.target.value.replace(/\D/g, "") })}
+                className={cn(nuevoProv.ruc.length === 11 && (rucValido(nuevoProv.ruc)? "border-emerald-400" : "border-red-400"))}
                 placeholder="20XXXXXXXXX"
               />
             </Field>
@@ -495,7 +495,7 @@ function Antecedentes({ reqs, ordenes, rol, onCotizar }: { reqs: Requerimiento[]
                 <Badge estado={r.estado} />
                 {r.estado === "OBSERVADO" && <p className="mt-1 max-w-[200px] truncate text-xs text-orange-700" title={r.observacion}>{r.observacion}</p>}
               </Td>
-              <Td>{oc ? oc.numero : "-"}</Td>
+              <Td>{oc? oc.numero : "-"}</Td>
               <Td>
                 <div className="flex gap-1">
                   <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "REQ", id: r.id })} title="Ver e historial">
@@ -535,7 +535,7 @@ function Cotizaciones({
   preReq?: string;
   onOC: (id: string) => void;
 }) {
-  const [reqId, setReqId] = useState(preReq ?? "");
+  const [reqId, setReqId] = useState(preReq?? "");
   const [proveedor, setProveedor] = useState("");
   const [ruc, setRuc] = useState("");
   const [numero, setNumero] = useState("");
@@ -547,7 +547,7 @@ function Cotizaciones({
     const req = reqs.find((r) => r.id === reqId);
     setItems(
       req
-        ? req.items.map((i) => ({ itemReqId: i.id, nombre: i.nombre, cantidad: i.cantidad, unidad: i.unidad, marca: i.marca, precioUnit: 0, subtotal: 0 }))
+       ? req.items.map((i) => ({ itemReqId: i.id, nombre: i.nombre, cantidad: i.cantidad, unidad: i.unidad, marca: i.marca, precioUnit: 0, subtotal: 0 }))
         : []
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -562,14 +562,13 @@ function Cotizaciones({
       setProveedor("");
       setRuc("");
       setNumero("");
-      setItems((p) => p.map((i) => ({ ...i, precioUnit: 0, subtotal: 0 })));
+      setItems((p) => p.map((i) => ({...i, precioUnit: 0, subtotal: 0 })));
     }
   };
 
-  // Menor total por REQ para comparativo
   const minPorReq = useMemo(() => {
     const m: Record<string, number> = {};
-    cotizaciones.forEach((c) => (m[c.reqId] = Math.min(m[c.reqId] ?? Infinity, c.total)));
+    cotizaciones.forEach((c) => (m[c.reqId] = Math.min(m[c.reqId]?? Infinity, c.total)));
     return m;
   }, [cotizaciones]);
 
@@ -583,7 +582,7 @@ function Cotizaciones({
               <Select
                 value={reqId}
                 onChange={(e) => setReqId(e.target.value)}
-                placeholder={reqs.length ? "Seleccione REQ…" : "No hay REQ aceptados"}
+                placeholder={reqs.length? "Seleccione REQ…" : "No hay REQ aceptados"}
                 options={reqs.map((r) => ({ value: r.id, label: `${r.numero} · ${r.sede} · ${r.estado}` }))}
               />
             </Field>
@@ -596,13 +595,13 @@ function Cotizaciones({
             <Field label="Proveedor" className="md:col-span-2">
               <Input value={proveedor} onChange={(e) => setProveedor(e.target.value)} placeholder="Razón social" />
             </Field>
-            <Field label="RUC" hint={ruc.length === 11 && !rucValido(ruc) ? "⚠ Dígito verificador inválido" : undefined}>
+            <Field label="RUC" hint={ruc.length === 11 &&!rucValido(ruc)? "⚠ Dígito verificador inválido" : undefined}>
               <Input
                 value={ruc}
                 maxLength={11}
                 inputMode="numeric"
                 onChange={(e) => setRuc(e.target.value.replace(/\D/g, ""))}
-                className={cn(ruc.length === 11 && (rucValido(ruc) ? "border-emerald-400" : "border-red-400"))}
+                className={cn(ruc.length === 11 && (rucValido(ruc)? "border-emerald-400" : "border-red-400"))}
                 placeholder="20XXXXXXXXX"
               />
             </Field>
@@ -624,7 +623,7 @@ function Cotizaciones({
                         value={i.precioUnit || ""}
                         onChange={(e) => {
                           const v = parseFloat(e.target.value) || 0;
-                          setItems((p) => p.map((x, j) => (j === k ? { ...x, precioUnit: v, subtotal: r2(v * x.cantidad) } : x)));
+                          setItems((p) => p.map((x, j) => (j === k? {...x, precioUnit: v, subtotal: r2(v * x.cantidad) } : x)));
                         }}
                         className="w-32 text-right"
                       />
@@ -706,7 +705,7 @@ function Totales({ subtotal, igv, total = r2(subtotal + igv) }: { subtotal: numb
 }
 
 // =====================================================================
-// ÓRDENES DE COMPRA
+// ÓRDENES DE COMPRA - CON TESORERIA INTEGRADA
 // =====================================================================
 function Ordenes({
   rol,
@@ -725,11 +724,17 @@ function Ordenes({
   preCoti?: string;
   onFacturar: (id: string) => void;
 }) {
-  const [cotiId, setCotiId] = useState(preCoti ?? "");
+  const [cotiId, setCotiId] = useState(preCoti?? "");
   const [fecha, setFecha] = useState(hoy());
   const [formaPago, setFormaPago] = useState<FormaPago>("CREDITO 30 DIAS");
   const [tiempo, setTiempo] = useState("");
   const [lugar, setLugar] = useState("");
+  // ===== TESORERIA: NUEVOS ESTADOS =====
+  const [cuentaOrigenPago, setCuentaOrigenPago] = useState("caja_general");
+  const [voucherMonto, setVoucherMonto] = useState("");
+  const [voucherFile, setVoucherFile] = useState<File | null>(null);
+  const [voucherPreview, setVoucherPreview] = useState("");
+
   const coti = cotis.find((c) => c.id === cotiId);
   const habilitado = puede(rol, "oc.crear");
 
@@ -738,13 +743,53 @@ function Ordenes({
     if (sede) setLugar(sede);
   }, [coti, reqs]);
 
-  const competidoras = coti ? todasCotis.filter((c) => c.reqId === coti.reqId) : [];
-  const minimo = competidoras.length ? Math.min(...competidoras.map((c) => c.total)) : 0;
+  useEffect(() => {
+    if (voucherFile) {
+      const url = URL.createObjectURL(voucherFile);
+      setVoucherPreview(url);
+      return () => URL.revokeObjectURL(url);
+    }
+  }, [voucherFile]);
+
+  const competidoras = coti? todasCotis.filter((c) => c.reqId === coti.reqId) : [];
+  const minimo = competidoras.length? Math.min(...competidoras.map((c) => c.total)) : 0;
 
   const guardar = () => {
-    if (ejecutar(() => crearOrdenCompra({ cotizacionId: cotiId, fecha, formaPago, tiempoEntrega: tiempo, lugarEntrega: lugar }, rol), "Orden de compra emitida")) {
-      setCotiId("");
-      setTiempo("");
+    const guardarConVoucher = (base64: string) => {
+      const ok = ejecutar(
+        () =>
+          crearOrdenCompra(
+            {
+              cotizacionId: cotiId,
+              fecha,
+              formaPago,
+              tiempoEntrega: tiempo,
+              lugarEntrega: lugar,
+              // @ts-ignore campos tesoreria
+              cuentaOrigenPago,
+              voucherMonto: voucherMonto? parseFloat(voucherMonto) : 0,
+              voucherNombre: voucherFile?.name || "",
+              voucherDataUrl: base64 || "",
+            } as any,
+            rol
+          ),
+        `OC Emitida - ${cuentaOrigenPago.toUpperCase()}`
+      );
+      if (ok) {
+        setCotiId("");
+        setTiempo("");
+        setVoucherMonto("");
+        setVoucherFile(null);
+        setVoucherPreview("");
+      }
+    };
+
+    if (voucherFile) {
+      const reader = new FileReader();
+      reader.onload = () => guardarConVoucher(reader.result as string);
+      reader.readAsDataURL(voucherFile);
+    } else {
+      guardarConVoucher("");
     }
   };
 
@@ -758,7 +803,7 @@ function Ordenes({
               <Select
                 value={cotiId}
                 onChange={(e) => setCotiId(e.target.value)}
-                placeholder={cotis.length ? "Seleccione Nro de cotización…" : "No hay cotizaciones disponibles"}
+                placeholder={cotis.length? "Seleccione Nro de cotización…" : "No hay cotizaciones disponibles"}
                 options={cotis.map((c) => ({ value: c.id, label: `${c.numero} · ${c.proveedor} · ${c.reqNumero} · ${soles(c.total)}` }))}
               />
             </Field>
@@ -774,6 +819,37 @@ function Ordenes({
             <Field label="Lugar de entrega" className="md:col-span-3">
               <Input value={lugar} onChange={(e) => setLugar(e.target.value)} />
             </Field>
+
+            {/* ===== BLOQUE NUEVO - TESORERIA ===== */}
+            <div className="md:col-span-3 mt-2 rounded-xl border-2 border-amber-300 bg-amber-50 p-4">
+              <h3 className="mb-3 flex items-center gap-2 font-bold text-slate-900">
+                <Receipt size={18} className="text-amber-600" /> COMPROBANTE DE PAGO Y ORIGEN DE FONDO - TESORERÍA
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Field label="¿DE QUÉ CUENTA SE REALIZA EL PAGO?">
+                  <Select
+                    value={cuentaOrigenPago}
+                    onChange={(e) => setCuentaOrigenPago(e.target.value)}
+                    options={[
+                      { value: "caja_general", label: "CAJA GENERAL" },
+                      { value: "caja_chica", label: "CAJA CHICA" },
+                      { value: "fondo_reserva", label: "FONDO DE RESERVA" },
+                    ]}
+                  />
+                </Field>
+                <Field label="MONTO DEL VOUCHER (S/)">
+                  <Input type="number" value={voucherMonto} onChange={(e) => setVoucherMonto(e.target.value)} placeholder="Ej: 2500.00" />
+                </Field>
+                <Field label="SUBIR VOUCHER / BAUCHER" hint="PDF, JPG, PNG">
+                  <Input type="file" accept="image/*,application/pdf" onChange={(e) => setVoucherFile(e.target.files?.[0] || null)} className="bg-white" />
+                </Field>
+              </div>
+              {voucherPreview && (
+                <div className="mt-3 rounded-lg bg-white p-2 border text-xs">
+                  Vista previa: <b>{voucherFile?.name}</b> - {voucherFile?.type.startsWith("image/")? <img src={voucherPreview} alt="voucher" className="h-20 mt-1 rounded border" /> : <span className="bg-red-100 px-2 py-1 rounded">PDF cargado</span>}
+                </div>
+              )}
+            </div>
           </div>
           {coti && (
             <>
@@ -799,7 +875,7 @@ function Ordenes({
           )}
           <div className="flex justify-end border-t border-slate-100 px-5 py-4">
             <Button onClick={guardar} disabled={!cotiId}>
-              <ShoppingBag size={16} /> Emitir OC
+              <ShoppingBag size={16} /> Emitir OC - {cuentaOrigenPago.toUpperCase().replace("_", " ")}
             </Button>
           </div>
         </Card>
@@ -807,8 +883,8 @@ function Ordenes({
 
       <Card>
         <CardHeader title="Órdenes de compra" />
-        <Table head={["Nro OC", "Fecha", "Proveedor", "Cotización", "REQ", "Forma pago", "Total", "Estado", "Acciones"]} empty={ordenes.length === 0}>
-          {ordenes.map((o) => (
+        <Table head={["Nro OC", "Fecha", "Proveedor", "Cotización", "REQ", "Forma pago", "Origen Fondo", "Total", "Estado", "Acciones"]} empty={ordenes.length === 0}>
+          {ordenes.map((o: any) => (
             <tr key={o.id} className="hover:bg-slate-50">
               <Td className="font-semibold text-slate-900">{o.numero}</Td>
               <Td>{fechaPE(o.fecha)}</Td>
@@ -816,6 +892,11 @@ function Ordenes({
               <Td>{o.cotizacionNumero}</Td>
               <Td>{o.reqNumero}</Td>
               <Td>{o.formaPago}</Td>
+              <Td>
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold">
+                  {(o.cuentaOrigenPago || "CAJA_GENERAL").toUpperCase().replace("_", " ")}
+                </span>
+              </Td>
               <Td className="text-right font-semibold">{soles(o.total)}</Td>
               <Td>
                 <Badge estado={o.estado} />
@@ -862,12 +943,11 @@ function Facturas({
   onGuia: (id: string) => void;
 }) {
   const [modo, setModo] = useState<"FACTURA" | "DJ">("FACTURA");
-  const [ocId, setOcId] = useState(preOc ?? "");
+  const [ocId, setOcId] = useState(preOc?? "");
   const [numero, setNumero] = useState("");
   const [fecha, setFecha] = useState(hoy());
   const [venc, setVenc] = useState(hoy());
   const [subtotal, setSubtotal] = useState(0);
-  // DJ
   const [dni, setDni] = useState("");
   const [vendedor, setVendedor] = useState("");
   const [motivoDJ, setMotivoDJ] = useState("");
@@ -888,7 +968,7 @@ function Facturas({
   const guardar = () => {
     const ok =
       modo === "FACTURA"
-        ? ejecutar(() => crearFactura({ ocId, numero, fecha, fechaVencimiento: venc, subtotal }, rol), "Factura registrada")
+       ? ejecutar(() => crearFactura({ ocId, numero, fecha, fechaVencimiento: venc, subtotal }, rol), "Factura registrada")
         : ejecutar(
             () => crearDeclaracionJurada({ ocId, fecha, dniVendedor: dni, nombreVendedor: vendedor, motivoSinComprobante: motivoDJ, aprobadoPor: aprobador }, rol),
             "Declaración jurada registrada"
@@ -903,7 +983,7 @@ function Facturas({
   };
 
   const ocsDJ = ocs.filter((o) => o.subtotal <= TOPE_DJ);
-  const lista = facturas.filter((f) => !filtroPago || f.estadoPago === filtroPago);
+  const lista = facturas.filter((f) =>!filtroPago || f.estadoPago === filtroPago);
   const porPagar = r2(facturas.filter((f) => f.estadoPago === "POR_PAGAR").reduce((a, f) => a + f.total, 0));
 
   return (
@@ -911,13 +991,13 @@ function Facturas({
       {puede(rol, "fac.crear") && (
         <Card>
           <CardHeader
-            title={modo === "FACTURA" ? "Registrar factura" : "Declaración jurada de compra"}
-            subtitle={modo === "FACTURA" ? "Vinculada a una Orden de Compra. IGV y total se calculan automáticamente." : `Excepción: compras sin comprobante, tope ${soles(TOPE_DJ)}, requiere aprobación de Gerencia.`}
+            title={modo === "FACTURA"? "Registrar factura" : "Declaración jurada de compra"}
+            subtitle={modo === "FACTURA"? "Vinculada a una Orden de Compra. IGV y total se calculan automáticamente." : `Excepción: compras sin comprobante, tope ${soles(TOPE_DJ)}, requiere aprobación de Gerencia.`}
             action={
               <div className="flex rounded-lg bg-slate-100 p-0.5 text-sm">
                 {(["FACTURA", "DJ"] as const).map((m) => (
-                  <button key={m} onClick={() => { setModo(m); setOcId(""); }} className={cn("rounded-md px-3 py-1.5 font-medium", modo === m ? "bg-white shadow" : "text-slate-500")}>
-                    {m === "FACTURA" ? "Factura" : "Decl. Jurada"}
+                  <button key={m} onClick={() => { setModo(m); setOcId(""); }} className={cn("rounded-md px-3 py-1.5 font-medium", modo === m? "bg-white shadow" : "text-slate-500")}>
+                    {m === "FACTURA"? "Factura" : "Decl. Jurada"}
                   </button>
                 ))}
               </div>
@@ -928,11 +1008,11 @@ function Facturas({
               <Select
                 value={ocId}
                 onChange={(e) => setOcId(e.target.value)}
-                placeholder={(modo === "FACTURA" ? ocs : ocsDJ).length ? "Seleccione Nro OC…" : "No hay OC pendientes de comprobante"}
-                options={(modo === "FACTURA" ? ocs : ocsDJ).map((o) => ({ value: o.id, label: `${o.numero} · ${o.proveedor} · ${soles(o.total)} · ${o.formaPago}` }))}
+                placeholder={(modo === "FACTURA"? ocs : ocsDJ).length? "Seleccione Nro OC…" : "No hay OC pendientes de comprobante"}
+                options={(modo === "FACTURA"? ocs : ocsDJ).map((o) => ({ value: o.id, label: `${o.numero} · ${o.proveedor} · ${soles(o.total)} · ${o.formaPago}` }))}
               />
             </Field>
-            {modo === "FACTURA" ? (
+            {modo === "FACTURA"? (
               <>
                 <Field label="Nro factura">
                   <Input value={numero} onChange={(e) => setNumero(e.target.value.toUpperCase())} placeholder="F001-00001234" />
@@ -940,13 +1020,13 @@ function Facturas({
                 <Field label="Fecha emisión">
                   <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
                 </Field>
-                <Field label="Fecha vencimiento" hint={oc ? `Según forma de pago: ${oc.formaPago}` : undefined}>
+                <Field label="Fecha vencimiento" hint={oc? `Según forma de pago: ${oc.formaPago}` : undefined}>
                   <Input type="date" value={venc} onChange={(e) => setVenc(e.target.value)} />
                 </Field>
                 <Field label="Proveedor">
-                  <Input value={oc ? `${oc.proveedor} (${oc.ruc})` : ""} disabled />
+                  <Input value={oc? `${oc.proveedor} (${oc.ruc})` : ""} disabled />
                 </Field>
-                <Field label="Subtotal (base imponible)" hint={difiere ? `⚠ Difiere de la OC (${soles(oc!.subtotal)})` : undefined}>
+                <Field label="Subtotal (base imponible)" hint={difiere? `⚠ Difiere de la OC (${soles(oc!.subtotal)})` : undefined}>
                   <Input type="number" step="0.01" value={subtotal || ""} onChange={(e) => setSubtotal(parseFloat(e.target.value) || 0)} className={cn("text-right", difiere && "border-amber-400")} />
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
@@ -960,9 +1040,9 @@ function Facturas({
               </>
             ) : (
               <>
-                {rol !== "GERENCIA" && (
+                {rol!== "GERENCIA" && (
                   <div className="flex items-center gap-2 rounded-lg bg-fuchsia-50 px-3 py-2 text-sm text-fuchsia-800 md:col-span-3">
-                    <AlertTriangle size={16} /> Solo el rol GERENCIA puede aprobar una declaración jurada. Cambie de rol en el menú lateral.
+                    <AlertTriangle size={16} /> Solo el rol GERENCIA puede aprobar una declaración jurada.
                   </div>
                 )}
                 <Field label="DNI vendedor">
@@ -989,8 +1069,8 @@ function Facturas({
             )}
           </div>
           <div className="flex justify-end border-t border-slate-100 px-5 py-4">
-            <Button onClick={guardar} disabled={!ocId || (modo === "DJ" && rol !== "GERENCIA")}>
-              <Receipt size={16} /> {modo === "FACTURA" ? "Registrar factura" : "Aprobar declaración jurada"}
+            <Button onClick={guardar} disabled={!ocId || (modo === "DJ" && rol!== "GERENCIA")}>
+              <Receipt size={16} /> {modo === "FACTURA"? "Registrar factura" : "Aprobar declaración jurada"}
             </Button>
           </div>
         </Card>
@@ -1018,9 +1098,7 @@ function Facturas({
             const vencida = f.estadoPago === "POR_PAGAR" && f.fechaVencimiento < hoy();
             return (
               <tr key={f.id} className="hover:bg-slate-50">
-                <Td>
-                  <Badge estado={f.tipo} />
-                </Td>
+                <Td><Badge estado={f.tipo} /></Td>
                 <Td className="font-semibold text-slate-900">{f.numero}</Td>
                 <Td>{fechaPE(f.fecha)}</Td>
                 <Td className={cn(vencida && "font-semibold text-red-600")}>{fechaPE(f.fechaVencimiento)}</Td>
@@ -1032,7 +1110,7 @@ function Facturas({
                 <Td>
                   <button
                     disabled={!puede(rol, "fac.pagar")}
-                    onClick={() => ejecutar(() => marcarPago(f.id, f.estadoPago === "POR_PAGAR", rol), f.estadoPago === "POR_PAGAR" ? `${f.numero} marcada como pagada` : `${f.numero} revertida a por pagar`)}
+                    onClick={() => ejecutar(() => marcarPago(f.id, f.estadoPago === "POR_PAGAR", rol), f.estadoPago === "POR_PAGAR"? `${f.numero} marcada como pagada` : `${f.numero} revertida`)}
                     title="Cambiar estado de pago"
                     className="disabled:cursor-not-allowed"
                   >
@@ -1041,16 +1119,10 @@ function Facturas({
                 </Td>
                 <Td>
                   <div className="flex gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "FACTURA", id: f.id })}>
-                      <Eye size={15} />
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={() => pdfFactura(f, ordenes.find((o) => o.id === f.ocId))}>
-                      <FileText size={14} /> PDF
-                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "FACTURA", id: f.id })}><Eye size={15} /></Button>
+                    <Button size="sm" variant="secondary" onClick={() => pdfFactura(f, ordenes.find((o) => o.id === f.ocId))}><FileText size={14} /> PDF</Button>
                     {f.tipo === "FACTURA" && ordenes.find((o) => o.id === f.ocId)?.estado === "FACTURADA" && puede(rol, "guia.crear") && (
-                      <Button size="sm" onClick={() => onGuia(f.id)}>
-                        Subir guía
-                      </Button>
+                      <Button size="sm" onClick={() => onGuia(f.id)}>Subir guía</Button>
                     )}
                   </div>
                 </Td>
@@ -1067,7 +1139,7 @@ function Facturas({
 // GUÍAS DE REMISIÓN (drag & drop)
 // =====================================================================
 function Guias({ rol, facturas, guias, preFac }: { rol: Rol; facturas: Factura[]; guias: Guia[]; preFac?: string }) {
-  const [facId, setFacId] = useState(preFac ?? "");
+  const [facId, setFacId] = useState(preFac?? "");
   const [numero, setNumero] = useState("");
   const [fecha, setFecha] = useState(hoy());
   const [archivo, setArchivo] = useState<{ nombre: string; tipo: string; url: string } | null>(null);
@@ -1083,7 +1155,7 @@ function Guias({ rol, facturas, guias, preFac }: { rol: Rol; facturas: Factura[]
       return;
     }
     if (file.size > MAX_ARCHIVO) {
-      toast(`El archivo pesa ${(file.size / 1048576).toFixed(1)} MB. Máximo 1.5 MB (comprima o escanee en menor resolución).`, "error");
+      toast(`El archivo pesa ${(file.size / 1048576).toFixed(1)} MB. Máximo 1.5 MB.`, "error");
       return;
     }
     const reader = new FileReader();
@@ -1099,12 +1171,8 @@ function Guias({ rol, facturas, guias, preFac }: { rol: Rol; facturas: Factura[]
 
   const guardar = () => {
     const ok = ejecutar(
-      () =>
-        crearGuia(
-          { facturaId: facId, numero, fecha, archivoNombre: archivo?.nombre ?? "", archivoTipo: archivo?.tipo ?? "", archivoDataUrl: archivo?.url ?? "" },
-          rol
-        ),
-      "Guía cargada. Almacén ya puede dar el visto bueno."
+      () => crearGuia({ facturaId: facId, numero, fecha, archivoNombre: archivo?.nombre?? "", archivoTipo: archivo?.tipo?? "", archivoDataUrl: archivo?.url?? "" }, rol),
+      "Guía cargada."
     );
     if (ok) {
       setFacId("");
@@ -1124,7 +1192,7 @@ function Guias({ rol, facturas, guias, preFac }: { rol: Rol; facturas: Factura[]
                 <Select
                   value={facId}
                   onChange={(e) => setFacId(e.target.value)}
-                  placeholder={facturas.length ? "Seleccione factura…" : "No hay facturas pendientes de guía"}
+                  placeholder={facturas.length? "Seleccione factura…" : "No hay facturas pendientes de guía"}
                   options={facturas.map((f) => ({ value: f.id, label: `${f.numero} · ${f.ocNumero} · ${f.proveedor}` }))}
                 />
               </Field>
@@ -1147,28 +1215,22 @@ function Guias({ rol, facturas, guias, preFac }: { rol: Rol; facturas: Factura[]
                 </p>
               )}
               <div
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDrag(true);
-                }}
+                onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
                 onDragLeave={() => setDrag(false)}
                 onDrop={onDrop}
                 onClick={() => inputRef.current?.click()}
-                className={cn(
-                  "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-10 text-center transition",
-                  drag ? "border-slate-900 bg-slate-100" : "border-slate-300 hover:border-slate-400 hover:bg-slate-50"
-                )}
+                className={cn("flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-10 text-center transition", drag? "border-slate-900 bg-slate-100" : "border-slate-300 hover:border-slate-400 hover:bg-slate-50")}
               >
                 <Upload size={28} className="text-slate-400" />
-                <p className="text-sm font-medium text-slate-700">{archivo ? archivo.nombre : "Arrastre aquí la guía o haga clic"}</p>
+                <p className="text-sm font-medium text-slate-700">{archivo? archivo.nombre : "Arrastre aquí la guía o haga clic"}</p>
                 <p className="text-xs text-slate-400">PDF, JPG, PNG · máx. 1.5 MB</p>
                 <input ref={inputRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={(e) => cargar(e.target.files?.[0])} />
               </div>
             </div>
             <div className="min-h-[300px] overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-              {!archivo ? (
+              {!archivo? (
                 <div className="flex h-full items-center justify-center text-sm text-slate-400">Vista previa</div>
-              ) : archivo.tipo.startsWith("image/") ? (
+              ) : archivo.tipo.startsWith("image/")? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={archivo.url} alt="Vista previa guía" className="h-full max-h-[460px] w-full object-contain" />
               ) : (
@@ -1177,12 +1239,8 @@ function Guias({ rol, facturas, guias, preFac }: { rol: Rol; facturas: Factura[]
             </div>
           </div>
           <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
-            {archivo && (
-              <Button variant="secondary" onClick={() => setArchivo(null)}>
-                Quitar archivo
-              </Button>
-            )}
-            <Button onClick={guardar} disabled={!facId || !archivo}>
+            {archivo && <Button variant="secondary" onClick={() => setArchivo(null)}>Quitar archivo</Button>}
+            <Button onClick={guardar} disabled={!facId ||!archivo}>
               <Truck size={16} /> Guardar guía
             </Button>
           </div>
@@ -1191,10 +1249,8 @@ function Guias({ rol, facturas, guias, preFac }: { rol: Rol; facturas: Factura[]
 
       <Card>
         <CardHeader title="Guías de remisión" />
-        {guias.length === 0 ? (
-          <div className="p-5">
-            <Empty icon={<Truck size={28} />} text="Aún no se cargan guías" />
-          </div>
+        {guias.length === 0? (
+          <div className="p-5"><Empty icon={<Truck size={28} />} text="Aún no se cargan guías" /></div>
         ) : (
           <Table head={["Nro guía", "Fecha", "Factura", "OC", "Archivo", "Estado", ""]}>
             {guias.map((g) => (
@@ -1204,14 +1260,8 @@ function Guias({ rol, facturas, guias, preFac }: { rol: Rol; facturas: Factura[]
                 <Td>{g.facturaNumero}</Td>
                 <Td>{g.ocNumero}</Td>
                 <Td className="max-w-[200px] truncate">{g.archivoNombre}</Td>
-                <Td>
-                  <Badge estado={g.estado} />
-                </Td>
-                <Td>
-                  <Button size="sm" variant="secondary" onClick={() => abrirDoc({ tipo: "GUIA", id: g.id })}>
-                    <Eye size={14} /> Ver
-                  </Button>
-                </Td>
+                <Td><Badge estado={g.estado} /></Td>
+                <Td><Button size="sm" variant="secondary" onClick={() => abrirDoc({ tipo: "GUIA", id: g.id })}><Eye size={14} /> Ver</Button></Td>
               </tr>
             ))}
           </Table>
