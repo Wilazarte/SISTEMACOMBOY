@@ -11,6 +11,7 @@ import { getSesion, rolNegocio } from "./auth";
 import { createClient } from "./supabase/client";
 import type {
   AsistenciaPeriodo,
+  CuentaOrigenPago,
   Compra,
   Cotizacion,
   EventoHistorial,
@@ -673,6 +674,72 @@ export function crearCotizacion(
 // 4. ORDEN DE COMPRA (vinculada a COTIZACIÓN)
 // ---------------------------------------------------------------------
 
+// ---------------------------------------------------------------------
+// Comprobante de pago y origen de la OC (baucher en Supabase Storage)
+// ---------------------------------------------------------------------
+
+export const CUENTAS_ORIGEN_PAGO: Record<CuentaOrigenPago, string> = {
+  caja_general: "CAJA GENERAL",
+  caja_chica: "CAJA CHICA",
+  fondo_reserva: "FONDO DE RESERVA",
+};
+
+/** Bucket privado de Storage y carpeta de los bauchers (equivale a /uploads/tesoreria/vouchers/). */
+export const BUCKET_TESORERIA = "tesoreria";
+export const MAX_VOUCHER = 5 * 1024 * 1024;
+export const TIPOS_VOUCHER: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "application/pdf": "pdf" };
+
+export function validarVoucher(file: File): void {
+  if (!TIPOS_VOUCHER[file.type]) throw new ErpError("Formato no permitido: suba JPG, PNG o PDF.");
+  if (file.size > MAX_VOUCHER) throw new ErpError(`El baucher pesa ${(file.size / 1048576).toFixed(1)} MB. Máximo 5 MB.`);
+}
+
+function validarPagoOC(data: Partial<Pick<OrdenCompra, "cuentaOrigenPago" | "voucherMonto">>): void {
+  if (!data.cuentaOrigenPago || !(data.cuentaOrigenPago in CUENTAS_ORIGEN_PAGO)) throw new ErpError("Seleccione de qué cuenta se realiza el pago.");
+  if (data.voucherMonto !== undefined && !(data.voucherMonto >= 0)) throw new ErpError("El monto del baucher no puede ser negativo.");
+}
+
+/** Sube el baucher a Storage (tesoreria/vouchers/<id>.<ext>) y devuelve su ruta. */
+async function subirVoucher(file: File): Promise<string> {
+  validarVoucher(file);
+  const ruta = `vouchers/${uid()}.${TIPOS_VOUCHER[file.type]}`;
+  const { error } = await createClient().storage.from(BUCKET_TESORERIA).upload(ruta, file, { contentType: file.type, upsert: false });
+  if (error) {
+    if (/bucket not found/i.test(error.message)) throw new ErpError("Falta el almacenamiento de bauchers en Supabase: ejecute supabase/fix_vouchers.sql.");
+    if (/row-level security|unauthorized|403/i.test(error.message)) throw new ErpError("Su usuario no puede subir bauchers.");
+    throw new ErpError(`No se pudo subir el baucher: ${error.message}`);
+  }
+  return ruta;
+}
+
+/** URL temporal (5 min) para ver un baucher privado. */
+export async function urlVoucher(ruta: string): Promise<string> {
+  const { data, error } = await createClient().storage.from(BUCKET_TESORERIA).createSignedUrl(ruta, 300);
+  if (error || !data) throw new ErpError(`No se pudo abrir el baucher: ${error?.message ?? "sin respuesta"}`);
+  return data.signedUrl;
+}
+
+/**
+ * Emitir OC con cuenta de origen y baucher opcional: valida, sube el archivo y crea la OC.
+ * Si la OC falla, el archivo subido se elimina (no quedan bauchers huérfanos).
+ */
+export async function emitirOrdenCompra(
+  data: Pick<OrdenCompra, "fecha" | "cotizacionId" | "formaPago" | "tiempoEntrega" | "lugarEntrega" | "cuentaOrigenPago" | "voucherMonto">,
+  voucher: File | null,
+  rol: Rol
+): Promise<OrdenCompra> {
+  validarOrdenCompra(data);
+  validarPagoOC(data);
+  if (!voucher) return crearOrdenCompra({ ...data, voucherMonto: undefined }, rol);
+  const ruta = await subirVoucher(voucher);
+  try {
+    return await crearOrdenCompra({ ...data, voucherUrl: ruta, voucherNombre: voucher.name, voucherTipo: voucher.type }, rol);
+  } catch (e) {
+    await createClient().storage.from(BUCKET_TESORERIA).remove([ruta]);
+    throw e;
+  }
+}
+
 function validarOrdenCompra(data: Pick<OrdenCompra, "cotizacionId" | "tiempoEntrega">): Cotizacion {
   const coti = getCotizaciones().find((c) => c.id === data.cotizacionId);
   if (!coti) throw new ErpError("Seleccione una cotización.");
@@ -684,10 +751,12 @@ function validarOrdenCompra(data: Pick<OrdenCompra, "cotizacionId" | "tiempoEntr
 }
 
 export async function crearOrdenCompra(
-  data: Pick<OrdenCompra, "fecha" | "cotizacionId" | "formaPago" | "tiempoEntrega" | "lugarEntrega">,
+  data: Pick<OrdenCompra, "fecha" | "cotizacionId" | "formaPago" | "tiempoEntrega" | "lugarEntrega"> &
+    Partial<Pick<OrdenCompra, "cuentaOrigenPago" | "voucherUrl" | "voucherNombre" | "voucherTipo" | "voucherMonto">>,
   rol: Rol
 ): Promise<OrdenCompra> {
   validarOrdenCompra(data);
+  validarPagoOC(data);
   const numero = formatear("OC", await siguiente("OC"));
   // Se revalida con los datos al día: otra PC pudo emitir OC para el mismo REQ mientras tanto
   const coti = validarOrdenCompra(data);
@@ -706,7 +775,14 @@ export async function crearOrdenCompra(
     igv: coti.igv,
     total: coti.total,
     estado: "EMITIDA",
-    historial: [evento(rol, "Orden de compra emitida", `Desde Cot. ${coti.numero}`)],
+    cuentaOrigenPago: data.cuentaOrigenPago ?? "caja_general",
+    historial: [
+      evento(
+        rol,
+        "Orden de compra emitida",
+        `Desde Cot. ${coti.numero} · Pago desde ${CUENTAS_ORIGEN_PAGO[data.cuentaOrigenPago ?? "caja_general"]}${data.voucherUrl ? " · con baucher" : ""}`
+      ),
+    ],
   };
   escribir(KEYS.ORDENES, [oc, ...getOrdenes()]);
   escribir(

@@ -46,6 +46,12 @@ Para cambiar una contraseña: Supabase → Authentication → Users → usuario 
 - Realtime (`supabase.channel("erp-cambios")`): lo que hace una PC aparece en las otras sin recargar. Al reconectarse tras un corte, se recarga todo.
 - Numeración (REQ, OC, DJ): la asigna la función `siguiente_numero(serie)` en Supabase, que bloquea el contador mientras lo incrementa; dos PCs emitiendo a la vez nunca reciben el mismo número. El contador no se puede escribir directo (RLS). El número que muestra el formulario antes de guardar es referencial.
 
+## Baucher de pago en la Orden de Compra
+- Compras › Órdenes de compra › *Emitir orden de compra* → sección **COMPROBANTE DE PAGO Y ORIGEN**: cuenta de pago (CAJA GENERAL / CAJA CHICA / FONDO DE RESERVA, por defecto CAJA GENERAL) y baucher opcional (JPG, PNG o PDF, máx. 5 MB, un archivo).
+- **Activar en Supabase:** SQL Editor → `supabase/fix_vouchers.sql` (o volver a correr `supabase_tables.sql`). Crea el bucket privado `tesoreria` (carpeta `vouchers/`) en Storage y sus permisos.
+- Se guarda en el documento de la OC (`compras`, tipo `orden`): `cuentaOrigenPago` (`caja_general` / `caja_chica` / `fondo_reserva`), `voucherUrl` (ruta `vouchers/<id>.<ext>` en el bucket), `voucherMonto`.
+- Solo tesorería y creador emiten OC y suben bauchers; los demás perfiles con acceso ven el formulario deshabilitado y abren el baucher en modo lectura (enlace temporal de 5 min).
+
 ## Ventas (COMBOY VID · RUC 20613238566)
 Flujo: **Nota de pedido → Aprobada → Factura / Boleta → Orden de despacho (Almacén) → Cobro**.
 

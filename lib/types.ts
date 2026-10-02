@@ -90,8 +90,17 @@ export interface OrdenCompra {
   total: number;
   estado: EstadoOC;
   vistoBueno?: VistoBueno;
+  // Comprobante de pago y origen (cuenta_origen_pago, voucher_url, voucher_monto)
+  cuentaOrigenPago?: CuentaOrigenPago;
+  voucherUrl?: string; // ruta en Supabase Storage: bucket "tesoreria", carpeta vouchers/
+  voucherNombre?: string;
+  voucherTipo?: string;
+  voucherMonto?: number;
   historial: EventoHistorial[];
 }
+
+/** Cuenta de la que sale el pago de una OC (se guarda como enum). */
+export type CuentaOrigenPago = "caja_general" | "caja_chica" | "fondo_reserva";
 
 export type TipoComprobante = "FACTURA" | "DECLARACION_JURADA";
 

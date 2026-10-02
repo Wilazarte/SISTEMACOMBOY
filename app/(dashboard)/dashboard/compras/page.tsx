@@ -24,6 +24,7 @@ import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Ta
 import { abrirDoc } from "@/components/doc-viewer";
 import {
   IGV,
+  CUENTAS_ORIGEN_PAGO,
   KEYS,
   MAX_ARCHIVO,
   TOPE_DJ,
@@ -32,8 +33,8 @@ import {
   crearDeclaracionJurada,
   crearFactura,
   crearGuia,
-  crearOrdenCompra,
   crearProveedor,
+  emitirOrdenCompra,
   fechaPE,
   hoy,
   marcarPago,
@@ -47,12 +48,14 @@ import {
   soles,
   totalesCompra,
   uid,
+  urlVoucher,
   useRol,
   useStore,
+  validarVoucher,
 } from "@/lib/storage";
 import { SEDES, UNIDADES } from "@/lib/empresa";
 import { pdfCotizacion, pdfFactura, pdfOrdenCompra, pdfRequerimiento } from "@/lib/pdf";
-import type { Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, Proveedor, Requerimiento, Rol, StockItem, TipoComprobanteCompra } from "@/lib/types";
+import type { Compra, Cotizacion, CuentaOrigenPago, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, Proveedor, Requerimiento, Rol, StockItem, TipoComprobanteCompra } from "@/lib/types";
 
 type Tab = "registrar" | "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias";
 
@@ -730,7 +733,12 @@ function Ordenes({
   const [formaPago, setFormaPago] = useState<FormaPago>("CREDITO 30 DIAS");
   const [tiempo, setTiempo] = useState("");
   const [lugar, setLugar] = useState("");
+  const [cuentaOrigen, setCuentaOrigen] = useState<CuentaOrigenPago>("caja_general");
+  const [voucher, setVoucher] = useState<{ file: File; url: string } | null>(null);
+  const [voucherMonto, setVoucherMonto] = useState("");
+  const voucherRef = useRef<HTMLInputElement>(null);
   const coti = cotis.find((c) => c.id === cotiId);
+  // Solo TESORERÍA y CREADOR (oc.crear) emiten la OC; el resto ve el formulario en solo lectura.
   const habilitado = puede(rol, "oc.crear");
 
   useEffect(() => {
@@ -738,25 +746,67 @@ function Ordenes({
     if (sede) setLugar(sede);
   }, [coti, reqs]);
 
+  useEffect(() => {
+    setVoucherMonto(coti ? String(coti.total) : "");
+  }, [coti]);
+
+  // Libera la vista previa local al reemplazar/quitar el baucher
+  useEffect(() => () => { if (voucher) URL.revokeObjectURL(voucher.url); }, [voucher]);
+
+  const cargarVoucher = (file?: File) => {
+    if (voucherRef.current) voucherRef.current.value = "";
+    if (!file) return;
+    try {
+      validarVoucher(file);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Archivo no válido", "error");
+      return;
+    }
+    setVoucher({ file, url: URL.createObjectURL(file) });
+  };
+
+  const verVoucher = async (ruta: string) => {
+    const w = window.open("", "_blank");
+    try {
+      const url = await urlVoucher(ruta);
+      if (w) w.location.href = url;
+      else window.open(url, "_blank");
+    } catch (e) {
+      w?.close();
+      toast(e instanceof Error ? e.message : "No se pudo abrir el baucher", "error");
+    }
+  };
+
   const competidoras = coti ? todasCotis.filter((c) => c.reqId === coti.reqId) : [];
   const minimo = competidoras.length ? Math.min(...competidoras.map((c) => c.total)) : 0;
 
   const [enviando, setEnviando] = useState(false);
   const guardar = async () => {
     setEnviando(true);
-    const ok = await ejecutarAsync(() => crearOrdenCompra({ cotizacionId: cotiId, fecha, formaPago, tiempoEntrega: tiempo, lugarEntrega: lugar }, rol), "Orden de compra emitida");
+    const monto = voucherMonto === "" ? undefined : parseFloat(voucherMonto);
+    const ok = await ejecutarAsync(
+      () =>
+        emitirOrdenCompra(
+          { cotizacionId: cotiId, fecha, formaPago, tiempoEntrega: tiempo, lugarEntrega: lugar, cuentaOrigenPago: cuentaOrigen, voucherMonto: monto },
+          voucher?.file ?? null,
+          rol
+        ),
+      "Orden de compra emitida"
+    );
     setEnviando(false);
     if (ok) {
       setCotiId("");
       setTiempo("");
+      setCuentaOrigen("caja_general");
+      setVoucher(null);
     }
   };
 
   return (
     <div className="space-y-6">
-      {habilitado && (
-        <Card>
-          <CardHeader title="Emitir orden de compra" subtitle="Se genera desde una COTIZACIÓN (no directamente desde el REQ)." />
+      <Card>
+        <CardHeader title="Emitir orden de compra" subtitle={habilitado ? "Se genera desde una COTIZACIÓN (no directamente desde el REQ)." : "Solo lectura: solo Tesorería y Creador pueden emitir órdenes de compra."} />
+        <fieldset disabled={!habilitado} className="min-w-0">
           <div className="grid gap-4 p-5 md:grid-cols-3">
             <Field label="Cotización" className="md:col-span-3">
               <Select
@@ -779,39 +829,95 @@ function Ordenes({
               <Input value={lugar} onChange={(e) => setLugar(e.target.value)} />
             </Field>
           </div>
-          {coti && (
-            <>
-              {competidoras.length > 1 && coti.total > minimo && (
-                <div className="mx-5 mb-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                  <AlertTriangle size={16} /> Existe una cotización más barata para {coti.reqNumero} ({soles(minimo)}).
-                </div>
-              )}
-              <Table head={["Producto", "Marca", "Cant.", "Und.", "P. Unit.", "Subtotal"]}>
-                {coti.items.map((i) => (
-                  <tr key={i.itemReqId}>
-                    <Td className="font-medium">{i.nombre}</Td>
-                    <Td>{i.marca || "-"}</Td>
-                    <Td>{i.cantidad}</Td>
-                    <Td>{i.unidad}</Td>
-                    <Td className="text-right">{soles(i.precioUnit)}</Td>
-                    <Td className="text-right">{soles(i.subtotal)}</Td>
-                  </tr>
-                ))}
-              </Table>
-              <Totales subtotal={coti.subtotal} igv={coti.igv} />
-            </>
-          )}
-          <div className="flex justify-end border-t border-slate-100 px-5 py-4">
-            <Button onClick={guardar} disabled={!cotiId || enviando}>
-              <ShoppingBag size={16} /> {enviando ? "Emitiendo…" : "Emitir OC"}
-            </Button>
+          <div className="mx-5 mb-5 rounded-xl border border-slate-200 p-4">
+            <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-700">Comprobante de pago y origen</p>
+            <div className="grid gap-4 md:grid-cols-3">
+              <Field label="¿De qué cuenta se realiza el pago? *">
+                <Select
+                  required
+                  value={cuentaOrigen}
+                  onChange={(e) => setCuentaOrigen(e.target.value as CuentaOrigenPago)}
+                  options={Object.entries(CUENTAS_ORIGEN_PAGO).map(([value, label]) => ({ value, label }))}
+                />
+              </Field>
+              <Field label="Monto del baucher (S/)">
+                <Input type="number" min={0} step="0.01" value={voucherMonto} onChange={(e) => setVoucherMonto(e.target.value)} />
+              </Field>
+              <div className="md:col-span-3">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Subir baucher de pago (JPG, PNG, PDF)</span>
+                <input ref={voucherRef} type="file" accept="image/jpeg,image/png,application/pdf" className="hidden" onChange={(e) => cargarVoucher(e.target.files?.[0])} />
+                {!voucher ? (
+                  <button
+                    type="button"
+                    onClick={() => voucherRef.current?.click()}
+                    className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 px-4 py-6 text-center transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:hover:border-slate-300 disabled:hover:bg-transparent"
+                  >
+                    <Upload size={24} className="text-slate-400" />
+                    <span className="text-sm font-medium text-slate-700">Haga clic para seleccionar el baucher</span>
+                    <span className="text-xs text-slate-400">JPG, PNG o PDF · un archivo · máx. 5 MB</span>
+                  </button>
+                ) : (
+                  <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 md:flex-row">
+                    <div className="h-40 overflow-hidden rounded-lg border border-slate-200 bg-white md:w-56">
+                      {voucher.file.type.startsWith("image/") ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={voucher.url} alt="Vista previa baucher" className="h-full w-full object-contain" />
+                      ) : (
+                        <iframe src={voucher.url} title="Vista previa baucher" className="h-full w-full" />
+                      )}
+                    </div>
+                    <div className="flex flex-1 flex-col justify-between gap-2">
+                      <div>
+                        <p className="break-all text-sm font-medium text-slate-900">{voucher.file.name}</p>
+                        <p className="text-xs text-slate-500">{(voucher.file.size / 1048576).toFixed(2)} MB</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="button" size="sm" variant="secondary" onClick={() => voucherRef.current?.click()}>
+                          <Upload size={14} /> Reemplazar
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" onClick={() => setVoucher(null)}>
+                          <Trash2 size={14} className="text-red-600" /> Eliminar
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </Card>
-      )}
+        </fieldset>
+        {coti && (
+          <>
+            {competidoras.length > 1 && coti.total > minimo && (
+              <div className="mx-5 mb-3 flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                <AlertTriangle size={16} /> Existe una cotización más barata para {coti.reqNumero} ({soles(minimo)}).
+              </div>
+            )}
+            <Table head={["Producto", "Marca", "Cant.", "Und.", "P. Unit.", "Subtotal"]}>
+              {coti.items.map((i) => (
+                <tr key={i.itemReqId}>
+                  <Td className="font-medium">{i.nombre}</Td>
+                  <Td>{i.marca || "-"}</Td>
+                  <Td>{i.cantidad}</Td>
+                  <Td>{i.unidad}</Td>
+                  <Td className="text-right">{soles(i.precioUnit)}</Td>
+                  <Td className="text-right">{soles(i.subtotal)}</Td>
+                </tr>
+              ))}
+            </Table>
+            <Totales subtotal={coti.subtotal} igv={coti.igv} />
+          </>
+        )}
+        <div className="flex justify-end border-t border-slate-100 px-5 py-4">
+          <Button onClick={guardar} disabled={!habilitado || !cotiId || enviando}>
+            <ShoppingBag size={16} /> {enviando ? "Emitiendo…" : "Emitir OC"}
+          </Button>
+        </div>
+      </Card>
 
       <Card>
         <CardHeader title="Órdenes de compra" />
-        <Table head={["Nro OC", "Fecha", "Proveedor", "Cotización", "REQ", "Forma pago", "Total", "Estado", "Acciones"]} empty={ordenes.length === 0}>
+        <Table head={["Nro OC", "Fecha", "Proveedor", "Cotización", "REQ", "Forma pago", "Cuenta pago", "Baucher", "Total", "Estado", "Acciones"]} empty={ordenes.length === 0}>
           {ordenes.map((o) => (
             <tr key={o.id} className="hover:bg-slate-50">
               <Td className="font-semibold text-slate-900">{o.numero}</Td>
@@ -820,6 +926,16 @@ function Ordenes({
               <Td>{o.cotizacionNumero}</Td>
               <Td>{o.reqNumero}</Td>
               <Td>{o.formaPago}</Td>
+              <Td>{o.cuentaOrigenPago ? CUENTAS_ORIGEN_PAGO[o.cuentaOrigenPago] : "-"}</Td>
+              <Td>
+                {o.voucherUrl ? (
+                  <Button size="sm" variant="ghost" title={o.voucherNombre} onClick={() => verVoucher(o.voucherUrl!)}>
+                    <Receipt size={14} /> Ver{o.voucherMonto !== undefined ? ` · ${soles(o.voucherMonto)}` : ""}
+                  </Button>
+                ) : (
+                  "-"
+                )}
+              </Td>
               <Td className="text-right font-semibold">{soles(o.total)}</Td>
               <Td>
                 <Badge estado={o.estado} />
