@@ -704,6 +704,37 @@ begin
   end if;
 end $$;
 
+-- 7f (cont.) columnas de condición de pago en public.ventas
+-- Columnas reales en public.ventas para notas de pedido y comprobantes (se llenan solas con un
+-- trigger desde data: la app no cambia y nunca quedan desincronizadas).
+create or replace function public.ventas_columnas_pago() returns trigger
+language plpgsql as $$
+begin
+  if new.tipo in ('nota_pedido', 'comprobante') then
+    new.condicion_pago_id := nullif(new.data ->> 'condPagoId', '');
+    new.condicion_pago_nombre := nullif(new.data ->> 'condPagoNombre', '');
+    new.dias_credito := round(coalesce(nullif(new.data ->> 'diasCredito', '')::numeric, 0))::int;
+    new.fecha_vencimiento := nullif(coalesce(new.data ->> 'fechaVencimiento', new.data ->> 'fechaVenc'), '')::date;
+  end if;
+  return new;
+end $$;
+
+do $$
+begin
+  if to_regclass('public.ventas') is not null then
+    alter table public.ventas
+      add column if not exists condicion_pago_id text,
+      add column if not exists condicion_pago_nombre text,
+      add column if not exists dias_credito integer,
+      add column if not exists fecha_vencimiento date;
+    drop trigger if exists ventas_columnas_pago on public.ventas;
+    create trigger ventas_columnas_pago before insert or update on public.ventas
+      for each row execute function public.ventas_columnas_pago();
+    -- Notas y comprobantes que ya existían
+    update public.ventas set data = data where tipo in ('nota_pedido', 'comprobante') and condicion_pago_id is distinct from nullif(data ->> 'condPagoId', '');
+  end if;
+end $$;
+
 -- ---------------------------------------------------------------------
 -- 8. REALTIME: los cambios de una PC llegan al instante a las demás
 -- ---------------------------------------------------------------------

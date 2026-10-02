@@ -7,6 +7,7 @@ import { KEYS, useStore } from "@/lib/storage";
 import { estadoCxC } from "@/lib/ventas";
 import type { ComprobanteVenta, NotaPedido } from "@/lib/types";
 import { CuentasPorCobrar } from "./cobrar";
+import { useCargaCondiciones } from "./comun";
 import { Comprobantes } from "./comprobantes";
 import { Clientes, CondicionesPago } from "./maestros";
 import { NotasPedido } from "./notas";
@@ -19,6 +20,7 @@ type Tab = "notas" | "comprobantes" | "condiciones" | "clientes" | "cobrar";
 export default function VentasPage() {
   const [tab, setTab] = useState<Tab>("notas");
   const [facturarNp, setFacturarNp] = useState<string | undefined>();
+  useCargaCondiciones(); // condiciones_pago al día para notas, comprobantes y clientes
   const notas = useStore<NotaPedido[]>(KEYS.NOTAS_PEDIDO, []);
   const comprobantes = useStore<ComprobanteVenta[]>(KEYS.COMPROBANTES, []);
   const vencidos = comprobantes.filter((c) => c.estado === "EMITIDO" && estadoCxC(c).estado === "VENCIDO").length;

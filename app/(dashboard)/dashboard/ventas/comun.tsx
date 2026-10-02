@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Search, Trash2, UserPlus } from "lucide-react";
 import { Button, Field, Input, Select, cn } from "@/components/ui";
 import { UNIDADES } from "@/lib/empresa";
-import { KEYS, r2, soles, useStore } from "@/lib/storage";
+import { KEYS, cargarCondicionesPago, r2, soles, useStore } from "@/lib/storage";
 import { LARGO_DOC, calcularLinea, lineaVacia, totalesVenta, validarDocumento } from "@/lib/ventas";
 import type { Cliente, CondicionPago, LineaVenta, StockItem, TipoDocCliente } from "@/lib/types";
 
@@ -15,6 +15,36 @@ export function useVentas() {
     condiciones: useStore<CondicionPago[]>(KEYS.COND_PAGO, []),
     stock: useStore<StockItem[]>(KEYS.STOCK, []),
   };
+}
+
+/**
+ * Lee condiciones_pago directo de Supabase (select * order by nombre) cada vez que cambia `clave`
+ * (al entrar a Ventas y al abrir la nota de pedido) y devuelve el estado para mostrar avisos.
+ */
+export function useCargaCondiciones(clave: unknown = 0) {
+  const [estado, setEstado] = useState<{ cargando: boolean; total: number; error?: string }>({ cargando: true, total: 0 });
+  useEffect(() => {
+    let vivo = true;
+    setEstado((e) => ({ ...e, cargando: true }));
+    cargarCondicionesPago()
+      .then((r) => vivo && setEstado({ cargando: false, ...r }))
+      .catch((e) => vivo && setEstado({ cargando: false, total: 0, error: e instanceof Error ? e.message : String(e) }));
+    return () => {
+      vivo = false;
+    };
+  }, [clave]);
+  return estado;
+}
+
+/** Aviso bajo el select cuando no llegan condiciones (error real de Supabase o 0 filas por RLS). */
+export function AvisoCondiciones({ carga, activas }: { carga: ReturnType<typeof useCargaCondiciones>; activas: number }) {
+  if (carga.cargando || activas > 0) return null;
+  const msg = carga.error
+    ? carga.error
+    : carga.total === 0
+      ? "Supabase devolvió 0 condiciones para su usuario. Si la tabla tiene datos, falta la política de lectura (RLS): ejecute supabase/condiciones_pago.sql."
+      : "Todas las condiciones están inactivas: active alguna en Ventas › Configuración.";
+  return <span className="mt-1 block text-xs font-medium text-red-600">{msg}</span>;
 }
 
 // ---------------------------------------------------------------- Líneas

@@ -8,7 +8,7 @@ import { pdfNotaPedido } from "@/lib/pdf";
 import { KEYS, fechaPE, hoy, puede, soles, useRol, useStore } from "@/lib/storage";
 import { anularNP, aprobarNP, clienteVacio, clonarNP, crearNotaPedido, getCondicionesPago, guardarCliente, guardarCondicion, lineaVacia, pideDias, sumarDias, type DatosNP } from "@/lib/ventas";
 import type { Cliente, CondicionPago, NotaPedido } from "@/lib/types";
-import { FormCliente, LineasEditor, SelectorCliente, TotalesVenta, useVentas } from "./comun";
+import { AvisoCondiciones, FormCliente, LineasEditor, SelectorCliente, TotalesVenta, useCargaCondiciones, useVentas } from "./comun";
 import { FormCondicion, condVacia } from "./maestros";
 
 const npVacia = (): DatosNP => ({
@@ -31,6 +31,8 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
   const [form, setForm] = useState<DatosNP | null>(null);
   const [clienteRapido, setClienteRapido] = useState<Cliente | null>(null);
   const [condRapida, setCondRapida] = useState<CondicionPago | null>(null);
+  const carga = useCargaCondiciones(!!form); // se vuelve a leer de Supabase al abrir la nota de pedido
+  const activas = condiciones.filter((c) => c.activo);
   const [anular, setAnular] = useState<NotaPedido | null>(null);
   const [motivo, setMotivo] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -192,13 +194,14 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
                   <Select
                     value={form.condPagoId}
                     onChange={(e) => setForm(conCondicion(form, e.target.value))}
-                    placeholder={condiciones.length ? "Seleccione…" : "Configure condiciones de pago"}
-                    options={condiciones.filter((c) => c.activo).map((c) => ({ value: c.id, label: c.nombre }))}
+                    placeholder={activas.length ? "Seleccione…" : carga.cargando ? "Cargando condiciones…" : "Configure condiciones de pago"}
+                    options={activas.map((c) => ({ value: c.id, label: c.nombre }))}
                   />
                   <Button type="button" variant="secondary" onClick={() => setCondRapida(condVacia())} title="Nueva condición de pago">
                     <Plus size={16} />
                   </Button>
                 </div>
+                <AvisoCondiciones carga={carga} activas={activas.length} />
               </Field>
               {pideDias(cond) && (
                 <>

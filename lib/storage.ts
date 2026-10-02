@@ -165,24 +165,48 @@ const clonar = <T,>(v: T): T => (typeof structuredClone === "function" ? structu
 const avisar = (key: StoreKey) => window.dispatchEvent(new CustomEvent(EVENTO, { detail: key }));
 const avisarError = (msg: string) => window.dispatchEvent(new CustomEvent("erp:toast", { detail: { msg, tipo: "error" } }));
 
-const RANGO_TIPO: Record<string, number> = { CONTADO: 0, CREDITO: 1, PERSONALIZADO: 2 };
-
 /** Fila de public.condiciones_pago <-> CondicionPago. */
+// Acepta tablas creadas a mano: nombre/descripcion, tipo en minúsculas, dias/dias_credito, activo/estado...
 function condicionDeFila(f: Fila): CondicionPago {
-  const dias = Number(f.dias) || 0;
-  const tipo = (["CONTADO", "CREDITO", "PERSONALIZADO"].includes(String(f.tipo)) ? f.tipo : dias > 0 ? "CREDITO" : "CONTADO") as CondicionPago["tipo"];
+  const texto = (v: unknown) => (v === null || v === undefined ? "" : String(v).trim());
+  const nombre = texto(f.nombre ?? f.name ?? f.descripcion ?? f.condicion) || texto(f.codigo) || String(f.id);
+  const dias = Math.max(0, Math.round(Number(f.dias ?? f.dias_credito ?? f.plazo ?? f.plazo_dias) || 0));
+  const tipoTxt = texto(f.tipo).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const tipo: CondicionPago["tipo"] =
+    tipoTxt.startsWith("CRED") || (!tipoTxt && /cr[eé]dito/i.test(nombre)) || (!tipoTxt && dias > 0)
+      ? "CREDITO"
+      : tipoTxt.startsWith("PERSONAL") || (!tipoTxt && /personaliz/i.test(nombre))
+        ? "PERSONALIZADO"
+        : "CONTADO";
+  const activo = f.activo === undefined || f.activo === null ? !/^(INACTIV|ANULAD|0|FALSE)/i.test(texto(f.estado)) : f.activo !== false && f.activo !== "false";
   return {
     id: String(f.id),
-    codigo: String(f.codigo ?? ""),
-    nombre: String(f.nombre ?? ""),
+    codigo: texto(f.codigo) || nombre.toUpperCase().replace(/[^A-Z0-9]+/g, "").slice(0, 20),
+    nombre,
     tipo,
     ...(f.medio ? { medio: String(f.medio) } : {}),
-    dias,
+    // Crédito sin días en la tabla: se toman del nombre ("Crédito 30 días")
+    dias: tipo === "CREDITO" && dias === 0 ? Number(/(\d+)\s*d/i.exec(nombre)?.[1] ?? 0) : dias,
     porcentajeInicial: Number(f.porcentaje_inicial) || 0,
-    contraentrega: !!f.contraentrega,
-    activo: f.activo !== false,
+    contraentrega: f.contraentrega === true,
+    activo,
     orden: Number(f.orden ?? 100),
   };
+}
+
+/**
+ * Carga las condiciones de pago directo de Supabase (no espera al inicio de sesión) y las deja en la caché
+ * que usan la nota de pedido, los comprobantes y los clientes.
+ */
+export async function cargarCondicionesPago(): Promise<{ total: number; error?: string }> {
+  const { data, error } = await createClient().from("condiciones_pago").select("*").order("nombre");
+  if (error) {
+    const falta = error.code === "42P01" || error.code === "PGRST205";
+    return { total: 0, error: falta ? "No existe la tabla condiciones_pago en Supabase: ejecute supabase/condiciones_pago.sql." : `condiciones_pago: ${error.message} (${error.code ?? "?"})` };
+  }
+  if (pendientes.get(KEYS.COND_PAGO)) return { total: (leer<CondicionPago[]>(KEYS.COND_PAGO, [])).length }; // no pisar un guardado en curso
+  fijarDesdeServidor(KEYS.COND_PAGO, (data ?? []) as Fila[]);
+  return { total: data?.length ?? 0 };
 }
 const filaDeCondicion = (c: CondicionPago): Fila => ({
   id: c.id,
@@ -214,10 +238,8 @@ function aFilas(key: StoreKey, valor: unknown): Fila[] {
 function deFilas(key: StoreKey, filas: Fila[]): unknown {
   const d = DESTINOS[key];
   if (d.forma === "condiciones")
-    // Contado, luego crédito (por días) y al final personalizado
-    return filas
-      .map(condicionDeFila)
-      .sort((a, b) => RANGO_TIPO[a.tipo] - RANGO_TIPO[b.tipo] || a.dias - b.dias || (a.orden ?? 100) - (b.orden ?? 100) || a.nombre.localeCompare(b.nombre));
+    // Por nombre ("Crédito 7 días" antes que "Crédito 15 días")
+    return filas.map(condicionDeFila).sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { numeric: true, sensitivity: "base" }));
   if (d.forma === "observaciones") {
     const r: Record<string, Omit<FilaObs, "modulo">[]> = {};
     [...(filas as unknown as FilaObs[])]
@@ -279,7 +301,7 @@ async function descargar(key: StoreKey): Promise<Fila[]> {
       d.forma === "observaciones"
         ? q.order("fecha", { ascending: false })
         : d.forma === "condiciones"
-          ? q.order("id")
+          ? q.order("nombre")
           : q.eq("tipo", d.tipo).order("created_at", { ascending: false });
     const { data, error } = await q.range(desde, desde + 999);
     if (error) throw error;
