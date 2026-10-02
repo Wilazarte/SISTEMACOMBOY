@@ -9,6 +9,7 @@ import autoTable from "jspdf-autotable";
 import QRCode from "qrcode";
 import { EMPRESA } from "./empresa";
 import { fechaPE, soles } from "./storage";
+import type { HistorialDetalle, HistorialPlanilla } from "./historial";
 import type { ComprobanteVenta, Cotizacion, Factura, Guia, LineaVenta, NotaPedido, OrdenCompra, OrdenDespacho, Requerimiento } from "./types";
 
 type RGB = [number, number, number];
@@ -242,6 +243,47 @@ const totales = (s: number, igv: number, t: number): [string, string][] => [
 ];
 
 // ---------------------------------------------------------------------
+
+/** Planilla cerrada (historial): copia fiel de lo guardado al cerrar la semana. */
+export function pdfPlanillaHistorial(h: HistorialPlanilla, detalle: HistorialDetalle[]): void {
+  const horas = (n: number) => n.toLocaleString("es-PE", { maximumFractionDigits: 2 });
+  abrir(
+    construir({
+      titulo: "PLANILLA DE PAGO - HISTORIAL",
+      numero: h.periodo,
+      estado: "CERRADA",
+      datos: [
+        ["Periodo", h.periodo],
+        ["Cerrada el", new Date(h.fecha_cierre).toLocaleString("es-PE")],
+        ["Cerrada por", h.creado_por || "-"],
+        ["Trabajadores", String(h.cantidad_trabajadores)],
+        ["Asistencia", h.asistencia_desde ? `${fechaPE(h.asistencia_desde)} al ${fechaPE(h.asistencia_hasta ?? h.asistencia_desde)}` : "-"],
+      ],
+      head: ["N°", "Trabajador", "Sueldo / Tipo", "Pensión", "Días", "Horas", "Tard.", "Bruto", "Dscto", "Neto"],
+      body: detalle.map((d) => [
+        d.trabajador_id,
+        d.nombre,
+        `${soles(d.sueldo)} ${d.tipo_sueldo ?? ""}`,
+        `${d.pension ?? "-"} ${d.afp_porcentaje}%`,
+        d.dias,
+        horas(d.horas),
+        d.tardanzas,
+        soles(d.bruto),
+        soles(d.descuento_afp),
+        soles(d.neto),
+      ]),
+      alinearDerecha: [4, 5, 6, 7, 8, 9],
+      totales: [
+        ["Total horas", horas(h.total_horas)],
+        ["Total bruto", soles(h.total_bruto)],
+        ["Total descuentos", soles(h.total_descuento)],
+        ["TOTAL NETO", soles(h.total_neto)],
+      ],
+      firmas: ["Elaborado por", "Gerencia"],
+    }),
+    `PLANILLA_${h.periodo.replace(/\s+/g, "_")}`
+  );
+}
 
 export function pdfRequerimiento(r: Requerimiento): void {
   abrir(

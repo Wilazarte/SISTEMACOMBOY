@@ -52,6 +52,12 @@ Para cambiar una contraseña: Supabase → Authentication → Users → usuario 
 - Se guarda en el documento de la OC (`compras`, tipo `orden`): `cuentaOrigenPago` (`caja_general` / `caja_chica` / `fondo_reserva`), `voucherUrl` (ruta `vouchers/<id>.<ext>` en el bucket), `voucherMonto`.
 - Solo tesorería y creador emiten OC y suben bauchers; los demás perfiles con acceso ven el formulario deshabilitado y abren el baucher en modo lectura (enlace temporal de 5 min).
 
+## Historial de planilla
+- **Activar en Supabase:** SQL Editor → `supabase/historial_planilla.sql` (o volver a correr `supabase_tables.sql`). Crea `planilla_historial`, `planilla_historial_detalle`, la función `cerrar_planilla()` y su Realtime.
+- Planilla › *Planilla del periodo* → **Cerrar semana y guardar en historial**: guarda una copia (no una referencia) de lo que se ve en pantalla, cabecera + detalle en una sola transacción. Un periodo se cierra una sola vez; el historial no se puede editar ni borrar.
+- Planilla › **Historial**: carpetas por mes con los periodos cerrados; cada uno abre `/dashboard/planilla/historial/[id]` (solo lectura, con PDF). Se actualiza en vivo en todas las PCs y celulares.
+- Cierran: planilla y creador. Ven: quienes tienen el módulo Planilla (incluida gerencia).
+
 ## Ventas (COMBOY VID · RUC 20613238566)
 Flujo: **Nota de pedido → Aprobada → Factura / Boleta → Orden de despacho (Almacén) → Cobro**.
 

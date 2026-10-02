@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { AlertTriangle, Calculator, Eye, FileDown, Lock, Pencil, Plus, Power, Trash2, Upload, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Archive, Calculator, Eye, FileDown, Lock, Pencil, Plus, Power, Trash2, Upload, Users } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, cn, ejecutar, toast } from "@/components/ui";
 import {
   AFP_OPTIONS,
@@ -25,9 +25,13 @@ import {
 } from "@/lib/storage";
 import { getSesion } from "@/lib/auth";
 import { HORAS_DIA, HORA_TARDANZA, leerMarcaciones, resumirAsistencia, textoCsv, type AsistenciaMap } from "@/lib/asistencia";
+import { CerrarSemana } from "@/components/planilla/CerrarSemana";
+import { HistorialPlanilla } from "@/components/planilla/HistorialPlanilla";
+import { useHistorialPlanilla } from "@/components/planilla/useHistorialPlanilla";
+import type { FilaCierre } from "@/lib/historial";
 import type { AsistenciaPeriodo, TipoAfp, TipoSueldo, Trabajador } from "@/lib/types";
 
-type Tab = "trabajadores" | "planilla";
+type Tab = "trabajadores" | "planilla" | "historial";
 
 type TrabajadorCalc = Trabajador & {
   dias: number;
@@ -104,8 +108,16 @@ function CampoBloqueado({ valor, alerta }: { valor: number; alerta?: boolean }) 
 
 export default function PlanillaPage() {
   const trabajadores = useTrabajadores();
-  const soloLectura = !!getSesion()?.soloLectura; // Gerencia: ver sin editar
+  const sesion = getSesion();
+  const soloLectura = !!sesion?.soloLectura; // Gerencia: ver sin editar
+  const puedeCerrar = !soloLectura && ["creador", "planilla", "admin"].includes(sesion?.rol ?? "");
   const [tab, setTab] = useState<Tab>("trabajadores");
+  const historial = useHistorialPlanilla();
+
+  // /dashboard/planilla?tab=historial (vuelta desde el detalle de un periodo cerrado)
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "historial") setTab("historial");
+  }, []);
   const asistencia = useStore<AsistenciaPeriodo[]>(KEYS.ASISTENCIA, []);
   const [periodo, setPeriodo] = useState("SEMANA 14 - ABRIL 2026");
   const [importando, setImportando] = useState(false);
@@ -125,6 +137,31 @@ export default function PlanillaPage() {
     () => trabajadores.filter((t) => t.activo).map((t) => calcular(t, excel?.asistencia, delPeriodo.get(idAsistencia(periodo, t.id)))),
     [trabajadores, excel, delPeriodo, periodo]
   );
+  // Copia de la planilla tal como se ve, para "Cerrar semana"
+  const filasCierre = useMemo<FilaCierre[]>(
+    () =>
+      calculados.map((t) => ({
+        trabajador_id: t.id,
+        nombre: t.nombre,
+        dni: t.dni || null,
+        cargo: t.cargo || null,
+        fecha_ingreso: t.fechaIngreso || null,
+        tipo_sueldo: sueldoDe(t).label,
+        pension: afpLabel(t),
+        afp_porcentaje: t.afpPorcentaje || 0,
+        sueldo: t.sueldo,
+        dias: t.dias,
+        horas: t.horas,
+        tardanzas: t.tardanzas,
+        valor_hora: Math.round(t.valorHora * 10000) / 10000,
+        bruto: t.bruto,
+        descuento_afp: t.descuentoAfp,
+        neto: t.neto,
+        origen: t.origen ?? null,
+      })),
+    [calculados]
+  );
+  const periodoCerrado = historial.lista.some((h) => h.periodo === normalizarPeriodo(periodo));
   const listaMaestro = trabajadores
     .filter((t) => verInactivos || t.activo)
     .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
@@ -245,6 +282,7 @@ export default function PlanillaPage() {
         tabs={[
           { id: "trabajadores", label: "Trabajadores", icon: <Users size={16} />, count: incompletos.length },
           { id: "planilla", label: "Planilla del periodo", icon: <Calculator size={16} /> },
+          { id: "historial", label: "Historial", icon: <Archive size={16} /> },
         ]}
       />
 
@@ -349,7 +387,20 @@ export default function PlanillaPage() {
             <CardHeader
               title={`Planilla · ${normalizarPeriodo(periodo)}`}
               subtitle={`Pago por horas: 1 día = ${HORAS_DIA} h · valor hora = sueldo diario / ${HORAS_DIA} · tardanza: entrada después de las ${HORA_TARDANZA}. DÍAS y TARD. 🔒: solo editables desde Módulo Creador / Importar Asistencia.`}
-              action={importarBtn}
+              action={
+                <div className="flex flex-wrap gap-2">
+                  {importarBtn}
+                  {puedeCerrar && (
+                    <CerrarSemana
+                      periodo={normalizarPeriodo(periodo)}
+                      filas={filasCierre}
+                      rango={excel ? { desde: excel.desde, hasta: excel.hasta } : undefined}
+                      yaCerrado={periodoCerrado}
+                      onCerrado={() => setTab("historial")}
+                    />
+                  )}
+                </div>
+              }
             />
             {calculados.length === 0 ? (
               <div className="p-5">
@@ -406,6 +457,8 @@ export default function PlanillaPage() {
           </Card>
         </>
       )}
+
+      {tab === "historial" && <HistorialPlanilla lista={historial.lista} cargando={historial.cargando} error={historial.error} />}
 
       {/* MODAL REGISTRO / EDICIÓN */}
       <Modal open={!!editando} onClose={() => setEditando(null)} title={editando?.idOriginal ? `Editar trabajador N° ${editando.idOriginal}` : "Registrar trabajador"}>
