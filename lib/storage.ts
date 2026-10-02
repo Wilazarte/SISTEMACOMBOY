@@ -451,7 +451,9 @@ export function escribir<T>(key: StoreKey, value: T): void {
       if (cambios.length) {
         const conflicto = d.forma === "observaciones" || d.forma === "condiciones" ? "id" : "tipo,id";
         const { error } = await sb.from(d.tabla).upsert(cambios, { onConflict: conflicto });
-        if (error) throw error;
+        // 42P10: la tabla no tiene el índice único (tipo, id) -> se guarda fila por fila sin ON CONFLICT
+        if (error?.code === "42P10") await guardarSinIndice(d, cambios);
+        else if (error) throw error;
       }
       if (borrados.length) {
         let q = sb.from(d.tabla).delete().in("id", borrados);
@@ -472,6 +474,23 @@ export function escribir<T>(key: StoreKey, value: T): void {
       if (n === 0 && sucias.delete(key)) await recargar(key);
     }
   });
+}
+
+/**
+ * Guardado sin ON CONFLICT (tablas creadas a mano sin índice único en tipo + id):
+ * se actualiza la fila por su clave y, si no existía, se inserta.
+ */
+async function guardarSinIndice(d: Destino, filas: Fila[]): Promise<void> {
+  const sb = createClient();
+  for (const f of filas) {
+    let q = sb.from(d.tabla).update(f).eq("id", f.id);
+    if (d.forma === "lista" || d.forma === "objeto") q = q.eq("tipo", d.tipo);
+    const { data, error } = await q.select("id");
+    if (error) throw error;
+    if (data && data.length > 0) continue;
+    const ins = await sb.from(d.tabla).insert(f);
+    if (ins.error) throw ins.error;
+  }
 }
 
 let errorEscritura: string | undefined;

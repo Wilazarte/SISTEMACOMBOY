@@ -55,6 +55,7 @@ Para cambiar una contraseña: Supabase → Authentication → Users → usuario 
 ## Condiciones de pago (Ventas)
 - **Activar en Supabase:** SQL Editor → `supabase/condiciones_pago.sql` (o volver a correr `supabase_tables.sql`). Crea `public.condiciones_pago` con Efectivo, Transferencia bancaria, Depósito, Yape, Plin, Tarjeta, Crédito 7/15/30/45/60 días y Personalizado; copia las condiciones que ya existían (mismo id).
 - Nota de pedido: guarda el **id** de la condición. Crédito pide días (propone los de la condición) y calcula la **fecha de vencimiento**; Personalizado pide días y un detalle libre. Al facturar se usan esos días.
+- **Clientes y notas en `public.ventas`** (no hay tabla `clientes`): `supabase/ventas_columnas.sql` agrega y llena por trigger `numero_np` (único), `ruc`, `cliente_nombre`, `condicion_pago_id`, `condicion_pago_nombre`, `dias_credito` y `fecha_vencimiento`, y crea el índice único (tipo, id). Si falta ese índice, el ERP igual guarda (actualiza o inserta fila por fila).
 - Nuevas condiciones: Ventas › **Configuración**, o el botón **+** junto al select de la nota de pedido. Las editan creador y tesorería.
 
 ## Historial de planilla
