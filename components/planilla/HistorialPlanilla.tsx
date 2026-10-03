@@ -94,7 +94,7 @@ export function HistorialPlanilla({ lista, cargando, error }: { lista: Periodo[]
                       {abiertaC ? <FolderOpen size={16} className="text-amber-500" /> : <Folder size={16} className="text-amber-500" />}
                       <span className="flex-1">{c.nombre}</span>
                       <span className="text-xs font-normal text-slate-500">
-                        {c.periodos.length} · {soles(c.periodos.reduce((a, p) => a + p.total_neto, 0))}
+                        {c.periodos.length} · {soles(c.periodos.reduce((a, p) => a + p.total_pagar, 0))}
                       </span>
                     </button>
                     {abiertaC && (
@@ -108,7 +108,7 @@ export function HistorialPlanilla({ lista, cargando, error }: { lista: Periodo[]
                             <FileText size={20} className="mt-0.5 shrink-0 text-slate-400 group-hover:text-amber-500" />
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-sm font-semibold text-slate-900">{p.periodo}</span>
-                              <span className="mt-0.5 block text-lg font-bold text-slate-900">{soles(p.total_neto)}</span>
+                              <span className="mt-0.5 block text-lg font-bold text-slate-900" title="Total pagado (neto - adelantos)">{soles(p.total_pagar)}</span>
                               <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
                                 <span>{fechaHora(p.fecha_cierre)}</span>
                                 <span className="inline-flex items-center gap-1">

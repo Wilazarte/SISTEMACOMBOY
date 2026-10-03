@@ -29,6 +29,8 @@ import { HORAS_DIA, HORA_TARDANZA, leerMarcaciones, resumirAsistencia, textoCsv,
 import { CerrarSemana } from "@/components/planilla/CerrarSemana";
 import { HistorialPlanilla } from "@/components/planilla/HistorialPlanilla";
 import { useHistorialPlanilla } from "@/components/planilla/useHistorialPlanilla";
+import { useAdelantosPendientes } from "@/components/planilla/useAdelantosPendientes";
+import { adelantosADescontar, pendientesDe, type PendientesTrabajador } from "@/lib/adelantos";
 import type { FilaCierre } from "@/lib/historial";
 import type { AsistenciaPeriodo, TipoAfp, TipoSueldo, Trabajador } from "@/lib/types";
 
@@ -43,6 +45,10 @@ type TrabajadorCalc = Trabajador & {
   bruto: number;
   descuentoAfp: number;
   neto: number;
+  adelantosPendientes: number; // todos los adelantos PENDIENTES del trabajador
+  adelantosDescuento: number; // los que se descuentan en este pago (caben en el neto)
+  adelantoIds: string[];
+  totalPagar: number; // neto - adelantosDescuento
 };
 
 /** Excel importado en esta sesión: se muestra completo, sin filtrar por periodo ni por fechas. */
@@ -94,6 +100,27 @@ function calcular(t: Trabajador, asistenciaExterna?: AsistenciaMap | null, regis
     descuentoAfp,
     neto: r2(bruto - descuentoAfp),
     origen: fechas ? "RELOJ" : registro?.origen_edicion,
+    adelantosPendientes: 0,
+    adelantosDescuento: 0,
+    adelantoIds: [],
+    totalPagar: r2(bruto - descuentoAfp),
+  };
+}
+
+/**
+ * Sueldo - adelantos = total a pagar. Se descuentan los adelantos PENDIENTES del más antiguo al más reciente
+ * mientras quepan en el neto; el que no alcanza queda pendiente para la siguiente planilla.
+ */
+function conAdelantos(c: TrabajadorCalc, grupos: Map<string, PendientesTrabajador>): TrabajadorCalc {
+  const pendientes = pendientesDe(c, grupos);
+  if (!pendientes.length) return c;
+  const { descontar, total } = adelantosADescontar(pendientes, c.neto);
+  return {
+    ...c,
+    adelantosPendientes: r2(pendientes.reduce((s, a) => s + a.monto, 0)),
+    adelantosDescuento: total,
+    adelantoIds: descontar.map((a) => a.id),
+    totalPagar: r2(c.neto - total),
   };
 }
 
@@ -114,6 +141,7 @@ export default function PlanillaPage() {
   const puedeCerrar = !soloLectura && ["creador", "planilla", "admin"].includes(sesion?.rol ?? "");
   const [tab, setTab] = useState<Tab>("trabajadores");
   const historial = useHistorialPlanilla();
+  const adelantos = useAdelantosPendientes();
 
   // /dashboard/planilla?tab=historial (vuelta desde el detalle de un periodo cerrado)
   useEffect(() => {
@@ -135,8 +163,11 @@ export default function PlanillaPage() {
     return m;
   }, [asistencia, periodo]);
   const calculados = useMemo(
-    () => trabajadores.filter((t) => t.activo).map((t) => calcular(t, excel?.asistencia, delPeriodo.get(idAsistencia(periodo, t.id)))),
-    [trabajadores, excel, delPeriodo, periodo]
+    () =>
+      trabajadores
+        .filter((t) => t.activo)
+        .map((t) => conAdelantos(calcular(t, excel?.asistencia, delPeriodo.get(idAsistencia(periodo, t.id))), adelantos.grupos)),
+    [trabajadores, excel, delPeriodo, periodo, adelantos.grupos]
   );
   // Copia de la planilla tal como se ve, para "Cerrar semana"
   const filasCierre = useMemo<FilaCierre[]>(
@@ -158,6 +189,9 @@ export default function PlanillaPage() {
         bruto: t.bruto,
         descuento_afp: t.descuentoAfp,
         neto: t.neto,
+        adelantos: t.adelantosDescuento,
+        total_pagar: t.totalPagar,
+        adelanto_ids: t.adelantoIds,
         origen: t.origen ?? null,
       })),
     [calculados]
@@ -232,8 +266,9 @@ export default function PlanillaPage() {
     doc.line(20, 55, 190, 55);
     doc.text(`Remuneración bruta: ${soles(t.bruto)}`, 20, 65);
     doc.text(`Descuento ${afpLabel(t)} (${t.afpPorcentaje}%): - ${soles(t.descuentoAfp)}`, 20, 72);
+    doc.text(`Adelantos descontados: - ${soles(t.adelantosDescuento)}`, 20, 78);
     doc.setFont("helvetica", "bold");
-    doc.text(`NETO A PAGAR: ${soles(t.neto)}`, 20, 85);
+    doc.text(`NETO A PAGAR: ${soles(t.totalPagar)}`, 20, 88);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.text("Firma Trabajador _________________ Firma Empleador _________________", 20, 110);
@@ -386,9 +421,13 @@ export default function PlanillaPage() {
               </p>
             </div>
             <div className="rounded-xl bg-slate-900 p-3 text-sm text-white">
-              Total neto: <b className="text-amber-400">{soles(r2(calculados.reduce((a, b) => a + b.neto, 0)))}</b>
+              Total a pagar: <b className="text-amber-400">{soles(r2(calculados.reduce((a, b) => a + b.totalPagar, 0)))}</b>
+              <p className="text-xs text-slate-400">
+                Neto {soles(r2(calculados.reduce((a, b) => a + b.neto, 0)))} − adelantos {soles(r2(calculados.reduce((a, b) => a + b.adelantosDescuento, 0)))}
+              </p>
             </div>
           </div>
+          {adelantos.error && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">Adelantos: {adelantos.error} (la planilla se calcula sin descontarlos).</p>}
 
           <Card>
             <CardHeader
@@ -403,7 +442,12 @@ export default function PlanillaPage() {
                       filas={filasCierre}
                       rango={excel ? { desde: excel.desde, hasta: excel.hasta } : undefined}
                       yaCerrado={periodoCerrado}
-                      onCerrado={() => setTab("historial")}
+                      onCerrado={() => {
+                        // Sin esperar a Realtime: el periodo aparece en el historial y los adelantos ya descontados salen de la planilla
+                        void historial.recargar();
+                        void adelantos.recargar();
+                        setTab("historial");
+                      }}
                     />
                   )}
                 </div>
@@ -414,7 +458,7 @@ export default function PlanillaPage() {
                 <Empty icon={<Calculator size={28} />} text="No hay trabajadores activos." />
               </div>
             ) : (
-              <Table head={["N°", "Trabajador", "F. ingreso", "Sueldo / Tipo", "Pensión", "Días 🔒", "Horas", "Tard. 🔒", "Bruto", "Dscto", "Neto", "Boleta"]}>
+              <Table head={["N°", "Trabajador", "F. ingreso", "Sueldo / Tipo", "Pensión", "Días 🔒", "Horas", "Tard. 🔒", "Bruto", "Dscto", "Neto", "Adelantos pendientes", "Total a pagar (con descuento)", "Boleta"]}>
                 {calculados.map((t) => (
                   <tr key={t.id}>
                     <Td className="font-mono">{t.id}</Td>
@@ -446,7 +490,22 @@ export default function PlanillaPage() {
                     </Td>
                     <Td className="text-right">{soles(t.bruto)}</Td>
                     <Td className="text-right text-red-600">- {soles(t.descuentoAfp)}</Td>
-                    <Td className="text-right font-bold">{soles(t.neto)}</Td>
+                    <Td className="text-right">{soles(t.neto)}</Td>
+                    <Td className="text-right">
+                      {t.adelantosPendientes > 0 ? (
+                        <>
+                          <span className="font-semibold text-red-600">- {soles(t.adelantosDescuento)}</span>
+                          {t.adelantosDescuento < t.adelantosPendientes && (
+                            <p className="text-[10px] text-amber-700" title="El adelanto que no cabe en el neto queda pendiente para la siguiente planilla">
+                              {soles(r2(t.adelantosPendientes - t.adelantosDescuento))} queda pendiente
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
+                    </Td>
+                    <Td className="text-right font-bold">{soles(t.totalPagar)}</Td>
                     <Td>
                       <div className="flex gap-1">
                         <Button size="sm" onClick={() => setBoletaSel(t)} title="Ver boleta">
@@ -517,9 +576,15 @@ export default function PlanillaPage() {
                     </td>
                     <td className="p-2 text-right">- {soles(boletaSel.descuentoAfp)}</td>
                   </tr>
+                  {boletaSel.adelantosDescuento > 0 && (
+                    <tr className="border-t text-red-600">
+                      <td className="p-2">Adelantos descontados ({boletaSel.adelantoIds.length})</td>
+                      <td className="p-2 text-right">- {soles(boletaSel.adelantosDescuento)}</td>
+                    </tr>
+                  )}
                   <tr className="border-t bg-amber-100 font-bold">
                     <td className="p-2">NETO A PAGAR</td>
-                    <td className="p-2 text-right">{soles(boletaSel.neto)}</td>
+                    <td className="p-2 text-right">{soles(boletaSel.totalPagar)}</td>
                   </tr>
                 </tbody>
               </table>

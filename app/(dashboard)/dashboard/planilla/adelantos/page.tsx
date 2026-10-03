@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, HandCoins, Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import { ArrowLeft, HandCoins, Lock, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Select, Table, Td, Textarea, cn, ejecutarAsync } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
-import { ESTADOS_ADELANTO, crearAdelanto, editarAdelanto, eliminarAdelanto, listarAdelantos, type Adelanto, type DatosAdelanto, type EstadoAdelanto } from "@/lib/adelantos";
+import { ESTADOS_ADELANTO, ESTADOS_EDITABLES, crearAdelanto, editarAdelanto, eliminarAdelanto, listarAdelantos, type Adelanto, type DatosAdelanto, type EstadoAdelanto } from "@/lib/adelantos";
 import { fechaPE, hoy, r2, soles, useTrabajadores } from "@/lib/storage";
 import { createClient } from "@/lib/supabase/client";
 
@@ -83,6 +83,7 @@ export default function AdelantosPage() {
   };
 
   const editar = (a: Adelanto) => {
+    if (a.estado === "DESCONTADO") return; // ya se pagó en una planilla
     setEditandoId(a.id);
     setForm({ trabajador_nombre: a.trabajador_nombre, dni: a.dni ?? "", fecha: a.fecha, monto: a.monto, motivo: a.motivo ?? "", estado: a.estado });
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -152,8 +153,8 @@ export default function AdelantosPage() {
             <Field label="Monto (S/) *">
               <Input type="number" min={0} step="0.01" value={form.monto || ""} onChange={(e) => setForm({ ...form, monto: parseFloat(e.target.value) || 0 })} placeholder="0.00" />
             </Field>
-            <Field label="Estado">
-              <Select value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value as EstadoAdelanto })} options={ESTADOS_ADELANTO.map((s) => ({ value: s, label: s }))} />
+            <Field label="Estado" hint="DESCONTADO lo pone el pago de la planilla">
+              <Select value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value as EstadoAdelanto })} options={ESTADOS_EDITABLES.map((s) => ({ value: s, label: s }))} />
             </Field>
             <Field label="Motivo" className="md:col-span-2">
               <Textarea value={form.motivo ?? ""} onChange={(e) => setForm({ ...form, motivo: e.target.value })} placeholder="Ej: pasajes, emergencia familiar…" className="min-h-[42px]" />
@@ -195,7 +196,16 @@ export default function AdelantosPage() {
         ) : (
           <Table head={["Fecha", "Trabajador", "DNI", "Monto", "Motivo", "Estado", ...(puedeEditar ? ["Acciones"] : [])]}>
             {visibles.map((a) => (
-              <tr key={a.id} className={cn("hover:bg-slate-50", editandoId === a.id && "bg-amber-50", a.estado === "ANULADO" && "opacity-60")}>
+              <tr
+                key={a.id}
+                className={cn(
+                  "hover:bg-slate-50",
+                  a.estado === "PENDIENTE" && "bg-amber-50/40",
+                  a.estado === "DESCONTADO" && "bg-emerald-50/40",
+                  editandoId === a.id && "bg-amber-100",
+                  a.estado === "ANULADO" && "opacity-60"
+                )}
+              >
                 <Td>{fechaPE(a.fecha)}</Td>
                 <Td className="font-semibold text-slate-900">{a.trabajador_nombre}</Td>
                 <Td className="font-mono">{a.dni || "-"}</Td>
@@ -207,9 +217,20 @@ export default function AdelantosPage() {
                 </Td>
                 <Td>
                   <Badge estado={a.estado} />
+                  {a.estado === "DESCONTADO" && (
+                    <p className="mt-1 text-[11px] text-emerald-700">
+                      {a.planilla_periodo ? `En ${a.planilla_periodo}` : "En planilla"}
+                      {a.descontado_en ? ` · ${new Date(a.descontado_en).toLocaleDateString("es-PE")}` : ""}
+                    </p>
+                  )}
                 </Td>
                 {puedeEditar && (
                   <Td>
+                    {a.estado === "DESCONTADO" ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500" title="Ya se descontó en una planilla: no se puede editar ni eliminar">
+                        <Lock size={13} /> Descontado
+                      </span>
+                    ) : (
                     <div className="flex gap-1">
                       <Button size="sm" variant="secondary" onClick={() => editar(a)} title="Editar">
                         <Pencil size={14} /> Editar
@@ -218,6 +239,7 @@ export default function AdelantosPage() {
                         <Trash2 size={14} className="text-red-600" />
                       </Button>
                     </div>
+                    )}
                   </Td>
                 )}
               </tr>

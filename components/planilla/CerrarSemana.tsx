@@ -7,8 +7,9 @@ import { cerrarPlanilla, type FilaCierre } from "@/lib/historial";
 import { fechaPE, r2, soles } from "@/lib/storage";
 
 /**
- * Botón "Cerrar semana y guardar en historial" de la pestaña principal.
- * Pide confirmación y guarda una COPIA de la planilla que se ve en pantalla (todo o nada).
+ * Botón "Pagar planilla" (cierra la semana) de la pestaña principal.
+ * Pide confirmación, guarda una COPIA de la planilla que se ve en pantalla y marca como DESCONTADOS
+ * los adelantos que se descuentan, con el id de la planilla (todo o nada).
  */
 export function CerrarSemana({
   periodo,
@@ -29,6 +30,9 @@ export function CerrarSemana({
   const descuento = r2(filas.reduce((a, f) => a + f.descuento_afp, 0));
   const neto = r2(filas.reduce((a, f) => a + f.neto, 0));
   const horas = r2(filas.reduce((a, f) => a + f.horas, 0));
+  const adelantos = r2(filas.reduce((a, f) => a + f.adelantos, 0));
+  const nAdelantos = filas.reduce((a, f) => a + f.adelanto_ids.length, 0);
+  const totalPagar = r2(filas.reduce((a, f) => a + f.total_pagar, 0));
   const sinAsistencia = filas.filter((f) => f.dias === 0).length;
 
   if (yaCerrado)
@@ -43,7 +47,7 @@ export function CerrarSemana({
     let id = "";
     const ok = await ejecutarAsync(async () => {
       id = await cerrarPlanilla(periodo, filas, rango);
-    }, `${periodo} guardado en el historial`);
+    }, `Planilla ${periodo} pagada y guardada en el historial${nAdelantos ? ` · ${nAdelantos} adelanto(s) descontado(s)` : ""}`);
     setGuardando(false);
     if (ok) {
       setAbierto(false);
@@ -53,11 +57,11 @@ export function CerrarSemana({
 
   return (
     <>
-      <Button variant="secondary" onClick={() => setAbierto(true)} disabled={filas.length === 0} title="Guarda una copia permanente de esta planilla">
-        <Archive size={16} /> Cerrar semana y guardar en historial
+      <Button variant="secondary" onClick={() => setAbierto(true)} disabled={filas.length === 0} title="Cierra la semana: guarda la planilla en el historial y descuenta los adelantos">
+        <Archive size={16} /> Pagar planilla
       </Button>
 
-      <Modal open={abierto} onClose={() => !guardando && setAbierto(false)} title="Cerrar semana y guardar en historial">
+      <Modal open={abierto} onClose={() => !guardando && setAbierto(false)} title="Pagar planilla y cerrar semana">
         <div className="space-y-4 text-sm">
           <p className="text-slate-600">
             Se guardará una copia permanente de la planilla <b className="text-slate-900">{periodo}</b> tal como se ve ahora. Después no se podrá modificar ni borrar, aunque
@@ -72,8 +76,12 @@ export function CerrarSemana({
             <b className="text-right">{soles(bruto)}</b>
             <span className="text-slate-500">Descuentos</span>
             <b className="text-right text-red-600">- {soles(descuento)}</b>
-            <span className="font-semibold text-slate-900">Total neto</span>
-            <b className="text-right text-slate-900">{soles(neto)}</b>
+            <span className="text-slate-500">Neto</span>
+            <b className="text-right">{soles(neto)}</b>
+            <span className="text-slate-500">Adelantos descontados ({nAdelantos})</span>
+            <b className="text-right text-red-600">- {soles(adelantos)}</b>
+            <span className="font-semibold text-slate-900">Total a pagar</span>
+            <b className="text-right text-slate-900">{soles(totalPagar)}</b>
             {rango?.desde && (
               <>
                 <span className="text-slate-500">Asistencia</span>
@@ -83,6 +91,11 @@ export function CerrarSemana({
               </>
             )}
           </div>
+          {nAdelantos > 0 && (
+            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-emerald-800">
+              Los {nAdelantos} adelanto(s) descontado(s) pasan a <b>DESCONTADO</b> y quedan vinculados a esta planilla.
+            </p>
+          )}
           {sinAsistencia > 0 && (
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-amber-800">
               {sinAsistencia} trabajador(es) activo(s) sin asistencia: se guardan con 0 días y S/ 0.00.
@@ -93,7 +106,7 @@ export function CerrarSemana({
               Cancelar
             </Button>
             <Button variant="warning" onClick={guardar} disabled={guardando}>
-              <Lock size={16} /> {guardando ? "Guardando…" : "Cerrar y guardar"}
+              <Lock size={16} /> {guardando ? "Guardando…" : "Pagar y cerrar semana"}
             </Button>
           </div>
         </div>

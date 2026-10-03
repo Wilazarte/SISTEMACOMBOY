@@ -12,6 +12,8 @@ export interface HistorialPlanilla {
   periodo: string;
   fecha_cierre: string;
   total_neto: number;
+  total_adelantos: number;
+  total_pagar: number;
   total_bruto: number;
   total_descuento: number;
   total_horas: number;
@@ -41,11 +43,15 @@ export interface HistorialDetalle {
   bruto: number;
   descuento_afp: number;
   neto: number;
+  adelantos: number; // adelantos descontados
+  total_pagar: number; // neto - adelantos
   origen: string | null;
 }
 
 /** Una fila de la planilla tal como se ve en pantalla al cerrar la semana. */
-export type FilaCierre = Omit<HistorialDetalle, "id" | "historial_id" | "orden">;
+export type FilaCierre = Omit<HistorialDetalle, "id" | "historial_id" | "orden"> & {
+  adelanto_ids: string[]; // adelantos PENDIENTES que pasan a DESCONTADO con este pago
+};
 
 const num = (v: unknown): number => {
   const n = Number(v);
@@ -71,6 +77,8 @@ const aCabecera = (r: Record<string, unknown>): HistorialPlanilla => ({
   periodo: String(r.periodo ?? ""),
   fecha_cierre: String(r.fecha_cierre ?? ""),
   total_neto: num(r.total_neto),
+  total_adelantos: num(r.total_adelantos),
+  total_pagar: r.total_pagar == null ? num(r.total_neto) - num(r.total_adelantos) : num(r.total_pagar),
   total_bruto: num(r.total_bruto),
   total_descuento: num(r.total_descuento),
   total_horas: num(r.total_horas),
@@ -100,6 +108,8 @@ const aDetalle = (r: Record<string, unknown>): HistorialDetalle => ({
   bruto: num(r.bruto),
   descuento_afp: num(r.descuento_afp),
   neto: num(r.neto),
+  adelantos: num(r.adelantos),
+  total_pagar: r.total_pagar == null ? num(r.neto) - num(r.adelantos) : num(r.total_pagar),
   origen: (r.origen as string | null) ?? null,
 });
 
@@ -150,7 +160,7 @@ export async function cerrarPlanilla(periodo: string, filas: FilaCierre[], rango
   return insertarDirecto(periodo, filas, rango);
 }
 
-const suma = (filas: FilaCierre[], k: "bruto" | "neto" | "descuento_afp" | "horas") => r2(filas.reduce((a, f) => a + (Number(f[k]) || 0), 0));
+const suma = (filas: FilaCierre[], k: "bruto" | "neto" | "descuento_afp" | "horas" | "adelantos" | "total_pagar") => r2(filas.reduce((a, f) => a + (Number(f[k]) || 0), 0));
 
 /** Inserta con todas las columnas; si la tabla solo tiene las básicas, reintenta con esas. */
 async function insertar<T>(tabla: string, completo: object | object[], basico: object | object[], select?: string): Promise<T> {
@@ -179,6 +189,8 @@ async function insertarDirecto(periodo: string, filas: FilaCierre[], rango?: { d
     ...basico,
     total_descuento: suma(filas, "descuento_afp"),
     total_horas: suma(filas, "horas"),
+    total_adelantos: suma(filas, "adelantos"),
+    total_pagar: suma(filas, "total_pagar"),
     asistencia_desde: rango?.desde || null,
     asistencia_hasta: rango?.hasta || null,
   };
@@ -197,12 +209,23 @@ async function insertarDirecto(periodo: string, filas: FilaCierre[], rango?: { d
     bruto: f.bruto,
     neto: f.neto,
   }));
-  const detCompleto = filas.map((f, i) => ({ ...detBasico[i], ...f, orden: i + 1 }));
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const detCompleto = filas.map(({ adelanto_ids, ...f }, i) => ({ ...detBasico[i], ...f, orden: i + 1 }));
   try {
     await insertar("planilla_historial_detalle", detCompleto, detBasico);
   } catch (e) {
     await createClient().from("planilla_historial").delete().eq("id", id); // no dejar una cabecera sin detalle
     throw e;
+  }
+  // Adelantos pagados: PENDIENTE -> DESCONTADO con planilla_id (sin la función no hay transacción)
+  const ids = filas.flatMap((f) => f.adelanto_ids);
+  if (ids.length) {
+    const { error } = await createClient()
+      .from("adelantos")
+      .update({ estado: "DESCONTADO", planilla_id: id, descontado_en: new Date().toISOString() })
+      .in("id", ids)
+      .ilike("estado", "pendiente");
+    if (error) throw new ErpError(`Planilla guardada, pero no se pudieron marcar los adelantos como descontados: ${error.message}. Márquelos en Adelantos.`);
   }
   return id;
 }

@@ -63,13 +63,16 @@ export function DetalleHistorial({ id }: { id: string }) {
           <p className="text-xs text-red-600">Descuentos: - {soles(h.total_descuento)}</p>
         </div>
         <div className="rounded-xl bg-slate-900 p-3 text-sm text-white">
-          Total neto: <b className="text-amber-400">{soles(h.total_neto)}</b>
+          Total pagado: <b className="text-amber-400">{soles(h.total_pagar)}</b>
+          <p className="text-xs text-slate-400">
+            Neto {soles(h.total_neto)} − adelantos {soles(h.total_adelantos)}
+          </p>
         </div>
       </div>
 
       <Card>
         <CardHeader title={`Planilla · ${h.periodo}`} subtitle="Copia permanente guardada al cerrar la semana. Solo lectura: no cambia aunque se modifique la asistencia o los trabajadores." />
-        <Table head={["N°", "Trabajador", "F. ingreso", "Sueldo / Tipo", "Pensión", "Días", "Horas", "Tard.", "Bruto", "Dscto", "Neto"]} empty={detalle.length === 0}>
+        <Table head={["N°", "Trabajador", "F. ingreso", "Sueldo / Tipo", "Pensión", "Días", "Horas", "Tard.", "Bruto", "Dscto", "Neto", "Adelantos", "Total pagado"]} empty={detalle.length === 0}>
           {detalle.map((d) => (
             <tr key={d.id}>
               <Td className="font-mono">{d.trabajador_id}</Td>
@@ -96,7 +99,9 @@ export function DetalleHistorial({ id }: { id: string }) {
               <Td className="text-center">{d.tardanzas}</Td>
               <Td className="text-right">{soles(d.bruto)}</Td>
               <Td className="text-right text-red-600">- {soles(d.descuento_afp)}</Td>
-              <Td className="text-right font-bold">{soles(d.neto)}</Td>
+              <Td className="text-right">{soles(d.neto)}</Td>
+              <Td className="text-right text-red-600">{d.adelantos ? `- ${soles(d.adelantos)}` : "-"}</Td>
+              <Td className="text-right font-bold">{soles(d.total_pagar)}</Td>
             </tr>
           ))}
         </Table>

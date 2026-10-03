@@ -497,6 +497,8 @@ create table if not exists public.planilla_historial (
 );
 alter table public.planilla_historial
   add column if not exists total_descuento numeric(10,2),
+  add column if not exists total_adelantos numeric(10,2) default 0, -- adelantos descontados en este pago
+  add column if not exists total_pagar numeric(10,2),                -- total_neto - total_adelantos
   add column if not exists total_horas numeric(10,2),
   add column if not exists creado_por_id uuid,
   add column if not exists asistencia_desde date, -- rango del Excel del reloj (si se importó)
@@ -525,7 +527,9 @@ alter table public.planilla_historial_detalle
   add column if not exists valor_hora numeric(12,4),
   add column if not exists descuento_afp numeric(10,2),
   add column if not exists origen text,
-  add column if not exists orden int;
+  add column if not exists orden int,
+  add column if not exists adelantos numeric(10,2) default 0, -- adelantos descontados al trabajador
+  add column if not exists total_pagar numeric(10,2);         -- neto - adelantos
 create index if not exists planilla_historial_detalle_historial on public.planilla_historial_detalle (historial_id);
 
 -- RLS: leen quienes ven Planilla (planilla, creador, gerencia). Nadie escribe directo:
@@ -571,29 +575,64 @@ begin
   end if;
 
   select count(*) into malas
-  from jsonb_to_recordset(p_filas) as f(trabajador_id text, dias numeric, horas numeric, tardanzas numeric, bruto numeric, descuento_afp numeric, neto numeric)
+  from jsonb_to_recordset(p_filas) as f(trabajador_id text, dias numeric, horas numeric, tardanzas numeric, bruto numeric, descuento_afp numeric, neto numeric,
+                                        adelantos numeric, total_pagar numeric)
   where coalesce(btrim(f.trabajador_id), '') = ''
      or coalesce(f.dias, -1) < 0 or coalesce(f.horas, -1) < 0 or coalesce(f.tardanzas, -1) < 0
      or coalesce(f.bruto, -1) < 0 or coalesce(f.descuento_afp, -1) < 0
-     or abs(coalesce(f.neto, 0) - (coalesce(f.bruto, 0) - coalesce(f.descuento_afp, 0))) > 0.01;
+     or abs(coalesce(f.neto, 0) - (coalesce(f.bruto, 0) - coalesce(f.descuento_afp, 0))) > 0.01
+     or coalesce(f.adelantos, 0) < 0 or coalesce(f.adelantos, 0) > coalesce(f.neto, 0) + 0.01
+     or (f.total_pagar is not null and abs(f.total_pagar - (coalesce(f.neto, 0) - coalesce(f.adelantos, 0))) > 0.01);
   if malas > 0 then
     raise exception 'Hay % fila(s) de planilla inválidas', malas using errcode = '22023';
   end if;
 
-  insert into public.planilla_historial (periodo, total_neto, total_bruto, total_descuento, total_horas, cantidad_trabajadores, creado_por, creado_por_id, asistencia_desde, asistencia_hasta)
-  select per, sum(f.neto), sum(f.bruto), sum(f.descuento_afp), sum(f.horas), count(*),
+  -- Adelantos a descontar: deben seguir PENDIENTES y sumar lo que se descuenta en cada fila.
+  -- Se bloquean hasta terminar para que otra PC no los edite ni los descuente dos veces.
+  if exists (select 1 from jsonb_array_elements(p_filas) x(fila) where jsonb_array_length(coalesce(x.fila -> 'adelanto_ids', '[]'::jsonb)) > 0) then
+    if to_regclass('public.adelantos') is null then
+      raise exception 'Falta la tabla adelantos: ejecute supabase/adelantos.sql' using errcode = '42P01';
+    end if;
+    perform 1 from public.adelantos a
+    where a.id::text in (select jsonb_array_elements_text(coalesce(x.fila -> 'adelanto_ids', '[]'::jsonb)) from jsonb_array_elements(p_filas) x(fila))
+    for update;
+    select count(*) into malas
+    from jsonb_array_elements(p_filas) as x(fila)
+    cross join lateral (
+      select count(*) as pedidos,
+             count(a.id) filter (where upper(a.estado) = 'PENDIENTE') as pendientes,
+             coalesce(sum(a.monto) filter (where upper(a.estado) = 'PENDIENTE'), 0) as suma
+      from jsonb_array_elements_text(coalesce(x.fila -> 'adelanto_ids', '[]'::jsonb)) as i(id)
+      left join public.adelantos a on a.id::text = i.id
+    ) r
+    where r.pedidos <> r.pendientes or abs(r.suma - coalesce((x.fila ->> 'adelantos')::numeric, 0)) > 0.01;
+    if malas > 0 then
+      raise exception 'Los adelantos cambiaron mientras se preparaba la planilla (ya descontados, editados o eliminados). Vuelva a intentarlo.'
+        using errcode = '40001';
+    end if;
+  end if;
+
+  insert into public.planilla_historial (periodo, total_neto, total_bruto, total_descuento, total_horas, total_adelantos, total_pagar,
+                                         cantidad_trabajadores, creado_por, creado_por_id, asistencia_desde, asistencia_hasta)
+  select per, sum(f.neto), sum(f.bruto), sum(f.descuento_afp), sum(f.horas), sum(coalesce(f.adelantos, 0)), sum(f.neto - coalesce(f.adelantos, 0)), count(*),
          (select coalesce(nullif(p.nombre, ''), p.usuario) from public.perfiles p where p.id = auth.uid()), auth.uid(), p_desde, p_hasta
-  from jsonb_to_recordset(p_filas) as f(neto numeric, bruto numeric, descuento_afp numeric, horas numeric)
+  from jsonb_to_recordset(p_filas) as f(neto numeric, bruto numeric, descuento_afp numeric, horas numeric, adelantos numeric)
   returning id into hid;
 
   insert into public.planilla_historial_detalle (historial_id, orden, trabajador_id, nombre, dni, cargo, fecha_ingreso, tipo_sueldo, pension, afp_porcentaje,
-                                                 sueldo, dias, horas, tardanzas, valor_hora, bruto, descuento_afp, neto, origen)
+                                                 sueldo, dias, horas, tardanzas, valor_hora, bruto, descuento_afp, neto, adelantos, total_pagar, origen)
   select hid, (x.ord)::int, btrim(f.trabajador_id), f.nombre, f.dni, f.cargo, nullif(f.fecha_ingreso, '')::date, f.tipo_sueldo, f.pension, f.afp_porcentaje,
-         f.sueldo, f.dias, f.horas, f.tardanzas, f.valor_hora, f.bruto, f.descuento_afp, f.neto, f.origen
+         f.sueldo, f.dias, f.horas, f.tardanzas, f.valor_hora, f.bruto, f.descuento_afp, f.neto, coalesce(f.adelantos, 0), f.neto - coalesce(f.adelantos, 0), f.origen
   from jsonb_array_elements(p_filas) with ordinality as x(fila, ord)
   cross join lateral jsonb_to_record(x.fila) as f(trabajador_id text, nombre text, dni text, cargo text, fecha_ingreso text, tipo_sueldo text, pension text,
                                                    afp_porcentaje numeric, sueldo numeric, dias numeric, horas numeric, tardanzas numeric,
-                                                   valor_hora numeric, bruto numeric, descuento_afp numeric, neto numeric, origen text);
+                                                   valor_hora numeric, bruto numeric, descuento_afp numeric, neto numeric, adelantos numeric, origen text);
+
+  -- Adelantos pagados en esta planilla: PENDIENTE -> DESCONTADO con planilla_id
+  if to_regclass('public.adelantos') is not null then
+    update public.adelantos a set estado = 'DESCONTADO', planilla_id = hid, descontado_en = now()
+    where a.id::text in (select jsonb_array_elements_text(coalesce(x.fila -> 'adelanto_ids', '[]'::jsonb)) from jsonb_array_elements(p_filas) x(fila));
+  end if;
   return hid;
 end $$;
 
@@ -778,28 +817,49 @@ alter table public.adelantos
   add column if not exists estado text not null default 'PENDIENTE', -- PENDIENTE | DESCONTADO | ANULADO
   add column if not exists created_at timestamptz not null default now(),
   add column if not exists updated_at timestamptz not null default now(),
-  add column if not exists updated_by uuid default auth.uid();
+  add column if not exists updated_by uuid default auth.uid(),
+  add column if not exists planilla_id uuid,          -- planilla_historial.id donde se descontó
+  add column if not exists descontado_en timestamptz;
+
+-- Estado sin importar mayúsculas ('pendiente' o 'PENDIENTE')
+alter table public.adelantos drop constraint if exists adelantos_valores_check;
+alter table public.adelantos add constraint adelantos_valores_check
+  check (coalesce(btrim(trabajador_nombre), '') <> '' and monto > 0 and upper(estado) in ('PENDIENTE', 'DESCONTADO', 'ANULADO')
+         and (dni is null or dni = '' or dni ~ '^\d{8}$')) not valid;
 
 do $$
 begin
-  if not exists (select 1 from pg_constraint where conname = 'adelantos_valores_check') then
-    alter table public.adelantos add constraint adelantos_valores_check
-      check (coalesce(btrim(trabajador_nombre), '') <> '' and monto > 0 and estado in ('PENDIENTE', 'DESCONTADO', 'ANULADO')
-             and (dni is null or dni = '' or dni ~ '^\d{8}$')) not valid;
+  -- planilla_id -> planilla_historial (si el historial ya existe)
+  if to_regclass('public.planilla_historial') is not null
+     and not exists (select 1 from pg_constraint where conname = 'adelantos_planilla_id_fkey') then
+    alter table public.adelantos add constraint adelantos_planilla_id_fkey
+      foreign key (planilla_id) references public.planilla_historial (id) on delete set null not valid;
   end if;
 end $$;
+create index if not exists adelantos_pendientes_idx on public.adelantos (upper(estado), trabajador_nombre);
 create index if not exists adelantos_fecha_idx on public.adelantos (fecha desc);
 
--- updated_at / updated_by al editar
+-- updated_at / updated_by al editar. Un adelanto DESCONTADO ya se pagó en una planilla: no se edita ni se borra.
 create or replace function public.adelantos_actualizado() returns trigger
 language plpgsql as $$
 begin
+  if upper(old.estado) = 'DESCONTADO' then
+    raise exception 'El adelanto ya fue descontado en planilla: no se puede % ', case when tg_op = 'DELETE' then 'eliminar' else 'modificar' end
+      using errcode = '55000';
+  end if;
+  if tg_op = 'DELETE' then
+    return old;
+  end if;
+  -- DESCONTADO solo lo pone el cierre de planilla (con planilla_id)
+  if upper(new.estado) = 'DESCONTADO' and new.planilla_id is null then
+    raise exception 'Un adelanto solo se marca DESCONTADO al pagar la planilla' using errcode = '55000';
+  end if;
   new.updated_at := now();
   new.updated_by := auth.uid();
   return new;
 end $$;
 drop trigger if exists adelantos_actualizado on public.adelantos;
-create trigger adelantos_actualizado before update on public.adelantos
+create trigger adelantos_actualizado before update or delete on public.adelantos
   for each row execute function public.adelantos_actualizado();
 
 -- RLS: lo ven quienes entran a Planilla (incluida gerencia); lo editan planilla y creador
