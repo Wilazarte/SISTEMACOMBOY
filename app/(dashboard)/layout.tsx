@@ -135,7 +135,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
         <nav className="space-y-1 p-3">
           {nav.map((n) => {
-            const activo = path === n.href;
+            const activo = path === n.href || (n.href !== "/dashboard" && path.startsWith(`${n.href}/`)); // subpáginas (Adelantos, Historial…)
             const Icon = n.icon;
             const contenido = (
               <>

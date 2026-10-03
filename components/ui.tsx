@@ -130,6 +130,7 @@ const COLORES: Record<string, string> = {
   CREDITO: "bg-orange-50 text-orange-700 ring-orange-200",
   CREDITO_CUOTAS: "bg-orange-50 text-orange-700 ring-orange-200",
   INACTIVO: "bg-slate-100 text-slate-500 ring-slate-300",
+  DESCONTADO: "bg-slate-800 text-white ring-slate-800",
 };
 
 const ETIQUETA: Record<string, string> = {

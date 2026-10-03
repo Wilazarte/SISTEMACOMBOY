@@ -58,6 +58,11 @@ Para cambiar una contraseña: Supabase → Authentication → Users → usuario 
 - **Clientes y notas en `public.ventas`** (no hay tabla `clientes`): `supabase/ventas_columnas.sql` agrega y llena por trigger `numero_np` (único), `ruc`, `cliente_nombre`, `condicion_pago_id`, `condicion_pago_nombre`, `dias_credito` y `fecha_vencimiento`, y crea el índice único (tipo, id). Si falta ese índice, el ERP igual guarda (actualiza o inserta fila por fila).
 - Nuevas condiciones: Ventas › **Configuración**, o el botón **+** junto al select de la nota de pedido. Las editan creador y tesorería.
 
+## Adelantos (Planilla › Adelantos)
+- **Activar en Supabase:** SQL Editor → `supabase/adelantos.sql` (o volver a correr `supabase_tables.sql`). Crea `public.adelantos` (id, trabajador_nombre, dni, fecha, monto, motivo, estado PENDIENTE / DESCONTADO / ANULADO) con RLS y Realtime.
+- `/dashboard/planilla/adelantos` (botón **Adelantos** en Planilla): formulario arriba y tabla abajo; **Editar** carga el adelanto en el formulario para actualizarlo, y se puede eliminar. CRUD en `lib/adelantos.ts`.
+- Editan planilla y creador; gerencia solo ve. El descuento en la planilla queda para la siguiente fase (por ahora solo se registra).
+
 ## Historial de planilla
 - **Activar en Supabase:** SQL Editor → `supabase/historial_planilla.sql` (o volver a correr `supabase_tables.sql`). Crea `planilla_historial`, `planilla_historial_detalle`, la función `cerrar_planilla()` y su Realtime.
 - Planilla › *Planilla del periodo* → **Cerrar semana y guardar en historial**: guarda una copia (no una referencia) de lo que se ve en pantalla, cabecera + detalle en una sola transacción. Un periodo se cierra una sola vez; el historial no se puede editar ni borrar.

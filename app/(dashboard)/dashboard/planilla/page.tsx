@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Archive, Calculator, Eye, FileDown, Lock, Pencil, Plus, Power, Trash2, Upload, Users } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, Archive, Calculator, HandCoins, Eye, FileDown, Lock, Pencil, Plus, Power, Trash2, Upload, Users } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, cn, ejecutar, toast } from "@/components/ui";
 import {
   AFP_OPTIONS,
@@ -260,6 +261,12 @@ export default function PlanillaPage() {
           <p className="text-sm text-slate-500">Maestro de trabajadores y cálculo de pago según asistencia del reloj</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link
+            href="/dashboard/planilla/adelantos"
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          >
+            <HandCoins size={16} /> Adelantos
+          </Link>
           <Button onClick={() => setEditando({ form: trabajadorVacio() })} disabled={soloLectura}>
             <Plus size={16} /> Registrar trabajador
           </Button>
