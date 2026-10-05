@@ -46,8 +46,9 @@ create unique index if not exists almacen_eq_serie_motor_uidx
 create unique index if not exists almacen_eq_chasis_uidx
   on public.almacen (upper(replace(data->>'codigo_chasis', ' ', ''))) where tipo = 'EQUIPO_TERMINADO';
 
--- Vista de consulta
-create or replace view public.v_equipos_terminados with (security_invoker = true) as
+-- Vista de consulta (se recrea: si ya existía con otras columnas, CREATE OR REPLACE no puede cambiarlas)
+drop view if exists public.v_equipos_terminados;
+create view public.v_equipos_terminados with (security_invoker = true) as
 select id, data->>'tipo_equipo' as tipo_equipo, data->>'modelo' as modelo, data->>'marca_motor' as marca_motor,
        data->>'serie_motor' as serie_motor, data->>'codigo_chasis' as codigo_chasis, data->>'color' as color,
        coalesce(data->>'ubicacion_sede', data->>'sede') as sede, (data->>'qc_aprobado')::boolean as qc_aprobado, data->>'fecha_qc' as fecha_qc,
