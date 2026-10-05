@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Archive, CheckCircle2, Lock } from "lucide-react";
 import { Button, Modal, ejecutarAsync } from "@/components/ui";
 import { cerrarPlanilla, type FilaCierre } from "@/lib/historial";
+import { asientoPlanilla } from "@/lib/contable";
+import { getSesion } from "@/lib/auth";
 import { fechaPE, r2, soles } from "@/lib/storage";
 
 /**
@@ -47,6 +49,8 @@ export function CerrarSemana({
     let id = "";
     const ok = await ejecutarAsync(async () => {
       id = await cerrarPlanilla(periodo, filas, rango);
+      // Contable: DEBE 62 Remuneraciones / HABER 10 Caja (+ AFP/ONP y adelantos descontados)
+      asientoPlanilla({ id, periodo, bruto, descuento, adelantos, pagado: totalPagar }, getSesion()?.usuario ?? "planilla");
     }, `Planilla ${periodo} pagada y guardada en el historial${nAdelantos ? ` · ${nAdelantos} adelanto(s) descontado(s)` : ""}`);
     setGuardando(false);
     if (ok) {

@@ -64,6 +64,10 @@ export const KEYS = {
   CONTRATISTAS: "planilla_contratistas",
   HUELLAS_ALIAS: "planilla_huellas_alias",
   BOLETAS: "planilla_boletas",
+  // Contable (tabla contable)
+  CONTABLE_ASIENTOS: "contable_asientos",
+  CONTABLE_PLAN: "contable_plan_cuentas",
+  CONTABLE_CIERRES: "contable_cierres",
 } as const;
 
 export type StoreKey = (typeof KEYS)[keyof typeof KEYS];
@@ -121,7 +125,7 @@ export class ErpError extends Error {}
 // hacen las otras PCs y refresca la pantalla al instante.
 // ---------------------------------------------------------------------
 
-type TablaDoc = "compras" | "almacen" | "planilla" | "ventas";
+type TablaDoc = "compras" | "almacen" | "planilla" | "ventas" | "contable";
 type Destino =
   | { tabla: TablaDoc; tipo: string; forma: "lista" | "objeto" }
   | { tabla: "observaciones"; forma: "observaciones" }
@@ -151,9 +155,12 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.CONTRATISTAS]: { tabla: "planilla", tipo: "contratista", forma: "lista" },
   [KEYS.HUELLAS_ALIAS]: { tabla: "planilla", tipo: "huella_alias", forma: "objeto" },
   [KEYS.BOLETAS]: { tabla: "planilla", tipo: "boleta", forma: "lista" },
+  [KEYS.CONTABLE_ASIENTOS]: { tabla: "contable", tipo: "ASIENTO_DIARIO", forma: "lista" },
+  [KEYS.CONTABLE_PLAN]: { tabla: "contable", tipo: "PLAN_CUENTAS", forma: "lista" },
+  [KEYS.CONTABLE_CIERRES]: { tabla: "contable", tipo: "CIERRE_MENSUAL", forma: "lista" },
   [KEYS.OBSERVACIONES]: { tabla: "observaciones", forma: "observaciones" },
 };
-const TABLAS = ["compras", "almacen", "planilla", "ventas", "observaciones", "condiciones_pago"] as const;
+const TABLAS = ["compras", "almacen", "planilla", "ventas", "observaciones", "condiciones_pago", "contable"] as const;
 /**
  * Fila única de las claves tipo "objeto" (contadores). Es un UUID fijo para que funcione
  * aunque la columna id de la tabla sea de tipo uuid (antes era "principal").
@@ -351,7 +358,11 @@ async function aplicarCambio(tabla: string, p: RealtimePostgresChangesPayload<Fi
 }
 
 /** Tablas de módulos nuevos: si aún no existen en Supabase, su módulo queda vacío en vez de bloquear todo. */
-const TABLAS_OPCIONALES: string[] = ["ventas", "condiciones_pago"];
+const TABLAS_OPCIONALES: string[] = ["ventas", "condiciones_pago", "contable"];
+
+/** Tablas opcionales que no existen en Supabase (p. ej. contable antes de correr contable_tables.sql). */
+const tablasFaltantes = new Set<string>();
+export const tablaDisponible = (tabla: string): boolean => !tablasFaltantes.has(tabla);
 
 const esTablaFaltante = (e: unknown): boolean => {
   const err = e as { code?: string; message?: string };
@@ -379,6 +390,10 @@ export function iniciarDatos(): Promise<void> {
       )
     );
     resultados.forEach(([k, f]) => fijarDesdeServidor(k, f));
+    tablasFaltantes.clear();
+    faltantes.forEach((t) => tablasFaltantes.add(t));
+    if (faltantes.has("contable") && getSesion()?.modulos.some((m) => m === "*" || m === "/dashboard/contable"))
+      avisarError("Falta la tabla contable en Supabase: ejecute supabase/contable_tables.sql. El resto del ERP funciona normal.");
     if (faltantes.has("ventas")) avisarError("Falta la tabla de Ventas en Supabase: ejecute supabase/fix_ventas.sql. El resto del ERP funciona normal.");
     if (faltantes.has("condiciones_pago"))
       avisarError("Falta la tabla condiciones_pago en Supabase: ejecute supabase/condiciones_pago.sql. El resto del ERP funciona normal.");

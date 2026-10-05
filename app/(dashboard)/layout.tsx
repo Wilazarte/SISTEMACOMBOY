@@ -18,7 +18,7 @@ const NAV = [
   { href: "/dashboard/almacen", label: "Almacén", icon: Warehouse },
   { href: "/dashboard/ventas", label: "Ventas", icon: Receipt },
   { href: "/dashboard/compras", label: "Tesorería / Compras", icon: ShoppingCart },
-  { href: "/dashboard/contable", label: "Contable", icon: Calculator, pronto: true },
+  { href: "/dashboard/contable", label: "Contable", icon: Calculator, activo: true },
   { href: "/dashboard/planilla", label: "Planilla", icon: Users },
   // Solo creador / admin (ver puedeVer en lib/auth.ts)
   { href: "/dashboard/creador", label: "Módulo Creador", icon: KeyRound },
@@ -181,6 +181,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 <span className="flex-1">{n.label}</span>
                 {n.href === "/dashboard/compras" && pendientes.length > 0 && <span className="rounded-full bg-corp px-1.5 text-[11px] font-bold text-white">{pendientes.length}</span>}
                 {n.pronto && <span className="text-[10px] uppercase tracking-wider text-white/30">Fase sig.</span>}
+                {"activo" in n && n.activo && <span className="rounded-full bg-emerald-500 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">Activo</span>}
               </>
             );
             if (n.pronto)

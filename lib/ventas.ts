@@ -23,6 +23,7 @@ import {
   siguienteNumero,
   uid,
 } from "./storage";
+import { asientoAjusteVenta, asientoDe, asientoNotaPedido, esAsientoContable, revertirAsiento, revertirAsientoId } from "./contable";
 import type {
   AsientoContable,
   Cliente,
@@ -404,6 +405,8 @@ async function crearODdeNP(np: NotaPedido, datos: DatosDespacho, usuario: string
     historial: [...n.historial, nuevoEvento(rol, estado === "Aprobada" ? "Aprobada" : "Orden de despacho generada", `Orden de despacho ${od.numero} enviada a Almacén`)],
   }));
   if (comp) escribir(KEYS.COMPROBANTES, getComprobantes().map((c) => (c.id === comp.id ? { ...c, odId: od.id, odNumero: od.numero, despacho } : c)));
+  // Contable: venta aprobada -> DEBE 1212 Clientes / HABER 70 Ventas + 40 IGV (si aún no tiene asiento de venta)
+  if (estado === "Aprobada") asientoNotaPedido(np, usuario);
   return od;
 }
 
@@ -475,6 +478,7 @@ export function anularNP(id: string, motivo: string, rol: Rol): void {
       );
     return { ...n, estado: "ANULADA", historial: [...n.historial, nuevoEvento(rol, "Anulada", motivo.trim())] };
   });
+  revertirAsiento("NP", id, motivo.trim(), String(rol));
 }
 
 export async function clonarNP(id: string, vendedor: string, rol: Rol): Promise<NotaPedido> {
@@ -795,7 +799,9 @@ export async function emitirComprobante(
   c.vendedor = existente?.vendedor || vendedor;
   c.estado = "EMITIDO";
 
-  const asiento = asientoVenta(c);
+  // Si la NP ya generó su asiento al aprobarse (contable), la factura no vuelve a registrar la venta
+  const asientoNP = np ? asientoDe("NP", np.id) : undefined;
+  const asiento = asientoNP ? undefined : asientoVenta(c);
   const od: OrdenDespacho = odNP
     ? {
         ...odNP,
@@ -820,10 +826,10 @@ export async function emitirComprobante(
       });
   c.odId = od.id;
   c.odNumero = od.numero;
-  c.asientoId = asiento.id;
+  c.asientoId = asientoNP?.id ?? asiento!.id;
 
   const cobrado = c.formaPago === "CONTADO" ? c.total : c.inicial;
-  const asientos = [asiento];
+  const asientos = asiento ? [asiento] : [];
   const cobros: CobroVenta[] = [];
   if (cobrado > 0) {
     cobros.push({
@@ -853,6 +859,7 @@ export async function emitirComprobante(
   if (cobros.length) escribir(KEYS.COBROS, [...cobros, ...getCobros()]);
   if (c.npId)
     actualizarNP(c.npId, (n) => ({ ...n, estado: "FACTURADA", comprobanteId: c.id, historial: [...n.historial, nuevoEvento(rol, "Facturada", numero)] }));
+  if (asientoNP && np) asientoAjusteVenta(np, c, vendedor); // solo si el importe facturado difiere de la NP
   return c;
 }
 
@@ -867,7 +874,9 @@ export function anularComprobante(id: string, motivo: string, rol: Rol): void {
   const emitido = c.estado === "EMITIDO";
   const nuevo: ComprobanteVenta = { ...c, estado: "ANULADO", saldo: 0, historial: [...c.historial, nuevoEvento(rol, "Anulado", motivo.trim())] };
   escribir(KEYS.COMPROBANTES, lista.map((x) => (x.id === id ? nuevo : x)));
-  if (emitido) escribir(KEYS.ASIENTOS, [asientoVenta(c, true), ...getAsientos()]);
+  // La venta de una NP aprobada se queda (la NP vuelve a APROBADA); solo se revierte el ajuste de importe
+  if (emitido && esAsientoContable(c.asientoId)) revertirAsientoId(`NPAJ-${c.id}`, `${c.numero} anulado`, String(rol));
+  else if (emitido) escribir(KEYS.ASIENTOS, [asientoVenta(c, true), ...getAsientos()]);
   if (od)
     escribir(
       KEYS.DESPACHOS,

@@ -58,6 +58,8 @@ import {
 } from "@/lib/storage";
 import { SEDES, UNIDADES } from "@/lib/empresa";
 import { pdfCotizacion, pdfFactura, pdfOrdenCompra, pdfRequerimiento } from "@/lib/pdf";
+import { asientoOrdenCompra } from "@/lib/contable";
+import { getSesion } from "@/lib/auth";
 import type { Compra, Cotizacion, CuentaOrigenPago, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, Proveedor, Requerimiento, Rol, StockItem, TipoComprobanteCompra } from "@/lib/types";
 
 type Tab = "registrar" | "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias";
@@ -852,15 +854,16 @@ function Ordenes({
   const guardar = async () => {
     setEnviando(true);
     const monto = voucherMonto === "" ? undefined : parseFloat(voucherMonto);
-    const ok = await ejecutarAsync(
-      () =>
-        emitirOrdenCompra(
-          { cotizacionId: cotiId, fecha, formaPago, tiempoEntrega: tiempo, lugarEntrega: lugar, cuentaOrigenPago: cuentaOrigen, voucherMonto: monto },
-          voucher?.file ?? null,
-          rol
-        ),
-      "Orden de compra emitida"
-    );
+    const ok = await ejecutarAsync(async () => {
+      const oc = await emitirOrdenCompra(
+        { cotizacionId: cotiId, fecha, formaPago, tiempoEntrega: tiempo, lugarEntrega: lugar, cuentaOrigenPago: cuentaOrigen, voucherMonto: monto },
+        voucher?.file ?? null,
+        rol
+      );
+      // Contable: DEBE 60 Compras + 40 IGV / HABER 42 Proveedores
+      asientoOrdenCompra(oc, getSesion()?.usuario ?? String(rol));
+      return oc;
+    }, "Orden de compra emitida · asiento contable generado");
     setEnviando(false);
     if (ok) {
       setCotiId("");
