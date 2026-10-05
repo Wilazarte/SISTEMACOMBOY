@@ -27,6 +27,8 @@ export interface Sesion {
   soloLectura: boolean;
   /** Cargo del usuario (columna opcional perfiles.cargo). */
   cargo?: string;
+  /** Nombre completo real (columna opcional perfiles.nombre_completo). */
+  nombreCompleto?: string;
 }
 
 /**
@@ -62,7 +64,7 @@ async function cargarSesion(): Promise<Sesion | null> {
   const { data, error } = await sb.from("perfiles").select("*").eq("id", user.id).maybeSingle();
   if (error) throw error;
   if (!data) return null;
-  return { usuario: data.usuario, rol: data.rol as RolAuth, nombre: data.nombre, modulos: data.modulos ?? [], soloLectura: !!data.solo_lectura, cargo: data.cargo ?? undefined };
+  return { usuario: data.usuario, rol: data.rol as RolAuth, nombre: data.nombre, modulos: data.modulos ?? [], soloLectura: !!data.solo_lectura, cargo: data.cargo ?? undefined, nombreCompleto: data.nombre_completo ?? undefined };
 }
 
 export async function login(usuario: string, pass: string): Promise<{ sesion?: Sesion; error?: string }> {
@@ -199,9 +201,16 @@ export function moduloGuardado(): ModuloLogin | null {
 
 const CARGOS: Record<RolAuth, string> = {
   creador: "Administrador del sistema",
-  tesoreria: "Jefe de Tesorería",
+  tesoreria: "Tesorera - Módulo de Compras",
   almacen: "Jefe de Almacén",
   planilla: "Jefe de RRHH",
   gerencia: "Gerente General",
 };
 export const cargoDe = (s: Sesion): string => s.cargo?.trim() || CARGOS[s.rol] || s.rol;
+
+/** Responsables reales por rol, si perfiles.nombre_completo aún no está cargado. */
+const NOMBRES: Partial<Record<RolAuth, string>> = {
+  tesoreria: "LIZBETH CAHUANA APFATA",
+  almacen: "JOSE MANUEL ORTIZ ARAPA",
+};
+export const nombreDe = (s: Sesion): string => s.nombreCompleto?.trim() || NOMBRES[s.rol] || s.nombre;

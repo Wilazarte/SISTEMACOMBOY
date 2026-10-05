@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { MapPin, UserCheck } from "lucide-react";
-import { cargoDe, moduloGuardado, type ModuloLogin, type Sesion } from "@/lib/auth";
+import { cargoDe, moduloGuardado, nombreDe, type ModuloLogin, type Sesion } from "@/lib/auth";
 
-export const ENCARGADOS: Record<ModuloLogin, string> = {
-  tesoreria: "Encargado: C.P.C. Maria Torres - Tesorería",
-  almacen: "Encargado: Ing. Will Lazarte - Almacén",
-  planilla: "Encargado: Lic. Ana Quispe - RRHH",
+export const ENCARGADOS: Record<string, string> = {
+  tesoreria: "Encargada: LIZBETH CAHUANA APFATA - Tesorera / Compras",
+  compras: "Encargada: LIZBETH CAHUANA APFATA - Tesorera / Compras",
+  almacen: "Encargado: JOSE MANUEL ORTIZ ARAPA - Almacén",
+  planilla: "Encargado: RRHH - Planilla",
   gerencia: "Encargado: Gerencia General - COMBOY VID",
 };
 
@@ -39,7 +40,7 @@ export function Header({ sesion }: { sesion: Sesion }) {
       <div className="min-w-0">
         <h1 className="font-serif text-xl font-semibold text-azul-900 sm:text-2xl">Bienvenido al Sistema ERP COMBOY VID</h1>
         <p className="mt-1 truncate text-sm text-plomo-600">
-          {sesion.nombre} | {cargoDe(sesion)} | {NOMBRE_EMPRESA}
+          {nombreDe(sesion)} | {cargoDe(sesion)} | {NOMBRE_EMPRESA}
         </p>
       </div>
       <div className="flex shrink-0 flex-col items-start gap-1.5 md:items-end">
