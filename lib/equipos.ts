@@ -6,15 +6,18 @@
 // Serie de motor y código de chasis / VIN son únicos.
 // =====================================================================
 
+import { SEDES } from "./empresa";
 import { ErpError, KEYS, escribir, hoy, leer, siguienteNumero } from "./storage";
 
 export const TIPOS_EQUIPO = ["DUMPER", "MINICARGADOR", "MIXER", "LOCOMOTORA", "OTRO"] as const;
 export const MARCAS_MOTOR = ["KUBOTA", "YANMAR", "HONDA", "LOMBARDINI", "OTRO"] as const;
-export const SEDES_EQUIPO = ["Planta Arequipa", "Lima", "Mina"] as const;
+/** Mismas sedes que el stock y el despacho (Adm Aqp por defecto). */
+export const SEDES_EQUIPO: readonly string[] = SEDES;
+export const SEDE_EQUIPO_DEFECTO = SEDES.includes("Adm Aqp") ? "Adm Aqp" : SEDES[0];
 
 export type TipoEquipo = (typeof TIPOS_EQUIPO)[number];
 export type MarcaMotor = (typeof MARCAS_MOTOR)[number];
-export type EstadoEquipo = "DISPONIBLE" | "EN_QC";
+export type EstadoEquipo = "DISPONIBLE" | "EN_QC" | "VENDIDO";
 
 export interface FotoEquipo {
   nombre: string;
@@ -30,6 +33,8 @@ export interface EquipoTerminado {
   codigo_chasis: string;
   color: string;
   sede: string;
+  /** Igual a sede (nombre de columna usado en consultas SQL / v_equipos_terminados). */
+  ubicacion_sede?: string;
   qc_aprobado: boolean;
   fecha_qc: string | null;
   supervisor_qc: string | null;
@@ -39,6 +44,45 @@ export interface EquipoTerminado {
   fotos: FotoEquipo[];
   creado_por: string;
   actualizado: string; // ISO
+  /** Al salir de almacén por una orden de despacho. */
+  vendido_od?: string;
+  fecha_venta?: string;
+}
+
+/** Sede real del equipo (registros hechos en Supabase pueden traer solo ubicacion_sede). */
+export const sedeEquipo = (e: Pick<EquipoTerminado, "sede" | "ubicacion_sede">): string => e.ubicacion_sede || e.sede || "";
+
+const norm = (s?: string | null) => (s ?? "").replace(/\s+/g, "").toUpperCase();
+
+/**
+ * Equipo terminado de una línea de venta / despacho: por codigo_chasis explícito o porque el producto /
+ * descripción es (o contiene) el código de chasis. Ej. "WH174MN-2 260380186".
+ */
+export function equipoDeLinea(
+  l: { codigo_chasis?: string; productoNombre?: string; descripcion?: string },
+  equipos: EquipoTerminado[] = getEquipos()
+): EquipoTerminado | undefined {
+  if (l.codigo_chasis) return equipos.find((e) => norm(e.codigo_chasis) === norm(l.codigo_chasis));
+  const textos = [norm(l.productoNombre), norm(l.descripcion)].filter(Boolean);
+  if (!textos.length) return undefined;
+  const exacto = equipos.find((e) => textos.includes(norm(e.codigo_chasis)));
+  if (exacto) return exacto;
+  return equipos.find((e) => norm(e.codigo_chasis).length >= 6 && textos.some((t) => t.includes(norm(e.codigo_chasis))));
+}
+
+/** Unidades DISPONIBLES de ese chasis en la sede (equivale a COUNT(*) en almacen tipo EQUIPO_TERMINADO). */
+export const disponibleEquipo = (codigoChasis: string, sede: string, equipos: EquipoTerminado[] = getEquipos()): number =>
+  equipos.filter((e) => norm(e.codigo_chasis) === norm(codigoChasis) && e.estado === "DISPONIBLE" && sedeEquipo(e) === sede).length;
+
+/** Salida de almacén: los equipos despachados pasan a VENDIDO (estado en data). */
+export function marcarEquiposVendidos(chasis: string[], od: string): void {
+  if (!chasis.length) return;
+  const set = new Set(chasis.map(norm));
+  const ahora = new Date().toISOString();
+  escribir(
+    KEYS.EQUIPOS,
+    getEquipos().map((e) => (set.has(norm(e.codigo_chasis)) && e.estado === "DISPONIBLE" ? { ...e, estado: "VENDIDO" as const, vendido_od: od, fecha_venta: ahora, actualizado: ahora } : e))
+  );
 }
 
 export type DatosEquipo = Pick<
@@ -53,15 +97,42 @@ export const equipoVacio = (): DatosEquipo => ({
   serie_motor: "",
   codigo_chasis: "",
   color: "",
-  sede: SEDES_EQUIPO[0],
-  qc_aprobado: false,
+  sede: SEDE_EQUIPO_DEFECTO,
+  qc_aprobado: true, // por defecto DISPONIBLE (se desmarca si aún está en control de calidad)
   fecha_qc: hoy(),
   supervisor_qc: "",
   observaciones_qc: "",
   fotos: [],
 });
 
-export const getEquipos = () => leer<EquipoTerminado[]>(KEYS.EQUIPOS, []);
+/** Completa registros hechos a mano en Supabase (pueden traer solo chasis, tipo, ubicacion_sede y estado). */
+export function normalizarEquipo(e: Partial<EquipoTerminado> & { id?: string }): EquipoTerminado {
+  const txt = (v: unknown) => (v === null || v === undefined ? "" : String(v));
+  const estado = txt(e.estado).toUpperCase();
+  return {
+    ...(e as EquipoTerminado),
+    id: txt(e.id),
+    tipo_equipo: (txt(e.tipo_equipo).toUpperCase() || "OTRO") as TipoEquipo,
+    modelo: txt(e.modelo),
+    marca_motor: (txt(e.marca_motor).toUpperCase() || "OTRO") as MarcaMotor,
+    serie_motor: txt(e.serie_motor),
+    codigo_chasis: txt(e.codigo_chasis),
+    color: txt(e.color),
+    sede: txt(e.ubicacion_sede || e.sede),
+    ubicacion_sede: txt(e.ubicacion_sede || e.sede),
+    qc_aprobado: e.qc_aprobado === undefined ? estado === "DISPONIBLE" || estado === "VENDIDO" : !!e.qc_aprobado,
+    fecha_qc: e.fecha_qc ?? null,
+    supervisor_qc: e.supervisor_qc ?? null,
+    observaciones_qc: e.observaciones_qc ?? null,
+    estado: (estado === "DISPONIBLE" || estado === "VENDIDO" ? estado : "EN_QC") as EstadoEquipo,
+    fecha_fabricacion: txt(e.fecha_fabricacion) || txt(e.actualizado),
+    fotos: Array.isArray(e.fotos) ? e.fotos : [],
+    creado_por: txt(e.creado_por) || "Supabase",
+    actualizado: txt(e.actualizado) || txt(e.fecha_fabricacion),
+  };
+}
+
+export const getEquipos = () => leer<Partial<EquipoTerminado>[]>(KEYS.EQUIPOS, []).map(normalizarEquipo);
 
 /** Para comparar únicos: sin espacios, mayúsculas. */
 const clave = (s: string) => s.replace(/\s+/g, "").toUpperCase();
@@ -121,12 +192,16 @@ export async function guardarEquipo(d: DatosEquipo, usuario: string, idExistente
     codigo_chasis,
     color,
     sede: d.sede,
+    ubicacion_sede: d.sede,
     qc_aprobado: d.qc_aprobado,
     fecha_qc: d.qc_aprobado ? d.fecha_qc : null,
     supervisor_qc: d.qc_aprobado ? d.supervisor_qc?.trim() || null : null,
     observaciones_qc: d.qc_aprobado ? d.observaciones_qc?.trim() || null : null,
-    estado: d.qc_aprobado ? "DISPONIBLE" : "EN_QC",
-    fecha_fabricacion: anterior?.fecha_fabricacion ?? ahora,
+    // Un equipo ya vendido no vuelve a stock al editarlo
+    estado: anterior?.estado === "VENDIDO" ? "VENDIDO" : d.qc_aprobado ? "DISPONIBLE" : "EN_QC",
+    vendido_od: anterior?.vendido_od,
+    fecha_venta: anterior?.fecha_venta,
+    fecha_fabricacion: anterior?.fecha_fabricacion || ahora,
     fotos: d.fotos.slice(0, 3),
     creado_por: anterior?.creado_por ?? usuario,
     actualizado: ahora,

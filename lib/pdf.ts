@@ -10,6 +10,7 @@ import QRCode from "qrcode";
 import { EMPRESA } from "./empresa";
 import { codigoContratista, codigoGasto, fechaPE, soles } from "./storage";
 import { codigoDesdeNumero, estadoDocumento } from "./utils/codigos";
+import { equipoDeLinea, sedeEquipo } from "./equipos";
 import { ESTADOS_OD, LUGARES_ENTREGA, estadoOD, origenOD, type EstadoAlmacen } from "./ventas";
 import { toast } from "@/components/ui";
 import type { HistorialDetalle, HistorialPlanilla } from "./historial";
@@ -979,12 +980,16 @@ export function pdfOrdenDespacho(o: OrdenDespacho): void {
         ["N° interno", o.numero],
       ],
       head: ["Código", "Nombre repuesto / equipo", "Cantidad", "Ubicación"],
-      body: o.items.map((l) => [
-        l.codigo ?? "-",
+      body: o.items.map((l) => {
+        // Equipo terminado: código EQ, chasis y sede real
+        const eq = equipoDeLinea(l);
+        return [
+        eq?.id || l.codigo || "-",
         l.descripcion + (l.ancho > 0 ? ` (${l.ancho} × ${l.alto} m × ${l.cantidadPiezas})` : "") + (l.productoNombre ? "" : " (servicio)"),
         `${l.solicitado} ${l.unidad}${l.despachado > 0 && l.despachado < l.solicitado ? ` (entregado ${l.despachado})` : ""}`,
-        l.ubicacion ?? "-",
-      ]),
+        eq ? `${sedeEquipo(eq)}${eq.estado !== "DISPONIBLE" ? ` (${eq.estado})` : ""} · chasis ${eq.codigo_chasis}` : l.ubicacion ?? "-",
+      ];
+      }),
       alinearDerecha: [2],
       extra: (doc, y0) => {
         let y = y0 + 2;

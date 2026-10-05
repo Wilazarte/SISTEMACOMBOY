@@ -136,6 +136,7 @@ const COLORES: Record<string, string> = {
   GASTO_TESORERIA: "bg-red-50 text-vino ring-red-200",
   DISPONIBLE: "bg-emerald-50 text-emerald-800 ring-emerald-200",
   EN_QC: "bg-red-50 text-vino ring-red-200",
+  VENDIDO: "bg-azul-900 text-white ring-azul-900",
   PEDIDO_ALISTADO: "bg-[#EEF2F7] text-azul-700 ring-[#C9D4E3]",
   PEDIDO_ENTREGADO: "bg-emerald-50 text-emerald-800 ring-emerald-200",
   DEJADO_EN_AGENCIA: "bg-red-50 text-vino ring-red-200",

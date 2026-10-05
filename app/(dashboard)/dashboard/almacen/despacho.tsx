@@ -7,6 +7,7 @@ import { getSesion } from "@/lib/auth";
 import { SEDES } from "@/lib/empresa";
 import { pdfOrdenDespacho } from "@/lib/pdf";
 import { KEYS, MAX_ARCHIVO, fechaPE, puede, r2, soles, stockDisponible, useRol, useStore } from "@/lib/storage";
+import { disponibleEquipo, equipoDeLinea, sedeEquipo, type EquipoTerminado } from "@/lib/equipos";
 import { codigoDesdeNumero } from "@/lib/utils/codigos";
 import {
   ESTADOS_OD,
@@ -195,9 +196,27 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
   const abierta = e === "PENDIENTE" || e === "PEDIDO_ALISTADO";
   const [obs, setObs] = useState(od.observacion ?? "");
   const [modo, setModo] = useState<Modo>(null);
+  useStore<EquipoTerminado[]>(KEYS.EQUIPOS, []); // en vivo: equipos terminados
+  /** Disponible en la sede: equipos terminados por chasis + sede + DISPONIBLE; repuestos por stock. */
+  const dispLinea = (l: OrdenDespacho["items"][number], s: string): number | null => {
+    const eq = equipoDeLinea(l);
+    if (eq) return disponibleEquipo(eq.codigo_chasis, s);
+    return l.productoNombre ? stockDisponible(s, l.productoNombre, l.unidad) : null;
+  };
+  /** Ubicación real: sede del equipo (si está DISPONIBLE) o sedes con stock del repuesto. */
+  const ubicacionLinea = (l: OrdenDespacho["items"][number]): string => {
+    const eq = equipoDeLinea(l);
+    if (eq) return eq.estado === "DISPONIBLE" ? sedeEquipo(eq) : `${sedeEquipo(eq)} (${eq.estado})`;
+    if (!l.productoNombre) return l.ubicacion ?? "-";
+    const sedes = SEDES.filter((x) => stockDisponible(x, l.productoNombre, l.unidad) > 0);
+    return sedes.length ? sedes.join(", ") : "Sin stock";
+  };
   const [sede, setSede] = useState(() => {
-    const p = od.items.find((l) => l.productoNombre);
-    return p ? [...SEDES].sort((a, b) => stockDisponible(b, p.productoNombre, p.unidad) - stockDisponible(a, p.productoNombre, p.unidad))[0] : SEDES[0];
+    const p = od.items.find((l) => l.productoNombre || equipoDeLinea(l));
+    if (!p) return SEDES[0];
+    const eq = equipoDeLinea(p);
+    if (eq && SEDES.includes(sedeEquipo(eq))) return sedeEquipo(eq);
+    return [...SEDES].sort((a, b) => (dispLinea(p, b) ?? 0) - (dispLinea(p, a) ?? 0))[0];
   });
   const [cant, setCant] = useState<Record<string, number>>(() => Object.fromEntries(od.items.map((l) => [l.id, pendienteLinea(l)])));
   // Si recoge un encargado del cliente, ya se sabe quién recibe
@@ -209,7 +228,10 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
 
   const conPendiente = od.items.some((l) => pendienteLinea(l) > 0);
   const faltantes = modo
-    ? od.items.filter((l) => l.productoNombre && (cant[l.id] ?? 0) > 0 && stockDisponible(sede, l.productoNombre, l.unidad) + 1e-9 < (cant[l.id] ?? 0))
+    ? od.items.filter((l) => {
+        const d = dispLinea(l, sede);
+        return d !== null && (cant[l.id] ?? 0) > 0 && d + 1e-9 < (cant[l.id] ?? 0);
+      })
     : [];
 
   const cargarFoto = (file?: File) => {
@@ -276,11 +298,11 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
             </thead>
             <tbody className="bg-white [&>tr]:border-b [&>tr]:border-plomo-100">
               {od.items.map((l) => {
-                const disp = l.productoNombre ? stockDisponible(sede, l.productoNombre, l.unidad) : null;
+                const disp = dispLinea(l, sede);
                 const falta = !!modo && disp !== null && (cant[l.id] ?? 0) > disp + 1e-9;
                 return (
                   <tr key={l.id} className={cn(falta && "bg-red-50")}>
-                    <td className="px-3 py-2 font-mono text-xs">{l.codigo ?? "-"}</td>
+                    <td className="px-3 py-2 font-mono text-xs">{equipoDeLinea(l)?.id || l.codigo || "-"}</td>
                     <td className="px-3 py-2">
                       {l.descripcion}
                       {l.ancho > 0 && <span className="text-xs text-plomo-500"> · {l.ancho}×{l.alto} m × {l.cantidadPiezas}</span>}
@@ -289,7 +311,10 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
                       {l.solicitado} {l.unidad}
                       {l.despachado > 0 && <p className="text-xs text-plomo-500">entregado {l.despachado}</p>}
                     </td>
-                    <td className="px-3 py-2 text-plomo-600">{l.ubicacion ?? "-"}</td>
+                    <td className="px-3 py-2 text-plomo-600">
+                      {ubicacionLinea(l)}
+                      {equipoDeLinea(l) && <p className="font-mono text-[11px] text-plomo-500">Chasis {equipoDeLinea(l)!.codigo_chasis}</p>}
+                    </td>
                     {modo && <td className={cn("px-3 py-2 text-right", falta ? "font-bold text-red-600" : "text-plomo-600")}>{disp === null ? "-" : `${disp} ${l.unidad}`}</td>}
                     {modo && (
                       <td className="px-3 py-2">
@@ -389,7 +414,7 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
             {faltantes.length > 0 && (
               <div role="alert" className="flex items-start gap-2 rounded-lg bg-vino px-4 py-3 text-sm font-medium text-white">
                 <AlertTriangle size={18} className="shrink-0" />
-                Stock insuficiente en {sede}: {faltantes.map((l) => `${l.descripcion} (hay ${stockDisponible(sede, l.productoNombre, l.unidad)} ${l.unidad})`).join(", ")}. Cambie de sede o entregue
+                Stock insuficiente en {sede}: {faltantes.map((l) => `${l.descripcion} (hay ${dispLinea(l, sede) ?? 0} ${l.unidad}${equipoDeLinea(l) ? ` · el equipo está en ${ubicacionLinea(l)}` : ""})`).join(", ")}. Cambie de sede o entregue
                 menos (entrega parcial).
               </div>
             )}

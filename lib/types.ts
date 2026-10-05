@@ -567,6 +567,8 @@ export interface LineaDespacho {
   /** Código del producto en Almacén (id del stock) y ubicación (sedes con stock) al emitir. */
   codigo?: string;
   ubicacion?: string;
+  /** Equipo terminado (fabricado): se despacha por chasis, no por stock de repuestos. */
+  codigo_chasis?: string;
 }
 
 export interface MovimientoDespacho {

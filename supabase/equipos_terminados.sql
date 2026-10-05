@@ -50,9 +50,14 @@ create unique index if not exists almacen_eq_chasis_uidx
 create or replace view public.v_equipos_terminados with (security_invoker = true) as
 select id, data->>'tipo_equipo' as tipo_equipo, data->>'modelo' as modelo, data->>'marca_motor' as marca_motor,
        data->>'serie_motor' as serie_motor, data->>'codigo_chasis' as codigo_chasis, data->>'color' as color,
-       data->>'sede' as sede, (data->>'qc_aprobado')::boolean as qc_aprobado, data->>'fecha_qc' as fecha_qc,
-       data->>'supervisor_qc' as supervisor_qc, data->>'estado' as estado, data->>'fecha_fabricacion' as fecha_fabricacion
+       coalesce(data->>'ubicacion_sede', data->>'sede') as sede, (data->>'qc_aprobado')::boolean as qc_aprobado, data->>'fecha_qc' as fecha_qc,
+       data->>'supervisor_qc' as supervisor_qc, data->>'estado' as estado, data->>'fecha_fabricacion' as fecha_fabricacion,
+       coalesce(data->>'ubicacion_sede', data->>'sede') as ubicacion_sede, data->>'vendido_od' as vendido_od
 from public.almacen where tipo = 'EQUIPO_TERMINADO';
+
+-- Equipos con sede solo en "sede" (registrados antes): se copia a ubicacion_sede (no cambia nada más)
+update public.almacen set data = data || jsonb_build_object('ubicacion_sede', data->>'sede')
+where tipo = 'EQUIPO_TERMINADO' and data->>'ubicacion_sede' is null and data->>'sede' is not null;
 grant select on public.v_equipos_terminados to authenticated;
 
 select * from public.v_equipos_terminados order by id;

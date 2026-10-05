@@ -312,7 +312,11 @@ function deFilas(key: StoreKey, filas: Fila[]): unknown {
     );
     return r;
   }
-  return filas.map((f) => f.data);
+  // Filas creadas a mano en Supabase pueden no traer "id" dentro de data: se toma el de la columna id
+  return filas.map((f) => {
+    const dato = (f.data ?? {}) as Record<string, unknown>;
+    return dato.id ? dato : { ...dato, id: String(f.id) };
+  });
 }
 
 /** Claves ordenadas: jsonb no conserva el orden original y no debe contar como cambio. */

@@ -9,8 +9,10 @@ import { EMPRESA } from "@/lib/empresa";
 import {
   MARCAS_MOTOR,
   SEDES_EQUIPO,
+  sedeEquipo,
   TIPOS_EQUIPO,
   equipoVacio,
+  normalizarEquipo,
   guardarEquipo,
   reducirFoto,
   type DatosEquipo,
@@ -20,11 +22,14 @@ import {
 } from "@/lib/equipos";
 import { KEYS, fechaPE, hoy, useStore } from "@/lib/storage";
 
-const fechaHora = (iso: string) => new Date(iso).toLocaleString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+const fechaHora = (iso?: string) => {
+  const d = iso ? new Date(iso) : null;
+  return d && !isNaN(d.getTime()) ? d.toLocaleString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-";
+};
 
 /** Sección "Equipos terminados" de Almacén › Stock: lista, alta (modal) y detalle con QR del chasis. */
 export function EquiposTerminados({ puedeRegistrar, nuevo, onNuevoCerrado }: { puedeRegistrar: boolean; nuevo: boolean; onNuevoCerrado: () => void }) {
-  const equipos = useStore<EquipoTerminado[]>(KEYS.EQUIPOS, []);
+  const equipos = useStore<EquipoTerminado[]>(KEYS.EQUIPOS, []).map(normalizarEquipo);
   const [q, setQ] = useState("");
   const [form, setForm] = useState<{ datos: DatosEquipo; id?: string } | null>(null);
   const [ver, setVer] = useState<string | null>(null);
@@ -41,13 +46,14 @@ export function EquiposTerminados({ puedeRegistrar, nuevo, onNuevoCerrado }: { p
     .filter((e) => !t || [e.codigo_chasis, e.serie_motor, e.modelo, e.id].some((v) => v.replace(/\s+/g, "").toUpperCase().includes(t)))
     .sort((a, b) => b.id.localeCompare(a.id));
   const disponibles = equipos.filter((e) => e.estado === "DISPONIBLE").length;
+  const vendidos = equipos.filter((e) => e.estado === "VENDIDO").length;
   const sel = equipos.find((e) => e.id === ver) ?? null;
 
   return (
     <Card>
       <CardHeader
         title="Equipos terminados"
-        subtitle={`${equipos.length} equipo(s) fabricados · ${disponibles} disponible(s) · ${equipos.length - disponibles} en control de calidad`}
+        subtitle={`${equipos.length} equipo(s) fabricados · ${disponibles} disponible(s) · ${equipos.length - disponibles - vendidos} en control de calidad · ${vendidos} vendido(s)`}
         action={
           <div className="flex flex-wrap gap-2">
             <div className="relative w-72">
@@ -71,7 +77,7 @@ export function EquiposTerminados({ puedeRegistrar, nuevo, onNuevoCerrado }: { p
           {lista.map((e) => (
             <tr key={e.id} className="cursor-pointer hover:bg-plomo-50" onClick={() => setVer(e.id)} title="Ver detalle y QR">
               <Td className="font-mono text-xs font-semibold text-azul-900">{e.id}</Td>
-              <Td>{e.sede}</Td>
+              <Td>{sedeEquipo(e)}</Td>
               <Td>
                 <p className="font-semibold text-azul-900">{e.modelo}</p>
                 <p className="text-xs text-plomo-500">{e.tipo_equipo}</p>
@@ -107,7 +113,7 @@ export function EquiposTerminados({ puedeRegistrar, nuevo, onNuevoCerrado }: { p
           onClose={() => setVer(null)}
           onEditar={() => {
             setVer(null);
-            setForm({ id: sel.id, datos: { ...sel, fecha_qc: sel.fecha_qc ?? hoy(), supervisor_qc: sel.supervisor_qc ?? getSesion()?.usuario ?? "", observaciones_qc: sel.observaciones_qc ?? "" } });
+            setForm({ id: sel.id, datos: { ...sel, sede: sedeEquipo(sel), fecha_qc: sel.fecha_qc ?? hoy(), supervisor_qc: sel.supervisor_qc ?? getSesion()?.usuario ?? "", observaciones_qc: sel.observaciones_qc ?? "" } });
           }}
         />
       )}
@@ -294,7 +300,8 @@ function DetalleEquipo({ e, puedeEditar, onClose, onEditar }: { e: EquipoTermina
           {fila("Marca de motor", e.marca_motor)}
           {fila("Serie de motor", e.serie_motor)}
           {fila("Color", e.color)}
-          {fila("Ubicación / sede", e.sede)}
+          {fila("Ubicación / sede", sedeEquipo(e))}
+          {e.vendido_od && fila("Vendido (salida de almacén)", `${e.vendido_od}${e.fecha_venta ? ` · ${fechaHora(e.fecha_venta)}` : ""}`)}
           {fila("Fabricado", fechaHora(e.fecha_fabricacion))}
           {e.qc_aprobado && fila("Fecha QC", e.fecha_qc ? fechaPE(e.fecha_qc) : "-")}
           {e.qc_aprobado && fila("Supervisor QC", e.supervisor_qc ?? "-")}
