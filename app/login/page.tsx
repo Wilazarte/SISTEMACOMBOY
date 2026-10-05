@@ -79,7 +79,7 @@ export default function LoginPage() {
       <aside className="flex w-full flex-col justify-center bg-[#0f2238] px-6 py-10 text-white sm:px-10 lg:w-1/2 lg:px-14">
         <div className="mx-auto w-full max-w-lg">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img ref={imgRef} src={logo} onError={() => setLogo("/logo-comboy.png")} alt="COMBOY VID" className={`h-24 w-auto object-contain sm:h-28 ${logo === "/logo-comboy.png" ? "rounded-xl bg-white p-3" : ""}`} />
+          <img ref={imgRef} src={logo} onError={() => setLogo("/logo-comboy.png")} alt="COMBOY VID" className="h-24 w-auto rounded-xl bg-white object-contain px-5 py-3 shadow-lg shadow-black/20 sm:h-28" />
           <h1 className="mt-8 font-serif text-3xl font-light leading-tight sm:text-[38px]">Sistema de gestión ERP COMBOY VID</h1>
           <p className="mt-3 text-sm leading-relaxed text-white/60">Plataforma integral para la gestión minera: compras, tesorería, almacén, planilla y gerencia en un solo lugar.</p>
 
