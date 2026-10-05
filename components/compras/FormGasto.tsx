@@ -140,21 +140,21 @@ export function FormGasto({ rol, proveedores, onGuardado }: { rol: Rol; proveedo
         </Field>
 
         {/* Detracción */}
-        <div className="rounded-xl border border-slate-200 p-4 md:col-span-3">
-          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-800">
-            <input type="checkbox" checked={d.detraccion} onChange={(e) => set("detraccion", e.target.checked)} className="h-4 w-4 accent-amber-500" /> ¿Aplica detracción?
+        <div className="rounded-xl border border-plomo-200 p-4 md:col-span-3">
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-azul-900">
+            <input type="checkbox" checked={d.detraccion} onChange={(e) => set("detraccion", e.target.checked)} className="h-4 w-4 accent-corp" /> ¿Aplica detracción?
           </label>
           {d.detraccion && (
             <div className="mt-3 flex flex-wrap items-end gap-3">
               <div role="group" aria-label="Porcentaje de detracción">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">% detracción</span>
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-plomo-500">% detracción</span>
                 <div className="flex gap-1">
                   {PORCENTAJES_DETRACCION.map((p) => (
                     <button
                       key={p}
                       type="button"
                       onClick={() => set("detraccionPorc", p)}
-                      className={cn("rounded-lg border px-4 py-2 text-sm font-bold", d.detraccionPorc === p ? "border-slate-900 bg-slate-900 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-amber-50")}
+                      className={cn("rounded-lg border px-4 py-2 text-sm font-bold", d.detraccionPorc === p ? "border-azul-900 bg-azul-900 text-white" : "border-plomo-200 bg-white text-slate-700 hover:bg-red-50")}
                     >
                       {p}%
                     </button>
@@ -181,7 +181,7 @@ export function FormGasto({ rol, proveedores, onGuardado }: { rol: Rol; proveedo
           ).map(([tipo, label, ref]) => {
             const a = archivo(tipo);
             return (
-              <div key={tipo} className="flex items-center gap-2 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-sm">
+              <div key={tipo} className="flex items-center gap-2 rounded-lg border border-dashed border-plomo-200 px-3 py-2 text-sm">
                 <input ref={ref} type="file" accept="application/pdf,image/*" className="hidden" onChange={(e) => adjuntar(tipo, e.target.files?.[0])} />
                 {a ? (
                   <>
@@ -191,7 +191,7 @@ export function FormGasto({ rol, proveedores, onGuardado }: { rol: Rol; proveedo
                     </button>
                   </>
                 ) : (
-                  <button type="button" onClick={() => ref.current?.click()} className="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900">
+                  <button type="button" onClick={() => ref.current?.click()} className="inline-flex items-center gap-1.5 text-plomo-600 hover:text-azul-900">
                     <FileUp size={14} /> {label}
                   </button>
                 )}
@@ -201,9 +201,9 @@ export function FormGasto({ rol, proveedores, onGuardado }: { rol: Rol; proveedo
           <span className="self-center text-xs text-slate-400">PDF o imagen · máx. 1.5 MB c/u</span>
         </div>
       </div>
-      <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-5 py-4">
-        <p className="text-sm text-slate-600">
-          Total <b className="text-slate-900">{soles(d.importe || 0)}</b>
+      <div className="flex items-center justify-between gap-3 border-t border-plomo-100 px-5 py-4">
+        <p className="text-sm text-plomo-600">
+          Total <b className="text-azul-900">{soles(d.importe || 0)}</b>
           {d.detraccion && (
             <>
               {" "}

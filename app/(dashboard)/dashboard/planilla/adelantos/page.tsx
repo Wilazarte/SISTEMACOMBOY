@@ -98,31 +98,31 @@ export default function AdelantosPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="w-full space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <Link href="/dashboard/planilla" className="mb-1 inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-900">
+          <Link href="/dashboard/planilla" className="mb-1 inline-flex items-center gap-1.5 text-sm font-medium text-plomo-500 hover:text-azul-900">
             <ArrowLeft size={16} /> Planilla
           </Link>
-          <h1 className="text-2xl font-bold text-slate-900">Adelantos</h1>
-          <p className="text-sm text-slate-500">Adelantos de sueldo a los trabajadores. El monto se descontará en la planilla.</p>
+          <h1 className="font-serif text-[36px] font-light leading-tight text-azul-900 lg:text-[42px]">Adelantos</h1>
+          <p className="mt-1 text-[13px] text-plomo-600">Adelantos de sueldo a los trabajadores. El monto se descontará en la planilla.</p>
         </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm">
+        <div className="rounded-xl border border-plomo-200 bg-white p-3 text-sm shadow-sm">
           Adelantos registrados: <b>{lista.length}</b>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm">
+        <div className="rounded-xl border border-plomo-200 bg-white p-3 text-sm shadow-sm">
           Pendientes de descontar: <b>{lista.filter((a) => a.estado === "PENDIENTE").length}</b>
         </div>
-        <div className="rounded-xl bg-slate-900 p-3 text-sm text-white">
-          Total pendiente: <b className="text-amber-400">{soles(totalPendiente)}</b>
+        <div className="rounded-xl bg-azul-900 p-3 text-sm text-white">
+          Total pendiente: <b className="text-white">{soles(totalPendiente)}</b>
         </div>
       </div>
 
       {/* FORMULARIO (registrar / editar) */}
-      <Card className={cn(editandoId && "ring-2 ring-amber-400")}>
+      <Card className={cn(editandoId && "ring-2 ring-corp")}>
         <CardHeader
           title={editandoId ? "Editar adelanto" : "Registrar adelanto"}
           subtitle={puedeEditar ? (editandoId ? "Modifique los datos y presione Actualizar." : "Elija un trabajador del maestro o escriba su nombre.") : "Solo lectura: solo Planilla y Creador registran adelantos."}
@@ -160,7 +160,7 @@ export default function AdelantosPage() {
               <Textarea value={form.motivo ?? ""} onChange={(e) => setForm({ ...form, motivo: e.target.value })} placeholder="Ej: pasajes, emergencia familiar…" className="min-h-[42px]" />
             </Field>
           </fieldset>
-          <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
+          <div className="flex justify-end gap-2 border-t border-plomo-100 px-5 py-4">
             {editandoId && (
               <Button type="button" variant="secondary" onClick={limpiar} disabled={guardando}>
                 <X size={16} /> Cancelar edición
@@ -199,7 +199,7 @@ export default function AdelantosPage() {
               <tr
                 key={a.id}
                 className={cn(
-                  "hover:bg-slate-50",
+                  "hover:bg-plomo-50",
                   a.estado === "PENDIENTE" && "bg-amber-50/40",
                   a.estado === "DESCONTADO" && "bg-emerald-50/40",
                   editandoId === a.id && "bg-amber-100",
@@ -207,7 +207,7 @@ export default function AdelantosPage() {
                 )}
               >
                 <Td>{fechaPE(a.fecha)}</Td>
-                <Td className="font-semibold text-slate-900">{a.trabajador_nombre}</Td>
+                <Td className="font-semibold text-azul-900">{a.trabajador_nombre}</Td>
                 <Td className="font-mono">{a.dni || "-"}</Td>
                 <Td className="text-right font-semibold">{soles(a.monto)}</Td>
                 <Td className="max-w-[260px]">
@@ -227,7 +227,7 @@ export default function AdelantosPage() {
                 {puedeEditar && (
                   <Td>
                     {a.estado === "DESCONTADO" ? (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-500" title="Ya se descontó en una planilla: no se puede editar ni eliminar">
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-plomo-500" title="Ya se descontó en una planilla: no se puede editar ni eliminar">
                         <Lock size={13} /> Descontado
                       </span>
                     ) : (

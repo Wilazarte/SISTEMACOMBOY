@@ -71,7 +71,7 @@ export function LineasEditor({ items, onChange, stock }: { items: LineaVenta[]; 
     <div className="space-y-2">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1000px] text-sm">
-          <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          <thead className="bg-azul-900 text-[11px] font-semibold uppercase tracking-widest text-white">
             <tr>
               <th className="w-8 px-2 py-2 text-left">#</th>
               <th className="w-48 px-2 py-2 text-left">Producto (Almacén)</th>
@@ -86,7 +86,7 @@ export function LineasEditor({ items, onChange, stock }: { items: LineaVenta[]; 
               <th className="w-8" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-plomo-100">
             {items.map((l, k) => (
               <tr key={l.id}>
                 <td className="px-2 py-1.5 text-slate-400">{k + 1}</td>
@@ -104,7 +104,7 @@ export function LineasEditor({ items, onChange, stock }: { items: LineaVenta[]; 
                     <Input type="number" min={0} step="any" value={l[c] || ""} onChange={(e) => set(l.id, { [c]: parseFloat(e.target.value) || 0 })} className="text-right" aria-label={c} />
                   </td>
                 ))}
-                <td className="px-2 py-1.5 text-right font-mono text-slate-600">{l.m2 > 0 ? l.m2.toFixed(2) : "-"}</td>
+                <td className="px-2 py-1.5 text-right font-mono text-plomo-600">{l.m2 > 0 ? l.m2.toFixed(2) : "-"}</td>
                 <td className="px-2 py-1.5">
                   <Input type="number" min={0} step="0.01" value={l.precio || ""} onChange={(e) => set(l.id, { precio: parseFloat(e.target.value) || 0 })} className="text-right" title={l.m2 > 0 ? "Precio por m²" : "Precio por unidad"} aria-label="precio" />
                 </td>
@@ -128,7 +128,7 @@ export function LineasEditor({ items, onChange, stock }: { items: LineaVenta[]; 
         <Button size="sm" variant="secondary" onClick={() => onChange([...items, lineaVacia()])}>
           <Plus size={14} /> Agregar línea
         </Button>
-        <p className="text-xs text-slate-500">Con medidas: m² = ancho × alto × cantidad y precio por m². Sin medidas (ej. instalación): precio por unidad.</p>
+        <p className="text-xs text-plomo-500">Con medidas: m² = ancho × alto × cantidad y precio por m². Sin medidas (ej. instalación): precio por unidad.</p>
       </div>
     </div>
   );
@@ -139,7 +139,7 @@ export function TotalesVenta({ items, conIgv, descuento }: { items: LineaVenta[]
   const t = totalesVenta(items, conIgv, descuento);
   return (
     <dl className="ml-auto w-72 space-y-1 text-sm">
-      <div className="flex justify-between text-slate-600">
+      <div className="flex justify-between text-plomo-600">
         <dt>Subtotal</dt>
         <dd>{soles(t.bruto)}</dd>
       </div>
@@ -149,17 +149,17 @@ export function TotalesVenta({ items, conIgv, descuento }: { items: LineaVenta[]
           <dd>- {soles(t.descuento)}</dd>
         </div>
       )}
-      <div className="flex justify-between text-slate-600">
+      <div className="flex justify-between text-plomo-600">
         <dt>{conIgv ? "Base imponible" : "Base (sin IGV)"}</dt>
         <dd>{soles(t.base)}</dd>
       </div>
-      <div className="flex justify-between text-slate-600">
+      <div className="flex justify-between text-plomo-600">
         <dt>IGV 18%</dt>
         <dd>{soles(t.igv)}</dd>
       </div>
-      <div className="flex justify-between rounded-lg bg-slate-900 px-3 py-2 font-bold text-white">
+      <div className="flex justify-between rounded-lg bg-azul-900 px-3 py-2 font-bold text-white">
         <dt>TOTAL</dt>
-        <dd className="text-amber-400">{soles(t.total)}</dd>
+        <dd className="text-white">{soles(t.total)}</dd>
       </div>
     </dl>
   );
@@ -273,7 +273,7 @@ export function FormCliente({
               value={form.direccionesEntrega.join("\n")}
               onChange={(e) => set("direccionesEntrega", e.target.value.split("\n"))}
               rows={3}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+              className="w-full rounded-lg border border-plomo-200 px-3 py-2 text-sm outline-none focus:border-azul-900 focus:ring-2 focus:ring-plomo-200"
             />
           </Field>
         </>

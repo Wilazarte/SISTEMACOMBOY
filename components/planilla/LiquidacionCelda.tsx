@@ -15,7 +15,7 @@ function Boton({ children, onClick, title, disabled }: { children: React.ReactNo
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className="min-w-[2.6rem] rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-amber-400 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40"
+      className="min-w-[2.6rem] rounded-lg border border-plomo-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-corp hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
     >
       {children}
     </button>
@@ -38,9 +38,9 @@ function Numero({ valor, entero, onGuardar, disabled, sufijo }: { valor: number;
           if (!Number.isNaN(n) && n !== valor) onGuardar(n);
         }}
         onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-        className="w-16 rounded-lg border border-slate-300 px-2 py-1.5 text-right text-sm font-semibold text-slate-900 disabled:bg-slate-100"
+        className="w-16 rounded-lg border border-plomo-200 px-2 py-1.5 text-right text-sm font-semibold text-azul-900 disabled:bg-plomo-100"
       />
-      <span className="text-xs text-slate-500">{sufijo}</span>
+      <span className="text-xs text-plomo-500">{sufijo}</span>
     </label>
   );
 }
@@ -117,7 +117,7 @@ export function LiquidacionCelda({ periodo, trabajadorId, liq, r, editable }: { 
         <div className="flex items-center gap-2 text-[11px] font-semibold text-amber-700">
           Ajuste manual
           {editable && (
-            <button type="button" onClick={() => silencioso(() => volverAlReloj(periodo, trabajadorId))} className="inline-flex items-center gap-0.5 text-slate-500 hover:text-slate-900" title="Volver a lo del reloj">
+            <button type="button" onClick={() => silencioso(() => volverAlReloj(periodo, trabajadorId))} className="inline-flex items-center gap-0.5 text-plomo-500 hover:text-azul-900" title="Volver a lo del reloj">
               <RotateCcw size={11} /> reloj
             </button>
           )}

@@ -46,16 +46,16 @@ export function Contratistas({ soloLectura }: { soloLectura: boolean }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm">
+        <div className="rounded-xl border border-plomo-200 bg-white p-3 text-sm shadow-sm">
           Concesiones activas: <b>{activos.length}</b>
-          <p className="text-xs text-slate-500">{lista.length} registradas en total</p>
+          <p className="text-xs text-plomo-500">{lista.length} registradas en total</p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm">
+        <div className="rounded-xl border border-plomo-200 bg-white p-3 text-sm shadow-sm">
           Contratado (activas): <b>{soles(r2(activos.reduce((s, c) => s + c.monto_total, 0)))}</b>
-          <p className="text-xs text-slate-500">Pagado {soles(r2(activos.reduce((s, c) => s + pagado(c), 0)))}</p>
+          <p className="text-xs text-plomo-500">Pagado {soles(r2(activos.reduce((s, c) => s + pagado(c), 0)))}</p>
         </div>
-        <div className="rounded-xl bg-slate-900 p-3 text-sm text-white">
-          Saldo por pagar: <b className="text-amber-400">{soles(r2(activos.reduce((s, c) => s + calcularSaldo(c), 0)))}</b>
+        <div className="rounded-xl bg-azul-900 p-3 text-sm text-white">
+          Saldo por pagar: <b className="text-white">{soles(r2(activos.reduce((s, c) => s + calcularSaldo(c), 0)))}</b>
         </div>
       </div>
 
@@ -71,7 +71,7 @@ export function Contratistas({ soloLectura }: { soloLectura: boolean }) {
             )
           }
         />
-        <div className="flex flex-wrap gap-2 border-b border-slate-100 px-5 py-3">
+        <div className="flex flex-wrap gap-2 border-b border-plomo-100 px-5 py-3">
           <Select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)} placeholder="Todos los servicios" options={OPC_TIPO} className="w-56" />
           <Select value={filtroSede} onChange={(e) => setFiltroSede(e.target.value)} placeholder="Todas las sedes" options={OPC_SEDE} className="w-56" />
           <Select
@@ -89,17 +89,17 @@ export function Contratistas({ soloLectura }: { soloLectura: boolean }) {
         ) : (
           <Table head={["Contratista", "Servicio", "Sede", "Vigencia", "Monto", "Pagado", "Saldo", "Estado", "Acciones"]}>
             {visibles.map((c) => (
-              <tr key={c.id} className={cn("hover:bg-slate-50", c.estado === "ANULADO" && "opacity-60")}>
+              <tr key={c.id} className={cn("hover:bg-plomo-50", c.estado === "ANULADO" && "opacity-60")}>
                 <Td>
-                  <p className="font-semibold text-slate-900">{c.razonSocial}</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="font-semibold text-azul-900">{c.razonSocial}</p>
+                  <p className="text-xs text-plomo-500">
                     {c.ruc ? `RUC ${c.ruc}` : "Sin RUC"}
                     {c.representante ? ` · ${c.representante}` : ""}
                   </p>
                 </Td>
                 <Td>
                   <p className="font-medium">{TIPOS_SERVICIO[c.tipoServicio] ?? c.tipoServicio}</p>
-                  <p className="max-w-[220px] truncate text-xs text-slate-500" title={c.descripcion}>
+                  <p className="max-w-[220px] truncate text-xs text-plomo-500" title={c.descripcion}>
                     {c.descripcion}
                   </p>
                 </Td>
@@ -114,7 +114,7 @@ export function Contratistas({ soloLectura }: { soloLectura: boolean }) {
                 <Td className={cn("text-right font-bold", calcularSaldo(c) > 0 ? "text-red-600" : "text-emerald-700")}>{soles(calcularSaldo(c))}</Td>
                 <Td>
                   <Badge estado={c.estado} />
-                  <p className="mt-1 text-[11px] text-slate-500">{c.comprobantes.length} comprobante(s)</p>
+                  <p className="mt-1 text-[11px] text-plomo-500">{c.comprobantes.length} comprobante(s)</p>
                 </Td>
                 <Td>
                   <div className="flex flex-wrap gap-1">
@@ -194,8 +194,8 @@ function FormConcesion({ form, onChange, onClose }: { form: ConcesionContratista
         <Field label="Adelanto (S/)">
           <Input type="number" min={0} step="0.01" value={form.adelanto || ""} onChange={(e) => set("adelanto", parseFloat(e.target.value) || 0)} />
         </Field>
-        <div className="flex flex-col justify-center rounded-lg bg-slate-50 px-3 text-sm">
-          Saldo: <b className="text-lg text-slate-900">{soles(calcularSaldo(form))}</b>
+        <div className="flex flex-col justify-center rounded-lg bg-plomo-50 px-3 text-sm">
+          Saldo: <b className="text-lg text-azul-900">{soles(calcularSaldo(form))}</b>
         </div>
         <Field label="Observaciones" className="sm:col-span-2 lg:col-span-3">
           <Textarea value={form.observaciones} onChange={(e) => set("observaciones", e.target.value)} />
@@ -224,7 +224,7 @@ function PagosConcesion({ c, soloLectura, onClose }: { c: ConcesionContratista; 
     <Modal open onClose={onClose} title={`${c.razonSocial} · ${TIPOS_SERVICIO[c.tipoServicio] ?? ""}`} wide>
       <div className="space-y-4 text-sm">
         <div className="grid gap-2 sm:grid-cols-4">
-          <div className="rounded-lg bg-slate-50 p-3">
+          <div className="rounded-lg bg-plomo-50 p-3">
             Monto: <b>{soles(c.monto_total)}</b>
           </div>
           <div className="rounded-lg bg-emerald-50 p-3 text-emerald-800">
@@ -233,14 +233,14 @@ function PagosConcesion({ c, soloLectura, onClose }: { c: ConcesionContratista; 
           <div className="rounded-lg bg-red-50 p-3 text-red-700">
             Saldo: <b>{soles(saldo)}</b>
           </div>
-          <div className="rounded-lg bg-sky-50 p-3 text-sky-800">
+          <div className="rounded-lg bg-[#EEF2F7] p-3 text-azul-700">
             Comprobantes: <b>{soles(facturado(c))}</b>
           </div>
         </div>
 
         {/* Pagos */}
-        <section className="rounded-xl border border-slate-200">
-          <h4 className="flex items-center gap-2 border-b border-slate-100 px-4 py-2 font-semibold text-slate-800">
+        <section className="rounded-xl border border-plomo-200">
+          <h4 className="flex items-center gap-2 border-b border-plomo-100 px-4 py-2 font-semibold text-azul-900">
             <HandCoins size={16} className="text-emerald-600" /> Pagos
           </h4>
           <table className="w-full">
@@ -294,12 +294,12 @@ function PagosConcesion({ c, soloLectura, onClose }: { c: ConcesionContratista; 
         </section>
 
         {/* Comprobantes */}
-        <section className="rounded-xl border border-slate-200">
-          <h4 className="flex items-center gap-2 border-b border-slate-100 px-4 py-2 font-semibold text-slate-800">
-            <Receipt size={16} className="text-sky-600" /> Comprobantes (RH / factura)
+        <section className="rounded-xl border border-plomo-200">
+          <h4 className="flex items-center gap-2 border-b border-plomo-100 px-4 py-2 font-semibold text-azul-900">
+            <Receipt size={16} className="text-azul-700" /> Comprobantes (RH / factura)
           </h4>
           {c.comprobantes.length === 0 ? (
-            <p className="px-4 py-3 text-slate-500">Sin comprobantes.</p>
+            <p className="px-4 py-3 text-plomo-500">Sin comprobantes.</p>
           ) : (
             <table className="w-full">
               <tbody>
@@ -343,9 +343,9 @@ function PagosConcesion({ c, soloLectura, onClose }: { c: ConcesionContratista; 
           )}
         </section>
 
-        {c.observaciones && <p className="whitespace-pre-line rounded-lg bg-slate-50 p-3 text-slate-600">{c.observaciones}</p>}
+        {c.observaciones && <p className="whitespace-pre-line rounded-lg bg-plomo-50 p-3 text-plomo-600">{c.observaciones}</p>}
 
-        <div className="flex flex-wrap items-end justify-between gap-2 border-t border-slate-100 pt-4">
+        <div className="flex flex-wrap items-end justify-between gap-2 border-t border-plomo-100 pt-4">
           <div className="flex flex-wrap items-end gap-2">
             {activa && (
               <>

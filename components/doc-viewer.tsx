@@ -103,7 +103,7 @@ export function DocViewer({ doc, onClose }: { doc: DocRef | null; onClose: () =>
   return (
     <Modal open={!!doc} onClose={onClose} title={r?.titulo ?? "Documento"} wide>
       {!r ? (
-        <p className="text-sm text-slate-500">El documento ya no existe (pudo ser rechazado y eliminado).</p>
+        <p className="text-sm text-plomo-500">El documento ya no existe (pudo ser rechazado y eliminado).</p>
       ) : (
         <div className="grid gap-6 md:grid-cols-[1fr_300px]">
           <div className="space-y-3">
@@ -115,11 +115,11 @@ export function DocViewer({ doc, onClose }: { doc: DocRef | null; onClose: () =>
                 </Button>
               )}
             </div>
-            <dl className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+            <dl className="divide-y divide-plomo-100 rounded-lg border border-plomo-200">
               {r.filas.map(([k, v]) => (
                 <div key={k} className="grid grid-cols-[120px_1fr] gap-2 px-3 py-2 text-sm">
-                  <dt className="font-medium text-slate-500">{k}</dt>
-                  <dd className="text-slate-800">{v}</dd>
+                  <dt className="font-medium text-plomo-500">{k}</dt>
+                  <dd className="text-azul-900">{v}</dd>
                 </div>
               ))}
             </dl>
@@ -132,7 +132,7 @@ export function DocViewer({ doc, onClose }: { doc: DocRef | null; onClose: () =>
               ))}
           </div>
           <div>
-            <h4 className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">Historial</h4>
+            <h4 className="mb-3 text-xs font-bold uppercase tracking-wide text-plomo-500">Historial</h4>
             <Timeline eventos={r.historial} />
           </div>
         </div>

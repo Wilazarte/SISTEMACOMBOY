@@ -70,7 +70,7 @@ export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadore
         subtitle={`${activos.length} activo(s) · contratado ${soles(r2(activos.reduce((s, t) => s + t.sueldo, 0)))} · no entran a la planilla del periodo`}
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700">
+            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-plomo-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">
               <input type="checkbox" checked={verInactivos} onChange={(e) => setVerInactivos(e.target.checked)} className="h-4 w-4 accent-red-600" /> Mostrar inactivos
             </label>
             {!soloLectura && (
@@ -90,20 +90,20 @@ export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadore
           {lista.map((t) => {
             const estado = estadoDe(t);
             return (
-              <tr key={t.id} className={cn("hover:bg-slate-50", !t.activo && "bg-slate-100 text-slate-400")}>
+              <tr key={t.id} className={cn("hover:bg-plomo-50", !t.activo && "bg-plomo-100 text-slate-400")}>
                 <Td className="font-mono">{t.id}</Td>
                 <Td>
-                  <p className={cn("font-semibold", t.activo ? "text-slate-900" : "text-slate-500")}>{t.nombre}</p>
-                  <p className="text-xs text-slate-500">{t.ruc ? `RUC ${t.ruc}` : t.dni ? `DNI ${t.dni}` : "Sin documento"}</p>
+                  <p className={cn("font-semibold", t.activo ? "text-azul-900" : "text-plomo-500")}>{t.nombre}</p>
+                  <p className="text-xs text-plomo-500">{t.ruc ? `RUC ${t.ruc}` : t.dni ? `DNI ${t.dni}` : "Sin documento"}</p>
                 </Td>
                 <Td>
                   <p className="font-medium">{t.empresa || "-"}</p>
-                  <p className="text-xs text-slate-500">{t.tipoServicio ? SERVICIOS_CONTRATISTA[t.tipoServicio] : "Sin servicio"}</p>
+                  <p className="text-xs text-plomo-500">{t.tipoServicio ? SERVICIOS_CONTRATISTA[t.tipoServicio] : "Sin servicio"}</p>
                 </Td>
                 <Td>{t.sede || "-"}</Td>
                 <Td className="text-right">
                   <b>{soles(t.sueldo)}</b>
-                  {t.formaPagoContrato && <p className="text-xs text-slate-500">{t.formaPagoContrato}</p>}
+                  {t.formaPagoContrato && <p className="text-xs text-plomo-500">{t.formaPagoContrato}</p>}
                 </Td>
                 <Td className="whitespace-nowrap text-xs">
                   {t.fechaIngreso ? fechaPE(t.fechaIngreso) : "-"}

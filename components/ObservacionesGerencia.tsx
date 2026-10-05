@@ -59,8 +59,8 @@ export function ObservacionesGerencia({ modulo, sesion }: { modulo: string; sesi
     <Card className="border-amber-300 bg-amber-50/60">
       <div className="flex items-center gap-2 border-b border-amber-200 px-5 py-3">
         <MessageSquareText size={18} className="text-amber-700" />
-        <h3 className="font-semibold text-slate-900">Observaciones de Gerencia · {NOMBRES[modulo] ?? modulo}</h3>
-        {lista.length > 0 && <span className="rounded-full bg-amber-400 px-2 text-xs font-bold text-slate-900">{lista.length}</span>}
+        <h3 className="font-semibold text-azul-900">Observaciones de Gerencia · {NOMBRES[modulo] ?? modulo}</h3>
+        {lista.length > 0 && <span className="rounded-full bg-corp px-2 text-xs font-bold text-white">{lista.length}</span>}
       </div>
       <div className="space-y-3 p-5">
         {escribe && (
@@ -78,13 +78,13 @@ export function ObservacionesGerencia({ modulo, sesion }: { modulo: string; sesi
           </form>
         )}
         {lista.length === 0 ? (
-          <p className="text-sm text-slate-500">Sin observaciones en este módulo.</p>
+          <p className="text-sm text-plomo-500">Sin observaciones en este módulo.</p>
         ) : (
           <ul className="space-y-2">
             {lista.map((o) => (
               <li key={o.id} className="flex items-start gap-3 rounded-lg border border-amber-200 bg-white px-3 py-2">
                 <div className="flex-1">
-                  <p className="whitespace-pre-wrap text-sm text-slate-800">{o.texto}</p>
+                  <p className="whitespace-pre-wrap text-sm text-azul-900">{o.texto}</p>
                   <p className="mt-0.5 text-xs text-slate-400">
                     {new Date(o.fecha).toLocaleString("es-PE")} · {o.usuario}
                   </p>

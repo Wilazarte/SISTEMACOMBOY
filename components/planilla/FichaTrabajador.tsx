@@ -13,7 +13,7 @@ const OPC_AFP = (Object.keys(AFP_OPTIONS) as TipoAfp[]).map((k) => ({ value: k, 
 
 function Seccion({ icono, titulo, children }: { icono: ReactNode; titulo: string; children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-slate-200 p-4">
+    <section className="rounded-xl border border-plomo-200 p-4">
       <h4 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-700">
         {icono} {titulo}
       </h4>
@@ -86,7 +86,7 @@ export function FichaTrabajador({
         {!nuevo && (
           <div className={cn("flex flex-wrap items-center gap-3 rounded-xl px-4 py-3", f.activo ? "bg-emerald-50" : "bg-red-50")}>
             <Badge estado={f.activo ? "ACTIVO" : "INACTIVO"} />
-            <span className="font-semibold text-slate-900">{f.nombre}</span>
+            <span className="font-semibold text-azul-900">{f.nombre}</span>
             {!f.activo && f.fechaBaja && (
               <span className="text-sm text-red-700">
                 Baja: {fechaPE(f.fechaBaja)}
@@ -97,7 +97,7 @@ export function FichaTrabajador({
         )}
 
         <fieldset disabled={soloLectura} className="min-w-0 space-y-4">
-          <Seccion icono={<Briefcase size={16} className="text-amber-500" />} titulo="Datos laborales">
+          <Seccion icono={<Briefcase size={16} className="text-corp" />} titulo="Datos laborales">
             <Field label="N° de huella (reloj) *">
               <Input value={f.id} onChange={(e) => set("id", e.target.value.trim())} placeholder="Ej: 15" />
             </Field>
@@ -143,7 +143,7 @@ export function FichaTrabajador({
             </Field>
           </Seccion>
 
-          <Seccion icono={<User size={16} className="text-sky-500" />} titulo="Datos personales">
+          <Seccion icono={<User size={16} className="text-azul-700" />} titulo="Datos personales">
             <Field label="Dirección" className="lg:col-span-2">
               <Input value={f.direccion ?? ""} onChange={(e) => set("direccion", e.target.value || undefined)} />
             </Field>
@@ -199,19 +199,19 @@ export function FichaTrabajador({
 
         {/* Historial de pagos */}
         {pagos && (
-          <div className="rounded-xl border border-slate-200">
-            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2">
-              <b className="text-sm text-slate-800">Historial de pagos ({pagos.length})</b>
+          <div className="rounded-xl border border-plomo-200">
+            <div className="flex items-center justify-between border-b border-plomo-100 px-4 py-2">
+              <b className="text-sm text-azul-900">Historial de pagos ({pagos.length})</b>
               <button type="button" onClick={() => setPagos(null)} className="text-slate-400 hover:text-slate-700" aria-label="Cerrar historial">
                 <X size={16} />
               </button>
             </div>
             {pagos.length === 0 ? (
-              <p className="p-4 text-sm text-slate-500">Aún no tiene planillas pagadas.</p>
+              <p className="p-4 text-sm text-plomo-500">Aún no tiene planillas pagadas.</p>
             ) : (
               <div className="max-h-64 overflow-y-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                  <thead className="bg-azul-900 text-[11px] uppercase tracking-widest text-white">
                     <tr>
                       <th className="px-3 py-2 text-left">Periodo</th>
                       <th className="px-3 py-2 text-right">Días</th>
@@ -242,7 +242,7 @@ export function FichaTrabajador({
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-plomo-100 pt-4">
           <div className="flex flex-wrap gap-2">
             {!nuevo && (
               <Button type="button" variant="secondary" onClick={verPagos} disabled={cargandoPagos}>

@@ -9,12 +9,13 @@ export const cn = (...c: (string | false | null | undefined)[]): string => c.fil
 // ---------------------------------------------------------------- Button
 type Variante = "primary" | "secondary" | "success" | "danger" | "warning" | "ghost";
 const VARIANTES: Record<Variante, string> = {
-  primary: "bg-slate-900 text-white hover:bg-slate-800",
-  secondary: "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50",
-  success: "bg-emerald-600 text-white hover:bg-emerald-700",
-  danger: "bg-red-600 text-white hover:bg-red-700",
-  warning: "bg-amber-500 text-white hover:bg-amber-600",
-  ghost: "text-slate-600 hover:bg-slate-100",
+  // Tema formal corporativo: rojo corporativo / rojo vino, azul oscuro y plomo
+  primary: "bg-corp text-white shadow-sm hover:bg-vino-900",
+  secondary: "bg-white text-azul-900 border border-plomo-200 hover:bg-plomo-50",
+  success: "bg-azul-700 text-white shadow-sm hover:bg-azul-900",
+  danger: "bg-vino text-white shadow-sm hover:bg-vino-900",
+  warning: "bg-corp text-white shadow-sm hover:bg-vino-900",
+  ghost: "text-plomo-600 hover:bg-plomo-100 hover:text-azul-900",
 };
 
 export function Button({
@@ -29,7 +30,7 @@ export function Button({
       {...props}
       className={cn(
         "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition disabled:cursor-not-allowed disabled:opacity-50",
-        size === "sm" ? "px-2.5 py-1.5 text-xs" : "px-4 py-2 text-sm",
+        size === "sm" ? "px-2.5 py-1.5 text-xs" : "px-6 py-2.5 text-sm",
         VARIANTES[variant],
         className
       )}
@@ -41,15 +42,15 @@ export function Button({
 
 // ---------------------------------------------------------------- Card
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("rounded-xl border border-slate-200 bg-white shadow-sm", className)}>{children}</div>;
+  return <div className={cn("rounded-xl border border-plomo-200 bg-white shadow-[0_4px_12px_rgba(15,36,64,0.06)]", className)}>{children}</div>;
 }
 
 export function CardHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-plomo-100 px-6 py-4">
       <div>
-        <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-        {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
+        <h3 className="text-[12px] font-semibold uppercase tracking-wider text-plomo-500">{title}</h3>
+        {subtitle && <p className="mt-1 text-[13px] text-plomo-600">{subtitle}</p>}
       </div>
       {action}
     </div>
@@ -60,7 +61,7 @@ export function CardHeader({ title, subtitle, action }: { title: string; subtitl
 export function Field({ label, children, className, hint }: { label: string; children: ReactNode; className?: string; hint?: string }) {
   return (
     <label className={cn("block", className)}>
-      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
+      <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-plomo-500">{label}</span>
       {children}
       {hint && <span className="mt-1 block text-xs text-slate-400">{hint}</span>}
     </label>
@@ -68,7 +69,7 @@ export function Field({ label, children, className, hint }: { label: string; chi
 }
 
 const inputCls =
-  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200 disabled:bg-slate-100";
+  "w-full rounded-lg border border-plomo-200 bg-white px-3 py-2 text-sm text-azul-900 outline-none transition focus:border-azul-900 focus:ring-1 focus:ring-azul-900 disabled:bg-plomo-100";
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cn(inputCls, props.className)} />;
@@ -93,46 +94,47 @@ export function Select({ options, placeholder, ...props }: SelectHTMLAttributes<
 
 // ---------------------------------------------------------------- Badge
 const COLORES: Record<string, string> = {
-  PENDIENTE: "bg-amber-100 text-amber-800 ring-amber-300",
-  ACEPTADO: "bg-emerald-100 text-emerald-800 ring-emerald-300",
-  OBSERVADO: "bg-orange-100 text-orange-800 ring-orange-300",
-  OBSERVADA: "bg-orange-100 text-orange-800 ring-orange-300",
-  COTIZADO: "bg-sky-100 text-sky-800 ring-sky-300",
-  COMPRADO: "bg-indigo-100 text-indigo-800 ring-indigo-300",
-  FINALIZADO: "bg-slate-800 text-white ring-slate-800",
-  FINALIZADA: "bg-slate-800 text-white ring-slate-800",
-  REGISTRADA: "bg-sky-100 text-sky-800 ring-sky-300",
-  CON_OC: "bg-indigo-100 text-indigo-800 ring-indigo-300",
-  EMITIDA: "bg-amber-100 text-amber-800 ring-amber-300",
-  FACTURADA: "bg-sky-100 text-sky-800 ring-sky-300",
-  EN_GUIA: "bg-violet-100 text-violet-800 ring-violet-300",
-  POR_PAGAR: "bg-red-100 text-red-800 ring-red-300",
-  PAGADA: "bg-emerald-100 text-emerald-800 ring-emerald-300",
-  PENDIENTE_VB: "bg-amber-100 text-amber-800 ring-amber-300",
-  CONFORME: "bg-emerald-100 text-emerald-800 ring-emerald-300",
-  FACTURA: "bg-slate-100 text-slate-700 ring-slate-300",
-  DECLARACION_JURADA: "bg-fuchsia-100 text-fuchsia-800 ring-fuchsia-300",
-  ACTIVO: "bg-emerald-100 text-emerald-800 ring-emerald-300",
-  APROBADA: "bg-emerald-100 text-emerald-800 ring-emerald-300",
-  ANULADA: "bg-slate-200 text-slate-500 ring-slate-300",
-  ANULADO: "bg-slate-200 text-slate-500 ring-slate-300",
-  BORRADOR: "bg-slate-100 text-slate-600 ring-slate-300",
-  EMITIDO: "bg-sky-100 text-sky-800 ring-sky-300",
-  PAGADO: "bg-emerald-100 text-emerald-800 ring-emerald-300",
-  VENCIDO: "bg-red-100 text-red-800 ring-red-300",
-  EN_PREPARACION: "bg-sky-100 text-sky-800 ring-sky-300",
-  DESPACHADO_PARCIAL: "bg-violet-100 text-violet-800 ring-violet-300",
-  DESPACHADO_TOTAL: "bg-slate-800 text-white ring-slate-800",
-  ENTREGADO: "bg-slate-800 text-white ring-slate-800",
-  PARCIAL: "bg-violet-100 text-violet-800 ring-violet-300",
-  NO_ENVIADO: "bg-amber-50 text-amber-700 ring-amber-200",
-  CONTADO: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  CREDITO: "bg-orange-50 text-orange-700 ring-orange-200",
-  CREDITO_CUOTAS: "bg-orange-50 text-orange-700 ring-orange-200",
-  INACTIVO: "bg-red-100 text-red-700 ring-red-300",
-  COMPRA: "bg-sky-100 text-sky-800 ring-sky-300",
-  GASTO_TESORERIA: "bg-amber-100 text-amber-800 ring-amber-300",
-  DESCONTADO: "bg-emerald-100 text-emerald-800 ring-emerald-300",
+  // Formales y suaves: verde = conforme, ámbar = pendiente, vino = observado / por pagar, azul = en proceso
+  PENDIENTE: "bg-amber-50 text-amber-800 ring-amber-200",
+  ACEPTADO: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  OBSERVADO: "bg-red-50 text-vino ring-red-200",
+  OBSERVADA: "bg-red-50 text-vino ring-red-200",
+  COTIZADO: "bg-[#EEF2F7] text-azul-700 ring-[#C9D4E3]",
+  COMPRADO: "bg-[#EEF2F7] text-azul-700 ring-[#C9D4E3]",
+  FINALIZADO: "bg-azul-900 text-white ring-azul-900",
+  FINALIZADA: "bg-azul-900 text-white ring-azul-900",
+  REGISTRADA: "bg-[#EEF2F7] text-azul-700 ring-[#C9D4E3]",
+  CON_OC: "bg-[#EEF2F7] text-azul-700 ring-[#C9D4E3]",
+  EMITIDA: "bg-amber-50 text-amber-800 ring-amber-200",
+  FACTURADA: "bg-[#EEF2F7] text-azul-700 ring-[#C9D4E3]",
+  EN_GUIA: "bg-amber-50 text-amber-800 ring-amber-200",
+  POR_PAGAR: "bg-red-50 text-vino ring-red-200",
+  PAGADA: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  PENDIENTE_VB: "bg-amber-50 text-amber-800 ring-amber-200",
+  CONFORME: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  FACTURA: "bg-plomo-100 text-plomo-600 ring-plomo-200",
+  DECLARACION_JURADA: "bg-[#EEF2F7] text-azul-700 ring-[#C9D4E3]",
+  ACTIVO: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  APROBADA: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  ANULADA: "bg-plomo-100 text-plomo-600 ring-plomo-200",
+  ANULADO: "bg-plomo-100 text-plomo-600 ring-plomo-200",
+  BORRADOR: "bg-plomo-100 text-plomo-600 ring-plomo-200",
+  EMITIDO: "bg-[#EEF2F7] text-azul-700 ring-[#C9D4E3]",
+  PAGADO: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  VENCIDO: "bg-red-50 text-vino ring-red-200",
+  EN_PREPARACION: "bg-[#EEF2F7] text-azul-700 ring-[#C9D4E3]",
+  DESPACHADO_PARCIAL: "bg-amber-50 text-amber-800 ring-amber-200",
+  DESPACHADO_TOTAL: "bg-azul-900 text-white ring-azul-900",
+  ENTREGADO: "bg-azul-900 text-white ring-azul-900",
+  PARCIAL: "bg-amber-50 text-amber-800 ring-amber-200",
+  NO_ENVIADO: "bg-amber-50 text-amber-800 ring-amber-200",
+  CONTADO: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  CREDITO: "bg-amber-50 text-amber-800 ring-amber-200",
+  CREDITO_CUOTAS: "bg-amber-50 text-amber-800 ring-amber-200",
+  INACTIVO: "bg-red-50 text-vino ring-red-200",
+  COMPRA: "bg-[#EEF2F7] text-azul-700 ring-[#C9D4E3]",
+  GASTO_TESORERIA: "bg-red-50 text-vino ring-red-200",
+  DESCONTADO: "bg-emerald-50 text-emerald-800 ring-emerald-200",
 };
 
 const ETIQUETA: Record<string, string> = {
@@ -152,7 +154,7 @@ const ETIQUETA: Record<string, string> = {
 
 export function Badge({ estado }: { estado: string }) {
   return (
-    <span className={cn("inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ring-inset", COLORES[estado] ?? "bg-slate-100 text-slate-700 ring-slate-300")}>
+    <span className={cn("inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-bold ring-1 ring-inset", COLORES[estado] ?? "bg-plomo-100 text-plomo-600 ring-plomo-200")}>
       {ETIQUETA[estado] ?? estado}
     </span>
   );
@@ -169,20 +171,20 @@ export function Tabs<T extends string>({
   onChange: (id: T) => void;
 }) {
   return (
-    <div className="flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+    <div className="flex gap-1 overflow-x-auto rounded-xl border border-plomo-200 bg-white p-1 shadow-[0_4px_12px_rgba(15,36,64,0.06)]">
       {tabs.map((t) => (
         <button
           key={t.id}
           onClick={() => onChange(t.id)}
           className={cn(
             "flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition",
-            value === t.id ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"
+            value === t.id ? "bg-azul-900 text-white shadow-sm" : "text-plomo-600 hover:bg-plomo-100 hover:text-azul-900"
           )}
         >
           {t.icon}
           {t.label}
           {t.count !== undefined && t.count > 0 && (
-            <span className={cn("rounded-full px-1.5 text-[11px] font-bold", value === t.id ? "bg-amber-400 text-slate-900" : "bg-amber-100 text-amber-800")}>{t.count}</span>
+            <span className={cn("rounded-full px-1.5 text-[11px] font-bold", value === t.id ? "bg-corp text-white" : "bg-red-50 text-vino")}>{t.count}</span>
           )}
         </button>
       ))}
@@ -200,11 +202,11 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 pt-[6vh]" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-azul-900/60 p-4 pt-[6vh]" onMouseDown={onClose}>
       <div className={cn("w-full rounded-xl bg-white shadow-2xl", wide ? "max-w-4xl" : "max-w-lg")} onMouseDown={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3.5">
-          <h3 className="font-semibold text-slate-900">{title}</h3>
-          <button onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Cerrar">
+        <div className="flex items-center justify-between rounded-t-xl border-b-[3px] border-b-corp px-6 py-4">
+          <h3 className="font-serif text-lg text-azul-900">{title}</h3>
+          <button onClick={onClose} className="rounded-md p-1 text-slate-400 hover:bg-plomo-100 hover:text-slate-700" aria-label="Cerrar">
             <X size={18} />
           </button>
         </div>
@@ -219,7 +221,7 @@ export function Table({ head, children, empty }: { head: string[]; children: Rea
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[720px] text-left text-sm">
-        <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        <thead className="bg-azul-900 text-[11px] font-semibold uppercase tracking-widest text-white">
           <tr>
             {head.map((h) => (
               <th key={h} className="whitespace-nowrap px-4 py-2.5">
@@ -228,9 +230,9 @@ export function Table({ head, children, empty }: { head: string[]; children: Rea
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">{children}</tbody>
+        <tbody className="bg-white [&>tr]:border-b [&>tr]:border-plomo-100">{children}</tbody>
       </table>
-      {empty && <p className="py-10 text-center text-sm text-slate-400">Sin registros</p>}
+      {empty && <p className="py-10 text-center text-sm text-plomo-500">Sin registros</p>}
     </div>
   );
 }
@@ -242,14 +244,14 @@ export const Td = ({ children, className }: { children: ReactNode; className?: s
 // ---------------------------------------------------------------- Timeline
 export function Timeline({ eventos }: { eventos: EventoHistorial[] }) {
   return (
-    <ol className="relative ml-2 border-l-2 border-slate-200">
+    <ol className="relative ml-2 border-l-2 border-plomo-200">
       {eventos.map((e, i) => {
         const ultimo = i === eventos.length - 1;
         return (
           <li key={i} className="mb-4 ml-5 last:mb-0">
             <span className={cn("absolute -left-[9px] mt-0.5 flex h-4 w-4 items-center justify-center rounded-full ring-4 ring-white", ultimo ? "bg-emerald-500" : "bg-slate-400")} />
-            <p className="text-sm font-semibold text-slate-800">{e.accion}</p>
-            {e.detalle && <p className="text-sm text-slate-600">{e.detalle}</p>}
+            <p className="text-sm font-semibold text-azul-900">{e.accion}</p>
+            {e.detalle && <p className="text-sm text-plomo-600">{e.detalle}</p>}
             <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-400">
               <Clock size={11} /> {new Date(e.fecha).toLocaleString("es-PE")} · {e.usuario}
             </p>
@@ -307,7 +309,7 @@ export function Toaster() {
   return (
     <div className="fixed bottom-4 right-4 z-[60] flex w-[min(92vw,380px)] flex-col gap-2">
       {items.map((t) => (
-        <div key={t.id} className={cn("flex items-start gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg", t.tipo === "ok" ? "bg-emerald-600" : "bg-red-600")}>
+        <div key={t.id} className={cn("flex items-start gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg", t.tipo === "ok" ? "bg-azul-900" : "bg-vino")}>
           {t.tipo === "ok" ? <CheckCircle2 size={18} className="shrink-0" /> : <AlertCircle size={18} className="shrink-0" />}
           {t.msg}
         </div>
@@ -318,7 +320,7 @@ export function Toaster() {
 
 export function Empty({ icon, text }: { icon: ReactNode; text: string }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white py-12 text-slate-400">
+    <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-plomo-200 bg-white py-12 text-plomo-500">
       {icon}
       <p className="text-sm">{text}</p>
     </div>

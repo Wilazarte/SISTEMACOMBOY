@@ -304,7 +304,7 @@ export default function PlanillaPage() {
   const importarBtn = !puedeEditar ? null : (
     <label
       className={cn(
-        "inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-600",
+        "inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-corp px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-vino-900",
         importando && "pointer-events-none opacity-60"
       )}
       title={`Guarda DÍAS, HORAS y TARD. en el periodo ${normalizarPeriodo(periodo)}`}
@@ -320,16 +320,16 @@ export default function PlanillaPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="w-full space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Planilla</h1>
-          <p className="text-sm text-slate-500">Trabajadores, liquidación del periodo, historial y contratistas</p>
+          <h1 className="font-serif text-[36px] font-light leading-tight text-azul-900 lg:text-[42px]">Planilla</h1>
+          <p className="mt-1 text-[13px] text-plomo-600">Trabajadores, liquidación del periodo, historial y contratistas</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
             href="/dashboard/planilla/adelantos"
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-plomo-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-plomo-50"
           >
             <HandCoins size={16} /> Adelantos
           </Link>
@@ -357,7 +357,7 @@ export default function PlanillaPage() {
                 <b>
                   N° {d.original.id} · {d.original.nombre}
                 </b>{" "}
-                <span className="text-xs text-slate-500">({d.motivo})</span>
+                <span className="text-xs text-plomo-500">({d.motivo})</span>
               </span>
               <span className="flex-1" />
               <Button size="sm" variant="danger" onClick={() => unir(d.duplicado.id, d.original.id, d.duplicado.nombre, d.original.nombre)}>
@@ -397,7 +397,7 @@ export default function PlanillaPage() {
             action={
               <div className="flex flex-wrap items-center gap-3">
                 <Input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar nombre, DNI, N°, cargo…" className="w-60" />
-                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700">
+                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-plomo-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">
                   <input type="checkbox" checked={verInactivos} onChange={(e) => setVerInactivos(e.target.checked)} className="h-4 w-4 accent-red-600" /> Mostrar inactivos
                 </label>
               </div>
@@ -410,11 +410,11 @@ export default function PlanillaPage() {
           ) : (
             <Table head={["N°", "Trabajador", "Cargo / sede", "F. ingreso", "Sueldo", "Pensión", "Estado", ""]}>
               {listaMaestro.map((t) => (
-                <tr key={t.id} className={cn("transition hover:bg-slate-50", !t.activo && "bg-slate-100 text-slate-400")}>
+                <tr key={t.id} className={cn("transition hover:bg-plomo-50", !t.activo && "bg-plomo-100 text-slate-400")}>
                   <Td className="font-mono text-base">{t.id}</Td>
                   <Td>
-                    <p className={cn("font-semibold", t.activo ? "text-slate-900" : "text-slate-500 line-through decoration-slate-300")}>{t.nombre}</p>
-                    <p className="text-xs text-slate-500">
+                    <p className={cn("font-semibold", t.activo ? "text-azul-900" : "text-plomo-500 line-through decoration-slate-300")}>{t.nombre}</p>
+                    <p className="text-xs text-plomo-500">
                       DNI {t.dni || "-"}
                       {edad(t.fechaNacimiento) !== null ? ` · ${edad(t.fechaNacimiento)} años` : ""}
                       {t.celular ? ` · ${t.celular}` : ""}
@@ -422,13 +422,13 @@ export default function PlanillaPage() {
                   </Td>
                   <Td>
                     {t.cargo}
-                    {t.sede && <p className="text-xs text-slate-500">{t.sede}</p>}
+                    {t.sede && <p className="text-xs text-plomo-500">{t.sede}</p>}
                   </Td>
                   <Td>
                     {t.fechaIngreso ? (
                       <>
                         <p>{fechaPE(t.fechaIngreso)}</p>
-                        <p className="text-xs text-slate-500">{antiguedad(t.fechaIngreso)}</p>
+                        <p className="text-xs text-plomo-500">{antiguedad(t.fechaIngreso)}</p>
                       </>
                     ) : (
                       <span className="text-xs font-semibold text-orange-600">Sin registrar</span>
@@ -436,11 +436,11 @@ export default function PlanillaPage() {
                   </Td>
                   <Td className="text-right">
                     {soles(t.sueldo)}
-                    <p className="text-xs text-slate-500">{sueldoDe(t).label}</p>
+                    <p className="text-xs text-plomo-500">{sueldoDe(t).label}</p>
                   </Td>
                   <Td>
                     <p>{afpLabel(t)}</p>
-                    <p className="text-xs text-slate-500">{t.afpPorcentaje}%</p>
+                    <p className="text-xs text-plomo-500">{t.afpPorcentaje}%</p>
                   </Td>
                   <Td>
                     <Badge estado={t.activo ? "ACTIVO" : "INACTIVO"} />
@@ -474,13 +474,13 @@ export default function PlanillaPage() {
       {tab === "planilla" && (
         <>
           <div className="grid gap-3 lg:grid-cols-4">
-            <label className="block rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Periodo</span>
+            <label className="block rounded-xl border border-plomo-200 bg-white p-3 shadow-sm">
+              <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-plomo-500">Periodo</span>
               <Input value={periodo} onChange={(e) => setPeriodo(e.target.value)} className="font-semibold" />
             </label>
-            <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm">
+            <div className="rounded-xl border border-plomo-200 bg-white p-3 text-sm shadow-sm">
               Trabajadores activos: <b>{calculados.length}</b>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-plomo-500">
                 {excel
                   ? `Excel del ${fechaPE(excel.desde)} al ${fechaPE(excel.hasta)} · ${excel.asistencia.size} trabajador(es)`
                   : delPeriodo.size
@@ -488,14 +488,14 @@ export default function PlanillaPage() {
                     : "Sin asistencia en este periodo"}
               </p>
             </div>
-            <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm">
+            <div className="rounded-xl border border-plomo-200 bg-white p-3 text-sm shadow-sm">
               Básico {soles(totales.basico)} · Extra {soles(totales.extra)}
               <p className="text-xs text-red-600">
                 AFP − {soles(totales.afp)} · Adelantos − {soles(totales.adelantos)}
               </p>
             </div>
-            <div className="rounded-xl bg-slate-900 p-3 text-sm text-white">
-              Total a pagar: <b className="text-xl text-amber-400">{soles(totales.pagar)}</b>
+            <div className="rounded-xl bg-azul-900 p-3 text-sm text-white">
+              Total a pagar: <b className="text-xl text-white">{soles(totales.pagar)}</b>
             </div>
           </div>
           {adelantos.error && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">Adelantos: {adelantos.error} (la planilla se calcula sin descontarlos).</p>}
@@ -504,8 +504,8 @@ export default function PlanillaPage() {
           <Card>
             <div className="flex flex-wrap items-end gap-4 p-4">
               <div>
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Modo de cálculo</span>
-                <div className="inline-flex overflow-hidden rounded-xl border border-slate-300">
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-plomo-500">Modo de cálculo</span>
+                <div className="inline-flex overflow-hidden rounded-xl border border-plomo-200">
                   {(Object.keys(MODOS_LIQUIDACION) as ModoLiquidacion[]).map((m) => (
                     <button
                       key={m}
@@ -514,7 +514,7 @@ export default function PlanillaPage() {
                       onClick={() => m !== liq.modo && ejecutar(() => cambiarModo(periodo, m), `Modo: ${MODOS_LIQUIDACION[m].label}`)}
                       className={cn(
                         "px-5 py-2.5 text-sm font-bold transition disabled:cursor-not-allowed",
-                        liq.modo === m ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-amber-50"
+                        liq.modo === m ? "bg-azul-900 text-white" : "bg-white text-plomo-600 hover:bg-red-50"
                       )}
                     >
                       {MODOS_LIQUIDACION[m].label.toUpperCase()}
@@ -523,7 +523,7 @@ export default function PlanillaPage() {
                 </div>
               </div>
               <label>
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Jornada (h)</span>
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-plomo-500">Jornada (h)</span>
                 <input
                   key={liq.horasJornada}
                   type="number"
@@ -536,12 +536,12 @@ export default function PlanillaPage() {
                     const n = parseFloat(e.target.value);
                     if (n !== liq.horasJornada) ejecutar(() => cambiarConfig(periodo, { horasJornada: n }), `Jornada: ${n} h`);
                   }}
-                  className="w-20 rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-semibold"
+                  className="w-20 rounded-lg border border-plomo-200 px-3 py-2.5 text-sm font-semibold"
                 />
               </label>
               {liq.modo === "DIAS_HORAS" && (
                 <label>
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Recargo h. extra (%)</span>
+                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-plomo-500">Recargo h. extra (%)</span>
                   <input
                     key={liq.recargoExtra}
                     type="number"
@@ -553,11 +553,11 @@ export default function PlanillaPage() {
                       const n = parseFloat(e.target.value) || 0;
                       if (n !== liq.recargoExtra) ejecutar(() => cambiarConfig(periodo, { recargoExtra: n }), `Recargo: ${n} %`);
                     }}
-                    className="w-24 rounded-lg border border-slate-300 px-3 py-2.5 text-sm font-semibold"
+                    className="w-24 rounded-lg border border-plomo-200 px-3 py-2.5 text-sm font-semibold"
                   />
                 </label>
               )}
-              <p className="min-w-[240px] flex-1 text-xs text-slate-500">
+              <p className="min-w-[240px] flex-1 text-xs text-plomo-500">
                 {MODOS_LIQUIDACION[liq.modo].ayuda}. Sueldo diario = mensual / 30 (diario: el mismo); sueldo hora = diario / {liq.horasJornada}. Tardanza: entrada después de las{" "}
                 {HORA_TARDANZA}. Los botones ajustan solo esta planilla: lo del reloj 🔒 no cambia.
               </p>
@@ -597,11 +597,11 @@ export default function PlanillaPage() {
                 {calculados.map((t) => (
                   <tr key={t.id} className="align-top">
                     <Td>
-                      <p className="font-semibold text-slate-900">
+                      <p className="font-semibold text-azul-900">
                         <span className="mr-1 font-mono text-xs text-slate-400">{t.id}</span>
                         {t.nombre}
                       </p>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-plomo-500">
                         {soles(t.sueldo)} {sueldoDe(t).label.toLowerCase()} · diario {soles(t.liq.sueldoDiario)} · hora {valorHoraTxt(t.valorHora)}
                       </p>
                     </Td>
@@ -619,7 +619,7 @@ export default function PlanillaPage() {
                     <Td className="text-right">{t.liq.montoExtra ? soles(t.liq.montoExtra) : <span className="text-slate-400">-</span>}</Td>
                     <Td className="text-right text-red-600">
                       - {soles(t.descuentoAfp)}
-                      <p className="text-[10px] text-slate-500">{t.afpPorcentaje}%</p>
+                      <p className="text-[10px] text-plomo-500">{t.afpPorcentaje}%</p>
                     </Td>
                     <Td className="text-right">
                       {t.adelantosPendientes > 0 ? (
@@ -660,8 +660,8 @@ export default function PlanillaPage() {
         <div className="space-y-6">
           <ContratistasMaestro trabajadores={maestro} soloLectura={!puedeEditar} />
           <div>
-            <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-slate-900">
-              <Building2 size={18} className="text-amber-500" /> Concesiones / servicios externos
+            <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-azul-900">
+              <Building2 size={18} className="text-corp" /> Concesiones / servicios externos
             </h2>
             <Contratistas soloLectura={!puedeEditar} />
           </div>
@@ -675,7 +675,7 @@ export default function PlanillaPage() {
       <Modal open={!!boletaSel} onClose={() => setBoletaSel(null)} title="Boleta de pago">
         {boletaSel && (
           <>
-            <div className="space-y-1 border-2 border-slate-900 p-4 text-xs">
+            <div className="space-y-1 border-2 border-azul-900 p-4 text-xs">
               <div className="flex justify-between border-b pb-2">
                 <b>CV COMBOY VID - BOLETA DE PAGO {periodo}</b>
                 <span>D.S. 001-98-TR</span>
@@ -691,7 +691,7 @@ export default function PlanillaPage() {
                 <b>Sueldo:</b> {sueldoDe(boletaSel).label} {soles(boletaSel.sueldo)} · diario {soles(boletaSel.liq.sueldoDiario)} · hora {valorHoraTxt(boletaSel.valorHora)}
               </p>
               <table className="mt-3 w-full border">
-                <thead className="bg-slate-100">
+                <thead className="bg-azul-900 text-[11px] uppercase tracking-widest text-white">
                   <tr>
                     <th className="p-2 text-left">Concepto</th>
                     <th className="p-2 text-right">Importe</th>

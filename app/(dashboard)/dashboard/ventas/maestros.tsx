@@ -100,7 +100,7 @@ export function CondicionesPago() {
       />
       <Table head={["Código", "Nombre", "Tipo", "Medio / Días", "% Inicial", "Contraentrega", "Estado", ""]} empty={condiciones.length === 0}>
         {condiciones.map((c) => (
-          <tr key={c.id} className={cn("hover:bg-slate-50", !c.activo && "opacity-50")}>
+          <tr key={c.id} className={cn("hover:bg-plomo-50", !c.activo && "opacity-50")}>
             <Td className="font-mono font-semibold">{c.codigo}</Td>
             <Td>{c.nombre}</Td>
             <Td>{TIPOS_CONDICION[c.tipo]}</Td>
@@ -176,7 +176,7 @@ export function Clientes() {
             <Input placeholder="Buscar…" value={q} onChange={(e) => setQ(e.target.value)} className="w-48" />
             {habilitado && (
               <>
-                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-plomo-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-plomo-50">
                   <Upload size={16} /> Importar Excel
                   <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={importar} />
                 </label>
@@ -192,17 +192,17 @@ export function Clientes() {
         {lista.map((c) => {
           const saldo = saldoCliente(c.id);
           return (
-            <tr key={c.id} className={cn("hover:bg-slate-50", c.estado === "INACTIVO" && "opacity-50")}>
+            <tr key={c.id} className={cn("hover:bg-plomo-50", c.estado === "INACTIVO" && "opacity-50")}>
               <Td className="font-mono">
                 {c.tipoDoc} {c.numDoc}
               </Td>
               <Td>
-                <p className="font-semibold text-slate-900">{c.razonSocial}</p>
-                <p className="max-w-xs truncate text-xs text-slate-500">{c.direccionFiscal || "-"}</p>
+                <p className="font-semibold text-azul-900">{c.razonSocial}</p>
+                <p className="max-w-xs truncate text-xs text-plomo-500">{c.direccionFiscal || "-"}</p>
               </Td>
               <Td>
                 {c.contacto || "-"}
-                <p className="text-xs text-slate-500">{[c.telefono, c.email].filter(Boolean).join(" · ")}</p>
+                <p className="text-xs text-plomo-500">{[c.telefono, c.email].filter(Boolean).join(" · ")}</p>
               </Td>
               <Td>{condiciones.find((x) => x.id === c.condPagoId)?.nombre ?? "-"}</Td>
               <Td className="text-right">{c.lineaCredito > 0 ? soles(c.lineaCredito) : "Sin límite"}</Td>

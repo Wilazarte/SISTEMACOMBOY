@@ -156,12 +156,12 @@ export function Comprobantes({ preNp, onListo }: { preNp?: string; onListo: () =
           )
         }
       />
-      <div className="flex flex-wrap gap-1 border-b border-slate-100 px-5 py-2">
+      <div className="flex flex-wrap gap-1 border-b border-plomo-100 px-5 py-2">
         {(["TODOS", "FACTURA", "BOLETA", "NOTA_CREDITO", "NOTA_DEBITO"] as Filtro[]).map((f) => (
           <button
             key={f}
             onClick={() => setFiltro(f)}
-            className={cn("rounded-md px-3 py-1.5 text-sm font-medium", filtro === f ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100")}
+            className={cn("rounded-md px-3 py-1.5 text-sm font-medium", filtro === f ? "bg-azul-900 text-white" : "text-plomo-600 hover:bg-plomo-100")}
           >
             {f === "TODOS" ? "Todos" : tipoLabel[f]}
           </button>
@@ -169,15 +169,15 @@ export function Comprobantes({ preNp, onListo }: { preNp?: string; onListo: () =
       </div>
       <Table head={["Fecha", "Serie-Número", "Cliente", "NP origen", "Base", "IGV", "Total", "Condición", "Saldo", "Estado", "SUNAT", "Entrega", "Acciones"]} empty={lista.length === 0}>
         {lista.map((c) => (
-          <tr key={c.id} className="hover:bg-slate-50">
+          <tr key={c.id} className="hover:bg-plomo-50">
             <Td>{fechaPE(c.fecha)}</Td>
-            <Td className="font-semibold text-slate-900">
+            <Td className="font-semibold text-azul-900">
               {c.numero || <span className="text-slate-400">{c.serie}-(borrador)</span>}
-              <p className="text-xs font-normal text-slate-500">{tipoLabel[c.tipo]}</p>
+              <p className="text-xs font-normal text-plomo-500">{tipoLabel[c.tipo]}</p>
             </Td>
             <Td>
-              <p className="font-medium text-slate-900">{c.cliente}</p>
-              <p className="text-xs text-slate-500">{c.clienteDoc}</p>
+              <p className="font-medium text-azul-900">{c.cliente}</p>
+              <p className="text-xs text-plomo-500">{c.clienteDoc}</p>
             </Td>
             <Td>{c.npNumero ?? "-"}</Td>
             <Td className="text-right">{soles(c.base)}</Td>
@@ -304,7 +304,7 @@ export function Comprobantes({ preNp, onListo }: { preNp?: string; onListo: () =
                     <input type="checkbox" checked={form.conIgv} onChange={(e) => setForm({ ...form, conIgv: e.target.checked })} /> Boleta con IGV 18 %
                   </label>
                 ) : (
-                  <p className="text-sm text-slate-600">Factura: operación gravada, IGV 18 %.</p>
+                  <p className="text-sm text-plomo-600">Factura: operación gravada, IGV 18 %.</p>
                 )}
                 <Field label="Descuento S/">
                   <Input type="number" min={0} step="0.01" value={form.descuento || ""} onChange={(e) => setForm({ ...form, descuento: parseFloat(e.target.value) || 0 })} className="w-40" />
@@ -315,7 +315,7 @@ export function Comprobantes({ preNp, onListo }: { preNp?: string; onListo: () =
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
               Estado SUNAT: el comprobante queda como NO ENVIADO. El ERP aún no está conectado a un OSE/PSE de facturación electrónica.
             </p>
-            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
+            <div className="flex flex-wrap justify-end gap-2 border-t border-plomo-100 pt-4">
               <Button variant="secondary" onClick={cerrar}>
                 Cancelar
               </Button>
@@ -331,7 +331,7 @@ export function Comprobantes({ preNp, onListo }: { preNp?: string; onListo: () =
       </Modal>
 
       <Modal open={!!anular} onClose={() => setAnular(null)} title={`Anular ${anular?.numero ?? ""}`}>
-        <p className="mb-3 text-sm text-slate-600">Se anula también su orden de despacho (si aún no se despachó) y se registra el asiento de reversión. Los cobros ya registrados no se revierten.</p>
+        <p className="mb-3 text-sm text-plomo-600">Se anula también su orden de despacho (si aún no se despachó) y se registra el asiento de reversión. Los cobros ya registrados no se revierten.</p>
         <Field label="Motivo">
           <Textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} autoFocus />
         </Field>

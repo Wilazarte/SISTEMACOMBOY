@@ -106,14 +106,14 @@ export default function ComprasPage() {
   const facturasSinGuia = facturas.filter((f) => f.tipo === "FACTURA" && !f.esGastoTesoreria && (!guias.some((g) => g.facturaId === f.id) || guias.some((g) => g.facturaId === f.id && g.estado === "OBSERVADA")));
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="w-full space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Tesorería / Compras</h1>
-          <p className="text-sm text-slate-500">Requerimiento → Cotización → Orden de Compra → Factura → Guía → V°B° Almacén</p>
+          <h1 className="font-serif text-[36px] font-light leading-tight text-azul-900 lg:text-[42px]">Tesorería / Compras</h1>
+          <p className="mt-1 text-[13px] text-plomo-600">Requerimiento → Cotización → Orden de Compra → Factura → Guía → V°B° Almacén</p>
         </div>
         {!puede(rol, "req.revisar") && (
-          <span className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600">Modo lectura para su rol</span>
+          <span className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-plomo-600">Modo lectura para su rol</span>
         )}
       </div>
 
@@ -166,16 +166,16 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
     <section>
       <div className="mb-3 flex items-center gap-2">
         <Bell size={18} className="text-amber-600" />
-        <h2 className="font-semibold text-slate-900">Requerimientos por revisar</h2>
-        <span className="rounded-full bg-amber-400 px-2 text-xs font-bold text-slate-900">{pendientes.length}</span>
+        <h2 className="font-semibold text-azul-900">Requerimientos por revisar</h2>
+        <span className="rounded-full bg-corp px-2 text-xs font-bold text-white">{pendientes.length}</span>
       </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {pendientes.map((r) => (
           <div key={r.id} className="flex flex-col rounded-xl border-2 border-amber-300 bg-amber-50 p-4 shadow-sm">
             <div className="flex items-start justify-between">
               <div>
-                <p className="font-bold text-slate-900">{r.numero}</p>
-                <p className="text-xs text-slate-600">
+                <p className="font-bold text-azul-900">{r.numero}</p>
+                <p className="text-xs text-plomo-600">
                   {fechaPE(r.fecha)} · {r.sede}
                 </p>
               </div>
@@ -184,7 +184,7 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
             <p className="mt-2 text-sm text-slate-700">
               <span className="font-medium">{r.solicitante}:</span> {r.motivo}
             </p>
-            <ul className="mt-2 space-y-0.5 text-xs text-slate-600">
+            <ul className="mt-2 space-y-0.5 text-xs text-plomo-600">
               {r.items.slice(0, 3).map((i) => (
                 <li key={i.id}>
                   • {i.cantidad} {i.unidad} — {i.nombre} {i.marca && `(${i.marca})`}
@@ -320,7 +320,7 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
             <Field label="Tipo de registro" className="min-w-[320px]">
               <Select value={modo} onChange={(e) => setModo(e.target.value as ModoRegistro)} options={MODOS_REGISTRO} className="text-base font-semibold" />
             </Field>
-            <p className="pb-2 text-sm text-slate-500">
+            <p className="pb-2 text-sm text-plomo-500">
               {modo === "GASTO"
                 ? "No ingresa a almacén: queda en Facturas como POR PAGAR para Tesorería."
                 : "Los productos ingresan al stock del almacén seleccionado."}
@@ -371,7 +371,7 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
 
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-sm">
-              <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              <thead className="bg-azul-900 text-[11px] font-semibold uppercase tracking-widest text-white">
                 <tr>
                   <th className="w-8 px-3 py-2 text-left">#</th>
                   <th className="px-2 py-2 text-left">Producto *</th>
@@ -382,7 +382,7 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
                   <th className="w-10" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-plomo-100">
                 {filas.map((i, k) => (
                   <tr key={i.id}>
                     <td className="px-3 py-1.5 text-slate-400">{k + 1}</td>
@@ -423,9 +423,9 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
               <Plus size={14} /> Agregar producto
             </Button>
           </div>
-          {conIgv && <p className="px-5 pt-3 text-right text-xs text-slate-500">Boleta: los precios incluyen IGV; la base imponible se obtiene dividiendo el total entre 1.18.</p>}
+          {conIgv && <p className="px-5 pt-3 text-right text-xs text-plomo-500">Boleta: los precios incluyen IGV; la base imponible se obtiene dividiendo el total entre 1.18.</p>}
           <Totales subtotal={subtotal} igv={igv} total={total} />
-          <div className="flex justify-end border-t border-slate-100 px-5 py-4">
+          <div className="flex justify-end border-t border-plomo-100 px-5 py-4">
             <Button onClick={guardar} disabled={!proveedorId || !fechaISO}>
               <PackagePlus size={16} /> Guardar compra e ingresar a stock
             </Button>
@@ -440,14 +440,14 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
             if (r.tipo === "GASTO_TESORERIA") {
               const g = r.gasto;
               return (
-                <tr key={g.id} className="hover:bg-slate-50">
+                <tr key={g.id} className="hover:bg-plomo-50">
                   <Td>
                     <Badge estado="GASTO_TESORERIA" />
                   </Td>
                   <Td>{fechaPE(g.fecha)}</Td>
                   <Td>
-                    <span className="font-semibold text-slate-900">{g.numero}</span>
-                    <p className="text-xs text-slate-500">{g.comprobanteGasto ? COMPROBANTES_GASTO[g.comprobanteGasto] : "-"}</p>
+                    <span className="font-semibold text-azul-900">{g.numero}</span>
+                    <p className="text-xs text-plomo-500">{g.comprobanteGasto ? COMPROBANTES_GASTO[g.comprobanteGasto] : "-"}</p>
                   </Td>
                   <Td>{g.proveedor}</Td>
                   <Td>{g.ruc || "-"}</Td>
@@ -466,14 +466,14 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
             }
             const c = r.compra;
             return (
-            <tr key={c.id} className="hover:bg-slate-50">
+            <tr key={c.id} className="hover:bg-plomo-50">
               <Td>
                 <Badge estado="COMPRA" />
               </Td>
               <Td>{fechaPE(c.fecha)}</Td>
               <Td>
-                <span className="font-semibold text-slate-900">{c.numero}</span>
-                <p className="text-xs text-slate-500">{c.tipoComprobante === "FACTURA" ? "Factura" : "Boleta"}</p>
+                <span className="font-semibold text-azul-900">{c.numero}</span>
+                <p className="text-xs text-plomo-500">{c.tipoComprobante === "FACTURA" ? "Factura" : "Boleta"}</p>
               </Td>
               <Td>{c.proveedor}</Td>
               <Td>{c.ruc}</Td>
@@ -556,8 +556,8 @@ function Antecedentes({ reqs, ordenes, rol, onCotizar }: { reqs: Requerimiento[]
         {lista.map((r) => {
           const oc = ordenes.find((o) => o.reqId === r.id);
           return (
-            <tr key={r.id} className="hover:bg-slate-50">
-              <Td className="font-semibold text-slate-900">{r.numero}</Td>
+            <tr key={r.id} className="hover:bg-plomo-50">
+              <Td className="font-semibold text-azul-900">{r.numero}</Td>
               <Td>{fechaPE(r.fecha)}</Td>
               <Td>{r.sede}</Td>
               <Td>{r.solicitante}</Td>
@@ -707,7 +707,7 @@ function Cotizaciones({
               <Totales subtotal={subtotal} igv={igv} />
             </>
           )}
-          <div className="flex justify-end border-t border-slate-100 px-5 py-4">
+          <div className="flex justify-end border-t border-plomo-100 px-5 py-4">
             <Button onClick={guardar} disabled={!reqId}>
               <FileCheck2 size={16} /> Guardar cotización
             </Button>
@@ -719,14 +719,14 @@ function Cotizaciones({
         <CardHeader title="Cotizaciones registradas" subtitle="★ = menor precio del requerimiento" />
         <Table head={["Fecha", "Nro Coti", "Nro REQ", "Proveedor", "RUC", "Monto total", "Estado", "Acciones"]} empty={cotizaciones.length === 0}>
           {cotizaciones.map((c) => (
-            <tr key={c.id} className="hover:bg-slate-50">
+            <tr key={c.id} className="hover:bg-plomo-50">
               <Td>{fechaPE(c.fechaEmision)}</Td>
-              <Td className="font-semibold text-slate-900">{c.numero}</Td>
+              <Td className="font-semibold text-azul-900">{c.numero}</Td>
               <Td>{c.reqNumero}</Td>
               <Td>{c.proveedor}</Td>
               <Td>{c.ruc}</Td>
               <Td className="text-right font-semibold">
-                {minPorReq[c.reqId] === c.total && <span className="mr-1 text-amber-500">★</span>}
+                {minPorReq[c.reqId] === c.total && <span className="mr-1 text-corp">★</span>}
                 {soles(c.total)}
               </Td>
               <Td>
@@ -759,15 +759,15 @@ function Totales({ subtotal, igv, total = r2(subtotal + igv) }: { subtotal: numb
   return (
     <div className="flex justify-end px-5 py-3">
       <dl className="w-72 space-y-1 text-sm">
-        <div className="flex justify-between text-slate-600">
+        <div className="flex justify-between text-plomo-600">
           <dt>Subtotal</dt>
           <dd>{soles(subtotal)}</dd>
         </div>
-        <div className="flex justify-between text-slate-600">
+        <div className="flex justify-between text-plomo-600">
           <dt>IGV 18%</dt>
           <dd>{soles(igv)}</dd>
         </div>
-        <div className="flex justify-between rounded-lg bg-slate-900 px-3 py-2 font-bold text-white">
+        <div className="flex justify-between rounded-lg bg-azul-900 px-3 py-2 font-bold text-white">
           <dt>TOTAL</dt>
           <dd>{soles(total)}</dd>
         </div>
@@ -897,7 +897,7 @@ function Ordenes({
               <Input value={lugar} onChange={(e) => setLugar(e.target.value)} />
             </Field>
           </div>
-          <div className="mx-5 mb-5 rounded-xl border border-slate-200 p-4">
+          <div className="mx-5 mb-5 rounded-xl border border-plomo-200 p-4">
             <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-700">Comprobante de pago y origen</p>
             <div className="grid gap-4 md:grid-cols-3">
               <Field label="¿De qué cuenta se realiza el pago? *">
@@ -912,21 +912,21 @@ function Ordenes({
                 <Input type="number" min={0} step="0.01" value={voucherMonto} onChange={(e) => setVoucherMonto(e.target.value)} />
               </Field>
               <div className="md:col-span-3">
-                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Subir baucher de pago (JPG, PNG, PDF)</span>
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-plomo-500">Subir baucher de pago (JPG, PNG, PDF)</span>
                 <input ref={voucherRef} type="file" accept="image/jpeg,image/png,application/pdf" className="hidden" onChange={(e) => cargarVoucher(e.target.files?.[0])} />
                 {!voucher ? (
                   <button
                     type="button"
                     onClick={() => voucherRef.current?.click()}
-                    className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 px-4 py-6 text-center transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:hover:border-slate-300 disabled:hover:bg-transparent"
+                    className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-plomo-200 px-4 py-6 text-center transition hover:border-slate-400 hover:bg-plomo-50 disabled:cursor-not-allowed disabled:hover:border-plomo-200 disabled:hover:bg-transparent"
                   >
                     <Upload size={24} className="text-slate-400" />
                     <span className="text-sm font-medium text-slate-700">Haga clic para seleccionar el baucher</span>
                     <span className="text-xs text-slate-400">JPG, PNG o PDF · un archivo · máx. 5 MB</span>
                   </button>
                 ) : (
-                  <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 md:flex-row">
-                    <div className="h-40 overflow-hidden rounded-lg border border-slate-200 bg-white md:w-56">
+                  <div className="flex flex-col gap-3 rounded-xl border border-plomo-200 bg-plomo-50 p-3 md:flex-row">
+                    <div className="h-40 overflow-hidden rounded-lg border border-plomo-200 bg-white md:w-56">
                       {voucher.file.type.startsWith("image/") ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={voucher.url} alt="Vista previa baucher" className="h-full w-full object-contain" />
@@ -936,8 +936,8 @@ function Ordenes({
                     </div>
                     <div className="flex flex-1 flex-col justify-between gap-2">
                       <div>
-                        <p className="break-all text-sm font-medium text-slate-900">{voucher.file.name}</p>
-                        <p className="text-xs text-slate-500">{(voucher.file.size / 1048576).toFixed(2)} MB</p>
+                        <p className="break-all text-sm font-medium text-azul-900">{voucher.file.name}</p>
+                        <p className="text-xs text-plomo-500">{(voucher.file.size / 1048576).toFixed(2)} MB</p>
                       </div>
                       <div className="flex gap-2">
                         <Button type="button" size="sm" variant="secondary" onClick={() => voucherRef.current?.click()}>
@@ -976,7 +976,7 @@ function Ordenes({
             <Totales subtotal={coti.subtotal} igv={coti.igv} />
           </>
         )}
-        <div className="flex justify-end border-t border-slate-100 px-5 py-4">
+        <div className="flex justify-end border-t border-plomo-100 px-5 py-4">
           <Button onClick={guardar} disabled={!habilitado || !cotiId || enviando}>
             <ShoppingBag size={16} /> {enviando ? "Emitiendo…" : "Emitir OC"}
           </Button>
@@ -987,8 +987,8 @@ function Ordenes({
         <CardHeader title="Órdenes de compra" />
         <Table head={["Nro OC", "Fecha", "Proveedor", "Cotización", "REQ", "Forma pago", "Cuenta pago", "Baucher", "Total", "Estado", "Acciones"]} empty={ordenes.length === 0}>
           {ordenes.map((o) => (
-            <tr key={o.id} className="hover:bg-slate-50">
-              <Td className="font-semibold text-slate-900">{o.numero}</Td>
+            <tr key={o.id} className="hover:bg-plomo-50">
+              <Td className="font-semibold text-azul-900">{o.numero}</Td>
               <Td>{fechaPE(o.fecha)}</Td>
               <Td>{o.proveedor}</Td>
               <Td>{o.cotizacionNumero}</Td>
@@ -1106,9 +1106,9 @@ function Facturas({
             title={modo === "FACTURA" ? "Registrar factura" : "Declaración jurada de compra"}
             subtitle={modo === "FACTURA" ? "Vinculada a una Orden de Compra. IGV y total se calculan automáticamente." : `Excepción: compras sin comprobante, tope ${soles(TOPE_DJ)}, requiere aprobación de Gerencia.`}
             action={
-              <div className="flex rounded-lg bg-slate-100 p-0.5 text-sm">
+              <div className="flex rounded-lg bg-plomo-100 p-0.5 text-sm">
                 {(["FACTURA", "DJ"] as const).map((m) => (
-                  <button key={m} onClick={() => { setModo(m); setOcId(""); }} className={cn("rounded-md px-3 py-1.5 font-medium", modo === m ? "bg-white shadow" : "text-slate-500")}>
+                  <button key={m} onClick={() => { setModo(m); setOcId(""); }} className={cn("rounded-md px-3 py-1.5 font-medium", modo === m ? "bg-white shadow" : "text-plomo-500")}>
                     {m === "FACTURA" ? "Factura" : "Decl. Jurada"}
                   </button>
                 ))}
@@ -1153,7 +1153,7 @@ function Facturas({
             ) : (
               <>
                 {rol !== "GERENCIA" && (
-                  <div className="flex items-center gap-2 rounded-lg bg-fuchsia-50 px-3 py-2 text-sm text-fuchsia-800 md:col-span-3">
+                  <div className="flex items-center gap-2 rounded-lg bg-[#EEF2F7] px-3 py-2 text-sm text-azul-700 md:col-span-3">
                     <AlertTriangle size={16} /> Solo el rol GERENCIA puede aprobar una declaración jurada. Cambie de rol en el menú lateral.
                   </div>
                 )}
@@ -1173,14 +1173,14 @@ function Facturas({
                   <Textarea value={motivoDJ} onChange={(e) => setMotivoDJ(e.target.value)} placeholder="Ej: compra en zona rural a persona natural sin RUC" />
                 </Field>
                 {oc && (
-                  <p className="text-sm text-slate-600 md:col-span-3">
+                  <p className="text-sm text-plomo-600 md:col-span-3">
                     Monto a declarar: <b>{soles(oc.subtotal)}</b> (sin IGV, sin crédito fiscal)
                   </p>
                 )}
               </>
             )}
           </div>
-          <div className="flex justify-end border-t border-slate-100 px-5 py-4">
+          <div className="flex justify-end border-t border-plomo-100 px-5 py-4">
             <Button onClick={guardar} disabled={!ocId || enviando || (modo === "DJ" && rol !== "GERENCIA")}>
               <Receipt size={16} /> {modo === "FACTURA" ? "Registrar factura" : "Aprobar declaración jurada"}
             </Button>
@@ -1209,28 +1209,28 @@ function Facturas({
           {lista.map((f) => {
             const vencida = f.estadoPago === "POR_PAGAR" && f.fechaVencimiento < hoy();
             return (
-              <tr key={f.id} className="hover:bg-slate-50">
+              <tr key={f.id} className="hover:bg-plomo-50">
                 <Td>
                   {f.esGastoTesoreria ? (
                     <>
                       <Badge estado="GASTO_TESORERIA" />
-                      <p className="mt-0.5 text-[11px] text-slate-500">{f.comprobanteGasto ? COMPROBANTES_GASTO[f.comprobanteGasto] : ""}</p>
+                      <p className="mt-0.5 text-[11px] text-plomo-500">{f.comprobanteGasto ? COMPROBANTES_GASTO[f.comprobanteGasto] : ""}</p>
                     </>
                   ) : (
                     <Badge estado={f.tipo} />
                   )}
                 </Td>
-                <Td className="font-semibold text-slate-900">{f.numero}</Td>
+                <Td className="font-semibold text-azul-900">{f.numero}</Td>
                 <Td>{fechaPE(f.fecha)}</Td>
                 <Td className={cn(vencida && "font-semibold text-red-600")}>{fechaPE(f.fechaVencimiento)}</Td>
                 <Td>{f.proveedor}</Td>
-                <Td>{f.esGastoTesoreria ? <span className="text-xs text-slate-600">{f.tipoGasto ? TIPOS_GASTO[f.tipoGasto] : "Gasto"}</span> : f.ocNumero}</Td>
+                <Td>{f.esGastoTesoreria ? <span className="text-xs text-plomo-600">{f.tipoGasto ? TIPOS_GASTO[f.tipoGasto] : "Gasto"}</span> : f.ocNumero}</Td>
                 <Td className="text-right">{soles(f.subtotal)}</Td>
                 <Td className="text-right">{soles(f.igv)}</Td>
                 <Td className="text-right font-semibold">
                   {soles(f.total)}
                   {f.detraccionMonto ? (
-                    <p className="text-[11px] font-normal text-slate-500">
+                    <p className="text-[11px] font-normal text-plomo-500">
                       Detr. − {soles(f.detraccionMonto)} · neto {soles(f.netoPagar ?? f.total)}
                     </p>
                   ) : null}
@@ -1362,7 +1362,7 @@ function Guias({ rol, facturas, guias, preFac }: { rol: Rol; facturas: Factura[]
                 </Field>
               </div>
               {fac && (
-                <p className="text-sm text-slate-600">
+                <p className="text-sm text-plomo-600">
                   Proveedor: <b>{fac.proveedor}</b> · Total factura: <b>{soles(fac.total)}</b>
                 </p>
               )}
@@ -1376,7 +1376,7 @@ function Guias({ rol, facturas, guias, preFac }: { rol: Rol; facturas: Factura[]
                 onClick={() => inputRef.current?.click()}
                 className={cn(
                   "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-10 text-center transition",
-                  drag ? "border-slate-900 bg-slate-100" : "border-slate-300 hover:border-slate-400 hover:bg-slate-50"
+                  drag ? "border-azul-900 bg-plomo-100" : "border-plomo-200 hover:border-slate-400 hover:bg-plomo-50"
                 )}
               >
                 <Upload size={28} className="text-slate-400" />
@@ -1385,7 +1385,7 @@ function Guias({ rol, facturas, guias, preFac }: { rol: Rol; facturas: Factura[]
                 <input ref={inputRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={(e) => cargar(e.target.files?.[0])} />
               </div>
             </div>
-            <div className="min-h-[300px] overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+            <div className="min-h-[300px] overflow-hidden rounded-xl border border-plomo-200 bg-plomo-50">
               {!archivo ? (
                 <div className="flex h-full items-center justify-center text-sm text-slate-400">Vista previa</div>
               ) : archivo.tipo.startsWith("image/") ? (
@@ -1396,7 +1396,7 @@ function Guias({ rol, facturas, guias, preFac }: { rol: Rol; facturas: Factura[]
               )}
             </div>
           </div>
-          <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
+          <div className="flex justify-end gap-2 border-t border-plomo-100 px-5 py-4">
             {archivo && (
               <Button variant="secondary" onClick={() => setArchivo(null)}>
                 Quitar archivo
@@ -1418,8 +1418,8 @@ function Guias({ rol, facturas, guias, preFac }: { rol: Rol; facturas: Factura[]
         ) : (
           <Table head={["Nro guía", "Fecha", "Factura", "OC", "Archivo", "Estado", ""]}>
             {guias.map((g) => (
-              <tr key={g.id} className="hover:bg-slate-50">
-                <Td className="font-semibold text-slate-900">{g.numero}</Td>
+              <tr key={g.id} className="hover:bg-plomo-50">
+                <Td className="font-semibold text-azul-900">{g.numero}</Td>
                 <Td>{fechaPE(g.fecha)}</Td>
                 <Td>{g.facturaNumero}</Td>
                 <Td>{g.ocNumero}</Td>

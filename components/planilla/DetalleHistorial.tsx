@@ -13,7 +13,7 @@ const horasTxt = (h: number) => h.toLocaleString("es-PE", { maximumFractionDigit
 export function DetalleHistorial({ id }: { id: string }) {
   const { datos, cargando, error } = useHistorialDetalle(id);
   const volver = (
-    <Link href="/dashboard/planilla?tab=historial" className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900">
+    <Link href="/dashboard/planilla?tab=historial" className="inline-flex items-center gap-1.5 text-sm font-medium text-plomo-600 hover:text-azul-900">
       <ArrowLeft size={16} /> Volver al historial
     </Link>
   );
@@ -21,7 +21,7 @@ export function DetalleHistorial({ id }: { id: string }) {
   if (cargando) return <p className="py-16 text-center text-sm text-slate-400">Cargando periodo…</p>;
   if (error || !datos)
     return (
-      <div className="mx-auto max-w-3xl space-y-4">
+      <div className="w-full space-y-4">
         {volver}
         <Card>
           <div className="p-5">
@@ -33,14 +33,14 @@ export function DetalleHistorial({ id }: { id: string }) {
 
   const { cabecera: h, detalle } = datos;
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="w-full space-y-6">
       {volver}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
+          <h1 className="flex items-center gap-3 font-serif text-[36px] font-light leading-tight text-azul-900 lg:text-[42px]">
             <Lock size={20} className="text-slate-400" /> {h.periodo}
           </h1>
-          <p className="text-sm text-slate-500">
+          <p className="mt-1 text-[13px] text-plomo-600">
             Cerrada el {new Date(h.fecha_cierre).toLocaleString("es-PE")}
             {h.creado_por ? ` por ${h.creado_por}` : ""}
             {h.asistencia_desde ? ` · asistencia del ${fechaPE(h.asistencia_desde)} al ${fechaPE(h.asistencia_hasta ?? h.asistencia_desde)}` : ""}
@@ -52,18 +52,18 @@ export function DetalleHistorial({ id }: { id: string }) {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm">
+        <div className="rounded-xl border border-plomo-200 bg-white p-3 text-sm shadow-sm">
           Trabajadores: <b>{h.cantidad_trabajadores}</b>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm">
+        <div className="rounded-xl border border-plomo-200 bg-white p-3 text-sm shadow-sm">
           Total horas: <b>{horasTxt(h.total_horas)}</b>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm">
+        <div className="rounded-xl border border-plomo-200 bg-white p-3 text-sm shadow-sm">
           Total bruto: <b>{soles(h.total_bruto)}</b>
           <p className="text-xs text-red-600">Descuentos: - {soles(h.total_descuento)}</p>
         </div>
-        <div className="rounded-xl bg-slate-900 p-3 text-sm text-white">
-          Total pagado: <b className="text-amber-400">{soles(h.total_pagar)}</b>
+        <div className="rounded-xl bg-azul-900 p-3 text-sm text-white">
+          Total pagado: <b className="text-white">{soles(h.total_pagar)}</b>
           <p className="text-xs text-slate-400">
             Neto {soles(h.total_neto)} − adelantos {soles(h.total_adelantos)}
           </p>
@@ -77,24 +77,24 @@ export function DetalleHistorial({ id }: { id: string }) {
             <tr key={d.id}>
               <Td className="font-mono">{d.trabajador_id}</Td>
               <Td>
-                <p className="font-semibold text-slate-900">{d.nombre}</p>
-                <p className="text-xs text-slate-500">
+                <p className="font-semibold text-azul-900">{d.nombre}</p>
+                <p className="text-xs text-plomo-500">
                   {d.dni || "-"} · {d.cargo || "-"}
                 </p>
               </Td>
               <Td>{d.fecha_ingreso ? fechaPE(d.fecha_ingreso) : "-"}</Td>
               <Td>
                 {soles(d.sueldo)}
-                <p className="text-xs text-slate-500">{d.tipo_sueldo || "-"}</p>
+                <p className="text-xs text-plomo-500">{d.tipo_sueldo || "-"}</p>
               </Td>
               <Td>
                 {d.pension || "-"}
-                <p className="text-xs text-slate-500">{d.afp_porcentaje}%</p>
+                <p className="text-xs text-plomo-500">{d.afp_porcentaje}%</p>
               </Td>
               <Td className="text-center">{d.dias}</Td>
               <Td className="text-center font-semibold">
                 {horasTxt(d.horas)}
-                <p className="text-[10px] font-normal text-slate-500">S/ {d.valor_hora.toFixed(4)}/h</p>
+                <p className="text-[10px] font-normal text-plomo-500">S/ {d.valor_hora.toFixed(4)}/h</p>
               </Td>
               <Td className="text-center">{d.tardanzas}</Td>
               <Td className="text-right">{soles(d.bruto)}</Td>

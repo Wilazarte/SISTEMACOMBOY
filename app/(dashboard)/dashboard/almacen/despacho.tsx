@@ -89,21 +89,21 @@ export function OrdenesDespacho() {
       ) : (
         <Table head={["N° OD", "Fecha", "Comprobante", "Cliente", "Productos", "Estado", "Acciones"]}>
           {lista.map((o) => (
-            <tr key={o.id} className="hover:bg-slate-50">
-              <Td className="font-semibold text-slate-900">{o.numero}</Td>
+            <tr key={o.id} className="hover:bg-plomo-50">
+              <Td className="font-semibold text-azul-900">{o.numero}</Td>
               <Td>{fechaPE(o.fecha)}</Td>
               <Td>{o.comprobanteNumero}</Td>
               <Td>
-                <p className="font-medium text-slate-900">{o.cliente}</p>
-                <p className="max-w-[220px] truncate text-xs text-slate-500">{o.lugarEntrega}</p>
+                <p className="font-medium text-azul-900">{o.cliente}</p>
+                <p className="max-w-[220px] truncate text-xs text-plomo-500">{o.lugarEntrega}</p>
               </Td>
               <Td>
                 <ul className="space-y-0.5 text-xs">
                   {o.items.map((l) => (
                     <li key={l.id}>
                       {l.descripcion}
-                      {l.ancho > 0 && <span className="text-slate-500"> · {l.ancho}×{l.alto} m × {l.cantidadPiezas}</span>}
-                      <span className="text-slate-500">
+                      {l.ancho > 0 && <span className="text-plomo-500"> · {l.ancho}×{l.alto} m × {l.cantidadPiezas}</span>}
+                      <span className="text-plomo-500">
                         {" "}
                         · {l.despachado}/{l.solicitado} {l.unidad}
                       </span>
@@ -151,7 +151,7 @@ export function OrdenesDespacho() {
               </Field>
             </div>
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              <thead className="bg-azul-900 text-[11px] font-semibold uppercase tracking-widest text-white">
                 <tr>
                   <th className="px-3 py-2 text-left">Descripción</th>
                   <th className="px-3 py-2 text-left">Medidas</th>
@@ -160,7 +160,7 @@ export function OrdenesDespacho() {
                   <th className="w-32 px-3 py-2 text-left">Despachar</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-plomo-100">
                 {sel.items.map((l) => {
                   const disp = l.productoNombre ? stockDisponible(sede, l.productoNombre, l.unidad) : null;
                   const falta = disp !== null && (cant[l.id] ?? 0) > disp + 1e-9;
@@ -170,11 +170,11 @@ export function OrdenesDespacho() {
                         {l.descripcion}
                         {!l.productoNombre && <span className="ml-1 text-xs text-slate-400">(servicio, no mueve stock)</span>}
                       </td>
-                      <td className="px-3 py-2 text-slate-600">{l.ancho > 0 ? `${l.ancho} × ${l.alto} m × ${l.cantidadPiezas}` : "-"}</td>
+                      <td className="px-3 py-2 text-plomo-600">{l.ancho > 0 ? `${l.ancho} × ${l.alto} m × ${l.cantidadPiezas}` : "-"}</td>
                       <td className="px-3 py-2 text-right">
                         {pendienteLinea(l)} {l.unidad}
                       </td>
-                      <td className={cn("px-3 py-2 text-right", falta ? "font-bold text-red-600" : "text-slate-600")}>{disp === null ? "-" : `${disp} ${l.unidad}`}</td>
+                      <td className={cn("px-3 py-2 text-right", falta ? "font-bold text-red-600" : "text-plomo-600")}>{disp === null ? "-" : `${disp} ${l.unidad}`}</td>
                       <td className="px-3 py-2">
                         <Input
                           type="number"
@@ -216,7 +216,7 @@ export function OrdenesDespacho() {
                 </div>
               </Field>
             </div>
-            <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
+            <div className="flex justify-end gap-2 border-t border-plomo-100 pt-4">
               <Button variant="secondary" onClick={() => setSel(null)}>
                 Cancelar
               </Button>

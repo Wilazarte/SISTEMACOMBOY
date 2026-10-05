@@ -44,10 +44,10 @@ export default function AlmacenPage() {
   const observados = procesados.filter((r) => r.estado === "OBSERVADO").length;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="w-full space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Almacén</h1>
-        <p className="text-sm text-slate-500">Emisión de requerimientos y visto bueno de ingreso de mercadería</p>
+        <h1 className="font-serif text-[36px] font-light leading-tight text-azul-900 lg:text-[42px]">Almacén</h1>
+        <p className="mt-1 text-[13px] text-plomo-600">Emisión de requerimientos y visto bueno de ingreso de mercadería</p>
       </div>
 
       {observados > 0 && (
@@ -90,7 +90,7 @@ function ItemsEditor({ items, onChange }: { items: ItemReq[]; onChange: (i: Item
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[860px] text-sm">
-        <thead className="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        <thead className="bg-azul-900 text-[11px] font-semibold uppercase tracking-widest text-white">
           <tr>
             <th className="w-8 px-3 py-2 text-left">#</th>
             <th className="px-2 py-2 text-left">Producto *</th>
@@ -101,7 +101,7 @@ function ItemsEditor({ items, onChange }: { items: ItemReq[]; onChange: (i: Item
             <th className="w-10" />
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-plomo-100">
           {items.map((i, k) => (
             <tr key={i.id}>
               <td className="px-3 py-1.5 text-slate-400">{k + 1}</td>
@@ -174,7 +174,7 @@ function NuevoReq({ rol, onCreado }: { rol: Rol; onCreado: () => void }) {
 
   return (
     <Card>
-      <CardHeader title="Nuevo requerimiento de almacén" subtitle="Al guardar se notifica automáticamente a Tesorería." action={<span className="rounded-lg bg-slate-100 px-3 py-1.5 font-mono text-sm font-bold text-slate-700" title="Número probable: el definitivo se asigna al guardar">{proximo}</span>} />
+      <CardHeader title="Nuevo requerimiento de almacén" subtitle="Al guardar se notifica automáticamente a Tesorería." action={<span className="rounded-lg bg-plomo-100 px-3 py-1.5 font-mono text-sm font-bold text-slate-700" title="Número probable: el definitivo se asigna al guardar">{proximo}</span>} />
       <div className="grid gap-4 p-5 md:grid-cols-4">
         <Field label="Sede *">
           <Select value={sede} onChange={(e) => setSede(e.target.value)} placeholder="Seleccione…" options={SEDES.map((s) => ({ value: s, label: s }))} />
@@ -190,7 +190,7 @@ function NuevoReq({ rol, onCreado }: { rol: Rol; onCreado: () => void }) {
         </Field>
       </div>
       <ItemsEditor items={items} onChange={setItems} />
-      <div className="flex justify-end border-t border-slate-100 px-5 py-4">
+      <div className="flex justify-end border-t border-plomo-100 px-5 py-4">
         <Button onClick={guardar} disabled={enviando}>
           <Send size={16} /> {enviando ? "Emitiendo…" : "Emitir y notificar a Tesorería"}
         </Button>
@@ -218,8 +218,8 @@ function ListaReq({ reqs, rol }: { reqs: Requerimiento[]; rol: Rol }) {
     <>
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
         {conteo.map(({ e, n }) => (
-          <button key={e} onClick={() => setEstado(estado === e ? "" : e)} className={cn("rounded-xl border bg-white p-3 text-left shadow-sm transition", estado === e ? "border-slate-900 ring-2 ring-slate-900" : "border-slate-200 hover:border-slate-300")}>
-            <p className="text-2xl font-bold text-slate-900">{n}</p>
+          <button key={e} onClick={() => setEstado(estado === e ? "" : e)} className={cn("rounded-xl border bg-white p-3 text-left shadow-sm transition", estado === e ? "border-azul-900 ring-2 ring-slate-900" : "border-plomo-200 hover:border-plomo-200")}>
+            <p className="text-2xl font-bold text-azul-900">{n}</p>
             <Badge estado={e} />
           </button>
         ))}
@@ -239,8 +239,8 @@ function ListaReq({ reqs, rol }: { reqs: Requerimiento[]; rol: Rol }) {
         />
         <Table head={["Nro REQ", "Fecha", "Sede", "Solicitante", "Motivo", "Items", "Estado", "Acciones"]} empty={lista.length === 0}>
           {lista.map((r) => (
-            <tr key={r.id} className={cn("hover:bg-slate-50", r.estado === "OBSERVADO" && "bg-orange-50/60")}>
-              <Td className="font-semibold text-slate-900">{r.numero}</Td>
+            <tr key={r.id} className={cn("hover:bg-plomo-50", r.estado === "OBSERVADO" && "bg-orange-50/60")}>
+              <Td className="font-semibold text-azul-900">{r.numero}</Td>
               <Td>{fechaPE(r.fecha)}</Td>
               <Td>{r.sede}</Td>
               <Td>{r.solicitante}</Td>
@@ -340,26 +340,26 @@ function Ingresos({ rol, porVB, ordenes, facturas, guias }: { rol: Rol; porVB: O
             const f = facturas.find((x) => x.ocId === o.id);
             const g = guias.find((x) => x.ocId === o.id);
             return (
-              <Card key={o.id} className="border-violet-200">
+              <Card key={o.id} className="border-plomo-200">
                 <div className="flex items-start justify-between p-5 pb-3">
                   <div>
-                    <p className="text-lg font-bold text-slate-900">{o.numero}</p>
-                    <p className="text-sm text-slate-500">
+                    <p className="text-lg font-bold text-azul-900">{o.numero}</p>
+                    <p className="text-sm text-plomo-500">
                       {o.proveedor} · {o.reqNumero} · {o.lugarEntrega}
                     </p>
                   </div>
                   <Badge estado="EN_GUIA" />
                 </div>
                 <div className="grid grid-cols-2 gap-2 px-5 text-sm">
-                  <div className="rounded-lg bg-slate-50 p-2.5">
-                    <p className="text-xs text-slate-500">{f?.tipo === "DECLARACION_JURADA" ? "Declaración jurada" : "Factura"}</p>
+                  <div className="rounded-lg bg-plomo-50 p-2.5">
+                    <p className="text-xs text-plomo-500">{f?.tipo === "DECLARACION_JURADA" ? "Declaración jurada" : "Factura"}</p>
                     <p className="font-semibold">{f?.numero ?? "-"}</p>
-                    <p className="text-xs text-slate-500">{f ? soles(f.total) : ""}</p>
+                    <p className="text-xs text-plomo-500">{f ? soles(f.total) : ""}</p>
                   </div>
-                  <div className="rounded-lg bg-slate-50 p-2.5">
-                    <p className="text-xs text-slate-500">Guía de remisión</p>
+                  <div className="rounded-lg bg-plomo-50 p-2.5">
+                    <p className="text-xs text-plomo-500">Guía de remisión</p>
                     {g ? (
-                      <button onClick={() => abrirDoc({ tipo: "GUIA", id: g.id })} className="font-semibold text-sky-700 underline">
+                      <button onClick={() => abrirDoc({ tipo: "GUIA", id: g.id })} className="font-semibold text-azul-700 underline">
                         {g.numero}
                       </button>
                     ) : (
@@ -374,7 +374,7 @@ function Ingresos({ rol, porVB, ordenes, facturas, guias }: { rol: Rol; porVB: O
                     </li>
                   ))}
                 </ul>
-                <div className="flex flex-wrap gap-2 border-t border-slate-100 px-5 py-3">
+                <div className="flex flex-wrap gap-2 border-t border-plomo-100 px-5 py-3">
                   <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "OC", id: o.id })}>
                     <Eye size={14} /> Historial
                   </Button>
@@ -395,8 +395,8 @@ function Ingresos({ rol, porVB, ordenes, facturas, guias }: { rol: Rol; porVB: O
         <CardHeader title="Ingresos finalizados" subtitle="Procesos de compra cerrados con visto bueno de almacén" />
         <Table head={["OC", "REQ", "Proveedor", "Recibido por", "Fecha V°B°", "Total", ""]} empty={finalizadas.length === 0}>
           {finalizadas.map((o) => (
-            <tr key={o.id} className="hover:bg-slate-50">
-              <Td className="font-semibold text-slate-900">{o.numero}</Td>
+            <tr key={o.id} className="hover:bg-plomo-50">
+              <Td className="font-semibold text-azul-900">{o.numero}</Td>
               <Td>{o.reqNumero}</Td>
               <Td>{o.proveedor}</Td>
               <Td>{o.vistoBueno?.recibidoPor}</Td>
@@ -417,10 +417,10 @@ function Ingresos({ rol, porVB, ordenes, facturas, guias }: { rol: Rol; porVB: O
       </Card>
 
       <Modal open={!!vb} onClose={() => setVb(null)} title={`Visto bueno de ingreso · ${vb?.numero ?? ""}`}>
-        <p className="mb-2 text-sm text-slate-600">Verifique físicamente cada producto:</p>
+        <p className="mb-2 text-sm text-plomo-600">Verifique físicamente cada producto:</p>
         <div className="mb-4 space-y-1.5">
           {vb?.items.map((i) => (
-            <label key={i.itemReqId} className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50">
+            <label key={i.itemReqId} className="flex cursor-pointer items-center gap-3 rounded-lg border border-plomo-200 px-3 py-2 text-sm hover:bg-plomo-50">
               <input type="checkbox" className="h-4 w-4 accent-emerald-600" checked={!!checks[i.itemReqId]} onChange={(e) => setChecks((p) => ({ ...p, [i.itemReqId]: e.target.checked }))} />
               <span>
                 <b>{i.cantidad} {i.unidad}</b> — {i.nombre}
@@ -500,9 +500,9 @@ function Stock({ stock }: { stock: StockItem[] }) {
       />
       <Table head={["Sede", "Producto", "Unidad", "Cantidad", "Último costo", "Valorizado", "Actualizado"]} empty={lista.length === 0}>
         {lista.map((s) => (
-          <tr key={s.id} className="hover:bg-slate-50">
+          <tr key={s.id} className="hover:bg-plomo-50">
             <Td>{s.sede}</Td>
-            <Td className="font-medium text-slate-900">{s.nombre}</Td>
+            <Td className="font-medium text-azul-900">{s.nombre}</Td>
             <Td>{s.unidad}</Td>
             <Td className="text-right font-semibold">{s.cantidad}</Td>
             <Td className="text-right">{soles(s.costoUnit)}</Td>

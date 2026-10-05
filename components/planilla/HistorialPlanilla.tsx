@@ -57,9 +57,9 @@ export function HistorialPlanilla({ lista, cargando, error }: { lista: Periodo[]
     });
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <button onClick={() => setAbierta((v) => !v)} className="flex w-full items-center gap-3 bg-slate-900 px-5 py-3 text-left text-white">
-        {abierta ? <FolderOpen size={20} className="text-amber-400" /> : <Folder size={20} className="text-amber-400" />}
+    <div className="overflow-hidden rounded-xl border border-plomo-200 bg-white shadow-sm">
+      <button onClick={() => setAbierta((v) => !v)} className="flex w-full items-center gap-3 bg-azul-900 px-5 py-3 text-left text-white">
+        {abierta ? <FolderOpen size={20} className="text-white" /> : <Folder size={20} className="text-white" />}
         <span className="flex-1">
           <span className="block font-semibold">Historial de planillas</span>
           <span className="block text-xs text-slate-400">{lista.length} periodo(s) cerrado(s) · copia permanente, solo lectura</span>
@@ -88,28 +88,28 @@ export function HistorialPlanilla({ lista, cargando, error }: { lista: Periodo[]
               {carpetas.map(([clave, c]) => {
                 const abiertaC = !cerradas.has(clave);
                 return (
-                  <div key={clave} className="rounded-lg border border-slate-200">
-                    <button onClick={() => alternar(clave)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                  <div key={clave} className="rounded-lg border border-plomo-200">
+                    <button onClick={() => alternar(clave)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-plomo-50">
                       <ChevronRight size={16} className={cn("text-slate-400 transition", abiertaC && "rotate-90")} />
-                      {abiertaC ? <FolderOpen size={16} className="text-amber-500" /> : <Folder size={16} className="text-amber-500" />}
+                      {abiertaC ? <FolderOpen size={16} className="text-corp" /> : <Folder size={16} className="text-corp" />}
                       <span className="flex-1">{c.nombre}</span>
-                      <span className="text-xs font-normal text-slate-500">
+                      <span className="text-xs font-normal text-plomo-500">
                         {c.periodos.length} · {soles(c.periodos.reduce((a, p) => a + p.total_pagar, 0))}
                       </span>
                     </button>
                     {abiertaC && (
-                      <div className="grid gap-2 border-t border-slate-100 p-2 sm:grid-cols-2 xl:grid-cols-3">
+                      <div className="grid gap-2 border-t border-plomo-100 p-2 sm:grid-cols-2 xl:grid-cols-3">
                         {c.periodos.map((p) => (
                           <Link
                             key={p.id}
                             href={`/dashboard/planilla/historial/${p.id}`}
-                            className="group flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-3 transition hover:border-amber-400 hover:shadow-sm"
+                            className="group flex items-start gap-3 rounded-lg border border-plomo-200 bg-white p-3 transition hover:border-corp hover:shadow-sm"
                           >
-                            <FileText size={20} className="mt-0.5 shrink-0 text-slate-400 group-hover:text-amber-500" />
+                            <FileText size={20} className="mt-0.5 shrink-0 text-slate-400 group-hover:text-corp" />
                             <span className="min-w-0 flex-1">
-                              <span className="block truncate text-sm font-semibold text-slate-900">{p.periodo}</span>
-                              <span className="mt-0.5 block text-lg font-bold text-slate-900" title="Total pagado (neto - adelantos)">{soles(p.total_pagar)}</span>
-                              <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                              <span className="block truncate text-sm font-semibold text-azul-900">{p.periodo}</span>
+                              <span className="mt-0.5 block text-lg font-bold text-azul-900" title="Total pagado (neto - adelantos)">{soles(p.total_pagar)}</span>
+                              <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-plomo-500">
                                 <span>{fechaHora(p.fecha_cierre)}</span>
                                 <span className="inline-flex items-center gap-1">
                                   <Users size={12} /> {p.cantidad_trabajadores}
@@ -117,7 +117,7 @@ export function HistorialPlanilla({ lista, cargando, error }: { lista: Periodo[]
                                 {p.creado_por && <span>por {p.creado_por}</span>}
                               </span>
                             </span>
-                            <ChevronRight size={16} className="mt-1 shrink-0 text-slate-300 group-hover:text-amber-500" />
+                            <ChevronRight size={16} className="mt-1 shrink-0 text-slate-300 group-hover:text-corp" />
                           </Link>
                         ))}
                       </div>

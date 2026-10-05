@@ -47,12 +47,12 @@ export default function CreadorPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="w-full space-y-6">
       <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
-          <KeyRound size={22} className="text-violet-600" /> Módulo Creador
+        <h1 className="flex items-center gap-3 font-serif text-[36px] font-light leading-tight text-azul-900 lg:text-[42px]">
+          <KeyRound size={22} className="text-corp" /> Módulo Creador
         </h1>
-        <p className="text-sm text-slate-500">Edición manual de asistencia: corrige DÍAS y TARD. de la planilla. Queda registrado como origen CREADOR.</p>
+        <p className="mt-1 text-[13px] text-plomo-600">Edición manual de asistencia: corrige DÍAS y TARD. de la planilla. Queda registrado como origen CREADOR.</p>
       </div>
 
       <Card>
@@ -81,7 +81,7 @@ export default function CreadorPage() {
               return (
                 <tr key={t.id} className={cn(cambiado(t.id) && "bg-amber-50")}>
                   <Td className="font-mono">{t.id}</Td>
-                  <Td className="font-semibold text-slate-900">{t.nombre}</Td>
+                  <Td className="font-semibold text-azul-900">{t.nombre}</Td>
                   {(["dias", "tardanzas"] as const).map((campo) => (
                     <Td key={campo}>
                       <Input
@@ -103,14 +103,14 @@ export default function CreadorPage() {
                   ))}
                   <Td>
                     {reg ? (
-                      <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-bold", reg.origen_edicion === "CREADOR" ? "bg-violet-100 text-violet-700" : "bg-sky-100 text-sky-700")}>
+                      <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-bold", reg.origen_edicion === "CREADOR" ? "bg-red-50 text-vino" : "bg-[#EEF2F7] text-azul-700")}>
                         {reg.origen_edicion}
                       </span>
                     ) : (
                       <span className="text-xs text-slate-400">Sin registro</span>
                     )}
                   </Td>
-                  <Td className="text-xs text-slate-500">{reg ? new Date(reg.fecha).toLocaleString("es-PE") : "-"}</Td>
+                  <Td className="text-xs text-plomo-500">{reg ? new Date(reg.fecha).toLocaleString("es-PE") : "-"}</Td>
                   <Td>
                     <Button size="sm" onClick={() => guardar(t.id)} disabled={!cambiado(t.id) || guardando !== null}>
                       <Save size={14} /> {guardando === t.id ? "Guardando…" : "Guardar"}

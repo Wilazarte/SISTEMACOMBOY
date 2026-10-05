@@ -42,6 +42,16 @@ function buscar(q: string): Resultado[] {
   return out.filter((r) => `${r.numero} ${r.detalle}`.toUpperCase().includes(t)).slice(0, 12);
 }
 
+/** Logotipo: COMBOY azul + VID rojo, serif. */
+function Logo({ className, claro }: { className?: string; claro?: boolean }) {
+  return (
+    <Link href="/dashboard" className={cn("flex items-baseline gap-2 font-serif font-bold leading-none tracking-tight", className)} aria-label="COMBOY VID - inicio">
+      <span className={claro ? "text-white" : "text-azul-900"}>COMBOY</span>
+      <span className="text-corp">VID</span>
+    </Link>
+  );
+}
+
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const path = usePathname();
   const router = useRouter();
@@ -74,7 +84,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   if (!listo || !sesion || (!datos.listo && !datos.error))
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-50 text-slate-400">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-plomo-50 text-plomo-500">
         <Loader2 size={24} className="animate-spin" />
         {sesion && <p className="text-sm">Cargando datos…</p>}
       </div>
@@ -82,16 +92,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   if (datos.error)
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
-        <div className="max-w-md rounded-xl border border-red-200 bg-white p-8 text-center shadow-sm">
-          <AlertTriangle size={36} className="mx-auto text-red-500" />
-          <h1 className="mt-3 text-lg font-bold text-slate-900">No se pudieron cargar los datos</h1>
-          <p className="mt-1 text-sm text-slate-600">{datos.error}</p>
+      <div className="flex min-h-screen items-center justify-center bg-plomo-50 p-4">
+        <div className="max-w-md rounded-xl border border-plomo-200 bg-white p-8 text-center shadow-sm">
+          <AlertTriangle size={36} className="mx-auto text-corp" />
+          <h1 className="mt-3 font-serif text-xl text-azul-900">No se pudieron cargar los datos</h1>
+          <p className="mt-1 text-sm text-plomo-600">{datos.error}</p>
           <div className="mt-5 flex justify-center gap-2">
-            <button onClick={() => window.dispatchEvent(new Event("erp:reintentar"))} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
+            <button onClick={() => window.dispatchEvent(new Event("erp:reintentar"))} className="rounded-lg bg-corp px-6 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-vino-900">
               Reintentar
             </button>
-            <button onClick={salir} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            <button onClick={salir} className="rounded-lg border border-plomo-200 bg-white px-6 py-2.5 text-sm font-medium text-azul-900 hover:bg-plomo-50">
               Cerrar sesión
             </button>
           </div>
@@ -120,20 +130,24 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const modulo = NAV.find((n) => n.href !== "/dashboard" && (path === n.href || path.startsWith(`${n.href}/`)))?.href;
 
   return (
-    <div className="min-h-screen lg:pl-64">
+    <div className="flex min-h-screen flex-col bg-plomo-50 lg:pl-[264px]">
       {/* Sidebar */}
-      <aside className={cn("fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 text-slate-300 transition-transform lg:translate-x-0", menu ? "translate-x-0" : "-translate-x-full")}>
-        <div className="flex h-16 items-center gap-3 border-b border-slate-800 px-5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500 font-black text-slate-900">CV</div>
-          <div>
-            <p className="text-sm font-bold text-white">COMBOY VID</p>
-            <p className="text-[11px] text-slate-400">ERP</p>
+      <aside
+        className={cn("fixed inset-y-0 left-0 z-40 flex w-[264px] flex-col text-white/70 transition-transform lg:translate-x-0", menu ? "translate-x-0" : "-translate-x-full")}
+        style={{ background: "linear-gradient(180deg, #0F2440 0%, #1E3A5F 100%)" }}
+      >
+        <div className="flex h-[72px] items-center gap-3 border-b border-white/10 px-5">
+          <Logo className="text-[26px] lg:hidden" claro />
+          <div className="hidden lg:block">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/80">ERP Corporativo</p>
+            <p className="mt-1 text-[10px] uppercase tracking-[0.3em] text-white/40">Soluciones mineras</p>
           </div>
           <button className="ml-auto lg:hidden" onClick={() => setMenu(false)} aria-label="Cerrar menú">
             <X size={18} />
           </button>
         </div>
-        <nav className="space-y-1 p-3">
+        <p className="px-5 pb-2 pt-6 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/40">Menú principal</p>
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
           {nav.map((n) => {
             const activo = path === n.href || (n.href !== "/dashboard" && path.startsWith(`${n.href}/`)); // subpáginas (Adelantos, Historial…)
             const Icon = n.icon;
@@ -141,15 +155,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <>
                 <Icon size={18} />
                 <span className="flex-1">{n.label}</span>
-                {n.href === "/dashboard/compras" && pendientes.length > 0 && (
-                  <span className="rounded-full bg-amber-400 px-1.5 text-[11px] font-bold text-slate-900">{pendientes.length}</span>
-                )}
-                {n.pronto && <span className="text-[10px] uppercase text-slate-500">Fase sig.</span>}
+                {n.href === "/dashboard/compras" && pendientes.length > 0 && <span className="rounded-full bg-corp px-1.5 text-[11px] font-bold text-white">{pendientes.length}</span>}
+                {n.pronto && <span className="text-[10px] uppercase tracking-wider text-white/30">Fase sig.</span>}
               </>
             );
             if (n.pronto)
               return (
-                <div key={n.href} className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium opacity-50">
+                <div key={n.href} className="flex cursor-not-allowed items-center gap-3 rounded-lg px-5 py-3 text-sm font-medium opacity-50">
                   {contenido}
                 </div>
               );
@@ -158,19 +170,22 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 key={n.href}
                 href={n.href}
                 onClick={() => setMenu(false)}
-                className={cn("flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition", activo ? "bg-white/10 text-white" : "hover:bg-white/5 hover:text-white")}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-5 py-3 text-sm font-medium transition",
+                  activo ? "ml-2 rounded-l-none border-l-2 border-l-corp bg-white/[0.08] text-white" : "text-white/70 hover:bg-white/[0.06] hover:text-white"
+                )}
               >
                 {contenido}
               </Link>
             );
           })}
         </nav>
-        <div className="absolute inset-x-0 bottom-0 border-t border-slate-800 p-4">
+        <div className="border-t border-white/10 p-4">
           {locales > 0 && (
             <button
               onClick={subirLocales}
               disabled={subiendo}
-              className="mb-3 flex w-full items-center gap-2 rounded-lg bg-amber-500/15 px-3 py-2 text-left text-xs font-medium text-amber-300 hover:bg-amber-500/25 disabled:opacity-60"
+              className="mb-3 flex w-full items-center gap-2 rounded-lg bg-white/[0.08] px-3 py-2 text-left text-xs font-medium text-white hover:bg-white/[0.12] disabled:opacity-60"
               title="Sube a Supabase los datos que este navegador tenía de la versión anterior"
             >
               {subiendo ? <Loader2 size={15} className="animate-spin" /> : <CloudUpload size={15} />}
@@ -178,107 +193,113 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             </button>
           )}
           <div className="flex items-center gap-2.5">
-            <UserCircle2 size={30} className="shrink-0 text-slate-500" />
+            <UserCircle2 size={30} className="shrink-0 text-white/40" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-white">{sesion.usuario}</p>
-              <p className="truncate text-[11px] text-slate-400">{sesion.nombre}</p>
+              <p className="truncate text-[11px] text-white/50">{sesion.nombre}</p>
             </div>
-            <button onClick={salir} className="rounded-lg p-2 text-slate-400 hover:bg-white/10 hover:text-white" title="Cerrar sesión" aria-label="Cerrar sesión">
+            <button onClick={salir} className="rounded-lg p-2 text-white/50 hover:bg-white/10 hover:text-white" title="Cerrar sesión" aria-label="Cerrar sesión">
               <LogOut size={17} />
             </button>
           </div>
         </div>
       </aside>
-      {menu && <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={() => setMenu(false)} />}
+      {menu && <div className="fixed inset-0 z-30 bg-azul-900/50 lg:hidden" onClick={() => setMenu(false)} />}
 
       {/* Header */}
-      <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur lg:px-8">
-        <button className="lg:hidden" onClick={() => setMenu(true)} aria-label="Abrir menú">
+      <header className="sticky top-0 z-20 flex h-[72px] items-center gap-4 border-b-[3px] border-b-corp bg-white px-4 lg:px-8">
+        <button className="text-azul-900 lg:hidden" onClick={() => setMenu(true)} aria-label="Abrir menú">
           <Menu size={22} />
         </button>
-        <div className={cn("relative max-w-md flex-1", !buscador && "invisible")}>
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar REQ, cotización, OC, factura, guía, proveedor…"
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm outline-none focus:border-slate-400 focus:bg-white"
-          />
-          {q.trim().length >= 2 && (
-            <div className="absolute inset-x-0 top-11 max-h-96 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl">
-              {resultados.length === 0 ? (
-                <p className="p-4 text-sm text-slate-400">Sin coincidencias</p>
-              ) : (
-                resultados.map((r) => (
-                  <button
-                    key={r.tipo + r.id}
-                    onClick={() => {
-                      abrirDoc({ tipo: r.tipo, id: r.id });
-                      setQ("");
-                    }}
-                    className="flex w-full items-center gap-3 border-b border-slate-100 px-4 py-2.5 text-left last:border-0 hover:bg-slate-50"
-                  >
-                    <span className="w-14 text-[10px] font-bold uppercase text-slate-400">{r.tipo}</span>
-                    <span className="flex-1">
-                      <span className="block text-sm font-semibold text-slate-800">{r.numero}</span>
-                      <span className="block text-xs text-slate-500">{r.detalle}</span>
-                    </span>
-                    <Badge estado={r.estado} />
-                  </button>
-                ))
-              )}
-            </div>
-          )}
-        </div>
-        <div className="ml-auto flex items-center gap-3">
+        <Logo className="hidden text-[42px] sm:flex" />
+        <div className="ml-auto flex flex-1 items-center justify-end gap-3">
+          <div className={cn("relative w-full max-w-md", !buscador && "invisible")}>
+            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-plomo-500" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar REQ, cotización, OC, factura, guía, proveedor…"
+              className="w-full rounded-full border-[1.5px] border-azul-900 bg-white py-2 pl-10 pr-4 text-sm text-azul-900 outline-none placeholder:text-plomo-500 focus:ring-2 focus:ring-azul-900/15"
+            />
+            {q.trim().length >= 2 && (
+              <div className="absolute inset-x-0 top-12 max-h-96 overflow-y-auto rounded-xl border border-plomo-200 bg-white shadow-[0_12px_32px_rgba(15,36,64,0.15)]">
+                {resultados.length === 0 ? (
+                  <p className="p-4 text-sm text-plomo-500">Sin coincidencias</p>
+                ) : (
+                  resultados.map((r) => (
+                    <button
+                      key={r.tipo + r.id}
+                      onClick={() => {
+                        abrirDoc({ tipo: r.tipo, id: r.id });
+                        setQ("");
+                      }}
+                      className="flex w-full items-center gap-3 border-b border-plomo-100 px-4 py-2.5 text-left last:border-0 hover:bg-plomo-50"
+                    >
+                      <span className="w-14 text-[10px] font-bold uppercase tracking-wider text-plomo-500">{r.tipo}</span>
+                      <span className="flex-1">
+                        <span className="block text-sm font-semibold text-azul-900">{r.numero}</span>
+                        <span className="block text-xs text-plomo-500">{r.detalle}</span>
+                      </span>
+                      <Badge estado={r.estado} />
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
           {veCompras && (
-            <Link href="/dashboard/compras" className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100" title="Requerimientos por revisar">
+            <Link href="/dashboard/compras" className="relative rounded-full p-2 text-azul-900 hover:bg-plomo-100" title="Requerimientos por revisar">
               <Bell size={20} />
               {pendientes.length > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-400 px-1 text-[11px] font-bold text-slate-900">
-                  {pendientes.length}
-                </span>
+                <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-corp px-1 text-[11px] font-bold text-white">{pendientes.length}</span>
               )}
             </Link>
           )}
-          <span className="hidden rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 sm:inline">{sesion.nombre}</span>
+          <span className="hidden items-center gap-2 whitespace-nowrap rounded-full border border-plomo-200 px-3 py-1.5 text-xs font-semibold text-azul-900 md:inline-flex">
+            <UserCircle2 size={16} className="text-plomo-500" /> {sesion.nombre}
+          </span>
         </div>
       </header>
 
-      <main className="p-4 lg:p-8">
+      <main className="w-full max-w-none flex-1 bg-plomo-50 p-0">
+        <div className="w-full px-6 py-8 lg:px-8">
         {sesion.modulos.length === 0 ? (
-          <div className="mx-auto mt-16 max-w-md rounded-xl border border-amber-200 bg-white p-8 text-center shadow-sm">
-            <ShieldAlert size={40} className="mx-auto text-amber-500" />
-            <h1 className="mt-3 text-xl font-bold text-slate-900">Sin módulos asignados</h1>
-            <p className="mt-1 text-sm text-slate-500">
+          <div className="mx-auto mt-16 max-w-md rounded-xl border border-plomo-200 bg-white p-8 text-center shadow-sm">
+            <ShieldAlert size={40} className="mx-auto text-corp" />
+            <h1 className="mt-3 font-serif text-2xl text-azul-900">Sin módulos asignados</h1>
+            <p className="mt-1 text-sm text-plomo-500">
               Su usuario ({sesion.usuario}, rol {sesion.rol}) inició sesión, pero todavía no tiene módulos habilitados. El administrador debe asignarlos en la tabla perfiles (columna modulos).
             </p>
           </div>
         ) : !permitido ? (
-          <div className="mx-auto mt-16 max-w-md rounded-xl border border-red-200 bg-white p-8 text-center shadow-sm">
-            <ShieldAlert size={40} className="mx-auto text-red-500" />
-            <h1 className="mt-3 text-xl font-bold text-slate-900">Acceso denegado</h1>
-            <p className="mt-1 text-sm text-slate-500">Su usuario ({sesion.usuario}) no tiene permiso para ver este módulo.</p>
-            <Link href={inicioDe(sesion)} className="mt-5 inline-flex rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
+          <div className="mx-auto mt-16 max-w-md rounded-xl border border-plomo-200 bg-white p-8 text-center shadow-sm">
+            <ShieldAlert size={40} className="mx-auto text-corp" />
+            <h1 className="mt-3 font-serif text-2xl text-azul-900">Acceso denegado</h1>
+            <p className="mt-1 text-sm text-plomo-500">Su usuario ({sesion.usuario}) no tiene permiso para ver este módulo.</p>
+            <Link href={inicioDe(sesion)} className="mt-5 inline-flex rounded-lg bg-corp px-6 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-vino-900">
               Ir a mi módulo
             </Link>
           </div>
         ) : (
           <div className="space-y-6">
             {sesion.soloLectura && (
-              <div className="mx-auto flex max-w-7xl items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-5 py-2.5 text-sm text-sky-800">
+              <div className="flex w-full items-center gap-2 rounded-xl border border-plomo-200 bg-white px-5 py-2.5 text-sm text-azul-700 shadow-[0_4px_12px_rgba(15,36,64,0.06)]">
                 <Eye size={16} /> Modo solo lectura: puede revisar todo y registrar observaciones, pero no guardar, editar ni eliminar.
               </div>
             )}
             {modulo && (
-              <div className="mx-auto max-w-7xl">
+              <div className="w-full">
                 <ObservacionesGerencia modulo={modulo} sesion={sesion} />
               </div>
             )}
             {children}
           </div>
         )}
+        </div>
       </main>
+      <footer className="border-t border-plomo-200 bg-white px-6 py-4 text-center text-[12px] tracking-wide text-plomo-500 lg:px-8">
+        <span className="font-serif text-azul-900">COMBOY</span> <span className="font-serif text-corp">VID</span> © 2025 • ERP Corporativo • Lima, Perú • v3.2.1
+      </footer>
       <DocViewerHost />
       <Toaster />
     </div>

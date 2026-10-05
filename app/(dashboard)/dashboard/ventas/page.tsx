@@ -26,10 +26,10 @@ export default function VentasPage() {
   const vencidos = comprobantes.filter((c) => c.estado === "EMITIDO" && estadoCxC(c).estado === "VENCIDO").length;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
+    <div className="w-full space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Ventas</h1>
-        <p className="text-sm text-slate-500">Nota de pedido → Aprobada → Factura / Boleta → Orden de despacho → Cobro</p>
+        <h1 className="font-serif text-[36px] font-light leading-tight text-azul-900 lg:text-[42px]">Ventas</h1>
+        <p className="mt-1 text-[13px] text-plomo-600">Nota de pedido → Aprobada → Factura / Boleta → Orden de despacho → Cobro</p>
       </div>
       <Tabs<Tab>
         value={tab}

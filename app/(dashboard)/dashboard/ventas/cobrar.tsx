@@ -35,16 +35,16 @@ export function CuentasPorCobrar() {
   return (
     <div className="space-y-6">
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase text-slate-500">Por cobrar</p>
-          <p className="text-xl font-bold text-slate-900">{soles(totalSaldo)}</p>
+        <div className="rounded-xl border border-plomo-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase text-plomo-500">Por cobrar</p>
+          <p className="text-xl font-bold text-azul-900">{soles(totalSaldo)}</p>
         </div>
         <div className="rounded-xl border border-red-200 bg-red-50 p-4">
           <p className="text-xs font-semibold uppercase text-red-700">Vencido</p>
           <p className="text-xl font-bold text-red-700">{soles(vencido)}</p>
         </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase text-slate-500">Cobrado (histórico)</p>
+        <div className="rounded-xl border border-plomo-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase text-plomo-500">Cobrado (histórico)</p>
           <p className="text-xl font-bold text-emerald-700">{soles(r2(cobros.reduce((a, c) => a + c.monto, 0)))}</p>
         </div>
       </div>
@@ -69,10 +69,10 @@ export function CuentasPorCobrar() {
         />
         <Table head={["Comprobante", "Cliente", "Emisión", "Vencimiento", "Total", "Pagado", "Saldo", "Días vencido", "Estado", ""]} empty={cxc.length === 0}>
           {cxc.map(({ c, estado, diasVencido, pagado }) => (
-            <tr key={c.id} className="hover:bg-slate-50">
-              <Td className="font-semibold text-slate-900">
+            <tr key={c.id} className="hover:bg-plomo-50">
+              <Td className="font-semibold text-azul-900">
                 {c.numero}
-                <p className="text-xs font-normal text-slate-500">{tipoLabel[c.tipo]}</p>
+                <p className="text-xs font-normal text-plomo-500">{tipoLabel[c.tipo]}</p>
               </Td>
               <Td>{c.cliente}</Td>
               <Td>{fechaPE(c.fecha)}</Td>
@@ -126,7 +126,7 @@ export function CuentasPorCobrar() {
             }}
             className="space-y-3"
           >
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-plomo-600">
               {sel.cliente} · Saldo <b>{soles(sel.saldo)}</b>
             </p>
             <div className="grid gap-3 sm:grid-cols-2">

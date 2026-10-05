@@ -1,11 +1,32 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body { @apply bg-slate-100 text-slate-900 antialiased; }
+/* ===================== Sistema de diseño COMBOY VID (formal corporativo) ===================== */
+:root {
+  --azul-900: #0f2440;
+  --azul-700: #1e3a5f;
+  --azul-500: #2a4a73;
+  --rojo-vino-900: #7f1d1d;
+  --rojo-vino: #9b1c1f;
+  --rojo-corp: #b91c1c;
+  --plomo-50: #f8fafc;
+  --plomo-100: #f1f5f9;
+  --plomo-200: #e2e8f0;
+  --plomo-500: #64748b;
+  --plomo-600: #475569;
+  --font-serif: "Libre Baskerville", "Instrument Serif", Georgia, "Times New Roman", serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html { font-family: var(--font-sans); }
+body { @apply bg-plomo-50 text-azul-900 antialiased; font-family: var(--font-sans); }
+h1 { font-family: var(--font-serif); }
 input[type="number"]::-webkit-inner-spin-button { opacity: 0.4; }
 
-/* Campo de solo lectura (DÍAS / TARD. en Planilla del periodo): no se puede clickear ni editar */
+/* Campo de solo lectura (DÍAS / TARD. de Planilla del periodo): no se puede clickear ni editar */
 .readonly-field {
-  @apply inline-flex cursor-not-allowed select-none items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 font-mono text-sm font-semibold text-slate-600;
+  @apply inline-flex cursor-not-allowed select-none items-center gap-1 rounded-md bg-plomo-100 px-2 py-0.5 font-mono text-sm font-semibold text-plomo-600;
 }
