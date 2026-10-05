@@ -169,6 +169,91 @@ export interface Trabajador {
   afpTipo: TipoAfp;
   afpPorcentaje: number; // ej. 13
   activo: boolean;
+  // ---- Ficha del trabajador (opcionales: los registros antiguos no los tienen) ----
+  fechaNacimiento?: string; // YYYY-MM-DD (la edad se calcula)
+  sede?: string; // lib/empresa.ts SEDES
+  nroAfiliacion?: string; // CUSPP / N° de afiliación AFP u ONP
+  direccion?: string;
+  celular?: string;
+  email?: string;
+  estadoCivil?: EstadoCivil;
+  nroHijos?: number;
+  emergenciaNombre?: string;
+  emergenciaParentesco?: string;
+  emergenciaCelular?: string;
+  observacionesMedicas?: string; // alergias, condiciones
+  fechaBaja?: string; // YYYY-MM-DD (al dar de baja)
+  motivoBaja?: string;
+}
+
+export type EstadoCivil = "SOLTERO" | "CASADO" | "CONVIVIENTE" | "DIVORCIADO" | "VIUDO";
+
+/** Huellas del reloj que pertenecen a otro trabajador (duplicados unidos): huella -> N° del trabajador. */
+export type AliasHuellas = Record<string, string>;
+
+// ---- Liquidación flexible de la planilla del periodo ----
+export type ModoLiquidacion = "DIAS" | "HORAS" | "DIAS_HORAS";
+
+/** Ajuste manual de un trabajador en el periodo (sin ajuste se usa lo del reloj). */
+export interface AjusteLiquidacion {
+  dias?: number; // entero
+  horas?: number; // modo HORAS
+  horasExtra?: number; // modo DÍAS + HORAS
+}
+
+/** Configuración y ajustes de la planilla de un periodo (un registro por periodo). */
+export interface LiquidacionPeriodo {
+  id: string; // periodo normalizado
+  periodo: string;
+  modo: ModoLiquidacion;
+  horasJornada: number; // sueldo_hora = sueldo_diario / horasJornada (8)
+  recargoExtra: number; // % sobre la hora en horas extra (0 = sin recargo)
+  ajustes: Record<string, AjusteLiquidacion>; // N° trabajador -> ajuste
+}
+
+// ---- Contratistas / concesiones (servicios externos a terceros) ----
+export type TipoServicioContratista =
+  | "ASESORIA"
+  | "GESTION_TRAMITE"
+  | "CONSTRUCCION"
+  | "IMPLEMENTACION_EQUIPO"
+  | "SISTEMA"
+  | "SERVICIO_BASICO"
+  | "OTRO";
+
+export interface ComprobanteContratista {
+  tipo: "RH" | "FACTURA" | "BOLETA" | "OTRO";
+  numero: string;
+  monto: number;
+  fecha: string;
+}
+
+export interface PagoContratista {
+  fecha: string;
+  monto: number;
+  medio: string; // EFECTIVO, TRANSFERENCIA...
+  nota?: string;
+}
+
+export interface ConcesionContratista {
+  id: string;
+  razonSocial: string;
+  ruc: string;
+  representante: string;
+  celular: string;
+  tipoServicio: TipoServicioContratista;
+  descripcion: string;
+  sede: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  monto_total: number;
+  adelanto: number;
+  saldo: number; // monto_total - adelanto - pagos
+  estado: "ACTIVO" | "FINALIZADO" | "ANULADO";
+  comprobantes: ComprobanteContratista[];
+  pagos?: PagoContratista[]; // pagos posteriores al adelanto
+  observaciones: string;
+  created_at?: string;
 }
 
 // =====================================================================

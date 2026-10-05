@@ -58,6 +58,13 @@ Para cambiar una contraseña: Supabase → Authentication → Users → usuario 
 - **Clientes y notas en `public.ventas`** (no hay tabla `clientes`): `supabase/ventas_columnas.sql` agrega y llena por trigger `numero_np` (único), `ruc`, `cliente_nombre`, `condicion_pago_id`, `condicion_pago_nombre`, `dias_credito` y `fecha_vencimiento`, y crea el índice único (tipo, id). Si falta ese índice, el ERP igual guarda (actualiza o inserta fila por fila).
 - Nuevas condiciones: Ventas › **Configuración**, o el botón **+** junto al select de la nota de pedido. Las editan creador y tesorería.
 
+## Planilla (rediseño)
+- **Trabajadores:** botón **Ficha** por trabajador (datos laborales con sede y edad automática, datos personales y contacto de emergencia). Desde la ficha: Guardar, **Dar de baja** (fecha + motivo), Reactivar, **Eliminar definitivo** (confirmación + escribir el N° de huella) y **Ver historial de pagos**. "Mostrar inactivos" los muestra en gris con badge rojo.
+- **Duplicados del reloj** (mismo DNI o mismo nombre con número al final, ej. "LIZBETH CAHUANA 1"): aviso con **Eliminar duplicado y unir huella**; las próximas importaciones suman esa huella al trabajador original (`KEYS.HUELLAS_ALIAS`).
+- **Planilla del periodo:** modo **DÍAS / HORAS / DÍAS + HORAS EXTRA** por periodo, jornada (8 h por defecto) y recargo de horas extra. Sueldo diario = mensual / 30 (diario: el mismo); hora = diario / jornada. Botones −1/+1 día, −1/+1 hora, +jornada, +media jornada. Son ajustes de la planilla (`KEYS.LIQUIDACIONES`): lo del reloj 🔒 no cambia y cada fila puede volver al reloj.
+- **Contratistas:** concesiones / servicios externos (asesoría, trámites, construcción, equipos, sistemas, servicios básicos) con comprobantes RH/factura, pagos, liquidar saldo, anular, contrato PDF y filtros por servicio, sede y estado (`KEYS.CONTRATISTAS`).
+- Todo se guarda en la tabla `planilla` de Supabase (no requiere SQL nuevo); los trabajadores existentes no cambian: los campos nuevos son opcionales.
+
 ## Adelantos (Planilla › Adelantos)
 - **Activar en Supabase:** SQL Editor → `supabase/adelantos.sql` (o volver a correr `supabase_tables.sql`). Crea `public.adelantos` (id, trabajador_nombre, dni, fecha, monto, motivo, estado PENDIENTE / DESCONTADO / ANULADO) con RLS y Realtime.
 - `/dashboard/planilla/adelantos` (botón **Adelantos** en Planilla): formulario arriba y tabla abajo; **Editar** carga el adelanto en el formulario para actualizarlo, y se puede eliminar. CRUD en `lib/adelantos.ts`.

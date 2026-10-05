@@ -129,7 +129,7 @@ const COLORES: Record<string, string> = {
   CONTADO: "bg-emerald-50 text-emerald-700 ring-emerald-200",
   CREDITO: "bg-orange-50 text-orange-700 ring-orange-200",
   CREDITO_CUOTAS: "bg-orange-50 text-orange-700 ring-orange-200",
-  INACTIVO: "bg-slate-100 text-slate-500 ring-slate-300",
+  INACTIVO: "bg-red-100 text-red-700 ring-red-300",
   DESCONTADO: "bg-emerald-100 text-emerald-800 ring-emerald-300",
 };
 

@@ -229,3 +229,38 @@ async function insertarDirecto(periodo: string, filas: FilaCierre[], rango?: { d
   }
   return id;
 }
+
+/** Pagos de planilla de un trabajador (periodos cerrados), del más reciente al más antiguo. */
+export interface PagoTrabajador {
+  periodo: string;
+  fecha_cierre: string;
+  dias: number;
+  horas: number;
+  bruto: number;
+  descuento_afp: number;
+  adelantos: number;
+  total_pagar: number;
+}
+
+export async function historialPagosTrabajador(trabajadorId: string): Promise<PagoTrabajador[]> {
+  const sb = createClient();
+  const det = await sb.from("planilla_historial_detalle").select("*").eq("trabajador_id", trabajadorId);
+  if (det.error) throw errorHistorial(det.error);
+  const filas = (det.data ?? []).map(aDetalle);
+  if (!filas.length) return [];
+  const cab = await sb.from("planilla_historial").select("id, periodo, fecha_cierre").in("id", [...new Set(filas.map((f) => f.historial_id))]);
+  if (cab.error) throw errorHistorial(cab.error);
+  const porId = new Map((cab.data ?? []).map((h) => [String(h.id), h as { periodo: string; fecha_cierre: string }]));
+  return filas
+    .map((d) => ({
+      periodo: porId.get(d.historial_id)?.periodo ?? "-",
+      fecha_cierre: porId.get(d.historial_id)?.fecha_cierre ?? "",
+      dias: d.dias,
+      horas: d.horas,
+      bruto: d.bruto,
+      descuento_afp: d.descuento_afp || r2(d.bruto - d.neto),
+      adelantos: d.adelantos,
+      total_pagar: d.total_pagar,
+    }))
+    .sort((a, b) => b.fecha_cierre.localeCompare(a.fecha_cierre));
+}

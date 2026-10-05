@@ -10,7 +10,9 @@ import type { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/
 import { getSesion, rolNegocio } from "./auth";
 import { createClient } from "./supabase/client";
 import type {
+  AliasHuellas,
   CondicionPago,
+  EstadoCivil,
   AsistenciaPeriodo,
   CuentaOrigenPago,
   Compra,
@@ -51,6 +53,10 @@ export const KEYS = {
   COBROS: "ventas_cobros",
   ASIENTOS: "ventas_asientos",
   DESPACHOS: "almacen_despachos",
+  // Planilla (nuevas)
+  LIQUIDACIONES: "planilla_liquidaciones",
+  CONTRATISTAS: "planilla_contratistas",
+  HUELLAS_ALIAS: "planilla_huellas_alias",
 } as const;
 
 export type StoreKey = (typeof KEYS)[keyof typeof KEYS];
@@ -134,6 +140,9 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.COBROS]: { tabla: "ventas", tipo: "cobro", forma: "lista" },
   [KEYS.ASIENTOS]: { tabla: "ventas", tipo: "asiento", forma: "lista" },
   [KEYS.DESPACHOS]: { tabla: "almacen", tipo: "despacho", forma: "lista" },
+  [KEYS.LIQUIDACIONES]: { tabla: "planilla", tipo: "liquidacion", forma: "lista" },
+  [KEYS.CONTRATISTAS]: { tabla: "planilla", tipo: "contratista", forma: "lista" },
+  [KEYS.HUELLAS_ALIAS]: { tabla: "planilla", tipo: "huella_alias", forma: "objeto" },
   [KEYS.OBSERVACIONES]: { tabla: "observaciones", forma: "observaciones" },
 };
 const TABLAS = ["compras", "almacen", "planilla", "ventas", "observaciones", "condiciones_pago"] as const;
@@ -1133,7 +1142,46 @@ function normalizarTrabajador(t: Partial<Trabajador>): Trabajador {
     afpTipo,
     afpPorcentaje: Number.isFinite(afpPorcentaje) && afpPorcentaje >= 0 ? afpPorcentaje : AFP_OPTIONS[afpTipo].porc,
     activo: t.activo !== false,
+    ...fichaOpcional(t),
   };
+}
+
+const CAMPOS_FICHA_TEXTO = [
+  "sede",
+  "nroAfiliacion",
+  "direccion",
+  "celular",
+  "email",
+  "emergenciaNombre",
+  "emergenciaParentesco",
+  "emergenciaCelular",
+  "observacionesMedicas",
+  "motivoBaja",
+] as const;
+export const ESTADOS_CIVILES: EstadoCivil[] = ["SOLTERO", "CASADO", "CONVIVIENTE", "DIVORCIADO", "VIUDO"];
+
+/** Campos opcionales de la ficha: se conservan solo si tienen valor (los registros antiguos no los tienen). */
+function fichaOpcional(t: Partial<Trabajador>): Partial<Trabajador> {
+  const r: Partial<Trabajador> = {};
+  CAMPOS_FICHA_TEXTO.forEach((k) => {
+    const v = typeof t[k] === "string" ? (t[k] as string).trim() : "";
+    if (v) r[k] = v;
+  });
+  if (typeof t.fechaNacimiento === "string" && FECHA_RE.test(t.fechaNacimiento)) r.fechaNacimiento = t.fechaNacimiento;
+  if (typeof t.fechaBaja === "string" && FECHA_RE.test(t.fechaBaja)) r.fechaBaja = t.fechaBaja;
+  if (t.estadoCivil && ESTADOS_CIVILES.includes(t.estadoCivil)) r.estadoCivil = t.estadoCivil;
+  const hijos = Number(t.nroHijos);
+  if (t.nroHijos !== undefined && t.nroHijos !== null && Number.isInteger(hijos) && hijos >= 0) r.nroHijos = hijos;
+  return r;
+}
+
+/** Edad en años cumplidos a la fecha de hoy. */
+export function edad(fechaNacimiento?: string): number | null {
+  if (!fechaNacimiento || !FECHA_RE.test(fechaNacimiento)) return null;
+  const [y, m, d] = fechaNacimiento.split("-").map(Number);
+  const [hy, hm, hd] = hoy().split("-").map(Number);
+  const e = hy - y - (hm < m || (hm === m && hd < d) ? 1 : 0);
+  return e >= 0 ? e : null;
 }
 
 export const getTrabajadores = (): Trabajador[] =>
@@ -1155,6 +1203,12 @@ function validarTrabajador(t: Trabajador): void {
   if (!(t.sueldo > 0)) throw new ErpError("El sueldo debe ser mayor a 0.");
   if (!(t.afpTipo in AFP_OPTIONS)) throw new ErpError("Seleccione el sistema de pensiones.");
   if (!(t.afpPorcentaje >= 0 && t.afpPorcentaje <= 100)) throw new ErpError("El % de descuento debe estar entre 0 y 100.");
+  if (t.fechaNacimiento && t.fechaNacimiento >= hoy()) throw new ErpError("La fecha de nacimiento debe ser pasada.");
+  const e = edad(t.fechaNacimiento);
+  if (t.fechaNacimiento && (e === null || e < 14 || e > 100)) throw new ErpError("Revise la fecha de nacimiento (edad entre 14 y 100 años).");
+  if (t.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(t.email)) throw new ErpError("Correo electrónico inválido.");
+  if (t.celular && !/^\+?\d[\d\s-]{6,14}$/.test(t.celular)) throw new ErpError("Celular inválido.");
+  if (t.emergenciaCelular && !/^\+?\d[\d\s-]{6,14}$/.test(t.emergenciaCelular)) throw new ErpError("Celular de emergencia inválido.");
 }
 
 /**
@@ -1176,23 +1230,101 @@ export function guardarTrabajador(data: Trabajador, idOriginal?: string): Trabaj
   return t;
 }
 
-/** Alta / baja sin revalidar el resto de datos (permite dar de baja a un trabajador incompleto). */
-export function cambiarEstadoTrabajador(id: string, activo: boolean): void {
+/**
+ * Alta / baja sin revalidar el resto de datos (permite dar de baja a un trabajador incompleto).
+ * Al dar de baja se guardan fecha y motivo; al reactivar se limpian.
+ */
+export function cambiarEstadoTrabajador(id: string, activo: boolean, baja?: { fecha: string; motivo: string }): void {
   const lista = getTrabajadores();
   if (!lista.some((t) => t.id === id)) throw new ErpError("Trabajador no encontrado.");
-  escribir(KEYS.TRABAJADORES, lista.map((t) => (t.id === id ? { ...t, activo } : t)));
+  if (!activo && baja) {
+    if (!FECHA_RE.test(baja.fecha)) throw new ErpError("Indique la fecha de baja.");
+    if (!baja.motivo.trim()) throw new ErpError("Indique el motivo de la baja.");
+  }
+  escribir(
+    KEYS.TRABAJADORES,
+    lista.map((t) => {
+      if (t.id !== id) return t;
+      if (activo) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { fechaBaja, motivoBaja, ...resto } = t;
+        return { ...resto, activo: true };
+      }
+      return { ...t, activo: false, ...(baja ? { fechaBaja: baja.fecha, motivoBaja: baja.motivo.trim() } : {}) };
+    })
+  );
 }
 
 export function eliminarTrabajador(id: string): void {
   escribir(KEYS.TRABAJADORES, getTrabajadores().filter((t) => t.id !== id));
 }
 
+// ---------------------------------------------------------------------
+// Duplicados del reloj (ej. "LIZBETH CAHUANA 1" creado con otra huella)
+// ---------------------------------------------------------------------
+
+export const getAliasHuellas = (): AliasHuellas => leer<AliasHuellas>(KEYS.HUELLAS_ALIAS, {});
+
+const nombreBase = (n: string) =>
+  n
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/\s+\d+$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+export interface Duplicado {
+  duplicado: Trabajador; // el que sobra
+  original: Trabajador; // el que se conserva
+  motivo: string;
+}
+
+/**
+ * Posibles duplicados: mismo DNI, o mismo nombre sin el número final ("LIZBETH CAHUANA 1" = "LIZBETH CAHUANA").
+ * Se propone conservar el registro completo (con fecha de ingreso) y quitar el incompleto.
+ */
+export function detectarDuplicados(lista: Trabajador[]): Duplicado[] {
+  const r: Duplicado[] = [];
+  const vistos = new Set<string>();
+  const peso = (t: Trabajador) => (t.fechaIngreso ? 2 : 0) + (t.dni ? 1 : 0) + (/\s\d+$/.test(t.nombre) ? 0 : 1);
+  lista.forEach((a, i) =>
+    lista.slice(i + 1).forEach((b) => {
+      const mismoDni = !!a.dni && a.dni === b.dni;
+      const mismoNombre = nombreBase(a.nombre) === nombreBase(b.nombre) && nombreBase(a.nombre) !== "";
+      if (!mismoDni && !mismoNombre) return;
+      const [original, duplicado] = peso(a) >= peso(b) ? [a, b] : [b, a];
+      if (vistos.has(duplicado.id)) return;
+      vistos.add(duplicado.id);
+      r.push({ duplicado, original, motivo: mismoDni ? `mismo DNI ${a.dni}` : "mismo nombre" });
+    })
+  );
+  return r;
+}
+
+/**
+ * Quita el duplicado y recuerda que su huella es del trabajador original: las próximas importaciones
+ * del reloj suman esa huella al original en vez de volver a crear el duplicado.
+ */
+export function unirDuplicado(duplicadoId: string, originalId: string): void {
+  const lista = getTrabajadores();
+  if (!lista.some((t) => t.id === duplicadoId) || !lista.some((t) => t.id === originalId)) throw new ErpError("Trabajador no encontrado.");
+  if (duplicadoId === originalId) throw new ErpError("Elija dos trabajadores distintos.");
+  const alias = getAliasHuellas();
+  // Si otras huellas apuntaban al duplicado, ahora apuntan al original
+  const nuevo: AliasHuellas = Object.fromEntries(Object.entries(alias).map(([h, t]) => [h, t === duplicadoId ? originalId : t]));
+  nuevo[duplicadoId] = originalId;
+  escribir(KEYS.HUELLAS_ALIAS, nuevo);
+  escribir(KEYS.TRABAJADORES, lista.filter((t) => t.id !== duplicadoId));
+}
+
 /** Registra en bloque los N° de huella que llegan del reloj y aún no existen. Devuelve cuántos se crearon. */
 export function registrarDesdeAsistencia(nuevos: { id: string; nombre: string }[]): number {
   const lista = getTrabajadores();
+  const alias = getAliasHuellas();
   let n = 0;
   nuevos.forEach(({ id, nombre }) => {
-    if (!id || lista.some((t) => t.id === id)) return;
+    if (!id || alias[id] || lista.some((t) => t.id === id)) return; // huella unida a otro trabajador: no se recrea
     // fechaIngreso vacía: se completa al editar el trabajador
     lista.push({ ...trabajadorVacio(), id, nombre: nombre.toUpperCase() || `TRABAJADOR ${id}`, fechaIngreso: "" });
     n++;

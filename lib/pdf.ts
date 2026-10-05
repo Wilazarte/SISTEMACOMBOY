@@ -10,6 +10,7 @@ import QRCode from "qrcode";
 import { EMPRESA } from "./empresa";
 import { fechaPE, soles } from "./storage";
 import type { HistorialDetalle, HistorialPlanilla } from "./historial";
+import type { ConcesionContratista } from "./types";
 import type { ComprobanteVenta, Cotizacion, Factura, Guia, LineaVenta, NotaPedido, OrdenCompra, OrdenDespacho, Requerimiento } from "./types";
 
 type RGB = [number, number, number];
@@ -243,6 +244,49 @@ const totales = (s: number, igv: number, t: number): [string, string][] => [
 ];
 
 // ---------------------------------------------------------------------
+
+/** Contrato simple de concesión / servicio externo (Planilla › Contratistas). */
+export function pdfContratoConcesion(c: ConcesionContratista, tipoServicio: string): void {
+  const pagado = (c.adelanto || 0) + (c.pagos ?? []).reduce((s, p) => s + p.monto, 0);
+  abrir(
+    construir({
+      titulo: "CONTRATO DE LOCACIÓN DE SERVICIOS",
+      numero: `CS-${c.id.slice(0, 8).toUpperCase()}`,
+      estado: c.estado,
+      datos: [
+        ["Contratante", `${EMPRESA.razonSocial} · RUC ${EMPRESA.ruc}`],
+        ["Contratista", c.razonSocial],
+        ["RUC / DNI", c.ruc || "-"],
+        ["Representante", c.representante || "-"],
+        ["Celular", c.celular || "-"],
+        ["Servicio", tipoServicio],
+        ["Sede", c.sede || "-"],
+        ["Vigencia", `${fechaPE(c.fecha_inicio)} al ${c.fecha_fin ? fechaPE(c.fecha_fin) : "culminación del servicio"}`],
+      ],
+      head: ["Concepto", "Detalle", "Importe"],
+      body: [
+        ["Objeto del servicio", c.descripcion, soles(c.monto_total)],
+        ["Adelanto", "A la firma del contrato", soles(c.adelanto || 0)],
+        ...(c.pagos ?? []).map((p, i) => [`Pago ${i + 1}`, `${fechaPE(p.fecha)} · ${p.medio}${p.nota ? ` · ${p.nota}` : ""}`, soles(p.monto)]),
+      ],
+      alinearDerecha: [2],
+      totales: [
+        ["Monto total", soles(c.monto_total)],
+        ["Pagado", soles(pagado)],
+        ["SALDO", soles(Math.max(0, c.monto_total - pagado))],
+      ],
+      notas: [
+        "PRIMERA: EL CONTRATISTA presta el servicio descrito con autonomía y sus propios medios; no existe vínculo laboral.",
+        "SEGUNDA: El pago se efectúa contra entrega de comprobante (recibo por honorarios o factura) por cada importe pagado.",
+        "TERCERA: EL CONTRATISTA asume sus obligaciones tributarias y de seguridad en la ejecución del servicio.",
+        "CUARTA: Cualquiera de las partes puede resolver el contrato por incumplimiento, liquidando lo efectivamente ejecutado.",
+        ...(c.observaciones ? [`Observaciones: ${c.observaciones}`] : []),
+      ],
+      firmas: ["EL CONTRATANTE", "EL CONTRATISTA"],
+    }),
+    `CONTRATO_${c.razonSocial.replace(/\s+/g, "_")}`
+  );
+}
 
 /** Planilla cerrada (historial): copia fiel de lo guardado al cerrar la semana. */
 export function pdfPlanillaHistorial(h: HistorialPlanilla, detalle: HistorialDetalle[]): void {
