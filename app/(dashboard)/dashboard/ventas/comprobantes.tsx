@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Ban, FilePlus2, FileText, Printer, Send, Trash2 } from "lucide-react";
+import { Ban, FilePlus2, FileText, Printer, Send, Trash2, Truck } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, Textarea, cn, ejecutar, ejecutarAsync } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { pdfComprobanteVenta, pdfTicketVenta } from "@/lib/pdf";
 import { KEYS, fechaPE, hoy, previewNumero, puede, r2, soles, useRol, useStore } from "@/lib/storage";
 import {
-  LUGARES_ENTREGA,
   SERIE,
   despachoVacio,
   anularComprobante,
@@ -22,8 +21,8 @@ import {
   totalesVenta,
   type DatosComprobante,
 } from "@/lib/ventas";
-import type { ComprobanteVenta, DatosDespacho, FormaPagoVenta, LugarEntrega, NotaPedido, OrdenDespacho, TipoComprobanteVenta } from "@/lib/types";
-import { CUENTAS_COBRO, LineasEditor, SelectorCliente, TotalesVenta, useVentas } from "./comun";
+import type { ComprobanteVenta, FormaPagoVenta, NotaPedido, OrdenDespacho, TipoComprobanteVenta } from "@/lib/types";
+import { CUENTAS_COBRO, DatosDespachoForm, LineasEditor, SelectorCliente, TotalesVenta, useVentas } from "./comun";
 
 type Filtro = "TODOS" | TipoComprobanteVenta;
 
@@ -90,6 +89,7 @@ export function Comprobantes({ preNp, onListo }: { preNp?: string; onListo: () =
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preNp]);
 
+  const npConOD = form?.npId ? notas.find((n) => n.id === form.npId && n.odId) : undefined;
   const t = form ? totalesVenta(form.items, form.tipo === "FACTURA" ? true : form.conIgv, form.descuento) : null;
   const cond = condiciones.find((c) => c.id === form?.condPagoId);
 
@@ -300,7 +300,13 @@ export function Comprobantes({ preNp, onListo }: { preNp?: string; onListo: () =
                 </Field>
               )}
             </div>
-            <DatosDespachoForm value={form.despacho ?? despachoVacio()} onChange={(despacho) => setForm({ ...form, despacho })} />
+            {npConOD ? (
+              <div className="flex items-center gap-2 rounded-xl border border-plomo-200 bg-plomo-50 px-4 py-3 text-sm text-azul-900">
+                <Truck size={16} /> Despacho: la orden <b>{npConOD.odNumero}</b> se generó al aprobar {npConOD.numero} y queda vinculada a este comprobante.
+              </div>
+            ) : (
+              <DatosDespachoForm value={form.despacho ?? despachoVacio()} onChange={(despacho) => setForm({ ...form, despacho })} />
+            )}
             <LineasEditor items={form.items} onChange={(items) => setForm({ ...form, items })} stock={stock} />
             <div className="flex flex-wrap items-start gap-4">
               <div className="space-y-3">
@@ -353,44 +359,3 @@ export function Comprobantes({ preNp, onListo }: { preNp?: string; onListo: () =
   );
 }
 
-/** Datos de despacho (obligatorio para emitir): lugar de entrega y, si es por agencia, agencia y guía. */
-function DatosDespachoForm({ value, onChange }: { value: DatosDespacho; onChange: (d: DatosDespacho) => void }) {
-  const set = <K extends keyof DatosDespacho>(k: K, v: DatosDespacho[K]) => onChange({ ...value, [k]: v });
-  const agencia = value.lugar === "ENVIO_AGENCIA";
-  return (
-    <fieldset className="rounded-xl border border-plomo-200 p-4">
-      <legend className="px-1 text-[12px] font-semibold uppercase tracking-wider text-plomo-500">Datos de despacho *</legend>
-      <div role="radiogroup" aria-label="Lugar de entrega" className="flex flex-wrap gap-2">
-        {(Object.keys(LUGARES_ENTREGA) as LugarEntrega[]).map((k) => (
-          <label
-            key={k}
-            className={cn(
-              "flex cursor-pointer items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition",
-              value.lugar === k ? "border-azul-900 bg-azul-900 text-white" : "border-plomo-200 bg-white text-azul-900 hover:bg-plomo-50"
-            )}
-          >
-            <input type="radio" name="lugar-entrega" value={k} checked={value.lugar === k} onChange={() => set("lugar", k)} className="accent-corp" />
-            {LUGARES_ENTREGA[k]}
-          </label>
-        ))}
-      </div>
-      {agencia && (
-        <div className="mt-3 grid gap-3 md:grid-cols-4">
-          <Field label="Nombre agencia *">
-            <Input value={value.agenciaNombre} onChange={(e) => set("agenciaNombre", e.target.value)} placeholder="Ej: Shalom, Marvisur" className={cn(!value.agenciaNombre.trim() && "border-red-300")} />
-          </Field>
-          <Field label="N° guía *">
-            <Input value={value.guiaNro} onChange={(e) => set("guiaNro", e.target.value.toUpperCase())} placeholder="Ej: 0045-123456" className={cn(!value.guiaNro.trim() && "border-red-300")} />
-          </Field>
-          <Field label="Costo envío S/">
-            <Input type="number" min={0} step="0.01" value={value.costoEnvio || ""} onChange={(e) => set("costoEnvio", parseFloat(e.target.value) || 0)} />
-          </Field>
-          <Field label="Dirección destino">
-            <Input value={value.direccionDestino} onChange={(e) => set("direccionDestino", e.target.value)} placeholder="Agencia / ciudad destino" />
-          </Field>
-        </div>
-      )}
-      {!value.lugar && <p className="mt-2 text-xs text-plomo-500">Obligatorio para emitir: genera la Orden de Despacho para Almacén.</p>}
-    </fieldset>
-  );
-}

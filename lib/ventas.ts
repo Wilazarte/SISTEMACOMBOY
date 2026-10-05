@@ -326,18 +326,104 @@ function actualizarNP(id: string, fn: (n: NotaPedido) => NotaPedido): void {
   escribir(KEYS.NOTAS_PEDIDO, lista);
 }
 
-export function aprobarNP(id: string, rol: Rol): void {
-  actualizarNP(id, (n) => {
-    if (n.estado !== "PENDIENTE") throw new ErpError(`La ${n.numero} está ${n.estado}; solo se aprueban notas PENDIENTES.`);
-    return { ...n, estado: "APROBADA", historial: [...n.historial, nuevoEvento(rol, "Aprobada")] };
+/**
+ * Aprobar la NP genera la Orden de Despacho (PENDIENTE) para Almacén con los datos de despacho
+ * (obligatorios; agencia y N° de guía si es envío por agencia). Al facturar, el comprobante se vincula a esa OD.
+ */
+export async function aprobarNP(id: string, datos: DatosDespacho, usuario: string, rol: Rol): Promise<OrdenDespacho> {
+  const np = getNotasPedido().find((n) => n.id === id);
+  if (!np) throw new ErpError("Nota de pedido no encontrada.");
+  if (np.estado !== "PENDIENTE") throw new ErpError(`La ${np.numero} está ${np.estado}; solo se aprueban notas PENDIENTES.`);
+  const despacho = validarDespacho(datos);
+  const odNumero = await siguienteNumero("OD");
+  const od = armarOD({
+    numero: odNumero,
+    despacho,
+    clienteId: np.clienteId,
+    cliente: np.cliente,
+    clienteDoc: np.clienteDoc,
+    vendedor: np.vendedor || usuario,
+    items: np.items,
+    direccion: np.lugarObra,
+    creadoPor: usuario,
+    npId: np.id,
+    npNumero: np.numero,
+    evento: nuevoEvento(rol, "Orden de despacho generada", `Al aprobar ${np.numero} · ${LUGARES_ENTREGA[despacho.lugar as LugarEntrega]}`),
   });
+  escribir(KEYS.DESPACHOS, [od, ...getDespachos()]);
+  actualizarNP(id, (n) => ({
+    ...n,
+    estado: "APROBADA",
+    odId: od.id,
+    odNumero: od.numero,
+    despacho,
+    historial: [...n.historial, nuevoEvento(rol, "Aprobada", `Orden de despacho ${od.numero} enviada a Almacén`)],
+  }));
+  return od;
 }
+
+/** Orden de despacho nueva (PENDIENTE, "nueva" para la campana de Almacén). */
+function armarOD(d: {
+  numero: string;
+  despacho: DatosDespacho;
+  clienteId: string;
+  cliente: string;
+  clienteDoc: string;
+  vendedor: string;
+  items: LineaVenta[];
+  direccion: string;
+  creadoPor: string;
+  evento: ReturnType<typeof nuevoEvento>;
+  npId?: string;
+  npNumero?: string;
+  comprobanteId?: string;
+  comprobanteNumero?: string;
+}): OrdenDespacho {
+  return {
+    id: uid(),
+    numero: d.numero,
+    fecha: hoy(),
+    comprobanteId: d.comprobanteId ?? "",
+    comprobanteNumero: d.comprobanteNumero ?? "",
+    npId: d.npId,
+    npNumero: d.npNumero,
+    clienteId: d.clienteId,
+    cliente: d.cliente,
+    lugarEntrega: d.direccion,
+    items: d.items.map(lineaDespacho),
+    estado: "PENDIENTE",
+    despachos: [],
+    historial: [d.evento],
+    clienteDoc: d.clienteDoc,
+    vendedor: d.vendedor,
+    lugar: d.despacho.lugar as LugarEntrega,
+    agenciaNombre: d.despacho.agenciaNombre || undefined,
+    guiaNro: d.despacho.guiaNro || undefined,
+    costoEnvio: d.despacho.lugar === "ENVIO_AGENCIA" ? d.despacho.costoEnvio : undefined,
+    direccionDestino: d.despacho.direccionDestino || d.direccion,
+    creadoPor: d.creadoPor,
+    vistoAlmacen: false, // campana de Almacén: "1 nueva orden"
+    postVentaStatus: null,
+    actualizado: new Date().toISOString(),
+  };
+}
+
+/** Venta de origen de la OD: NP y/o comprobante. */
+export const origenOD = (o: OrdenDespacho): string => [o.npNumero, o.comprobanteNumero].filter(Boolean).join(" · ") || "-";
 
 export function anularNP(id: string, motivo: string, rol: Rol): void {
   if (!motivo.trim()) throw new ErpError("Indique el motivo de la anulación.");
   actualizarNP(id, (n) => {
     if (n.estado === "FACTURADA") throw new ErpError(`La ${n.numero} ya está facturada: anule el comprobante.`);
     if (n.estado === "ANULADA") throw new ErpError("Ya está anulada.");
+    const od = n.odId ? getDespachos().find((o) => o.id === n.odId) : undefined;
+    if (od && (od.despachos.length > 0 || ["PEDIDO_ENTREGADO", "DEJADO_EN_AGENCIA"].includes(estadoOD(od))))
+      throw new ErpError(`La ${od.numero} ya salió de almacén: no se puede anular la nota de pedido.`);
+    if (od && od.estado !== "ANULADO")
+      escribir(
+        KEYS.DESPACHOS,
+        getDespachos().map((o) => (o.id === od.id ? { ...o, estado: "ANULADO" as const, historial: [...o.historial, nuevoEvento(rol, "Anulada", `${n.numero} anulada: ${motivo.trim()}`)] } : o))
+      );
     return { ...n, estado: "ANULADA", historial: [...n.historial, nuevoEvento(rol, "Anulada", motivo.trim())] };
   });
 }
@@ -570,7 +656,10 @@ export async function emitirComprobante(
   const existente = borradorId ? getComprobantes().find((c) => c.id === borradorId) : undefined;
   if (existente && existente.estado !== "BORRADOR") throw new ErpError("Este comprobante ya fue emitido.");
   const c = armarComprobante(data, existente);
-  c.despacho = validarDespacho(data.despacho); // antes de pedir números
+  // Si viene de una NP aprobada, su Orden de Despacho ya existe: solo se vincula
+  const np = c.npId ? getNotasPedido().find((n) => n.id === c.npId) : undefined;
+  const odNP = np?.odId ? getDespachos().find((o) => o.id === np.odId && o.estado !== "ANULADO") : undefined;
+  c.despacho = odNP ? np!.despacho : validarDespacho(data.despacho); // antes de pedir números
   const cliente = getClientes().find((x) => x.id === c.clienteId)!;
   const porCobrar = r2(c.total - (c.formaPago === "CONTADO" ? c.total : c.inicial));
   if (porCobrar > 0 && cliente.lineaCredito > 0 && saldoCliente(cliente.id) + porCobrar > cliente.lineaCredito)
@@ -580,38 +669,35 @@ export async function emitirComprobante(
 
   // Números primero (atómicos en Supabase); luego todas las escrituras
   const numero = await siguienteNumero(SERIE[data.tipo]);
-  const odNumero = await siguienteNumero("OD");
+  const odNumero = odNP ? odNP.numero : await siguienteNumero("OD");
   const ahora = new Date().toISOString();
   c.numero = numero;
   c.vendedor = existente?.vendedor || vendedor;
   c.estado = "EMITIDO";
 
   const asiento = asientoVenta(c);
-  const od: OrdenDespacho = {
-    id: uid(),
-    numero: odNumero,
-    fecha: hoy(),
-    comprobanteId: c.id,
-    comprobanteNumero: numero,
-    clienteId: c.clienteId,
-    cliente: c.cliente,
-    lugarEntrega: c.lugarEntrega,
-    items: c.items.map(lineaDespacho),
-    estado: "PENDIENTE",
-    despachos: [],
-    historial: [nuevoEvento(rol, "Orden de despacho generada", `Desde ${numero} · ${LUGARES_ENTREGA[c.despacho.lugar as LugarEntrega]}`)],
-    clienteDoc: c.clienteDoc,
-    vendedor: c.vendedor,
-    lugar: c.despacho.lugar as LugarEntrega,
-    agenciaNombre: c.despacho.agenciaNombre || undefined,
-    guiaNro: c.despacho.guiaNro || undefined,
-    costoEnvio: c.despacho.lugar === "ENVIO_AGENCIA" ? c.despacho.costoEnvio : undefined,
-    direccionDestino: c.despacho.direccionDestino || c.lugarEntrega,
-    creadoPor: vendedor,
-    vistoAlmacen: false, // campana de Almacén: "1 nueva orden"
-    postVentaStatus: null,
-    actualizado: ahora,
-  };
+  const od: OrdenDespacho = odNP
+    ? {
+        ...odNP,
+        comprobanteId: c.id,
+        comprobanteNumero: numero,
+        actualizado: ahora,
+        historial: [...odNP.historial, nuevoEvento(rol, "Facturada", `${numero} vinculado a la orden`)],
+      }
+    : armarOD({
+        numero: odNumero,
+        despacho: c.despacho!,
+        clienteId: c.clienteId,
+        cliente: c.cliente,
+        clienteDoc: c.clienteDoc,
+        vendedor: c.vendedor,
+        items: c.items,
+        direccion: c.lugarEntrega,
+        creadoPor: vendedor,
+        comprobanteId: c.id,
+        comprobanteNumero: numero,
+        evento: nuevoEvento(rol, "Orden de despacho generada", `Desde ${numero} · ${LUGARES_ENTREGA[c.despacho!.lugar as LugarEntrega]}`),
+      });
   c.odId = od.id;
   c.odNumero = od.numero;
   c.asientoId = asiento.id;
@@ -643,7 +729,7 @@ export async function emitirComprobante(
 
   escribir(KEYS.COMPROBANTES, [c, ...getComprobantes().filter((x) => x.id !== c.id)]);
   escribir(KEYS.ASIENTOS, [...asientos, ...getAsientos()]);
-  escribir(KEYS.DESPACHOS, [od, ...getDespachos()]);
+  escribir(KEYS.DESPACHOS, odNP ? getDespachos().map((o) => (o.id === od.id ? od : o)) : [od, ...getDespachos()]);
   if (cobros.length) escribir(KEYS.COBROS, [...cobros, ...getCobros()]);
   if (c.npId)
     actualizarNP(c.npId, (n) => ({ ...n, estado: "FACTURADA", comprobanteId: c.id, historial: [...n.historial, nuevoEvento(rol, "Facturada", numero)] }));
@@ -665,7 +751,13 @@ export function anularComprobante(id: string, motivo: string, rol: Rol): void {
   if (od)
     escribir(
       KEYS.DESPACHOS,
-      getDespachos().map((o) => (o.id === od.id ? { ...o, estado: "ANULADO" as const, historial: [...o.historial, nuevoEvento(rol, "Anulada", `Comprobante ${c.numero} anulado`)] } : o))
+      getDespachos().map((o) =>
+        o.id !== od.id
+          ? o
+          : o.npId // la OD es de la nota de pedido (vuelve a APROBADA): se conserva, solo se desvincula
+            ? { ...o, comprobanteId: "", comprobanteNumero: "", historial: [...o.historial, nuevoEvento(rol, "Comprobante anulado", `${c.numero}: la orden sigue con ${o.npNumero}`)] }
+            : { ...o, estado: "ANULADO" as const, historial: [...o.historial, nuevoEvento(rol, "Anulada", `Comprobante ${c.numero} anulado`)] }
+      )
     );
   if (c.npId && getNotasPedido().find((n) => n.id === c.npId)?.comprobanteId === c.id)
     actualizarNP(c.npId, (n) => ({ ...n, estado: "APROBADA", comprobanteId: undefined, historial: [...n.historial, nuevoEvento(rol, "Comprobante anulado", c.numero)] }));

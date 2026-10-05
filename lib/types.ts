@@ -435,6 +435,10 @@ export interface NotaPedido {
   estado: EstadoNP;
   observaciones: string;
   comprobanteId?: string;
+  /** Orden de despacho creada al aprobar la NP (y sus datos de despacho). */
+  odId?: string;
+  odNumero?: string;
+  despacho?: DatosDespacho;
   historial: EventoHistorial[];
 }
 
@@ -577,6 +581,9 @@ export interface OrdenDespacho {
   despachos: MovimientoDespacho[];
   historial: EventoHistorial[];
   // --- Flujo Ventas -> Almacén
+  /** Nota de pedido que originó la OD (al aprobarla). comprobanteId/Numero quedan vacíos hasta facturar. */
+  npId?: string;
+  npNumero?: string;
   clienteDoc?: string;
   vendedor?: string;
   lugar?: LugarEntrega;

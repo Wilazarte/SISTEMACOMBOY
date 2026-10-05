@@ -5,10 +5,11 @@ import { Ban, CalendarClock, Check, Copy, FileText, Plus, Receipt } from "lucide
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, Textarea, ejecutar, ejecutarAsync } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { pdfNotaPedido } from "@/lib/pdf";
+import { codigoDesdeNumero } from "@/lib/utils/codigos";
 import { KEYS, fechaPE, hoy, puede, soles, useRol, useStore } from "@/lib/storage";
-import { anularNP, aprobarNP, clienteVacio, clonarNP, crearNotaPedido, getCondicionesPago, guardarCliente, guardarCondicion, lineaVacia, pideDias, sumarDias, type DatosNP } from "@/lib/ventas";
-import type { Cliente, CondicionPago, NotaPedido } from "@/lib/types";
-import { AvisoCondiciones, FormCliente, LineasEditor, SelectorCliente, TotalesVenta, useCargaCondiciones, useVentas } from "./comun";
+import { anularNP, aprobarNP, despachoVacio, estadoOD, clienteVacio, clonarNP, crearNotaPedido, getCondicionesPago, guardarCliente, guardarCondicion, lineaVacia, pideDias, sumarDias, type DatosNP } from "@/lib/ventas";
+import type { Cliente, CondicionPago, DatosDespacho, NotaPedido, OrdenDespacho } from "@/lib/types";
+import { AvisoCondiciones, DatosDespachoForm, FormCliente, LineasEditor, SelectorCliente, TotalesVenta, useCargaCondiciones, useVentas } from "./comun";
 import { FormCondicion, condVacia } from "./maestros";
 
 const npVacia = (): DatosNP => ({
@@ -27,6 +28,7 @@ const npVacia = (): DatosNP => ({
 export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void }) {
   const [rol] = useRol();
   const notas = useStore<NotaPedido[]>(KEYS.NOTAS_PEDIDO, []);
+  const ods = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, []);
   const { clientes, condiciones, stock } = useVentas();
   const [form, setForm] = useState<DatosNP | null>(null);
   const [clienteRapido, setClienteRapido] = useState<Cliente | null>(null);
@@ -37,6 +39,7 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
   const [motivo, setMotivo] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [filtro, setFiltro] = useState("");
+  const [aprobar, setAprobar] = useState<{ np: NotaPedido; despacho: DatosDespacho } | null>(null);
   const habilitado = puede(rol, "venta.gestionar");
   const vendedor = getSesion()?.usuario ?? "";
   const lista = notas.filter((n) => !filtro || n.estado === filtro);
@@ -108,7 +111,7 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
           </div>
         }
       />
-      <Table head={["N° NP", "Fecha", "Cliente", "Total", "Condición pago", "Estado", "Vendedor", "Acciones"]} empty={lista.length === 0}>
+      <Table head={["N° NP", "Fecha", "Cliente", "Total", "Condición pago", "Estado", "Despacho", "Vendedor", "Acciones"]} empty={lista.length === 0}>
         {lista.map((n) => (
           <tr key={n.id} className="hover:bg-plomo-50">
             <Td className="font-semibold text-azul-900">{n.numero}</Td>
@@ -130,6 +133,19 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
             <Td>
               <Badge estado={n.estado} />
             </Td>
+            <Td>
+              {(() => {
+                const od = n.odId ? ods.find((o) => o.id === n.odId) : undefined;
+                return od ? (
+                  <div>
+                    <p className="font-mono text-xs font-semibold text-azul-900">{codigoDesdeNumero("OD", od.numero, od.fecha)}</p>
+                    <Badge estado={estadoOD(od)} />
+                  </div>
+                ) : (
+                  "-"
+                );
+              })()}
+            </Td>
             <Td>{n.vendedor}</Td>
             <Td>
               <div className="flex flex-wrap gap-1">
@@ -137,7 +153,7 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
                   <FileText size={14} /> PDF
                 </Button>
                 {habilitado && n.estado === "PENDIENTE" && (
-                  <Button size="sm" variant="success" onClick={() => ejecutar(() => aprobarNP(n.id, rol), `${n.numero} aprobada`)}>
+                  <Button size="sm" variant="success" onClick={() => setAprobar({ np: n, despacho: n.despacho ?? { ...despachoVacio(), direccionDestino: n.lugarObra } })}>
                     <Check size={14} /> Aprobar
                   </Button>
                 )}
@@ -282,6 +298,37 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
               </Button>
             </div>
           </form>
+        )}
+      </Modal>
+
+      <Modal open={!!aprobar} onClose={() => setAprobar(null)} title={`Aprobar ${aprobar?.np.numero ?? ""} · ${aprobar?.np.cliente ?? ""}`} wide>
+        {aprobar && (
+          <div className="space-y-4">
+            <p className="text-sm text-plomo-600">
+              Al aprobar se genera la <b>Orden de Despacho</b> y se notifica a Almacén. Indique dónde se entrega el pedido.
+            </p>
+            <DatosDespachoForm value={aprobar.despacho} onChange={(despacho) => setAprobar({ ...aprobar, despacho })} />
+            <div className="flex justify-end gap-2 border-t border-plomo-100 pt-4">
+              <Button variant="secondary" onClick={() => setAprobar(null)}>
+                Cancelar
+              </Button>
+              <Button
+                variant="success"
+                disabled={enviando}
+                onClick={async () => {
+                  setEnviando(true);
+                  const ok = await ejecutarAsync(async () => {
+                    const od = await aprobarNP(aprobar.np.id, aprobar.despacho, vendedor, rol);
+                    return od;
+                  }, `${aprobar.np.numero} aprobada · orden de despacho enviada a Almacén`);
+                  setEnviando(false);
+                  if (ok) setAprobar(null);
+                }}
+              >
+                <Check size={16} /> Aprobar y generar orden de despacho
+              </Button>
+            </div>
+          </div>
         )}
       </Modal>
 

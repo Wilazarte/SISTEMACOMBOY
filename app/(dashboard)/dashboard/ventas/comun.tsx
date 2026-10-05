@@ -5,8 +5,8 @@ import { Plus, Search, Trash2, UserPlus } from "lucide-react";
 import { Button, Field, Input, Select, cn } from "@/components/ui";
 import { UNIDADES } from "@/lib/empresa";
 import { KEYS, cargarCondicionesPago, r2, soles, useStore } from "@/lib/storage";
-import { LARGO_DOC, calcularLinea, lineaVacia, totalesVenta, validarDocumento } from "@/lib/ventas";
-import type { Cliente, CondicionPago, LineaVenta, StockItem, TipoDocCliente } from "@/lib/types";
+import { LARGO_DOC, LUGARES_ENTREGA, calcularLinea, lineaVacia, totalesVenta, validarDocumento } from "@/lib/ventas";
+import type { Cliente, CondicionPago, DatosDespacho, LugarEntrega, LineaVenta, StockItem, TipoDocCliente } from "@/lib/types";
 
 /** Datos de Ventas sincronizados con Supabase (tiempo real). */
 export function useVentas() {
@@ -283,3 +283,45 @@ export function FormCliente({
 }
 
 export const CUENTAS_COBRO = ["Caja principal", "BCP Soles", "Interbank Soles", "BBVA Soles", "Yape / Plin"];
+
+/** Datos de despacho (obligatorio para emitir): lugar de entrega y, si es por agencia, agencia y guía. */
+export function DatosDespachoForm({ value, onChange }: { value: DatosDespacho; onChange: (d: DatosDespacho) => void }) {
+  const set = <K extends keyof DatosDespacho>(k: K, v: DatosDespacho[K]) => onChange({ ...value, [k]: v });
+  const agencia = value.lugar === "ENVIO_AGENCIA";
+  return (
+    <fieldset className="rounded-xl border border-plomo-200 p-4">
+      <legend className="px-1 text-[12px] font-semibold uppercase tracking-wider text-plomo-500">Datos de despacho *</legend>
+      <div role="radiogroup" aria-label="Lugar de entrega" className="flex flex-wrap gap-2">
+        {(Object.keys(LUGARES_ENTREGA) as LugarEntrega[]).map((k) => (
+          <label
+            key={k}
+            className={cn(
+              "flex cursor-pointer items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition",
+              value.lugar === k ? "border-azul-900 bg-azul-900 text-white" : "border-plomo-200 bg-white text-azul-900 hover:bg-plomo-50"
+            )}
+          >
+            <input type="radio" name="lugar-entrega" value={k} checked={value.lugar === k} onChange={() => set("lugar", k)} className="accent-corp" />
+            {LUGARES_ENTREGA[k]}
+          </label>
+        ))}
+      </div>
+      {agencia && (
+        <div className="mt-3 grid gap-3 md:grid-cols-4">
+          <Field label="Nombre agencia *">
+            <Input value={value.agenciaNombre} onChange={(e) => set("agenciaNombre", e.target.value)} placeholder="Ej: Shalom, Marvisur" className={cn(!value.agenciaNombre.trim() && "border-red-300")} />
+          </Field>
+          <Field label="N° guía *">
+            <Input value={value.guiaNro} onChange={(e) => set("guiaNro", e.target.value.toUpperCase())} placeholder="Ej: 0045-123456" className={cn(!value.guiaNro.trim() && "border-red-300")} />
+          </Field>
+          <Field label="Costo envío S/">
+            <Input type="number" min={0} step="0.01" value={value.costoEnvio || ""} onChange={(e) => set("costoEnvio", parseFloat(e.target.value) || 0)} />
+          </Field>
+          <Field label="Dirección destino">
+            <Input value={value.direccionDestino} onChange={(e) => set("direccionDestino", e.target.value)} placeholder="Agencia / ciudad destino" />
+          </Field>
+        </div>
+      )}
+      {!value.lugar && <p className="mt-2 text-xs text-plomo-500">Obligatorio para emitir: genera la Orden de Despacho para Almacén.</p>}
+    </fieldset>
+  );
+}

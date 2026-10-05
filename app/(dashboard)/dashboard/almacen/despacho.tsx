@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Building2, Camera, CheckCircle2, ClipboardCheck, Eraser, FileText, MapPin, PackageCheck, Save, Truck } from "lucide-react";
-import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, Textarea, cn, ejecutar, toast } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, Textarea, Timeline, cn, ejecutar, toast } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { SEDES } from "@/lib/empresa";
 import { pdfOrdenDespacho } from "@/lib/pdf";
@@ -16,6 +16,7 @@ import {
   guardarObservacionOD,
   marcarAlistado,
   marcarODsVistas,
+  origenOD,
   pendienteLinea,
   type EstadoAlmacen,
 } from "@/lib/ventas";
@@ -32,7 +33,11 @@ export const codigoOD = (o: OrdenDespacho) => codigoDesdeNumero("OD", o.numero, 
 const lugarTxt = (o: OrdenDespacho) => (o.lugar ? LUGARES_ENTREGA[o.lugar] : o.lugarEntrega || "-");
 
 /** Órdenes de despacho: las crea Ventas al emitir; Almacén las alista y entrega. */
-export function OrdenesDespacho() {
+/**
+ * vista "almacen": atiende (alistar / entregar / agencia). vista "ventas": registro y seguimiento
+ * (solo lectura para Ventas; los botones de estado dependen del permiso despacho.dar).
+ */
+export function OrdenesDespacho({ vista = "almacen" }: { vista?: "almacen" | "ventas" }) {
   const [rol] = useRol();
   const ods = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, []);
   useStore<StockItem[]>(KEYS.STOCK, []); // se re-renderiza cuando cambia el stock
@@ -45,14 +50,14 @@ export function OrdenesDespacho() {
 
   // Al abrir la pestaña, Almacén "ve" las órdenes nuevas (se apaga la campana)
   useEffect(() => {
-    if (habilitado && !getSesion()?.soloLectura) {
+    if (vista === "almacen" && habilitado && !getSesion()?.soloLectura) {
       try {
         marcarODsVistas(rol);
       } catch {
         /* sin permiso de escritura: la campana sigue */
       }
     }
-  }, [habilitado, rol, ods.length]);
+  }, [vista, habilitado, rol, ods.length]);
 
   const lista = ods.filter(
     (o) => (!estado || estadoOD(o) === estado) && (!desde || o.fecha >= desde) && (!hasta || o.fecha <= hasta) && (!lugar || o.lugar === lugar)
@@ -82,7 +87,14 @@ export function OrdenesDespacho() {
       </div>
 
       <Card>
-        <CardHeader title="Órdenes de despacho" subtitle="Las genera Ventas al emitir la factura / boleta. Almacén alista, entrega (con firma) o deja en agencia." />
+        <CardHeader
+          title={vista === "ventas" ? "Registro y seguimiento de despachos" : "Órdenes de despacho"}
+          subtitle={
+            vista === "ventas"
+              ? "Cada nota de pedido aprobada genera su orden de despacho. Aquí se ve en qué estado la tiene Almacén."
+              : "Las genera Ventas al aprobar la nota de pedido. Almacén alista, entrega (con firma) o deja en agencia."
+          }
+        />
         <div className="grid gap-3 border-b border-plomo-100 px-6 py-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Estado">
             <Select
@@ -112,7 +124,7 @@ export function OrdenesDespacho() {
             <Empty icon={<Truck size={28} />} text="No hay órdenes de despacho" />
           </div>
         ) : (
-          <Table head={["Código", "Fecha", "Cliente", "Venta origen", "Lugar entrega", "Estado", "Acciones"]}>
+          <Table head={["Código", "Fecha", "Cliente", "Venta origen", "Lugar entrega", "Estado", ...(vista === "ventas" ? ["Seguimiento"] : []), "Acciones"]}>
             {lista.map((o) => (
               <tr key={o.id} className="cursor-pointer hover:bg-plomo-50" onClick={() => setSelId(o.id)}>
                 <Td className="font-mono font-semibold text-azul-900">
@@ -125,7 +137,7 @@ export function OrdenesDespacho() {
                   <p className="font-medium text-azul-900">{o.cliente}</p>
                   {o.clienteDoc && <p className="text-xs text-plomo-500">{o.clienteDoc}</p>}
                 </Td>
-                <Td>{o.comprobanteNumero}</Td>
+                <Td>{origenOD(o)}</Td>
                 <Td>
                   <p className="font-medium">{lugarTxt(o)}</p>
                   {o.lugar === "ENVIO_AGENCIA" && (
@@ -137,6 +149,11 @@ export function OrdenesDespacho() {
                 <Td>
                   <Badge estado={estadoOD(o)} />
                 </Td>
+                {vista === "ventas" && (
+                  <Td>
+                    <Seguimiento od={o} />
+                  </Td>
+                )}
                 <Td>
                   <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                     <Button size="sm" variant="secondary" onClick={() => setSelId(o.id)}>
@@ -224,7 +241,7 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <Badge estado={e} />
           <span className="text-plomo-600">
-            {fechaPE(od.fecha)} · Venta {od.comprobanteNumero}
+            {fechaPE(od.fecha)} · Venta {origenOD(od)}
             {od.vendedor ? ` · Vendedor ${od.vendedor}` : ""}
             {od.atendidoPor ? ` · Atendido por ${od.atendidoPor}` : ""}
           </span>
@@ -388,6 +405,11 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
             )}
           </div>
         )}
+        <Seguimiento od={od} grande />
+        <div className="rounded-xl border border-plomo-200 p-4">
+          <p className="mb-3 text-[12px] font-semibold uppercase tracking-wider text-plomo-500">Historial de la orden</p>
+          <Timeline eventos={od.historial} />
+        </div>
         {!habilitado && abierta && <p className="text-right text-xs text-plomo-500">Solo Almacén cambia el estado de la orden.</p>}
         {abierta && !conPendiente && <p className="text-right text-xs text-plomo-500">Todo el pedido ya salió de almacén.</p>}
       </div>
@@ -460,5 +482,44 @@ function FirmaPad({ onChange }: { onChange: (f?: ArchivoAdjunto) => void }) {
       </div>
       {vacia && <p className="mt-1 text-xs text-plomo-500">Firme dentro del recuadro.</p>}
     </div>
+  );
+}
+
+/** Pasos del despacho: Pendiente → Alistado → Entregado / En agencia. */
+function Seguimiento({ od, grande }: { od: OrdenDespacho; grande?: boolean }) {
+  const e = estadoOD(od);
+  if (e === "ANULADO") return <Badge estado="ANULADO" />;
+  const final: EstadoAlmacen = e === "DEJADO_EN_AGENCIA" ? "DEJADO_EN_AGENCIA" : "PEDIDO_ENTREGADO";
+  const pasos: EstadoAlmacen[] = ["PENDIENTE", "PEDIDO_ALISTADO", final];
+  const actual = pasos.indexOf(e);
+  const fecha = (k: EstadoAlmacen) => {
+    const acc = { PENDIENTE: /generada/i, PEDIDO_ALISTADO: /alistado|preparación/i, PEDIDO_ENTREGADO: /entregado|despachado total/i, DEJADO_EN_AGENCIA: /agencia/i, ANULADO: /anulad/i }[k];
+    const ev = [...od.historial].reverse().find((h) => acc.test(h.accion));
+    return ev ? new Date(ev.fecha).toLocaleString("es-PE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+  };
+  return (
+    <ol className={cn("flex items-start", grande ? "gap-0 rounded-xl border border-plomo-200 p-4" : "gap-0")} aria-label="Seguimiento del despacho">
+      {pasos.map((k, i) => {
+        const hecho = i <= actual;
+        return (
+          <li key={k} className={cn("flex flex-1 items-start", i < pasos.length - 1 && "min-w-[70px]")}>
+            <div className="flex flex-col items-center text-center">
+              <span
+                className={cn(
+                  "flex items-center justify-center rounded-full font-bold",
+                  grande ? "h-8 w-8 text-sm" : "h-5 w-5 text-[10px]",
+                  hecho ? (i === actual ? "bg-corp text-white" : "bg-azul-900 text-white") : "border-2 border-plomo-200 bg-white text-plomo-500"
+                )}
+              >
+                {hecho ? "✓" : i + 1}
+              </span>
+              <span className={cn("mt-1 whitespace-nowrap", grande ? "text-xs" : "text-[10px]", hecho ? "font-semibold text-azul-900" : "text-plomo-500")}>{ESTADOS_OD[k]}</span>
+              {grande && hecho && <span className="text-[10px] text-plomo-500">{fecha(k)}</span>}
+            </div>
+            {i < pasos.length - 1 && <span className={cn("mt-2.5 h-0.5 flex-1", grande && "mt-4", i < actual ? "bg-azul-900" : "bg-plomo-200")} />}
+          </li>
+        );
+      })}
+    </ol>
   );
 }

@@ -10,7 +10,7 @@ import QRCode from "qrcode";
 import { EMPRESA } from "./empresa";
 import { codigoContratista, codigoGasto, fechaPE, soles } from "./storage";
 import { codigoDesdeNumero, estadoDocumento } from "./utils/codigos";
-import { ESTADOS_OD, LUGARES_ENTREGA, estadoOD, type EstadoAlmacen } from "./ventas";
+import { ESTADOS_OD, LUGARES_ENTREGA, estadoOD, origenOD, type EstadoAlmacen } from "./ventas";
 import { toast } from "@/components/ui";
 import type { HistorialDetalle, HistorialPlanilla } from "./historial";
 import type { ConcesionContratista, LugarEntrega } from "./types";
@@ -973,7 +973,7 @@ export function pdfOrdenDespacho(o: OrdenDespacho): void {
       datos: [
         ["Cliente", o.cliente],
         ["DNI / RUC", o.clienteDoc || "-"],
-        ["Venta origen", o.comprobanteNumero],
+        ["Venta origen", origenOD(o)],
         ["Fecha OD", fechaPE(o.fecha)],
         ["Vendedor", o.vendedor || "-"],
         ["N° interno", o.numero],
