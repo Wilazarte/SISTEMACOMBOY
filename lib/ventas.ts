@@ -21,6 +21,7 @@ import {
   r2,
   rucValido,
   siguienteNumero,
+  sumarDias,
   uid,
 } from "./storage";
 import { asientoAjusteVenta, asientoDe, asientoNotaPedido, esAsientoContable, revertirAsiento, revertirAsientoId } from "./contable";
@@ -53,11 +54,8 @@ export const getCobros = () => leer<CobroVenta[]>(KEYS.COBROS, []);
 export const getAsientos = () => leer<AsientoContable[]>(KEYS.ASIENTOS, []);
 export const getDespachos = () => leer<OrdenDespacho[]>(KEYS.DESPACHOS, []);
 
-export const sumarDias = (iso: string, d: number): string => {
-  const f = new Date(`${iso}T12:00:00`);
-  f.setDate(f.getDate() + d);
-  return f.toISOString().slice(0, 10);
-};
+/** Versión segura (fecha vacía / DD/MM/YYYY / días inválidos): ver lib/storage.ts. */
+export { sumarDias } from "./storage";
 
 // ---------------------------------------------------------------------
 // Cálculos

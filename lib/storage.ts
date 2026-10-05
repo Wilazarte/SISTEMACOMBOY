@@ -96,6 +96,35 @@ export const hoy = (): string => {
   return new Date(d.getTime() - off).toISOString().slice(0, 10);
 };
 
+/**
+ * Fecha (YYYY-MM-DD) + d días, sin romper nunca: acepta "YYYY-MM-DD", "DD/MM/YYYY", ISO con hora o Date.
+ * Fecha vacía / inválida -> se usa hoy. Días no numéricos (undefined, NaN) -> 0.
+ */
+export function sumarDias(fecha: string | Date | null | undefined, d: number | null | undefined): string {
+  const base = aFechaSegura(fecha);
+  const dias = Number.isFinite(Number(d)) ? Math.trunc(Number(d)) : 0;
+  const f = new Date(`${base}T12:00:00`);
+  f.setDate(f.getDate() + dias);
+  return isNaN(f.getTime()) ? hoy() : f.toISOString().slice(0, 10);
+}
+
+/** Normaliza a YYYY-MM-DD (vacío o inválido -> hoy). */
+export function aFechaSegura(fecha: string | Date | null | undefined): string {
+  if (fecha instanceof Date) return isNaN(fecha.getTime()) ? hoy() : fecha.toISOString().slice(0, 10);
+  const t = String(fecha ?? "").trim();
+  if (!t) return hoy();
+  let y: number, m: number, dd: number;
+  const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(t);
+  const pe = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(t);
+  if (iso) [y, m, dd] = [Number(iso[1]), Number(iso[2]), Number(iso[3])];
+  else if (pe) [y, m, dd] = [Number(pe[3]), Number(pe[2]), Number(pe[1])];
+  else return hoy();
+  const f = new Date(Date.UTC(y, m - 1, dd, 12));
+  // 31/09 o 30/02 no existen: Date los "corre" de mes, se rechazan
+  if (isNaN(f.getTime()) || f.getUTCFullYear() !== y || f.getUTCMonth() !== m - 1 || f.getUTCDate() !== dd) return hoy();
+  return f.toISOString().slice(0, 10);
+}
+
 export const soles = (n: number): string =>
   `S/ ${n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 

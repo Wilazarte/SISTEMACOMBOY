@@ -55,6 +55,7 @@ import {
   useRol,
   useStore,
   validarVoucher,
+  sumarDias,
 } from "@/lib/storage";
 import { SEDES, UNIDADES } from "@/lib/empresa";
 import { pdfCotizacion, pdfFactura, pdfOrdenCompra, pdfRequerimiento } from "@/lib/pdf";
@@ -73,10 +74,11 @@ const DIAS_CREDITO: Record<FormaPago, number> = {
   "ADELANTO 50%": 0,
 };
 
-const sumarDias = (iso: string, d: number): string => {
-  const f = new Date(`${iso}T12:00:00`);
-  f.setDate(f.getDate() + d);
-  return f.toISOString().slice(0, 10);
+/** Días de crédito de la forma de pago; formas antiguas o escritas a mano ("Crédito 45 días") se leen del texto. */
+const diasCredito = (forma?: string): number => {
+  if (forma && forma in DIAS_CREDITO) return DIAS_CREDITO[forma as FormaPago];
+  const n = /(\d+)\s*D[IÍ]AS?/i.exec(forma ?? "")?.[1];
+  return n ? Number(n) : 0;
 };
 
 // =====================================================================
@@ -1072,7 +1074,7 @@ function Facturas({
   useEffect(() => {
     if (oc) {
       setSubtotal(oc.subtotal);
-      setVenc(sumarDias(fecha, DIAS_CREDITO[oc.formaPago]));
+      setVenc(sumarDias(fecha, diasCredito(oc.formaPago)));
     }
   }, [oc, fecha]);
 
