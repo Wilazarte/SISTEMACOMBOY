@@ -148,3 +148,24 @@ export function resumirAsistencia(fechas: Map<string, string[]>): { dias: number
   });
   return { dias, horas: dias * HORAS_DIA, tardanzas };
 }
+
+/**
+ * Huellas unidas a otro trabajador (duplicados del reloj): sus marcas se suman al trabajador original.
+ * `alias`: huella -> N° del trabajador que se conserva.
+ */
+export function aplicarAlias(m: Marcaciones, alias: Record<string, string>): Marcaciones {
+  if (!Object.keys(alias).length) return m;
+  const asistencia: AsistenciaMap = new Map();
+  const nombres = new Map<string, string>();
+  m.asistencia.forEach((fechas, huella) => {
+    const id = alias[huella] ?? huella;
+    const destino = asistencia.get(id) ?? new Map<string, string[]>();
+    fechas.forEach((horas, fecha) => {
+      const previas = destino.get(fecha) ?? [];
+      destino.set(fecha, [...previas, ...horas.filter((h) => !previas.includes(h))]);
+    });
+    asistencia.set(id, destino);
+    if (!nombres.has(id)) nombres.set(id, alias[huella] ? m.nombres.get(id) ?? "" : m.nombres.get(huella) ?? "");
+  });
+  return { ...m, asistencia, nombres };
+}
