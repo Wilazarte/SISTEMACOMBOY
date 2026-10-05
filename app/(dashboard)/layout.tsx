@@ -7,6 +7,7 @@ import { AlertTriangle, Bell, Factory, Calculator, CloudUpload, Eye, KeyRound, R
 import { Badge, Toaster, cn, toast } from "@/components/ui";
 import { DocViewerHost, abrirDoc, type DocRef } from "@/components/doc-viewer";
 import { ObservacionesGerencia } from "@/components/ObservacionesGerencia";
+import { Header } from "@/components/Header";
 import { inicioDe, logout, puedeVer, useSesion, veDashboard } from "@/lib/auth";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
 import { KEYS, detenerDatos, getCotizaciones, getFacturas, getGuias, getOrdenes, getPendientes, getProcesados, useDatos, useStore } from "@/lib/storage";
@@ -327,6 +328,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </div>
         ) : (
           <div className="space-y-6">
+            <Header sesion={sesion} />
             {sesion.soloLectura && (
               <div className="flex w-full items-center gap-2 rounded-xl border border-plomo-200 bg-white px-5 py-2.5 text-sm text-azul-700 shadow-[0_4px_12px_rgba(15,36,64,0.06)]">
                 <Eye size={16} /> Modo solo lectura: puede revisar todo y registrar observaciones, pero no guardar, editar ni eliminar.
