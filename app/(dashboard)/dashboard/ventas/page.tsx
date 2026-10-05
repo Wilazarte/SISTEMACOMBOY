@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ClipboardList, Contact, Receipt, Settings2, Truck, Wallet } from "lucide-react";
-import { Tabs } from "@/components/ui";
+import { AlertTriangle, ClipboardList, Contact, Receipt, Settings2, Truck, Wallet } from "lucide-react";
+import { Button, Tabs } from "@/components/ui";
 import { KEYS, useStore } from "@/lib/storage";
-import { estadoCxC, estadoOD } from "@/lib/ventas";
+import { estadoCxC, estadoOD, npsSinDespacho } from "@/lib/ventas";
 import type { ComprobanteVenta, NotaPedido, OrdenDespacho } from "@/lib/types";
 import { OrdenesDespacho } from "../almacen/despacho";
 import { CuentasPorCobrar } from "./cobrar";
@@ -25,6 +25,7 @@ export default function VentasPage() {
   const notas = useStore<NotaPedido[]>(KEYS.NOTAS_PEDIDO, []);
   const comprobantes = useStore<ComprobanteVenta[]>(KEYS.COMPROBANTES, []);
   const despachos = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, []);
+  const sinOD = npsSinDespacho(notas, despachos);
   const vencidos = comprobantes.filter((c) => c.estado === "EMITIDO" && estadoCxC(c).estado === "VENCIDO").length;
 
   return (
@@ -62,7 +63,23 @@ export default function VentasPage() {
         />
       )}
       {tab === "comprobantes" && <Comprobantes preNp={facturarNp} onListo={() => setFacturarNp(undefined)} />}
-      {tab === "despachos" && <OrdenesDespacho vista="ventas" />}
+      {tab === "despachos" && (
+        <>
+          {sinOD.length > 0 && (
+            <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-vino">
+              <AlertTriangle size={18} className="shrink-0" />
+              <span className="flex-1">
+                {sinOD.length} nota(s) de pedido aprobada(s) sin orden de despacho: <b>{sinOD.map((n) => n.numero).join(", ")}</b>. Se aprobaron antes de este flujo
+                o no se pudo guardar la orden. Genérela con el botón <b>Generar despacho</b>.
+              </span>
+              <Button size="sm" onClick={() => setTab("notas")}>
+                Ir a Notas de pedido
+              </Button>
+            </div>
+          )}
+          <OrdenesDespacho vista="ventas" />
+        </>
+      )}
       {tab === "condiciones" && <CondicionesPago />}
       {tab === "clientes" && <Clientes />}
       {tab === "cobrar" && <CuentasPorCobrar />}

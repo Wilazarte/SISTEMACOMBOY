@@ -12,7 +12,9 @@ import {
   KEYS,
   descontarStock,
   escribir,
+  esperarGuardado,
   getStock,
+  puede,
   hoy,
   leer,
   nuevoEvento,
@@ -334,8 +336,36 @@ export async function aprobarNP(id: string, datos: DatosDespacho, usuario: strin
   const np = getNotasPedido().find((n) => n.id === id);
   if (!np) throw new ErpError("Nota de pedido no encontrada.");
   if (np.estado !== "PENDIENTE") throw new ErpError(`La ${np.numero} está ${np.estado}; solo se aprueban notas PENDIENTES.`);
+  return crearODdeNP(np, datos, usuario, rol, "Aprobada");
+}
+
+/** OD activa (no anulada) de una nota de pedido. */
+export const odDeNP = (n: NotaPedido, ods: OrdenDespacho[] = getDespachos()): OrdenDespacho | undefined =>
+  ods.find((o) => o.estado !== "ANULADO" && (o.id === n.odId || o.npId === n.id));
+
+/** NP aprobadas / facturadas sin orden de despacho (p. ej. aprobadas antes de que existiera este flujo). */
+export const npsSinDespacho = (notas: NotaPedido[], ods: OrdenDespacho[]): NotaPedido[] =>
+  notas.filter((n) => (n.estado === "APROBADA" || n.estado === "FACTURADA") && !odDeNP(n, ods));
+
+/** Genera la OD de una NP ya aprobada o facturada que no la tiene. */
+export async function generarDespachoNP(id: string, datos: DatosDespacho, usuario: string, rol: Rol): Promise<OrdenDespacho> {
+  const np = getNotasPedido().find((n) => n.id === id);
+  if (!np) throw new ErpError("Nota de pedido no encontrada.");
+  if (np.estado !== "APROBADA" && np.estado !== "FACTURADA") throw new ErpError(`La ${np.numero} está ${np.estado}: apruébela primero.`);
+  const previa = odDeNP(np);
+  if (previa) throw new ErpError(`La ${np.numero} ya tiene la orden de despacho ${previa.numero}.`);
+  return crearODdeNP(np, datos, usuario, rol, np.estado);
+}
+
+/**
+ * Crea la OD de la NP y ESPERA a que Supabase la confirme: si no se guarda, la NP no cambia
+ * y se muestra el error (antes la pantalla quedaba en 0 sin aviso claro).
+ */
+async function crearODdeNP(np: NotaPedido, datos: DatosDespacho, usuario: string, rol: Rol, estado: NotaPedido["estado"] | "Aprobada"): Promise<OrdenDespacho> {
+  if (!puede(rol, "venta.gestionar")) throw new ErpError("Su usuario no puede generar órdenes de despacho.");
   const despacho = validarDespacho(datos);
   const odNumero = await siguienteNumero("OD");
+  const comp = np.comprobanteId ? getComprobantes().find((c) => c.id === np.comprobanteId && c.estado === "EMITIDO") : undefined;
   const od = armarOD({
     numero: odNumero,
     despacho,
@@ -348,17 +378,26 @@ export async function aprobarNP(id: string, datos: DatosDespacho, usuario: strin
     creadoPor: usuario,
     npId: np.id,
     npNumero: np.numero,
-    evento: nuevoEvento(rol, "Orden de despacho generada", `Al aprobar ${np.numero} · ${LUGARES_ENTREGA[despacho.lugar as LugarEntrega]}`),
+    comprobanteId: comp?.id,
+    comprobanteNumero: comp?.numero,
+    evento: nuevoEvento(rol, "Orden de despacho generada", `${estado === "Aprobada" ? "Al aprobar" : "Desde"} ${np.numero} · ${LUGARES_ENTREGA[despacho.lugar as LugarEntrega]}`),
   });
+  await esperarGuardado(); // descarta errores anteriores
   escribir(KEYS.DESPACHOS, [od, ...getDespachos()]);
-  actualizarNP(id, (n) => ({
+  const error = await esperarGuardado();
+  if (error)
+    throw new ErpError(
+      `No se pudo guardar la orden de despacho en Supabase (tabla almacen): ${error}. La ${np.numero} no se modificó. Revise que su usuario pueda escribir en Almacén (RLS).`
+    );
+  actualizarNP(np.id, (n) => ({
     ...n,
-    estado: "APROBADA",
+    estado: estado === "Aprobada" ? "APROBADA" : n.estado,
     odId: od.id,
     odNumero: od.numero,
     despacho,
-    historial: [...n.historial, nuevoEvento(rol, "Aprobada", `Orden de despacho ${od.numero} enviada a Almacén`)],
+    historial: [...n.historial, nuevoEvento(rol, estado === "Aprobada" ? "Aprobada" : "Orden de despacho generada", `Orden de despacho ${od.numero} enviada a Almacén`)],
   }));
+  if (comp) escribir(KEYS.COMPROBANTES, getComprobantes().map((c) => (c.id === comp.id ? { ...c, odId: od.id, odNumero: od.numero, despacho } : c)));
   return od;
 }
 
@@ -658,7 +697,7 @@ export async function emitirComprobante(
   const c = armarComprobante(data, existente);
   // Si viene de una NP aprobada, su Orden de Despacho ya existe: solo se vincula
   const np = c.npId ? getNotasPedido().find((n) => n.id === c.npId) : undefined;
-  const odNP = np?.odId ? getDespachos().find((o) => o.id === np.odId && o.estado !== "ANULADO") : undefined;
+  const odNP = np ? odDeNP(np) : undefined;
   c.despacho = odNP ? np!.despacho : validarDespacho(data.despacho); // antes de pedir números
   const cliente = getClientes().find((x) => x.id === c.clienteId)!;
   const porCobrar = r2(c.total - (c.formaPago === "CONTADO" ? c.total : c.inicial));

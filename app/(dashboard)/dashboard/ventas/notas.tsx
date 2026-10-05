@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Ban, CalendarClock, Check, Copy, FileText, Plus, Receipt } from "lucide-react";
+import { Ban, CalendarClock, Check, Copy, FileText, Plus, Receipt, Truck } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, Textarea, ejecutar, ejecutarAsync } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { pdfNotaPedido } from "@/lib/pdf";
 import { codigoDesdeNumero } from "@/lib/utils/codigos";
 import { KEYS, fechaPE, hoy, puede, soles, useRol, useStore } from "@/lib/storage";
-import { anularNP, aprobarNP, despachoVacio, estadoOD, clienteVacio, clonarNP, crearNotaPedido, getCondicionesPago, guardarCliente, guardarCondicion, lineaVacia, pideDias, sumarDias, type DatosNP } from "@/lib/ventas";
+import { anularNP, aprobarNP, despachoVacio, estadoOD, generarDespachoNP, odDeNP, clienteVacio, clonarNP, crearNotaPedido, getCondicionesPago, guardarCliente, guardarCondicion, lineaVacia, pideDias, sumarDias, type DatosNP } from "@/lib/ventas";
 import type { Cliente, CondicionPago, DatosDespacho, NotaPedido, OrdenDespacho } from "@/lib/types";
 import { AvisoCondiciones, DatosDespachoForm, FormCliente, LineasEditor, SelectorCliente, TotalesVenta, useCargaCondiciones, useVentas } from "./comun";
 import { FormCondicion, condVacia } from "./maestros";
@@ -135,12 +135,14 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
             </Td>
             <Td>
               {(() => {
-                const od = n.odId ? ods.find((o) => o.id === n.odId) : undefined;
+                const od = odDeNP(n, ods) ?? (n.odId ? ods.find((o) => o.id === n.odId) : undefined);
                 return od ? (
                   <div>
                     <p className="font-mono text-xs font-semibold text-azul-900">{codigoDesdeNumero("OD", od.numero, od.fecha)}</p>
                     <Badge estado={estadoOD(od)} />
                   </div>
+                ) : n.estado === "APROBADA" || n.estado === "FACTURADA" ? (
+                  <span className="text-xs font-semibold text-vino">Sin orden</span>
                 ) : (
                   "-"
                 );
@@ -155,6 +157,11 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
                 {habilitado && n.estado === "PENDIENTE" && (
                   <Button size="sm" variant="success" onClick={() => setAprobar({ np: n, despacho: n.despacho ?? { ...despachoVacio(), direccionDestino: n.lugarObra } })}>
                     <Check size={14} /> Aprobar
+                  </Button>
+                )}
+                {habilitado && (n.estado === "APROBADA" || n.estado === "FACTURADA") && !odDeNP(n, ods) && (
+                  <Button size="sm" variant="danger" title="Esta nota no tiene orden de despacho" onClick={() => setAprobar({ np: n, despacho: n.despacho ?? { ...despachoVacio(), direccionDestino: n.lugarObra } })}>
+                    <Truck size={14} /> Generar despacho
                   </Button>
                 )}
                 {habilitado && n.estado === "APROBADA" && (
@@ -301,7 +308,12 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
         )}
       </Modal>
 
-      <Modal open={!!aprobar} onClose={() => setAprobar(null)} title={`Aprobar ${aprobar?.np.numero ?? ""} · ${aprobar?.np.cliente ?? ""}`} wide>
+      <Modal
+        open={!!aprobar}
+        onClose={() => setAprobar(null)}
+        title={`${aprobar?.np.estado === "PENDIENTE" ? "Aprobar" : "Generar despacho"} ${aprobar?.np.numero ?? ""} · ${aprobar?.np.cliente ?? ""}`}
+        wide
+      >
         {aprobar && (
           <div className="space-y-4">
             <p className="text-sm text-plomo-600">
@@ -318,14 +330,14 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
                 onClick={async () => {
                   setEnviando(true);
                   const ok = await ejecutarAsync(async () => {
-                    const od = await aprobarNP(aprobar.np.id, aprobar.despacho, vendedor, rol);
-                    return od;
-                  }, `${aprobar.np.numero} aprobada · orden de despacho enviada a Almacén`);
+                    const pendiente = aprobar.np.estado === "PENDIENTE";
+                    return pendiente ? aprobarNP(aprobar.np.id, aprobar.despacho, vendedor, rol) : generarDespachoNP(aprobar.np.id, aprobar.despacho, vendedor, rol);
+                  }, `${aprobar.np.numero}: orden de despacho enviada a Almacén`);
                   setEnviando(false);
                   if (ok) setAprobar(null);
                 }}
               >
-                <Check size={16} /> Aprobar y generar orden de despacho
+                <Check size={16} /> {aprobar.np.estado === "PENDIENTE" ? "Aprobar y generar orden de despacho" : "Generar orden de despacho"}
               </Button>
             </div>
           </div>
