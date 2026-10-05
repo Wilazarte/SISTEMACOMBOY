@@ -385,10 +385,16 @@ async function crearODdeNP(np: NotaPedido, datos: DatosDespacho, usuario: string
   await esperarGuardado(); // descarta errores anteriores
   escribir(KEYS.DESPACHOS, [od, ...getDespachos()]);
   const error = await esperarGuardado();
-  if (error)
+  if (error) {
+    const columna = /null value in column "([^"]+)"/i.exec(error)?.[1];
     throw new ErpError(
-      `No se pudo guardar la orden de despacho en Supabase (tabla almacen): ${error}. La ${np.numero} no se modificó. Revise que su usuario pueda escribir en Almacén (RLS).`
+      columna
+        ? `No se pudo guardar la orden de despacho: la tabla almacen de Supabase tiene la columna antigua "${columna}" obligatoria. Ejecute supabase/fix_almacen.sql en el SQL Editor y vuelva a aprobar. La ${np.numero} no se modificó.`
+        : /row-level security|permission|42501/i.test(error)
+          ? `No se pudo guardar la orden de despacho: su usuario no tiene permiso para escribir en Almacén (RLS). La ${np.numero} no se modificó.`
+          : `No se pudo guardar la orden de despacho en Supabase: ${error}. La ${np.numero} no se modificó.`
     );
+  }
   actualizarNP(np.id, (n) => ({
     ...n,
     estado: estado === "Aprobada" ? "APROBADA" : n.estado,
@@ -549,6 +555,16 @@ export function resumenEntrega(o: Pick<OrdenDespacho, "lugar" | "agenciaNombre" 
   if (o.lugar === "ENVIO_AGENCIA") return `Agencia ${o.agenciaNombre ?? ""}${o.guiaNro ? ` · guía ${o.guiaNro}` : ""}`;
   if (lugarConDireccion(o.lugar)) return `${LUGARES_ENTREGA[o.lugar]}: ${o.clienteDireccionEntrega ?? ""}`;
   return LUGARES_ENTREGA[o.lugar];
+}
+
+/** null si los datos de despacho están completos; si no, qué falta (para deshabilitar el botón). */
+export function faltaDespacho(d?: DatosDespacho): string | null {
+  try {
+    validarDespacho(d);
+    return null;
+  } catch (e) {
+    return (e as Error).message;
+  }
 }
 
 export const resumenDespacho = (d: DatosDespacho): string =>

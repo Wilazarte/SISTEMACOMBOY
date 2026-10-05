@@ -7,7 +7,7 @@ import { getSesion } from "@/lib/auth";
 import { pdfNotaPedido } from "@/lib/pdf";
 import { codigoDesdeNumero } from "@/lib/utils/codigos";
 import { KEYS, fechaPE, hoy, puede, soles, useRol, useStore } from "@/lib/storage";
-import { anularNP, aprobarNP, despachoVacio, estadoOD, generarDespachoNP, odDeNP, clienteVacio, clonarNP, crearNotaPedido, getCondicionesPago, guardarCliente, guardarCondicion, lineaVacia, pideDias, sumarDias, type DatosNP } from "@/lib/ventas";
+import { anularNP, aprobarNP, despachoVacio, faltaDespacho, estadoOD, generarDespachoNP, odDeNP, clienteVacio, clonarNP, crearNotaPedido, getCondicionesPago, guardarCliente, guardarCondicion, lineaVacia, pideDias, sumarDias, type DatosNP } from "@/lib/ventas";
 import type { Cliente, CondicionPago, DatosDespacho, NotaPedido, OrdenDespacho } from "@/lib/types";
 import { AvisoCondiciones, DatosDespachoForm, FormCliente, LineasEditor, SelectorCliente, TotalesVenta, useCargaCondiciones, useVentas } from "./comun";
 import { FormCondicion, condVacia } from "./maestros";
@@ -331,9 +331,10 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
               <Button variant="secondary" onClick={() => setAprobar(null)}>
                 Cancelar
               </Button>
+              {faltaDespacho(aprobar.despacho) && <p className="mr-auto self-center text-xs text-vino">{faltaDespacho(aprobar.despacho)}</p>}
               <Button
                 variant="success"
-                disabled={enviando}
+                disabled={enviando || !!faltaDespacho(aprobar.despacho)}
                 onClick={async () => {
                   setEnviando(true);
                   const ok = await ejecutarAsync(async () => {

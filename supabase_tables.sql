@@ -92,6 +92,19 @@ begin
       execute format('alter table public.%I alter column id type text using id::text', t);
     end if;
 
+    -- Columnas antiguas obligatorias que el ERP no llena (fecha, producto, cantidad...) -> opcionales
+    for col in
+      select column_name from information_schema.columns
+      where table_schema = 'public' and table_name = t and is_nullable = 'NO' and column_default is null
+        and is_identity = 'NO' and column_name not in ('id', 'tipo', 'data', 'created_at', 'updated_at')
+        and column_name not in (
+          select kcu.column_name from information_schema.table_constraints tc
+          join information_schema.key_column_usage kcu on kcu.constraint_name = tc.constraint_name and kcu.table_schema = tc.table_schema
+          where tc.table_schema = 'public' and tc.table_name = t and tc.constraint_type = 'PRIMARY KEY')
+    loop
+      execute format('alter table public.%I alter column %I drop not null', t, col.column_name);
+    end loop;
+
     -- Clave usada al guardar (upsert por tipo + id)
     execute format('create unique index if not exists %I on public.%I (tipo, id)', t || '_tipo_id_uidx', t);
   end loop;

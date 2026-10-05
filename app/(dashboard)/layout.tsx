@@ -11,7 +11,7 @@ import { inicioDe, logout, puedeVer, useSesion } from "@/lib/auth";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
 import { KEYS, detenerDatos, getCotizaciones, getFacturas, getGuias, getOrdenes, getPendientes, getProcesados, useDatos, useStore } from "@/lib/storage";
 import type { OrdenDespacho, Requerimiento } from "@/lib/types";
-import { avisoOD, odsNuevas } from "@/lib/ventas";
+import { avisoOD, getDespachos, odsNuevas } from "@/lib/ventas";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, pronto: true },
@@ -86,7 +86,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     for (const o of nuevas)
       if (!odsAvisadas.current.has(o.id)) {
         odsAvisadas.current.add(o.id);
-        toast(`Nueva orden de despacho: ${avisoOD(o)}`);
+        // Solo si Supabase la guardó: si la rechaza, la caché vuelve atrás y no se avisa
+        setTimeout(() => {
+          if (odsNuevas(getDespachos()).some((x) => x.id === o.id)) toast(`Nueva orden de despacho: ${avisoOD(o)}`);
+        }, 2500);
       }
   }, [ods, sesion, datos.listo]);
 
