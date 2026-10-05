@@ -7,14 +7,14 @@ import { AlertTriangle, Bell, Calculator, CloudUpload, Eye, KeyRound, Receipt, L
 import { Badge, Toaster, cn, toast } from "@/components/ui";
 import { DocViewerHost, abrirDoc, type DocRef } from "@/components/doc-viewer";
 import { ObservacionesGerencia } from "@/components/ObservacionesGerencia";
-import { inicioDe, logout, puedeVer, useSesion } from "@/lib/auth";
+import { inicioDe, logout, puedeVer, useSesion, veDashboard } from "@/lib/auth";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
 import { KEYS, detenerDatos, getCotizaciones, getFacturas, getGuias, getOrdenes, getPendientes, getProcesados, useDatos, useStore } from "@/lib/storage";
 import type { OrdenDespacho, Requerimiento } from "@/lib/types";
 import { avisoOD, getDespachos, odsNuevas } from "@/lib/ventas";
 
-const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, pronto: true },
+const NAV: { href: string; label: string; icon: typeof LayoutDashboard; pronto?: boolean; activo?: boolean }[] = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/almacen", label: "Almacén", icon: Warehouse },
   { href: "/dashboard/ventas", label: "Ventas", icon: Receipt },
   { href: "/dashboard/compras", label: "Tesorería / Compras", icon: ShoppingCart },
@@ -144,7 +144,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
   };
 
-  const nav = NAV.filter((n) => puedeVer(sesion, n.href));
+  const nav = NAV.filter((n) => (n.href === "/dashboard" ? veDashboard(sesion) : puedeVer(sesion, n.href)));
   const permitido = puedeVer(sesion, path);
   const veCompras = puedeVer(sesion, "/dashboard/compras");
   // Campana de Almacén: órdenes de despacho nuevas que creó Ventas
@@ -181,7 +181,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 <span className="flex-1">{n.label}</span>
                 {n.href === "/dashboard/compras" && pendientes.length > 0 && <span className="rounded-full bg-corp px-1.5 text-[11px] font-bold text-white">{pendientes.length}</span>}
                 {n.pronto && <span className="text-[10px] uppercase tracking-wider text-white/30">Fase sig.</span>}
-                {"activo" in n && n.activo && <span className="rounded-full bg-emerald-500 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">Activo</span>}
+                {n.activo && <span className="rounded-full bg-emerald-500 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">Activo</span>}
               </>
             );
             if (n.pronto)

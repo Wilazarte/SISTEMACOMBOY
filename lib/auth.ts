@@ -131,6 +131,10 @@ export function puedeEditarAsistencia(sesion: Sesion | null): boolean {
   return !!sesion && !sesion.soloLectura && ROLES_EDITAR_ASISTENCIA.includes(sesion.rol);
 }
 
+/** Dashboard (resumen): creador, gerencia, tesorería / ventas y almacén. */
+export const ROLES_DASHBOARD: RolAuth[] = ["creador", "gerencia", "tesoreria", "almacen"];
+export const veDashboard = (sesion: Sesion | null): boolean => !!sesion && ROLES_DASHBOARD.includes(sesion.rol);
+
 export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
   if (!sesion) return false;
   if (ruta === "/dashboard") return true; // solo redirige al primer módulo permitido
@@ -141,7 +145,7 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
 
 /** Primer módulo al que entra el usuario tras el login. */
 export function inicioDe(sesion: Sesion): string {
-  if (sesion.modulos.includes("*")) return "/dashboard/compras";
+  if (sesion.modulos.includes("*") || veDashboard(sesion)) return "/dashboard";
   // Sin módulos asignados se queda en /dashboard (el layout muestra el aviso; evita el bucle con /login)
   return sesion.modulos.find((m) => m.startsWith("/dashboard/")) ?? "/dashboard";
 }
