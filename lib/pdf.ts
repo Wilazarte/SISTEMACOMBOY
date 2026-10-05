@@ -8,7 +8,9 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import QRCode from "qrcode";
 import { EMPRESA } from "./empresa";
-import { fechaPE, soles } from "./storage";
+import { codigoContratista, codigoGasto, fechaPE, soles } from "./storage";
+import { codigoDesdeNumero, estadoDocumento } from "./utils/codigos";
+import { toast } from "@/components/ui";
 import type { HistorialDetalle, HistorialPlanilla } from "./historial";
 import type { ConcesionContratista } from "./types";
 import type { ComprobanteVenta, Cotizacion, Factura, Guia, LineaVenta, NotaPedido, OrdenCompra, OrdenDespacho, Requerimiento } from "./types";
@@ -131,37 +133,33 @@ function cabecera(doc: jsPDF, titulo: string, subtitulo: string, estado?: string
     doc.text(l, M, y);
   }
 
-  // Derecha 38 %: cuadro del documento
-  const bw = ancho * 0.38;
+  // Derecha: cuadro limpio (fondo blanco) con solo nombre del documento, código y estado
+  const bw = 210 * PT;
   const bx = W - M - bw;
   const cx = bx + bw / 2;
+  const pad = 12 * PT;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  const lt = doc.splitTextToSize(titulo.toUpperCase(), bw - 8) as string[];
-  doc.setFontSize(11);
-  const ls = doc.splitTextToSize(subtitulo, bw - 8) as string[];
-  const alto = 10 * PT * 2 + lt.length * 3.6 + 1.4 + ls.length * 4.4 + (estado ? 8 : 0);
+  doc.setFontSize(8.5);
+  const lt = doc.splitTextToSize(titulo.toUpperCase(), bw - 2 * pad) as string[];
+  const alto = pad * 2 + lt.length * 3.4 + 4 * PT + 4.2 + (estado ? 8 * PT + 4.2 : 0);
+  doc.setFillColor(255, 255, 255);
   doc.setDrawColor(...AZUL);
   doc.setLineWidth(2 * PT);
-  doc.roundedRect(bx, top, bw, alto, 10 * PT, 10 * PT, "S");
-  let yy = top + 10 * PT + 3;
-  doc.setFontSize(9);
+  doc.roundedRect(bx, top, bw, alto, 12 * PT, 12 * PT, "FD");
+  let yy = top + pad + 2.6;
   doc.setTextColor(...AZUL);
   doc.text(lt, cx, yy, { align: "center" });
-  yy += lt.length * 3.6 + 1.4 + 1;
+  yy += (lt.length - 1) * 3.4 + 4 * PT + 4;
   doc.setFontSize(11);
-  doc.setTextColor(...ROJO);
-  doc.text(ls, cx, yy, { align: "center" });
-  yy += ls.length * 4.4;
+  doc.text(subtitulo, cx, yy, { align: "center" });
   if (estado) {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7);
+    yy += 8 * PT + 1.4;
+    doc.setFontSize(6.5);
     const txt = `ESTADO: ${estado.toUpperCase()}`;
-    const pw = doc.getTextWidth(txt) + 6;
+    const pw = doc.getTextWidth(txt) + 20 * PT;
     doc.setLineWidth(1 * PT);
-    doc.roundedRect(cx - pw / 2, yy - 0.8, pw, 4.4, 2.2, 2.2, "S");
-    doc.setTextColor(...AZUL);
-    doc.text(txt, cx, yy + 2.2, { align: "center" });
+    doc.roundedRect(cx - pw / 2, yy, pw, 4.2, 10 * PT, 10 * PT, "S");
+    doc.text(txt, cx, yy + 2.9, { align: "center" });
   }
 
   // Franja roja
@@ -367,6 +365,21 @@ function construir(b: Bloque): jsPDF {
   return doc;
 }
 
+/** Descarga el PDF con nombre = código del documento (BOL-002-2026.pdf). */
+function guardar(doc: jsPDF, codigo: string): void {
+  doc.setProperties({ title: codigo });
+  doc.save(`${codigo}.pdf`);
+}
+
+/** Ejecuta un PDF que primero reserva su código en Supabase; los errores se muestran como aviso. */
+async function conCodigo(fn: () => Promise<void>): Promise<void> {
+  try {
+    await fn();
+  } catch (e) {
+    toast(e instanceof Error ? e.message : "No se pudo generar el PDF", "error");
+  }
+}
+
 function abrir(doc: jsPDF, nombre: string): void {
   const url = doc.output("bloburl");
   const w = window.open(String(url), "_blank");
@@ -382,13 +395,17 @@ const totales = (s: number, igv: number, t: number): [string, string][] => [
 // ---------------------------------------------------------------------
 
 /** Contrato simple de concesión / servicio externo (Planilla › Contratistas). */
-export function pdfContratoConcesion(c: ConcesionContratista, tipoServicio: string): void {
+export function pdfContratoConcesion(c: ConcesionContratista, tipoServicio: string): Promise<void> {
+  return conCodigo(async () => pdfContrato(c, tipoServicio, await codigoContratista(c.id)));
+}
+
+function pdfContrato(c: ConcesionContratista, tipoServicio: string, codigo: string): void {
   const pagado = (c.adelanto || 0) + (c.pagos ?? []).reduce((s, p) => s + p.monto, 0);
-  abrir(
+  guardar(
     construir({
-      titulo: "CONTRATO DE LOCACIÓN DE SERVICIOS",
-      numero: `CS-${c.id.slice(0, 8).toUpperCase()}`,
-      estado: c.estado,
+      titulo: "REQUERIMIENTO CONTRATISTA",
+      numero: codigo,
+      estado: estadoDocumento(c.estado),
       datos: [
         ["Contratante", `${EMPRESA.razonSocial} · RUC ${EMPRESA.ruc}`],
         ["Contratista", c.razonSocial],
@@ -420,7 +437,7 @@ export function pdfContratoConcesion(c: ConcesionContratista, tipoServicio: stri
       ],
       firmas: ["EL CONTRATANTE", "EL CONTRATISTA"],
     }),
-    `CONTRATO_${c.razonSocial.replace(/\s+/g, "_")}`
+    codigo
   );
 }
 
@@ -448,11 +465,11 @@ export interface DatosBoleta {
   totalPagar: number;
 }
 
-/** Boleta individual de pago (Planilla del periodo): se descarga como PDF. */
-export function pdfBoletaPago(d: DatosBoleta): void {
+/** Boleta individual de pago (Planilla del periodo): se descarga como BOL-xxx-AAAA.pdf. */
+export function pdfBoletaPago(d: DatosBoleta, codigo: string): void {
   const doc = construir({
     titulo: "BOLETA DE PAGO",
-    numero: `${d.nombre.toUpperCase()} - ${d.periodo}`,
+    numero: codigo,
     estado: "EMITIDA",
     datos: [
       ["Trabajador", d.nombre],
@@ -488,7 +505,7 @@ export function pdfBoletaPago(d: DatosBoleta): void {
     firmas: ["Firma del trabajador", "Firma del empleador"],
     huellaEn: 0,
   });
-  doc.save(`BOLETA_${d.id}_${d.nombre.replace(/\s+/g, "_")}.pdf`);
+  guardar(doc, codigo);
 }
 
 /** Planilla cerrada (historial): copia fiel de lo guardado al cerrar la semana. */
@@ -583,12 +600,14 @@ export function pdfCotizacion(c: Cotizacion): void {
 }
 
 export function pdfOrdenCompra(o: OrdenCompra): void {
-  abrir(
+  const codigo = codigoDesdeNumero("OC", o.numero, o.fecha);
+  guardar(
     construir({
       titulo: "ORDEN DE COMPRA",
-      numero: o.numero,
-      estado: o.estado,
+      numero: codigo,
+      estado: estadoDocumento(o.estado),
       datos: [
+        ["N° OC", o.numero],
         ["Proveedor", o.proveedor],
         ["RUC", o.ruc],
         ["Fecha", fechaPE(o.fecha)],
@@ -609,18 +628,18 @@ export function pdfOrdenCompra(o: OrdenCompra): void {
       ],
       firmas: ["Elaborado: Compras", "Aprobado: Gerencia", "Proveedor"],
     }),
-    o.numero
+    codigo
   );
 }
 
 /** Gasto / servicio de Tesorería (sin OC ni stock). */
-function pdfGasto(f: Factura): void {
+function pdfGasto(f: Factura, codigo: string): void {
   const comp = { FACTURA: "Factura", BOLETA: "Boleta", DJ: "Declaración Jurada de Gasto", RECIBO: "Recibo" }[f.comprobanteGasto ?? "FACTURA"];
-  abrir(
+  guardar(
     construir({
-      titulo: "GASTO / SERVICIO - TESORERÍA",
-      numero: f.numero,
-      estado: f.estadoPago === "PAGADA" ? "PAGADA" : "POR PAGAR",
+      titulo: "GASTO",
+      numero: codigo,
+      estado: estadoDocumento(f.estadoPago),
       datos: [
         ["Proveedor / agencia", f.proveedor],
         ["RUC / DNI", f.ruc || "-"],
@@ -639,12 +658,15 @@ function pdfGasto(f: Factura): void {
       ],
       firmas: ["Solicitante", "Tesorería", "Gerencia"],
     }),
-    f.numero
+    codigo
   );
 }
 
 export function pdfFactura(f: Factura, oc?: OrdenCompra): void {
-  if (f.esGastoTesoreria) return pdfGasto(f);
+  if (f.esGastoTesoreria) {
+    void conCodigo(async () => pdfGasto(f, await codigoGasto(f.id)));
+    return;
+  }
   const esDJ = f.tipo === "DECLARACION_JURADA";
   abrir(
     construir({
@@ -732,12 +754,14 @@ const tipoDocSunat = (doc: string) => (doc.startsWith("RUC") ? "6" : doc.startsW
 export function pdfNotaPedido(n: NotaPedido): void {
   const vence = new Date(`${n.fecha}T12:00:00`);
   vence.setDate(vence.getDate() + n.validezDias);
-  abrir(
+  const codigo = codigoDesdeNumero("NP", n.numero, n.fecha);
+  guardar(
     construir({
-      titulo: "NOTA DE PEDIDO / COTIZACIÓN",
-      numero: n.numero,
-      estado: n.estado,
+      titulo: "NOTA DE PEDIDO",
+      numero: codigo,
+      estado: estadoDocumento(n.estado),
       datos: [
+        ["N° NP", n.numero],
         ["Cliente", n.cliente],
         ["Documento", n.clienteDoc],
         ["Fecha", fechaPE(n.fecha)],
@@ -767,7 +791,7 @@ export function pdfNotaPedido(n: NotaPedido): void {
       qrTexto: ["Pagos a nombre de " + EMPRESA.razonSocial + ":", ...lineasCuentas(), `Enviar constancia indicando la ${n.numero}.`],
       firmas: [`Vendedor: ${n.vendedor}`, "Aceptado: Cliente"],
     }),
-    n.numero
+    codigo
   );
 }
 
@@ -893,12 +917,14 @@ export function pdfTicketVenta(c: ComprobanteVenta): void {
 
 export function pdfOrdenDespacho(o: OrdenDespacho): void {
   const ultimo = o.despachos[o.despachos.length - 1];
-  abrir(
+  const codigo = codigoDesdeNumero("OD", o.numero, o.fecha);
+  guardar(
     construir({
       titulo: "ORDEN DE DESPACHO",
-      numero: o.numero,
-      estado: o.estado.replace("_", " "),
+      numero: codigo,
+      estado: estadoDocumento(o.estado),
       datos: [
+        ["N° OD", o.numero],
         ["Cliente", o.cliente],
         ["Comprobante", o.comprobanteNumero],
         ["Fecha OD", fechaPE(o.fecha)],
@@ -923,6 +949,6 @@ export function pdfOrdenDespacho(o: OrdenDespacho): void {
       ),
       firmas: ["Despachado por: Almacén", "Transportista", "Recibí conforme: Cliente"],
     }),
-    o.numero
+    codigo
   );
 }

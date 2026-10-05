@@ -10,6 +10,7 @@ import {
   PORCENTAJES_DETRACCION,
   TIPOS_GASTO,
   calcularDetraccion,
+  codigoGasto,
   fechaPE,
   hoy,
   parseFechaPE,
@@ -64,15 +65,22 @@ export function FormGasto({ rol, proveedores, onGuardado }: { rol: Rol; proveedo
     reader.readAsDataURL(file);
   };
 
-  const guardar = () => {
+  const guardar = async () => {
+    let id = "";
     if (
-      ejecutar(
-        () => registrarGastoTesoreria({ ...d, fecha: fechaISO }, rol),
-        `Gasto registrado · en Facturas como POR PAGAR${monto ? ` (neto ${soles(neto)})` : ""}`
-      )
-    ) {
-      setD(vacio());
-      onGuardado?.();
+      !ejecutar(() => {
+        id = registrarGastoTesoreria({ ...d, fecha: fechaISO }, rol).id;
+      }, `Gasto registrado · en Facturas como POR PAGAR${monto ? ` (neto ${soles(neto)})` : ""}`)
+    )
+      return;
+    setD(vacio());
+    onGuardado?.();
+    // Código global GST-xxx-AAAA (si falla, se vuelve a intentar al generar el PDF)
+    try {
+      const codigo = await codigoGasto(id);
+      toast(`Código del gasto: ${codigo}`);
+    } catch (e) {
+      toast(`Gasto registrado sin código GST: ${(e as Error).message}`, "error");
     }
   };
 

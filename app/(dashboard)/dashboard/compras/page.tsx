@@ -1224,7 +1224,16 @@ function Facturas({
                 <Td>{fechaPE(f.fecha)}</Td>
                 <Td className={cn(vencida && "font-semibold text-red-600")}>{fechaPE(f.fechaVencimiento)}</Td>
                 <Td>{f.proveedor}</Td>
-                <Td>{f.esGastoTesoreria ? <span className="text-xs text-plomo-600">{f.tipoGasto ? TIPOS_GASTO[f.tipoGasto] : "Gasto"}</span> : f.ocNumero}</Td>
+                <Td>
+                  {f.esGastoTesoreria ? (
+                    <>
+                      {f.codigo && <p className="font-mono text-xs font-semibold text-azul-900">{f.codigo}</p>}
+                      <span className="text-xs text-plomo-600">{f.tipoGasto ? TIPOS_GASTO[f.tipoGasto] : "Gasto"}</span>
+                    </>
+                  ) : (
+                    f.ocNumero
+                  )}
+                </Td>
                 <Td className="text-right">{soles(f.subtotal)}</Td>
                 <Td className="text-right">{soles(f.igv)}</Td>
                 <Td className="text-right font-semibold">

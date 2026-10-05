@@ -12,6 +12,7 @@ import { createClient } from "./supabase/client";
 import type {
   AliasHuellas,
   ArchivoGasto,
+  ConcesionContratista,
   ComprobanteGasto,
   TipoGasto,
   ServicioContratista,
@@ -35,6 +36,7 @@ import type {
   Trabajador,
   VistoBueno,
 } from "./types";
+import { generarCodigo } from "./utils/codigos";
 
 export const KEYS = {
   REQS_PENDIENTES: "reqs_almacen_pendientes",
@@ -61,6 +63,7 @@ export const KEYS = {
   LIQUIDACIONES: "planilla_liquidaciones",
   CONTRATISTAS: "planilla_contratistas",
   HUELLAS_ALIAS: "planilla_huellas_alias",
+  BOLETAS: "planilla_boletas",
 } as const;
 
 export type StoreKey = (typeof KEYS)[keyof typeof KEYS];
@@ -147,6 +150,7 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.LIQUIDACIONES]: { tabla: "planilla", tipo: "liquidacion", forma: "lista" },
   [KEYS.CONTRATISTAS]: { tabla: "planilla", tipo: "contratista", forma: "lista" },
   [KEYS.HUELLAS_ALIAS]: { tabla: "planilla", tipo: "huella_alias", forma: "objeto" },
+  [KEYS.BOLETAS]: { tabla: "planilla", tipo: "boleta", forma: "lista" },
   [KEYS.OBSERVACIONES]: { tabla: "observaciones", forma: "observaciones" },
 };
 const TABLAS = ["compras", "almacen", "planilla", "ventas", "observaciones", "condiciones_pago"] as const;
@@ -538,7 +542,7 @@ function evento(usuario: Rol, accion: string, detalle?: string): EventoHistorial
 export const nuevoEvento = evento;
 
 /** Series con correlativo atómico en Supabase (siguiente_numero). */
-export type Serie = "REQ" | "OC" | "DJ" | "NP" | "F001" | "B001" | "OD";
+export type Serie = "REQ" | "OC" | "DJ" | "NP" | "F001" | "B001" | "OD" | "BOL" | "GST" | "RCT";
 
 /** Actualiza la caché de contadores sin enviarla: el servidor ya tiene el valor. */
 function fijarContador(serie: Serie, n: number): void {
@@ -585,6 +589,71 @@ function formatear(serie: Serie, n: number): string {
   if (serie === "OC") return `OC-${new Date().getFullYear()}-${String(n).padStart(4, "0")}`;
   if (serie === "DJ") return `DJ-${String(n).padStart(3, "0")}`;
   return `${serie}-${String(n).padStart(4, "0")}`; // NP-0001, F001-0001, B001-0001, OD-0001
+}
+
+/**
+ * Código global BOL / GST / RCT (BOL-002-2026). Lo reserva Supabase (siguiente_numero): si falta la serie
+ * en la función, avisa que se corra supabase/codigos_documentos.sql.
+ */
+async function reservarCodigo(tipo: "BOL" | "GST" | "RCT"): Promise<{ codigo: string; correlativo: number; anio: number }> {
+  let n: number;
+  try {
+    n = await siguiente(tipo);
+  } catch (e) {
+    if (/serie inv/i.test((e as Error).message))
+      throw new ErpError(`Falta habilitar la serie ${tipo} en Supabase: ejecute supabase/codigos_documentos.sql en el SQL Editor.`);
+    throw e;
+  }
+  const anio = new Date().getFullYear();
+  return { codigo: generarCodigo(tipo, n, anio), correlativo: n, anio };
+}
+
+/** Boleta de pago emitida: un código por trabajador y periodo (al volver a descargarla se reutiliza). */
+export interface BoletaEmitida {
+  id: string; // `${periodo}|${trabajadorId}`
+  codigo: string;
+  correlativo: number;
+  anio: number;
+  periodo: string;
+  trabajadorId: string;
+  nombre: string;
+  totalPagar: number;
+  fecha: string;
+}
+
+export const getBoletas = () => leer<BoletaEmitida[]>(KEYS.BOLETAS, []);
+
+export async function codigoBoleta(periodo: string, trabajadorId: string, nombre: string, totalPagar: number): Promise<string> {
+  const id = `${periodo}|${trabajadorId}`;
+  const previa = getBoletas().find((b) => b.id === id);
+  if (previa) {
+    if (previa.totalPagar !== totalPagar) escribir(KEYS.BOLETAS, getBoletas().map((b) => (b.id === id ? { ...b, totalPagar, nombre } : b)));
+    return previa.codigo;
+  }
+  const c = await reservarCodigo("BOL");
+  escribir(KEYS.BOLETAS, [...getBoletas(), { id, ...c, periodo, trabajadorId, nombre, totalPagar, fecha: new Date().toISOString() }]);
+  return c.codigo;
+}
+
+/** Código GST del gasto de Tesorería (se asigna una sola vez). */
+export async function codigoGasto(facturaId: string): Promise<string> {
+  const f = getFacturas().find((x) => x.id === facturaId);
+  if (!f) throw new ErpError("Gasto no encontrado.");
+  if (f.codigo) return f.codigo;
+  const { codigo } = await reservarCodigo("GST");
+  escribir(KEYS.FACTURAS, getFacturas().map((x) => (x.id === facturaId ? { ...x, codigo } : x)));
+  return codigo;
+}
+
+/** Código RCT del contratista / concesión (se asigna una sola vez). */
+export async function codigoContratista(id: string): Promise<string> {
+  const lista = leer<ConcesionContratista[]>(KEYS.CONTRATISTAS, []);
+  const c = lista.find((x) => x.id === id);
+  if (!c) throw new ErpError("Contratista no encontrado.");
+  if (c.codigo) return c.codigo;
+  const { codigo } = await reservarCodigo("RCT");
+  escribir(KEYS.CONTRATISTAS, leer<ConcesionContratista[]>(KEYS.CONTRATISTAS, []).map((x) => (x.id === id ? { ...x, codigo } : x)));
+  return codigo;
 }
 
 /** Número formateado reservado en Supabase (para ventas y despachos). */

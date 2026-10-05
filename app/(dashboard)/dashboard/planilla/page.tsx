@@ -4,7 +4,7 @@ import { pdfBoletaPago } from "@/lib/pdf";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, Archive, Building2, Calculator, Copy, Eye, FileDown, HandCoins, Lock, Pencil, Plus, Trash2, Upload, Users } from "lucide-react";
-import { Badge, Button, Card, CardHeader, Empty, Input, Modal, Tabs, Td, Table, cn, ejecutar, toast } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, Empty, Input, Modal, Tabs, Td, Table, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import {
   AFP_OPTIONS,
   KEYS,
@@ -20,6 +20,7 @@ import {
   idAsistencia,
   importarAsistenciaReloj,
   normalizarPeriodo,
+  codigoBoleta,
   r2,
   registrarDesdeAsistencia,
   soles,
@@ -272,7 +273,10 @@ export default function PlanillaPage() {
   };
 
   const descargarPDF = (t: TrabajadorCalc) =>
-    pdfBoletaPago({
+    ejecutarAsync(async () => {
+      // Código global BOL-xxx-AAAA (uno por trabajador y periodo; al volver a descargar se reutiliza)
+      const codigo = await codigoBoleta(normalizarPeriodo(periodo), t.id, t.nombre, t.totalPagar);
+      pdfBoletaPago({
       periodo: normalizarPeriodo(periodo),
       id: t.id,
       nombre: t.nombre,
@@ -293,8 +297,9 @@ export default function PlanillaPage() {
       bruto: t.bruto,
       descuentoAfp: t.descuentoAfp,
       adelantos: t.adelantosDescuento,
-      totalPagar: t.totalPagar,
-    });
+        totalPagar: t.totalPagar,
+      }, codigo);
+    }, "Boleta descargada");
 
   const importarBtn = !puedeEditar ? null : (
     <label

@@ -106,6 +106,8 @@ export type TipoComprobante = "FACTURA" | "DECLARACION_JURADA";
 
 export interface Factura {
   id: string;
+  /** Código GST-001-2026 (solo gastos de Tesorería). */
+  codigo?: string;
   tipo: TipoComprobante;
   numero: string; // F001-00001234 o DJ-001
   fecha: string;
@@ -264,6 +266,8 @@ export interface PagoContratista {
 
 export interface ConcesionContratista {
   id: string;
+  /** Código RCT-001-2026. */
+  codigo?: string;
   razonSocial: string;
   ruc: string;
   representante: string;
