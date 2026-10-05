@@ -1100,17 +1100,17 @@ export function observarIngreso(ocId: string, motivo: string, rol: Rol): void {
 export const TIPOS_SUELDO: Record<TipoSueldo, { label: string; divisor: number }> = {
   DIARIO: { label: "Diario", divisor: 1 },
   SEMANAL: { label: "Semanal", divisor: 6 }, // 6 días laborables
-  QUINCENAL: { label: "Quincenal", divisor: 15 },
-  MENSUAL: { label: "Mensual", divisor: 30 },
+  QUINCENAL: { label: "Quincenal", divisor: 13 }, // 13 días laborables
+  MENSUAL: { label: "Mensual", divisor: 26 }, // 26 días laborables
   POR_CONTRATO: { label: "Por contrato", divisor: 30 }, // contratistas: no entran a la planilla del periodo
 };
 
 export const AFP_OPTIONS: Record<TipoAfp, { label: string; porc: number }> = {
-  AFP_INTEGRA: { label: "AFP Integra", porc: 13.0 },
-  AFP_PRIMA: { label: "AFP Prima", porc: 12.9 },
-  AFP_HABITAT: { label: "AFP Habitat", porc: 12.85 },
-  AFP_PROFUTURO: { label: "AFP Profuturo", porc: 12.95 },
-  ONP: { label: "ONP 13%", porc: 13.0 },
+  AFP_INTEGRA: { label: "AFP Integra", porc: 10 },
+  AFP_PRIMA: { label: "AFP Prima", porc: 10 },
+  AFP_HABITAT: { label: "AFP Habitat", porc: 10 },
+  AFP_PROFUTURO: { label: "AFP Profuturo", porc: 10 },
+  ONP: { label: "ONP", porc: 10 },
   SIN: { label: "Sin descuento / Recibo por Honorarios", porc: 0 },
 };
 
