@@ -3,14 +3,15 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { AlertTriangle, Bell, Calculator, CloudUpload, Eye, KeyRound, Receipt, LayoutDashboard, Loader2, LogOut, Menu, Search, ShieldAlert, ShoppingCart, UserCircle2, Users, Warehouse, X } from "lucide-react";
+import { AlertTriangle, Bell, Calculator, CloudUpload, Eye, KeyRound, Receipt, LayoutDashboard, Loader2, LogOut, Menu, Search, Truck, ShieldAlert, ShoppingCart, UserCircle2, Users, Warehouse, X } from "lucide-react";
 import { Badge, Toaster, cn, toast } from "@/components/ui";
 import { DocViewerHost, abrirDoc, type DocRef } from "@/components/doc-viewer";
 import { ObservacionesGerencia } from "@/components/ObservacionesGerencia";
 import { inicioDe, logout, puedeVer, useSesion } from "@/lib/auth";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
 import { KEYS, detenerDatos, getCotizaciones, getFacturas, getGuias, getOrdenes, getPendientes, getProcesados, useDatos, useStore } from "@/lib/storage";
-import type { Requerimiento } from "@/lib/types";
+import type { OrdenDespacho, Requerimiento } from "@/lib/types";
+import { odsNuevas } from "@/lib/ventas";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, pronto: true },
@@ -58,6 +59,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { sesion, listo } = useSesion();
   const datos = useDatos(!!sesion);
   const pendientes = useStore<Requerimiento[]>(KEYS.REQS_PENDIENTES, []);
+  const ods = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, []);
   const [q, setQ] = useState("");
   const [menu, setMenu] = useState(false);
   const [locales, setLocales] = useState(0);
@@ -126,6 +128,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const nav = NAV.filter((n) => puedeVer(sesion, n.href));
   const permitido = puedeVer(sesion, path);
   const veCompras = puedeVer(sesion, "/dashboard/compras");
+  // Campana de Almacén: órdenes de despacho nuevas que creó Ventas
+  const veDespacho = puedeVer(sesion, "/dashboard/almacen") && ["creador", "almacen"].includes(sesion.rol);
+  const nuevasOD = veDespacho ? odsNuevas(ods).length : 0;
   const buscador = veCompras || puedeVer(sesion, "/dashboard/almacen");
   const modulo = NAV.find((n) => n.href !== "/dashboard" && (path === n.href || path.startsWith(`${n.href}/`)))?.href;
 
@@ -247,6 +252,25 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               </div>
             )}
           </div>
+          {veDespacho && (
+            <Link
+              href="/dashboard/almacen?tab=despacho"
+              onClick={() => window.dispatchEvent(new Event("erp:ir-despacho"))}
+              className="relative flex items-center gap-2 rounded-full p-2 text-azul-900 hover:bg-plomo-100"
+              title={nuevasOD ? `${nuevasOD} nueva(s) orden(es) de despacho` : "Órdenes de despacho"}
+              aria-label="Órdenes de despacho nuevas"
+            >
+              {veCompras ? <Truck size={20} /> : <Bell size={20} />}
+              {nuevasOD > 0 && (
+                <>
+                  <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-corp px-1 text-[11px] font-bold text-white">{nuevasOD}</span>
+                  <span className="hidden whitespace-nowrap rounded-full bg-corp px-2.5 py-0.5 text-[11px] font-bold text-white xl:inline">
+                    {nuevasOD} nueva{nuevasOD > 1 ? "s" : ""} orden{nuevasOD > 1 ? "es" : ""}
+                  </span>
+                </>
+              )}
+            </Link>
+          )}
           {veCompras && (
             <Link href="/dashboard/compras" className="relative rounded-full p-2 text-azul-900 hover:bg-plomo-100" title="Requerimientos por revisar">
               <Bell size={20} />

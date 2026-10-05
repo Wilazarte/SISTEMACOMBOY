@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Boxes, CheckCircle2, Truck, ClipboardList, Eye, FilePlus2, FileText, MessageSquareWarning, PackageCheck, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar, ejecutarAsync } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
@@ -23,6 +23,7 @@ import {
 import { pdfActaIngreso, pdfRequerimiento } from "@/lib/pdf";
 import type { EstadoReq, Factura, Guia, ItemReq, OrdenCompra, OrdenDespacho, Requerimiento, Rol, StockItem } from "@/lib/types";
 import { OrdenesDespacho } from "./despacho";
+import { estadoOD } from "@/lib/ventas";
 
 type Tab = "nuevo" | "lista" | "ingresos" | "stock" | "despacho";
 
@@ -38,6 +39,14 @@ export default function AlmacenPage() {
   const stock = useStore<StockItem[]>(KEYS.STOCK, []);
   const despachos = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, []);
   const [tab, setTab] = useState<Tab>(puede(rol, "req.crear") ? "nuevo" : "lista");
+
+  // Campana "nueva orden de despacho": /dashboard/almacen?tab=despacho (o evento si ya está en la página)
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "despacho") setTab("despacho");
+    const ir = () => setTab("despacho");
+    window.addEventListener("erp:ir-despacho", ir);
+    return () => window.removeEventListener("erp:ir-despacho", ir);
+  }, []);
 
  const todos = [...pendientes, ...procesados].sort((a, b) => (b.numero || "").localeCompare(a.numero || ""));
   const porVB = ordenes.filter((o) => o.estado === "EN_GUIA" && !guias.some((g) => g.ocId === o.id && g.estado === "OBSERVADA"));
@@ -68,7 +77,7 @@ export default function AlmacenPage() {
             id: "despacho",
             label: "Órdenes de despacho",
             icon: <Truck size={16} />,
-            count: despachos.filter((o) => o.estado === "PENDIENTE" || o.estado === "EN_PREPARACION").length,
+            count: despachos.filter((o) => estadoOD(o) === "PENDIENTE" || estadoOD(o) === "PEDIDO_ALISTADO").length,
           },
         ]}
       />

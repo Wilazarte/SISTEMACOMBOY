@@ -10,9 +10,10 @@ import QRCode from "qrcode";
 import { EMPRESA } from "./empresa";
 import { codigoContratista, codigoGasto, fechaPE, soles } from "./storage";
 import { codigoDesdeNumero, estadoDocumento } from "./utils/codigos";
+import { ESTADOS_OD, LUGARES_ENTREGA, estadoOD, type EstadoAlmacen } from "./ventas";
 import { toast } from "@/components/ui";
 import type { HistorialDetalle, HistorialPlanilla } from "./historial";
-import type { ConcesionContratista } from "./types";
+import type { ConcesionContratista, LugarEntrega } from "./types";
 import type { ComprobanteVenta, Cotizacion, Factura, Guia, LineaVenta, NotaPedido, OrdenCompra, OrdenDespacho, Requerimiento } from "./types";
 
 type RGB = [number, number, number];
@@ -93,6 +94,10 @@ interface Bloque {
   horizontal?: boolean;
   /** Casillero de huella digital junto a la firma indicada (índice). */
   huellaEn?: number;
+  /** Secciones propias del documento (después de la tabla y los totales). Devuelve la nueva Y. */
+  extra?: (doc: jsPDF, y: number) => number;
+  /** Imagen de firma (dataURL PNG) sobre la línea de la firma indicada. */
+  firmaImagen?: { indice: number; url: string; nombre?: string };
 }
 
 /** Dibuja un QR con rectángulos (síncrono: no bloquea la ventana del PDF). */
@@ -185,11 +190,11 @@ function datosGrid(doc: jsPDF, y: number, datos: [string, string][], columnas = 
       doc.setFontSize(7.5);
       doc.setTextColor(...AZUL);
       const label = `${par[0]}: `;
-      const lw = Math.min(doc.getTextWidth(label), col * 0.45);
+      const lw = doc.getTextWidth(label);
       doc.text(label, x, yy);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(...NEGRO);
-      const val = doc.splitTextToSize(par[1] || "-", col - lw - 3) as string[];
+      const val = doc.splitTextToSize(par[1] || "-", Math.max(col - lw - 3, 18)) as string[];
       doc.text(val, x + lw, yy);
       alto = Math.max(alto, val.length * 3.1 + 0.5);
     }
@@ -252,7 +257,7 @@ function bloqueTotales(doc: jsPDF, y: number, filas: [string, string][]): number
   return y + 2;
 }
 
-function firmas(doc: jsPDF, y: number, nombres: string[], huellaEn?: number): void {
+function firmas(doc: jsPDF, y: number, nombres: string[], huellaEn?: number, img?: Bloque["firmaImagen"]): void {
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
   const tope = H - ALTO_PIE - 12;
@@ -271,6 +276,19 @@ function firmas(doc: jsPDF, y: number, nombres: string[], huellaEn?: number): vo
     doc.setFontSize(7.5);
     doc.setTextColor(...AZUL);
     doc.text(n, cx, yy + 4, { align: "center" });
+    if (img && img.indice === i) {
+      try {
+        doc.addImage(img.url, "PNG", cx - 22, yy - 15, 44, 14);
+      } catch {
+        /* firma ilegible: queda la línea */
+      }
+      if (img.nombre) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(6.5);
+        doc.setTextColor(...GRIS);
+        doc.text(img.nombre, cx, yy + 7.5, { align: "center" });
+      }
+    }
     if (huellaEn === i) {
       // Casillero de huella digital a la derecha de la firma
       doc.setDrawColor(...BORDE);
@@ -329,6 +347,7 @@ function construir(b: Bloque): jsPDF {
   y = datosGrid(doc, y, b.datos, b.columnas ?? 3);
   y = tabla(doc, y, b.head, b.body, b.alinearDerecha);
   if (b.totales?.length) y = bloqueTotales(doc, y, b.totales);
+  if (b.extra) y = b.extra(doc, y);
 
   if (b.notas?.length) {
     y += 2;
@@ -360,7 +379,7 @@ function construir(b: Bloque): jsPDF {
     y += 29;
   }
 
-  firmas(doc, y, b.firmas, b.huellaEn);
+  firmas(doc, y, b.firmas, b.huellaEn, b.firmaImagen);
   pie(doc);
   return doc;
 }
@@ -915,39 +934,105 @@ export function pdfTicketVenta(c: ComprobanteVenta): void {
   abrir(doc, `${c.numero || "borrador"}-ticket`);
 }
 
+/** Casilla de verificación (marcada con X) + texto. */
+function casilla(doc: jsPDF, x: number, y: number, marcada: boolean, texto: string): number {
+  doc.setDrawColor(...AZUL);
+  doc.setLineWidth(0.3);
+  doc.rect(x, y - 2.8, 3.2, 3.2, "S");
+  if (marcada) {
+    doc.setFillColor(...AZUL);
+    doc.rect(x + 0.6, y - 2.2, 2, 2, "F");
+  }
+  doc.setFont("helvetica", marcada ? "bold" : "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...(marcada ? AZUL : NEGRO));
+  doc.text(texto, x + 4.6, y);
+  return x + 4.6 + doc.getTextWidth(texto) + 7;
+}
+
+function tituloSeccion(doc: jsPDF, y: number, t: string): number {
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...AZUL);
+  doc.text(t, M, y);
+  doc.setDrawColor(...PLOMO_200);
+  doc.setLineWidth(1 * PT);
+  doc.line(M, y + 1.2, doc.internal.pageSize.getWidth() - M, y + 1.2);
+  return y + 5.5;
+}
+
+/** Orden de despacho OD-001-2026: ítems, lugar de entrega, estados de Almacén y firmas. */
 export function pdfOrdenDespacho(o: OrdenDespacho): void {
-  const ultimo = o.despachos[o.despachos.length - 1];
   const codigo = codigoDesdeNumero("OD", o.numero, o.fecha);
+  const e = estadoOD(o);
   guardar(
     construir({
       titulo: "ORDEN DE DESPACHO",
       numero: codigo,
-      estado: estadoDocumento(o.estado),
+      estado: ESTADOS_OD[e],
       datos: [
-        ["N° OD", o.numero],
         ["Cliente", o.cliente],
-        ["Comprobante", o.comprobanteNumero],
+        ["DNI / RUC", o.clienteDoc || "-"],
+        ["Venta origen", o.comprobanteNumero],
         ["Fecha OD", fechaPE(o.fecha)],
-        ["Lugar entrega", o.lugarEntrega || "-"],
-        ["Último despacho", ultimo ? `${new Date(ultimo.fecha).toLocaleString("es-PE")} · ${ultimo.responsable}` : "-"],
-        ["Guía remisión", ultimo?.guiaRemision || "-"],
+        ["Vendedor", o.vendedor || "-"],
+        ["N° interno", o.numero],
       ],
-      head: ["#", "Descripción", "Medidas (m)", "Piezas", "Und.", "Solicitado", "Despachado", "Pendiente"],
-      body: o.items.map((l, k) => [
-        k + 1,
-        l.descripcion + (l.productoNombre ? "" : " (servicio)"),
-        l.ancho > 0 ? `${l.ancho} × ${l.alto}` : "-",
-        l.cantidadPiezas,
-        l.unidad,
-        l.solicitado,
-        l.despachado,
-        Math.round((l.solicitado - l.despachado) * 100) / 100,
+      head: ["Código", "Nombre repuesto / equipo", "Cantidad", "Ubicación"],
+      body: o.items.map((l) => [
+        l.codigo ?? "-",
+        l.descripcion + (l.ancho > 0 ? ` (${l.ancho} × ${l.alto} m × ${l.cantidadPiezas})` : "") + (l.productoNombre ? "" : " (servicio)"),
+        `${l.solicitado} ${l.unidad}${l.despachado > 0 && l.despachado < l.solicitado ? ` (entregado ${l.despachado})` : ""}`,
+        l.ubicacion ?? "-",
       ]),
-      alinearDerecha: [3, 5, 6, 7],
+      alinearDerecha: [2],
+      extra: (doc, y0) => {
+        let y = y0 + 2;
+        if (y > doc.internal.pageSize.getHeight() - ALTO_PIE - 60) {
+          doc.addPage();
+          y = 20;
+        }
+        // LUGAR DE ENTREGA
+        y = tituloSeccion(doc, y, "LUGAR DE ENTREGA");
+        let x = M;
+        (Object.keys(LUGARES_ENTREGA) as LugarEntrega[]).forEach((k) => (x = casilla(doc, x, y, o.lugar === k, LUGARES_ENTREGA[k])));
+        y += 5;
+        const det: [string, string][] =
+          o.lugar === "ENVIO_AGENCIA"
+            ? [
+                ["Agencia", o.agenciaNombre || "-"],
+                ["N° guía", o.guiaNro || "-"],
+                ["Costo envío", o.costoEnvio ? soles(o.costoEnvio) : "-"],
+                ["Destino", o.direccionDestino || "-"],
+              ]
+            : [["Dirección", o.direccionDestino || o.lugarEntrega || "-"]];
+        y = datosGrid(doc, y, det, o.lugar === "ENVIO_AGENCIA" ? 4 : 1);
+        // ESTADOS ALMACÉN
+        y = tituloSeccion(doc, y + 1, "ESTADOS ALMACÉN");
+        x = M;
+        const orden: EstadoAlmacen[] = ["PENDIENTE", "PEDIDO_ALISTADO", "PEDIDO_ENTREGADO", "DEJADO_EN_AGENCIA"];
+        const alcanzado = (k: EstadoAlmacen) =>
+          k === "PENDIENTE" || k === e || (k === "PEDIDO_ALISTADO" && (e === "PEDIDO_ENTREGADO" || e === "DEJADO_EN_AGENCIA"));
+        orden.forEach((k) => (x = casilla(doc, x, y, e !== "ANULADO" && alcanzado(k), ESTADOS_OD[k])));
+        y += 5;
+        y = datosGrid(
+          doc,
+          y,
+          [
+            ["Atendido por", o.atendidoPor || "-"],
+            ["Recibió", o.recibidoPor || "-"],
+            ["Actualizado", o.actualizado ? new Date(o.actualizado).toLocaleString("es-PE") : "-"],
+            ["Observación", o.observacion || "-"],
+          ],
+          2
+        );
+        return y;
+      },
       notas: o.despachos.map(
-        (d, i) => `Despacho ${i + 1}: ${new Date(d.fecha).toLocaleString("es-PE")} · ${d.responsable} · ${d.sede}${d.guiaRemision ? ` · GR ${d.guiaRemision}` : ""}${d.observacion ? ` · ${d.observacion}` : ""}`
+        (d, i) => `Salida ${i + 1}: ${new Date(d.fecha).toLocaleString("es-PE")} · ${d.responsable} · ${d.sede}${d.guiaRemision ? ` · guía ${d.guiaRemision}` : ""}${d.observacion ? ` · ${d.observacion}` : ""}`
       ),
-      firmas: ["Despachado por: Almacén", "Transportista", "Recibí conforme: Cliente"],
+      firmas: ["Almacén", "Cliente"],
+      firmaImagen: o.firmaCliente ? { indice: 1, url: o.firmaCliente.url, nombre: o.recibidoPor } : undefined,
     }),
     codigo
   );

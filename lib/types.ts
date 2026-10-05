@@ -449,6 +449,8 @@ export interface Cuota {
 
 export interface ComprobanteVenta {
   id: string;
+  /** Lugar de entrega y agencia para la Orden de Despacho. */
+  despacho?: DatosDespacho;
   tipo: TipoComprobanteVenta;
   serie: string; // F001 / B001
   numero: string; // F001-0001 ("" mientras es borrador)
@@ -505,7 +507,36 @@ export interface AsientoContable {
   lineas: { cuenta: string; nombre: string; debe: number; haber: number }[];
 }
 
-export type EstadoOD = "PENDIENTE" | "EN_PREPARACION" | "DESPACHADO_PARCIAL" | "DESPACHADO_TOTAL" | "ANULADO";
+/**
+ * Estados de Almacén: PENDIENTE → PEDIDO_ALISTADO → PEDIDO_ENTREGADO / DEJADO_EN_AGENCIA.
+ * (EN_PREPARACION, DESPACHADO_PARCIAL y DESPACHADO_TOTAL son de órdenes antiguas; ver estadoOD() en lib/ventas.ts.)
+ */
+export type EstadoOD =
+  | "PENDIENTE"
+  | "PEDIDO_ALISTADO"
+  | "PEDIDO_ENTREGADO"
+  | "DEJADO_EN_AGENCIA"
+  | "ANULADO"
+  | "EN_PREPARACION"
+  | "DESPACHADO_PARCIAL"
+  | "DESPACHADO_TOTAL";
+
+export type LugarEntrega = "OFICINA_AREQUIPA" | "SECOCHA" | "ENVIO_AGENCIA";
+
+/** Datos de despacho que Ventas llena antes de emitir (obligatorios). */
+export interface DatosDespacho {
+  lugar: LugarEntrega | "";
+  agenciaNombre: string; // Shalom, Marvisur…
+  guiaNro: string;
+  costoEnvio: number;
+  direccionDestino: string;
+}
+
+export interface ArchivoAdjunto {
+  nombre: string;
+  tipo: string;
+  url: string; // dataURL
+}
 
 export interface LineaDespacho {
   id: string;
@@ -517,6 +548,9 @@ export interface LineaDespacho {
   cantidadPiezas: number;
   solicitado: number; // en la unidad de stock (m² si unidad M2)
   despachado: number;
+  /** Código del producto en Almacén (id del stock) y ubicación (sedes con stock) al emitir. */
+  codigo?: string;
+  ubicacion?: string;
 }
 
 export interface MovimientoDespacho {
@@ -542,4 +576,23 @@ export interface OrdenDespacho {
   estado: EstadoOD;
   despachos: MovimientoDespacho[];
   historial: EventoHistorial[];
+  // --- Flujo Ventas -> Almacén
+  clienteDoc?: string;
+  vendedor?: string;
+  lugar?: LugarEntrega;
+  agenciaNombre?: string;
+  guiaNro?: string;
+  costoEnvio?: number;
+  direccionDestino?: string;
+  observacion?: string;
+  creadoPor?: string; // Ventas
+  atendidoPor?: string; // Almacén
+  /** Firma del cliente (Marcar entregado) y foto de la guía (Dejado en agencia). */
+  firmaCliente?: ArchivoAdjunto;
+  recibidoPor?: string;
+  fotoGuia?: ArchivoAdjunto;
+  /** false hasta que Almacén abre la pestaña: campana "nueva orden". */
+  vistoAlmacen?: boolean;
+  postVentaStatus?: string | null; // reservado
+  actualizado?: string;
 }

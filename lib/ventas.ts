@@ -12,6 +12,7 @@ import {
   KEYS,
   descontarStock,
   escribir,
+  getStock,
   hoy,
   leer,
   nuevoEvento,
@@ -27,6 +28,9 @@ import type {
   ComprobanteVenta,
   CondicionPago,
   Cuota,
+  DatosDespacho,
+  LugarEntrega,
+  ArchivoAdjunto,
   FormaPagoVenta,
   LineaDespacho,
   LineaVenta,
@@ -368,7 +372,53 @@ export interface DatosComprobante {
   nCuotas: number;
   inicial: number;
   lugarEntrega: string;
+  /** Datos de despacho (obligatorios para emitir). */
+  despacho?: DatosDespacho;
 }
+
+// ---------------------------------------------------------------------
+// Datos de despacho (Ventas) y estados de Almacén
+// ---------------------------------------------------------------------
+
+export const LUGARES_ENTREGA: Record<LugarEntrega, string> = {
+  OFICINA_AREQUIPA: "Oficina Arequipa",
+  SECOCHA: "Secocha",
+  ENVIO_AGENCIA: "Envío por agencia",
+};
+
+export const despachoVacio = (): DatosDespacho => ({ lugar: "", agenciaNombre: "", guiaNro: "", costoEnvio: 0, direccionDestino: "" });
+
+/** Lugar de entrega obligatorio; si es ENVIO_AGENCIA, agencia y N° de guía también. */
+export function validarDespacho(d?: DatosDespacho): DatosDespacho {
+  if (!d || !d.lugar || !(d.lugar in LUGARES_ENTREGA)) throw new ErpError("Datos de despacho: seleccione el lugar de entrega (Oficina Arequipa, Secocha o Envío por agencia).");
+  if (d.lugar !== "ENVIO_AGENCIA") return { ...despachoVacio(), lugar: d.lugar };
+  const agenciaNombre = d.agenciaNombre.trim();
+  const guiaNro = d.guiaNro.trim().toUpperCase();
+  if (!agenciaNombre) throw new ErpError("Envío por agencia: indique el nombre de la agencia (Shalom, Marvisur…).");
+  if (!guiaNro) throw new ErpError("Envío por agencia: indique el N° de guía.");
+  const costoEnvio = r2(Number(d.costoEnvio) || 0);
+  if (costoEnvio < 0) throw new ErpError("El costo de envío no puede ser negativo.");
+  return { lugar: d.lugar, agenciaNombre, guiaNro, costoEnvio, direccionDestino: d.direccionDestino.trim() };
+}
+
+/** Estado de Almacén (las órdenes antiguas se traducen a los estados nuevos). */
+export type EstadoAlmacen = "PENDIENTE" | "PEDIDO_ALISTADO" | "PEDIDO_ENTREGADO" | "DEJADO_EN_AGENCIA" | "ANULADO";
+export function estadoOD(o: OrdenDespacho): EstadoAlmacen {
+  if (o.estado === "EN_PREPARACION" || o.estado === "DESPACHADO_PARCIAL") return "PEDIDO_ALISTADO";
+  if (o.estado === "DESPACHADO_TOTAL") return "PEDIDO_ENTREGADO";
+  return o.estado;
+}
+
+export const ESTADOS_OD: Record<EstadoAlmacen, string> = {
+  PENDIENTE: "Pendiente",
+  PEDIDO_ALISTADO: "Alistado",
+  PEDIDO_ENTREGADO: "Entregado",
+  DEJADO_EN_AGENCIA: "En agencia",
+  ANULADO: "Anulado",
+};
+
+/** Órdenes nuevas que Almacén aún no abrió (campana). */
+export const odsNuevas = (ods: OrdenDespacho[]) => ods.filter((o) => o.vistoAlmacen === false && estadoOD(o) === "PENDIENTE");
 
 export const saldoCliente = (clienteId: string): number =>
   r2(getComprobantes().filter((c) => c.clienteId === clienteId && c.estado === "EMITIDO").reduce((a, c) => a + c.saldo, 0));
@@ -438,6 +488,7 @@ function armarComprobante(data: DatosComprobante, existente?: ComprobanteVenta):
     estado: "BORRADOR",
     estadoSunat: "NO_ENVIADO",
     lugarEntrega: data.lugarEntrega.trim() || np?.lugarObra || cliente.direccionesEntrega[0] || cliente.direccionFiscal,
+    despacho: data.despacho,
     vendedor: existente?.vendedor ?? "",
     historial: existente?.historial ?? [],
   };
@@ -487,7 +538,12 @@ function asientoCobro(c: ComprobanteVenta, monto: number, medio: CobroVenta["med
 /** Línea de venta -> línea de despacho. Productos en m² se despachan por m²; servicios no mueven stock. */
 function lineaDespacho(l: LineaVenta): LineaDespacho {
   const porM2 = l.unidad === "M2" && l.m2 > 0;
+  const nombre = l.productoNombre.trim().toUpperCase();
+  // Código y ubicación (sedes con stock) del producto en Almacén
+  const enStock = nombre ? getStock().filter((s) => s.nombre === nombre && s.unidad === l.unidad) : [];
   return {
+    codigo: enStock[0]?.id.slice(0, 8).toUpperCase() || (nombre ? "-" : "SERV"),
+    ubicacion: enStock.filter((s) => s.cantidad > 0).map((s) => s.sede).join(", ") || (nombre ? "Sin stock" : "-"),
     id: uid(),
     productoNombre: l.productoNombre.trim().toUpperCase(),
     descripcion: l.descripcion,
@@ -514,6 +570,7 @@ export async function emitirComprobante(
   const existente = borradorId ? getComprobantes().find((c) => c.id === borradorId) : undefined;
   if (existente && existente.estado !== "BORRADOR") throw new ErpError("Este comprobante ya fue emitido.");
   const c = armarComprobante(data, existente);
+  c.despacho = validarDespacho(data.despacho); // antes de pedir números
   const cliente = getClientes().find((x) => x.id === c.clienteId)!;
   const porCobrar = r2(c.total - (c.formaPago === "CONTADO" ? c.total : c.inicial));
   if (porCobrar > 0 && cliente.lineaCredito > 0 && saldoCliente(cliente.id) + porCobrar > cliente.lineaCredito)
@@ -542,7 +599,18 @@ export async function emitirComprobante(
     items: c.items.map(lineaDespacho),
     estado: "PENDIENTE",
     despachos: [],
-    historial: [nuevoEvento(rol, "Orden de despacho generada", `Desde ${numero}`)],
+    historial: [nuevoEvento(rol, "Orden de despacho generada", `Desde ${numero} · ${LUGARES_ENTREGA[c.despacho.lugar as LugarEntrega]}`)],
+    clienteDoc: c.clienteDoc,
+    vendedor: c.vendedor,
+    lugar: c.despacho.lugar as LugarEntrega,
+    agenciaNombre: c.despacho.agenciaNombre || undefined,
+    guiaNro: c.despacho.guiaNro || undefined,
+    costoEnvio: c.despacho.lugar === "ENVIO_AGENCIA" ? c.despacho.costoEnvio : undefined,
+    direccionDestino: c.despacho.direccionDestino || c.lugarEntrega,
+    creadoPor: vendedor,
+    vistoAlmacen: false, // campana de Almacén: "1 nueva orden"
+    postVentaStatus: null,
+    actualizado: ahora,
   };
   c.odId = od.id;
   c.odNumero = od.numero;
@@ -665,8 +733,9 @@ export const pendienteLinea = (l: LineaDespacho) => r2(l.solicitado - l.despacha
 export function estadoEntrega(c: ComprobanteVenta, ods: OrdenDespacho[]): "PENDIENTE" | "PARCIAL" | "ENTREGADO" | "-" {
   const od = ods.find((o) => o.id === c.odId);
   if (!od || c.estado !== "EMITIDO") return "-";
-  if (od.estado === "DESPACHADO_TOTAL") return "ENTREGADO";
-  if (od.estado === "DESPACHADO_PARCIAL") return "PARCIAL";
+  const e = estadoOD(od);
+  if (e === "PEDIDO_ENTREGADO" || e === "DEJADO_EN_AGENCIA") return "ENTREGADO";
+  if (od.despachos.length > 0) return "PARCIAL";
   return "PENDIENTE";
 }
 
@@ -678,18 +747,103 @@ function actualizarOD(id: string, fn: (o: OrdenDespacho) => OrdenDespacho): void
   escribir(KEYS.DESPACHOS, lista);
 }
 
-export function prepararDespacho(id: string, rol: Rol): void {
+const soloAlmacen = (rol: Rol) => {
+  if (rol !== "ALMACEN" && rol !== "GERENCIA") throw new ErpError("Solo Almacén puede cambiar el estado de la orden de despacho.");
+};
+
+/** Almacén abrió la pestaña: las órdenes dejan de contar como "nuevas" en la campana. */
+export function marcarODsVistas(rol: Rol): void {
+  if (rol !== "ALMACEN" && rol !== "GERENCIA") return;
+  const lista = getDespachos();
+  if (!lista.some((o) => o.vistoAlmacen === false)) return;
+  escribir(KEYS.DESPACHOS, lista.map((o) => (o.vistoAlmacen === false ? { ...o, vistoAlmacen: true } : o)));
+}
+
+/** Observación de Almacén (sin cambiar estado). */
+export function guardarObservacionOD(id: string, observacion: string, usuario: string, rol: Rol): void {
+  soloAlmacen(rol);
+  actualizarOD(id, (o) => ({ ...o, observacion: observacion.trim(), atendidoPor: usuario, actualizado: new Date().toISOString(), historial: [...o.historial, nuevoEvento(rol, "Observación de Almacén", observacion.trim() || "(vacía)")] }));
+}
+
+/** PENDIENTE → PEDIDO_ALISTADO. */
+export function marcarAlistado(id: string, usuario: string, observacion: string, rol: Rol): void {
+  soloAlmacen(rol);
   actualizarOD(id, (o) => {
-    if (o.estado !== "PENDIENTE") throw new ErpError(`La ${o.numero} está ${o.estado}.`);
-    return { ...o, estado: "EN_PREPARACION", historial: [...o.historial, nuevoEvento(rol, "En preparación")] };
+    if (estadoOD(o) !== "PENDIENTE") throw new ErpError(`La ${o.numero} ya está ${ESTADOS_OD[estadoOD(o)].toUpperCase()}.`);
+    return {
+      ...o,
+      estado: "PEDIDO_ALISTADO",
+      vistoAlmacen: true,
+      atendidoPor: usuario,
+      observacion: observacion.trim() || o.observacion,
+      actualizado: new Date().toISOString(),
+      historial: [...o.historial, nuevoEvento(rol, "Pedido alistado", usuario)],
+    };
   });
+}
+
+/** @deprecated usar marcarAlistado */
+export const prepararDespacho = (id: string, rol: Rol) => marcarAlistado(id, "", "", rol);
+
+/**
+ * Cierre de Almacén: descuenta stock de lo pendiente (registrarDespacho) y deja la orden en
+ * PEDIDO_ENTREGADO (con firma del cliente) o DEJADO_EN_AGENCIA (foto de la guía opcional).
+ * Si se entrega solo una parte, queda PEDIDO_ALISTADO con el despacho parcial registrado.
+ */
+export function cerrarDespacho(
+  id: string,
+  final: "PEDIDO_ENTREGADO" | "DEJADO_EN_AGENCIA",
+  datos: {
+    mov: Omit<MovimientoDespacho, "fecha">;
+    observacion: string;
+    firmaCliente?: ArchivoAdjunto;
+    recibidoPor?: string;
+    fotoGuia?: ArchivoAdjunto;
+    guiaNro?: string;
+  },
+  rol: Rol
+): OrdenDespacho {
+  soloAlmacen(rol);
+  const od = getDespachos().find((o) => o.id === id);
+  if (!od) throw new ErpError("Orden de despacho no encontrada.");
+  const e = estadoOD(od);
+  if (e === "ANULADO" || e === "PEDIDO_ENTREGADO" || e === "DEJADO_EN_AGENCIA") throw new ErpError(`La ${od.numero} está ${ESTADOS_OD[e].toUpperCase()}.`);
+  if (final === "PEDIDO_ENTREGADO") {
+    if (!datos.firmaCliente) throw new ErpError("Marcar entregado: falta la firma del cliente.");
+    if (!datos.recibidoPor?.trim()) throw new ErpError("Indique el nombre de quien recibe.");
+  }
+  const pendiente = od.items.some((l) => pendienteLinea(l) > 0);
+  let o = od;
+  if (pendiente && datos.mov.lineas.some((l) => l.cantidad > 0)) o = registrarDespacho(id, datos.mov, rol);
+  const total = o.items.every((l) => pendienteLinea(l) <= 0);
+  const ahora = new Date().toISOString();
+  let actualizada!: OrdenDespacho;
+  actualizarOD(id, (x) => {
+    actualizada = {
+      ...x,
+      estado: total ? final : "PEDIDO_ALISTADO",
+      vistoAlmacen: true,
+      atendidoPor: datos.mov.responsable.trim() || x.atendidoPor,
+      observacion: datos.observacion.trim() || x.observacion,
+      firmaCliente: datos.firmaCliente ?? x.firmaCliente,
+      recibidoPor: datos.recibidoPor?.trim() || x.recibidoPor,
+      fotoGuia: datos.fotoGuia ?? x.fotoGuia,
+      guiaNro: datos.guiaNro?.trim().toUpperCase() || x.guiaNro,
+      actualizado: ahora,
+      historial: total
+        ? [...x.historial, nuevoEvento(rol, final === "PEDIDO_ENTREGADO" ? "Pedido entregado" : "Dejado en agencia", final === "PEDIDO_ENTREGADO" ? `Recibió: ${datos.recibidoPor?.trim()}` : `${x.agenciaNombre ?? "Agencia"}${datos.guiaNro || x.guiaNro ? ` · guía ${datos.guiaNro || x.guiaNro}` : ""}`)]
+        : x.historial,
+    };
+    return actualizada;
+  });
+  return actualizada;
 }
 
 /** Despacho (parcial o total): valida stock, descuenta (m² o unidades) y actualiza el estado de la OD. */
 export function registrarDespacho(id: string, mov: Omit<MovimientoDespacho, "fecha">, rol: Rol): OrdenDespacho {
   const od = getDespachos().find((o) => o.id === id);
   if (!od) throw new ErpError("Orden de despacho no encontrada.");
-  if (od.estado === "ANULADO" || od.estado === "DESPACHADO_TOTAL") throw new ErpError(`La ${od.numero} está ${od.estado}.`);
+  if (["ANULADO", "DESPACHADO_TOTAL", "PEDIDO_ENTREGADO", "DEJADO_EN_AGENCIA"].includes(od.estado)) throw new ErpError(`La ${od.numero} está ${od.estado}.`);
   if (!mov.responsable.trim()) throw new ErpError("Indique quién despacha.");
   if (!mov.sede) throw new ErpError("Seleccione el almacén (sede) de salida.");
   const lineas = mov.lineas.filter((l) => l.cantidad > 0);

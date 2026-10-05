@@ -134,6 +134,9 @@ const COLORES: Record<string, string> = {
   INACTIVO: "bg-red-50 text-vino ring-red-200",
   COMPRA: "bg-[#EEF2F7] text-azul-700 ring-[#C9D4E3]",
   GASTO_TESORERIA: "bg-red-50 text-vino ring-red-200",
+  PEDIDO_ALISTADO: "bg-[#EEF2F7] text-azul-700 ring-[#C9D4E3]",
+  PEDIDO_ENTREGADO: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  DEJADO_EN_AGENCIA: "bg-red-50 text-vino ring-red-200",
   DESCONTADO: "bg-emerald-50 text-emerald-800 ring-emerald-200",
 };
 
@@ -150,6 +153,9 @@ const ETIQUETA: Record<string, string> = {
   CREDITO: "CRÉDITO",
   CREDITO_CUOTAS: "CRÉDITO CUOTAS",
   GASTO_TESORERIA: "GASTO TESORERIA",
+  PEDIDO_ALISTADO: "ALISTADO",
+  PEDIDO_ENTREGADO: "ENTREGADO",
+  DEJADO_EN_AGENCIA: "EN AGENCIA",
 };
 
 export function Badge({ estado }: { estado: string }) {
