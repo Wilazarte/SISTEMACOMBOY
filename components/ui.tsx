@@ -134,6 +134,8 @@ const COLORES: Record<string, string> = {
   INACTIVO: "bg-red-50 text-vino ring-red-200",
   COMPRA: "bg-[#EEF2F7] text-azul-700 ring-[#C9D4E3]",
   GASTO_TESORERIA: "bg-red-50 text-vino ring-red-200",
+  DISPONIBLE: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  EN_QC: "bg-red-50 text-vino ring-red-200",
   PEDIDO_ALISTADO: "bg-[#EEF2F7] text-azul-700 ring-[#C9D4E3]",
   PEDIDO_ENTREGADO: "bg-emerald-50 text-emerald-800 ring-emerald-200",
   DEJADO_EN_AGENCIA: "bg-red-50 text-vino ring-red-200",
@@ -154,6 +156,7 @@ const ETIQUETA: Record<string, string> = {
   CREDITO_CUOTAS: "CRÉDITO CUOTAS",
   GASTO_TESORERIA: "GASTO TESORERIA",
   PEDIDO_ALISTADO: "ALISTADO",
+  EN_QC: "EN QC",
   PEDIDO_ENTREGADO: "ENTREGADO",
   DEJADO_EN_AGENCIA: "EN AGENCIA",
 };

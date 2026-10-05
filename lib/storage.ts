@@ -64,6 +64,7 @@ export const KEYS = {
   CONTRATISTAS: "planilla_contratistas",
   HUELLAS_ALIAS: "planilla_huellas_alias",
   BOLETAS: "planilla_boletas",
+  EQUIPOS: "almacen_equipos_terminados",
   // Contable (tabla contable)
   CONTABLE_ASIENTOS: "contable_asientos",
   CONTABLE_PLAN: "contable_plan_cuentas",
@@ -155,6 +156,7 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.CONTRATISTAS]: { tabla: "planilla", tipo: "contratista", forma: "lista" },
   [KEYS.HUELLAS_ALIAS]: { tabla: "planilla", tipo: "huella_alias", forma: "objeto" },
   [KEYS.BOLETAS]: { tabla: "planilla", tipo: "boleta", forma: "lista" },
+  [KEYS.EQUIPOS]: { tabla: "almacen", tipo: "EQUIPO_TERMINADO", forma: "lista" },
   [KEYS.CONTABLE_ASIENTOS]: { tabla: "contable", tipo: "ASIENTO_DIARIO", forma: "lista" },
   [KEYS.CONTABLE_PLAN]: { tabla: "contable", tipo: "PLAN_CUENTAS", forma: "lista" },
   [KEYS.CONTABLE_CIERRES]: { tabla: "contable", tipo: "CIERRE_MENSUAL", forma: "lista" },
@@ -557,7 +559,7 @@ function evento(usuario: Rol, accion: string, detalle?: string): EventoHistorial
 export const nuevoEvento = evento;
 
 /** Series con correlativo atómico en Supabase (siguiente_numero). */
-export type Serie = "REQ" | "OC" | "DJ" | "NP" | "F001" | "B001" | "OD" | "BOL" | "GST" | "RCT";
+export type Serie = "REQ" | "OC" | "DJ" | "NP" | "F001" | "B001" | "OD" | "BOL" | "GST" | "RCT" | "EQ";
 
 /** Actualiza la caché de contadores sin enviarla: el servidor ya tiene el valor. */
 function fijarContador(serie: Serie, n: number): void {
@@ -602,6 +604,7 @@ export function previewNumero(serie: Serie): string {
 function formatear(serie: Serie, n: number): string {
   if (serie === "REQ") return `REQ-ALM-${String(n).padStart(3, "0")}`;
   if (serie === "OC") return `OC-${new Date().getFullYear()}-${String(n).padStart(4, "0")}`;
+  if (serie === "EQ") return `EQ-${new Date().getFullYear()}-${String(n).padStart(4, "0")}`;
   if (serie === "DJ") return `DJ-${String(n).padStart(3, "0")}`;
   return `${serie}-${String(n).padStart(4, "0")}`; // NP-0001, F001-0001, B001-0001, OD-0001
 }

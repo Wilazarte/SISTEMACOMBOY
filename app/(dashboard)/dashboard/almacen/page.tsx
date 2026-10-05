@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Boxes, CheckCircle2, Truck, ClipboardList, Eye, FilePlus2, FileText, MessageSquareWarning, PackageCheck, Pencil, Plus, Send, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Boxes, CheckCircle2, Factory, Truck, ClipboardList, Eye, FilePlus2, FileText, MessageSquareWarning, PackageCheck, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar, ejecutarAsync } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
+import { getSesion } from "@/lib/auth";
 import { SEDES, UNIDADES } from "@/lib/empresa";
 import {
   KEYS,
@@ -23,6 +24,7 @@ import {
 import { pdfActaIngreso, pdfRequerimiento } from "@/lib/pdf";
 import type { EstadoReq, Factura, Guia, ItemReq, OrdenCompra, OrdenDespacho, Requerimiento, Rol, StockItem } from "@/lib/types";
 import { OrdenesDespacho } from "./despacho";
+import { EquiposTerminados } from "@/components/almacen/EquiposTerminados";
 import { estadoOD } from "@/lib/ventas";
 
 type Tab = "nuevo" | "lista" | "ingresos" | "stock" | "despacho";
@@ -85,7 +87,7 @@ export default function AlmacenPage() {
       {tab === "nuevo" && <NuevoReq rol={rol} onCreado={() => setTab("lista")} />}
       {tab === "lista" && <ListaReq reqs={todos} rol={rol} />}
       {tab === "ingresos" && <Ingresos rol={rol} porVB={porVB} ordenes={ordenes} facturas={facturas} guias={guias} />}
-      {tab === "stock" && <Stock stock={stock} />}
+      {tab === "stock" && <Stock stock={stock} rol={rol} />}
       {tab === "despacho" && <OrdenesDespacho />}
     </div>
   );
@@ -488,22 +490,36 @@ function Ingresos({ rol, porVB, ordenes, facturas, guias }: { rol: Rol; porVB: O
 // =====================================================================
 // STOCK (alimentado por las compras registradas y por el V°B° de ingresos)
 // =====================================================================
-function Stock({ stock }: { stock: StockItem[] }) {
+function Stock({ stock, rol }: { stock: StockItem[]; rol: Rol }) {
   const [sede, setSede] = useState("");
   const [q, setQ] = useState("");
+  const [nuevoEquipo, setNuevoEquipo] = useState(false);
+  const cerrarNuevo = useCallback(() => setNuevoEquipo(false), []);
+  const puedeRegistrar = puede(rol, "req.crear") && !getSesion()?.soloLectura; // Almacén y creador
   const lista = stock
     .filter((s) => (!sede || s.sede === sede) && (!q || s.nombre.toLowerCase().includes(q.toLowerCase())))
     .sort((a, b) => a.sede.localeCompare(b.sede) || a.nombre.localeCompare(b.nombre));
   const valorizado = lista.reduce((a, s) => a + s.cantidad * s.costoUnit, 0);
   return (
+    <div className="space-y-6">
+    <EquiposTerminados puedeRegistrar={puedeRegistrar} nuevo={nuevoEquipo} onNuevoCerrado={cerrarNuevo} />
     <Card>
       <CardHeader
         title="Stock de almacén"
         subtitle={`${lista.length} producto(s) · Valorizado ${soles(valorizado)} (último costo: sin IGV en factura/OC, con IGV en boleta)`}
         action={
-          <div className="flex flex-wrap gap-2">
-            <Input placeholder="Buscar producto…" value={q} onChange={(e) => setQ(e.target.value)} className="w-48" />
-            <Select value={sede} onChange={(e) => setSede(e.target.value)} placeholder="Todas las sedes" options={SEDES.map((s) => ({ value: s, label: s }))} className="w-48" />
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="w-48">
+              <Input placeholder="Buscar producto…" value={q} onChange={(e) => setQ(e.target.value)} />
+            </div>
+            {puedeRegistrar && (
+              <Button onClick={() => setNuevoEquipo(true)}>
+                <Factory size={16} /> + Registrar Equipo Terminado
+              </Button>
+            )}
+            <div className="w-48">
+              <Select value={sede} onChange={(e) => setSede(e.target.value)} placeholder="Todas las sedes" options={SEDES.map((s) => ({ value: s, label: s }))} />
+            </div>
           </div>
         }
       />
@@ -521,5 +537,6 @@ function Stock({ stock }: { stock: StockItem[] }) {
         ))}
       </Table>
     </Card>
+    </div>
   );
 }
