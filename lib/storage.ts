@@ -11,6 +11,9 @@ import { getSesion, rolNegocio } from "./auth";
 import { createClient } from "./supabase/client";
 import type {
   AliasHuellas,
+  ArchivoGasto,
+  ComprobanteGasto,
+  TipoGasto,
   ServicioContratista,
   CondicionPago,
   EstadoCivil,
@@ -1538,6 +1541,118 @@ export const sedeIngresoOC = (oc: OrdenCompra): string => buscarReq(oc.reqId)?.s
  * Totales de una compra. FACTURA: precios sin IGV (se suma 18 %).
  * BOLETA: precios con IGV incluido (el total es la suma de filas y se desglosa la base).
  */
+// ---------------------------------------------------------------------
+// GASTOS / SERVICIOS DE TESORERÍA (sin requerimiento, OC ni ingreso a stock)
+// Se guardan como comprobante en "Facturas" (tabla compras, tipo factura) con esGastoTesoreria = true.
+// ---------------------------------------------------------------------
+
+export const TIPOS_GASTO: Record<TipoGasto, string> = {
+  REPRESENTACION: "Almuerzo ejecutivo / Representación",
+  SERVICIO_BASICO: "Servicio básico (Luz / Agua / Internet / Celular)",
+  TRANSPORTE: "Transporte / Agencia / Flete",
+  COMPRA_SIN_REQ: "Compra sin requerimiento",
+  OTROS: "Otros",
+};
+
+export const COMPROBANTES_GASTO: Record<ComprobanteGasto, string> = {
+  FACTURA: "Factura",
+  BOLETA: "Boleta",
+  DJ: "Declaración Jurada de Gasto",
+  RECIBO: "Recibo",
+};
+
+/** % de detracción sugerido según el servicio (transporte de carga 4 %, servicios en general 12 %, otros 10 %). */
+export const DETRACCION_SUGERIDA: Record<TipoGasto, number> = {
+  REPRESENTACION: 10,
+  SERVICIO_BASICO: 12,
+  TRANSPORTE: 4,
+  COMPRA_SIN_REQ: 10,
+  OTROS: 12,
+};
+export const PORCENTAJES_DETRACCION = [4, 10, 12];
+
+export interface DatosGasto {
+  fecha: string;
+  tipoGasto: TipoGasto;
+  descripcion: string;
+  importe: number; // total del comprobante (con IGV si es factura)
+  comprobante: ComprobanteGasto;
+  numero: string;
+  proveedor: string;
+  ruc: string;
+  detraccion: boolean;
+  detraccionPorc: number;
+  archivos: ArchivoGasto[];
+}
+
+/** Detracción y neto a pagar: ej. agencia S/ 100 con 4 % -> detracción S/ 4, neto S/ 96. */
+export function calcularDetraccion(importe: number, aplica: boolean, porc: number): { monto: number; neto: number } {
+  const total = r2(Number(importe) || 0);
+  const monto = aplica ? r2((total * (Number(porc) || 0)) / 100) : 0;
+  return { monto, neto: r2(total - monto) };
+}
+
+const NUM_GASTO: Partial<Record<ComprobanteGasto, RegExp>> = {
+  FACTURA: /^[EF][A-Z0-9]{3}-\d{1,8}$/,
+  BOLETA: /^[BE][A-Z0-9]{3}-\d{1,8}$/,
+};
+
+/** Registra un gasto / servicio: NO ingresa a stock; queda en Facturas como POR PAGAR. */
+export function registrarGastoTesoreria(d: DatosGasto, rol: Rol): Factura {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d.fecha)) throw new ErpError("Fecha del gasto inválida. Use DD/MM/AAAA.");
+  if (d.fecha > hoy()) throw new ErpError("La fecha del gasto no puede ser futura.");
+  if (!(d.tipoGasto in TIPOS_GASTO)) throw new ErpError("Seleccione el tipo de gasto.");
+  if (!d.descripcion.trim()) throw new ErpError("Describa el gasto.");
+  const total = r2(Number(d.importe));
+  if (!(total > 0)) throw new ErpError("El importe total debe ser mayor a 0.");
+  if (!(d.comprobante in COMPROBANTES_GASTO)) throw new ErpError("Seleccione el tipo de comprobante.");
+  const numero = d.numero.trim().toUpperCase();
+  if (!numero) throw new ErpError(`Ingrese el N° de ${COMPROBANTES_GASTO[d.comprobante].toLowerCase()}.`);
+  const re = NUM_GASTO[d.comprobante];
+  if (re && !re.test(numero)) throw new ErpError(`N° de ${d.comprobante.toLowerCase()} inválido. Ej: ${d.comprobante === "FACTURA" ? "F001-00001234" : "B001-00000456"}`);
+  const proveedor = d.proveedor.trim().toUpperCase();
+  if (!proveedor) throw new ErpError("Indique el proveedor o agencia.");
+  const ruc = d.ruc.trim();
+  if (ruc && !/^\d{8}$/.test(ruc) && !/^\d{11}$/.test(ruc)) throw new ErpError("RUC (11 dígitos) o DNI (8 dígitos) inválido.");
+  if (d.comprobante === "FACTURA" && ruc.length !== 11) throw new ErpError("La factura requiere el RUC del proveedor.");
+  if (ruc.length === 11 && !rucValido(ruc)) throw new ErpError("RUC inválido (dígito verificador).");
+  if (getFacturas().some((f) => f.numero === numero && (ruc ? f.ruc === ruc : f.proveedor === proveedor)) || (ruc && getCompras().some((c) => c.numero === numero && c.ruc === ruc)))
+    throw new ErpError(`El comprobante ${numero} de ${proveedor} ya fue registrado.`);
+  if (d.detraccion && !(d.detraccionPorc > 0 && d.detraccionPorc <= 100)) throw new ErpError("Indique el % de detracción.");
+  if (d.archivos.some((a) => a.dataUrl.length > MAX_ARCHIVO * 1.4)) throw new ErpError("Cada archivo debe pesar como máximo 1.5 MB.");
+
+  // Factura: el importe incluye IGV (crédito fiscal). Boleta / DJ / recibo: sin IGV separado.
+  const subtotal = d.comprobante === "FACTURA" ? r2(total / (1 + IGV)) : total;
+  const { monto, neto } = calcularDetraccion(total, d.detraccion, d.detraccionPorc);
+  const f: Factura = {
+    id: uid(),
+    tipo: d.comprobante === "DJ" ? "DECLARACION_JURADA" : "FACTURA",
+    numero,
+    fecha: d.fecha,
+    fechaVencimiento: d.fecha,
+    ocId: "",
+    ocNumero: "-",
+    reqId: "",
+    reqNumero: "-",
+    proveedor,
+    ruc,
+    subtotal,
+    igv: r2(total - subtotal),
+    total,
+    estadoPago: "POR_PAGAR",
+    historial: [evento(rol, "Gasto de Tesorería registrado", `${TIPOS_GASTO[d.tipoGasto]} · ${COMPROBANTES_GASTO[d.comprobante]} ${numero}${monto ? ` · detracción ${d.detraccionPorc}% S/ ${monto.toFixed(2)}` : ""}`)],
+    esGastoTesoreria: true,
+    tipoGasto: d.tipoGasto,
+    descripcion: d.descripcion.trim(),
+    comprobanteGasto: d.comprobante,
+    ...(d.detraccion ? { detraccionPorc: d.detraccionPorc, detraccionMonto: monto } : {}),
+    netoPagar: neto,
+    ...(d.archivos.length ? { archivos: d.archivos } : {}),
+  };
+  escribir(KEYS.FACTURAS, [f, ...getFacturas()]);
+  return f;
+}
+
 export function totalesCompra(tipo: Compra["tipoComprobante"], items: { cantidad: number; precioUnit: number }[]) {
   const suma = r2(items.reduce((a, i) => a + r2((i.cantidad || 0) * (i.precioUnit || 0)), 0));
   if (tipo === "BOLETA") {

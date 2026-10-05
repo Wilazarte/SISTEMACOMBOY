@@ -22,9 +22,12 @@ import {
 } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
+import { FormGasto } from "@/components/compras/FormGasto";
 import {
   IGV,
+  COMPROBANTES_GASTO,
   CUENTAS_ORIGEN_PAGO,
+  TIPOS_GASTO,
   KEYS,
   MAX_ARCHIVO,
   TOPE_DJ,
@@ -99,7 +102,8 @@ export default function ComprasPage() {
   const cotizables = procesados.filter((r) => r.estado === "ACEPTADO" || r.estado === "COTIZADO");
   const cotisSinOC = cotizaciones.filter((c) => c.estado === "REGISTRADA" && !ordenes.some((o) => o.reqId === c.reqId));
   const ocsSinFactura = ordenes.filter((o) => o.estado === "EMITIDA");
-  const facturasSinGuia = facturas.filter((f) => f.tipo === "FACTURA" && (!guias.some((g) => g.facturaId === f.id) || guias.some((g) => g.facturaId === f.id && g.estado === "OBSERVADA")));
+  // Los gastos de Tesorería no llevan guía ni V°B° (no ingresan a almacén)
+  const facturasSinGuia = facturas.filter((f) => f.tipo === "FACTURA" && !f.esGastoTesoreria && (!guias.some((g) => g.facturaId === f.id) || guias.some((g) => g.facturaId === f.id && g.estado === "OBSERVADA")));
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
@@ -119,7 +123,7 @@ export default function ComprasPage() {
         value={tab}
         onChange={(t) => ir(t)}
         tabs={[
-          { id: "registrar", label: "Registrar compra", icon: <PackagePlus size={16} /> },
+          { id: "registrar", label: "Registrar gasto / compra", icon: <PackagePlus size={16} /> },
           { id: "antecedentes", label: "Antecedentes", icon: <History size={16} /> },
           { id: "cotizaciones", label: "Cotizaciones", icon: <FileSpreadsheet size={16} />, count: cotizables.filter((r) => r.estado === "ACEPTADO").length },
           { id: "ordenes", label: "Órdenes de compra", icon: <ShoppingBag size={16} />, count: cotisSinOC.length },
@@ -128,7 +132,7 @@ export default function ComprasPage() {
         ]}
       />
 
-      {tab === "registrar" && <RegistrarCompra rol={rol} proveedores={proveedores} compras={compras} stock={stock} />}
+      {tab === "registrar" && <RegistrarCompra rol={rol} proveedores={proveedores} compras={compras} gastos={facturas.filter((f) => f.esGastoTesoreria)} stock={stock} />}
       {tab === "antecedentes" && <Antecedentes reqs={procesados} ordenes={ordenes} rol={rol} onCotizar={(id) => ir("cotizaciones", { req: id })} />}
       {tab === "cotizaciones" && (
         <Cotizaciones key={pre.req ?? "c"} rol={rol} reqs={cotizables} cotizaciones={cotizaciones} preReq={pre.req} onOC={(id) => ir("ordenes", { coti: id })} />
@@ -256,7 +260,14 @@ const mascaraFecha = (v: string): string => {
   return [d.slice(0, 2), d.slice(2, 4), d.slice(4, 8)].filter(Boolean).join("/");
 };
 
-function RegistrarCompra({ rol, proveedores, compras, stock }: { rol: Rol; proveedores: Proveedor[]; compras: Compra[]; stock: StockItem[] }) {
+type ModoRegistro = "GASTO" | "COMPRA";
+const MODOS_REGISTRO: { value: ModoRegistro; label: string }[] = [
+  { value: "GASTO", label: "Gasto / Servicio sin stock - Tesorería" },
+  { value: "COMPRA", label: "Compra con ingreso a stock" },
+];
+
+function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Rol; proveedores: Proveedor[]; compras: Compra[]; gastos: Factura[]; stock: StockItem[] }) {
+  const [modo, setModo] = useState<ModoRegistro>("GASTO");
   const [proveedorId, setProveedorId] = useState("");
   const [nuevoProv, setNuevoProv] = useState<{ razonSocial: string; ruc: string } | null>(null);
   const [fechaTxt, setFechaTxt] = useState(fechaPE(hoy()));
@@ -294,9 +305,33 @@ function RegistrarCompra({ rol, proveedores, compras, stock }: { rol: Rol; prove
     }
   };
 
+  // Compras (con stock) y gastos de Tesorería en una sola lista, de la más reciente a la más antigua
+  const registros = [
+    ...compras.map((c) => ({ tipo: "COMPRA" as const, id: c.id, fecha: c.fecha, compra: c })),
+    ...gastos.map((g) => ({ tipo: "GASTO_TESORERIA" as const, id: g.id, fecha: g.fecha, gasto: g })),
+  ].sort((a, b) => b.fecha.localeCompare(a.fecha));
+  const totalRegistros = r2(compras.reduce((a, c) => a + c.total, 0) + gastos.reduce((a, g) => a + g.total, 0));
+
   return (
     <div className="space-y-6">
       {habilitado && (
+        <Card>
+          <div className="flex flex-wrap items-end gap-4 p-5">
+            <Field label="Tipo de registro" className="min-w-[320px]">
+              <Select value={modo} onChange={(e) => setModo(e.target.value as ModoRegistro)} options={MODOS_REGISTRO} className="text-base font-semibold" />
+            </Field>
+            <p className="pb-2 text-sm text-slate-500">
+              {modo === "GASTO"
+                ? "No ingresa a almacén: queda en Facturas como POR PAGAR para Tesorería."
+                : "Los productos ingresan al stock del almacén seleccionado."}
+            </p>
+          </div>
+        </Card>
+      )}
+
+      {habilitado && modo === "GASTO" && <FormGasto rol={rol} proveedores={proveedores} />}
+
+      {habilitado && modo === "COMPRA" && (
         <Card>
           <CardHeader title="Registrar compra" subtitle="Factura: precios sin IGV (se suma 18 %). Boleta: precios con IGV incluido. Al guardar, los productos ingresan al stock del almacén seleccionado." />
           <div className="grid gap-4 p-5 md:grid-cols-3">
@@ -399,10 +434,42 @@ function RegistrarCompra({ rol, proveedores, compras, stock }: { rol: Rol; prove
       )}
 
       <Card>
-        <CardHeader title="Compras registradas" subtitle={`${compras.length} compra(s) · Total ${soles(r2(compras.reduce((a, c) => a + c.total, 0)))}`} />
-        <Table head={["Fecha", "Comprobante", "Proveedor", "RUC", "Almacén", "Items", "Subtotal", "IGV", "Total"]} empty={compras.length === 0}>
-          {compras.map((c) => (
+        <CardHeader title="Compras registradas" subtitle={`${compras.length} compra(s) · ${gastos.length} gasto(s) de Tesorería · Total ${soles(totalRegistros)}`} />
+        <Table head={["Tipo", "Fecha", "Comprobante", "Proveedor", "RUC", "Almacén / gasto", "Items / detalle", "Subtotal", "IGV", "Total"]} empty={registros.length === 0}>
+          {registros.map((r) => {
+            if (r.tipo === "GASTO_TESORERIA") {
+              const g = r.gasto;
+              return (
+                <tr key={g.id} className="hover:bg-slate-50">
+                  <Td>
+                    <Badge estado="GASTO_TESORERIA" />
+                  </Td>
+                  <Td>{fechaPE(g.fecha)}</Td>
+                  <Td>
+                    <span className="font-semibold text-slate-900">{g.numero}</span>
+                    <p className="text-xs text-slate-500">{g.comprobanteGasto ? COMPROBANTES_GASTO[g.comprobanteGasto] : "-"}</p>
+                  </Td>
+                  <Td>{g.proveedor}</Td>
+                  <Td>{g.ruc || "-"}</Td>
+                  <Td>{g.tipoGasto ? TIPOS_GASTO[g.tipoGasto] : "-"}</Td>
+                  <Td className="max-w-[220px]">
+                    <span className="block truncate" title={g.descripcion}>
+                      {g.descripcion}
+                    </span>
+                    {g.detraccionMonto ? <p className="text-xs text-red-600">Detracción {g.detraccionPorc}% − {soles(g.detraccionMonto)}</p> : null}
+                  </Td>
+                  <Td className="text-right">{soles(g.subtotal)}</Td>
+                  <Td className="text-right">{soles(g.igv)}</Td>
+                  <Td className="text-right font-semibold">{soles(g.total)}</Td>
+                </tr>
+              );
+            }
+            const c = r.compra;
+            return (
             <tr key={c.id} className="hover:bg-slate-50">
+              <Td>
+                <Badge estado="COMPRA" />
+              </Td>
               <Td>{fechaPE(c.fecha)}</Td>
               <Td>
                 <span className="font-semibold text-slate-900">{c.numero}</span>
@@ -418,7 +485,8 @@ function RegistrarCompra({ rol, proveedores, compras, stock }: { rol: Rol; prove
               <Td className="text-right">{soles(c.igv)}</Td>
               <Td className="text-right font-semibold">{soles(c.total)}</Td>
             </tr>
-          ))}
+            );
+          })}
         </Table>
       </Card>
 
@@ -1027,7 +1095,8 @@ function Facturas({
 
   const ocsDJ = ocs.filter((o) => o.subtotal <= TOPE_DJ);
   const lista = facturas.filter((f) => !filtroPago || f.estadoPago === filtroPago);
-  const porPagar = r2(facturas.filter((f) => f.estadoPago === "POR_PAGAR").reduce((a, f) => a + f.total, 0));
+  // Por pagar al proveedor: en gastos con detracción, el neto (la detracción va al Banco de la Nación)
+  const porPagar = r2(facturas.filter((f) => f.estadoPago === "POR_PAGAR").reduce((a, f) => a + (f.netoPagar ?? f.total), 0));
 
   return (
     <div className="space-y-6">
@@ -1142,16 +1211,30 @@ function Facturas({
             return (
               <tr key={f.id} className="hover:bg-slate-50">
                 <Td>
-                  <Badge estado={f.tipo} />
+                  {f.esGastoTesoreria ? (
+                    <>
+                      <Badge estado="GASTO_TESORERIA" />
+                      <p className="mt-0.5 text-[11px] text-slate-500">{f.comprobanteGasto ? COMPROBANTES_GASTO[f.comprobanteGasto] : ""}</p>
+                    </>
+                  ) : (
+                    <Badge estado={f.tipo} />
+                  )}
                 </Td>
                 <Td className="font-semibold text-slate-900">{f.numero}</Td>
                 <Td>{fechaPE(f.fecha)}</Td>
                 <Td className={cn(vencida && "font-semibold text-red-600")}>{fechaPE(f.fechaVencimiento)}</Td>
                 <Td>{f.proveedor}</Td>
-                <Td>{f.ocNumero}</Td>
+                <Td>{f.esGastoTesoreria ? <span className="text-xs text-slate-600">{f.tipoGasto ? TIPOS_GASTO[f.tipoGasto] : "Gasto"}</span> : f.ocNumero}</Td>
                 <Td className="text-right">{soles(f.subtotal)}</Td>
                 <Td className="text-right">{soles(f.igv)}</Td>
-                <Td className="text-right font-semibold">{soles(f.total)}</Td>
+                <Td className="text-right font-semibold">
+                  {soles(f.total)}
+                  {f.detraccionMonto ? (
+                    <p className="text-[11px] font-normal text-slate-500">
+                      Detr. − {soles(f.detraccionMonto)} · neto {soles(f.netoPagar ?? f.total)}
+                    </p>
+                  ) : null}
+                </Td>
                 <Td>
                   <button
                     disabled={!puede(rol, "fac.pagar")}
@@ -1170,6 +1253,20 @@ function Facturas({
                     <Button size="sm" variant="secondary" onClick={() => pdfFactura(f, ordenes.find((o) => o.id === f.ocId))}>
                       <FileText size={14} /> PDF
                     </Button>
+                    {(f.archivos ?? []).map((a) => (
+                      <Button
+                        key={a.tipo}
+                        size="sm"
+                        variant="ghost"
+                        title={a.nombre}
+                        onClick={() => {
+                          const w = window.open();
+                          if (w) w.document.write(`<iframe src="${a.dataUrl}" style="border:0;width:100%;height:100vh"></iframe>`);
+                        }}
+                      >
+                        <Upload size={14} /> {a.tipo === "GUIA" ? "Guía" : "Adjunto"}
+                      </Button>
+                    ))}
                     {f.tipo === "FACTURA" && ordenes.find((o) => o.id === f.ocId)?.estado === "FACTURADA" && puede(rol, "guia.crear") && (
                       <Button size="sm" onClick={() => onGuia(f.id)}>
                         Subir guía

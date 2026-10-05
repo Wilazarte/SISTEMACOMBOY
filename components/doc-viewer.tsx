@@ -61,6 +61,24 @@ function resolver(ref: DocRef): Resuelto | null {
     const f = getFacturas().find((x) => x.id === ref.id);
     if (!f) return null;
     const oc = getOrdenes().find((x) => x.id === f.ocId);
+    if (f.esGastoTesoreria) {
+      const adj = f.archivos?.find((a) => a.tipo === "FACTURA") ?? f.archivos?.[0];
+      return {
+        titulo: `Gasto Tesorería ${f.numero}`,
+        estado: f.estadoPago,
+        filas: [
+          ["Proveedor", `${f.proveedor}${f.ruc ? ` (${f.ruc})` : ""}`],
+          ["Fecha", fechaPE(f.fecha)],
+          ["Descripción", f.descripcion ?? "-"],
+          ["Total", soles(f.total)],
+          ...(f.detraccionMonto ? ([["Detracción", `${f.detraccionPorc}% · ${soles(f.detraccionMonto)}`]] as [string, string][]) : []),
+          ["Neto a pagar", soles(f.netoPagar ?? f.total)],
+        ],
+        historial: f.historial,
+        pdf: () => pdfFactura(f, oc),
+        ...(adj ? { archivo: { url: adj.dataUrl, tipo: adj.mime, nombre: adj.nombre } } : {}),
+      };
+    }
     return {
       titulo: `${f.tipo === "FACTURA" ? "Factura" : "Decl. Jurada"} ${f.numero}`,
       estado: f.estadoPago,

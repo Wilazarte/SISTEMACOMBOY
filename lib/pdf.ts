@@ -408,7 +408,38 @@ export function pdfOrdenCompra(o: OrdenCompra): void {
   );
 }
 
+/** Gasto / servicio de Tesorería (sin OC ni stock). */
+function pdfGasto(f: Factura): void {
+  const comp = { FACTURA: "Factura", BOLETA: "Boleta", DJ: "Declaración Jurada de Gasto", RECIBO: "Recibo" }[f.comprobanteGasto ?? "FACTURA"];
+  abrir(
+    construir({
+      titulo: "GASTO / SERVICIO - TESORERÍA",
+      numero: f.numero,
+      estado: f.estadoPago === "PAGADA" ? "PAGADA" : "POR PAGAR",
+      datos: [
+        ["Proveedor / agencia", f.proveedor],
+        ["RUC / DNI", f.ruc || "-"],
+        ["Fecha", fechaPE(f.fecha)],
+        ["Comprobante", `${comp} ${f.numero}`],
+        ["Adjuntos", f.archivos?.length ? f.archivos.map((a) => a.nombre).join(", ") : "-"],
+      ],
+      head: ["#", "Descripción", "Importe"],
+      body: [[1, f.descripcion ?? "-", soles(f.total)]],
+      alinearDerecha: [2],
+      totales: [
+        ...(f.igv ? ([["Subtotal", soles(f.subtotal)], ["IGV 18%", soles(f.igv)]] as [string, string][]) : []),
+        ["Total", soles(f.total)],
+        ...(f.detraccionMonto ? ([[`Detracción ${f.detraccionPorc}%`, `- ${soles(f.detraccionMonto)}`]] as [string, string][]) : []),
+        ["NETO A PAGAR", soles(f.netoPagar ?? f.total)],
+      ],
+      firmas: ["Solicitante", "Tesorería", "Gerencia"],
+    }),
+    f.numero
+  );
+}
+
 export function pdfFactura(f: Factura, oc?: OrdenCompra): void {
+  if (f.esGastoTesoreria) return pdfGasto(f);
   const esDJ = f.tipo === "DECLARACION_JURADA";
   abrir(
     construir({

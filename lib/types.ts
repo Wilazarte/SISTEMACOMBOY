@@ -124,6 +124,24 @@ export interface Factura {
   motivoSinComprobante?: string;
   aprobadoPor?: string;
   historial: EventoHistorial[];
+  // ---- Gasto / servicio de Tesorería (sin OC ni ingreso a stock) ----
+  esGastoTesoreria?: boolean;
+  tipoGasto?: TipoGasto;
+  descripcion?: string;
+  comprobanteGasto?: ComprobanteGasto;
+  detraccionPorc?: number; // % de detracción (4, 10, 12)
+  detraccionMonto?: number;
+  netoPagar?: number; // total - detracción
+  archivos?: ArchivoGasto[];
+}
+
+export type TipoGasto = "REPRESENTACION" | "SERVICIO_BASICO" | "TRANSPORTE" | "COMPRA_SIN_REQ" | "OTROS";
+export type ComprobanteGasto = "FACTURA" | "BOLETA" | "DJ" | "RECIBO";
+export interface ArchivoGasto {
+  tipo: "FACTURA" | "GUIA";
+  nombre: string;
+  mime: string;
+  dataUrl: string;
 }
 
 export interface Guia {
