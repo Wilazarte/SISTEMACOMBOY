@@ -6,6 +6,13 @@ import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Ta
 import {
   AFP_OPTIONS,
   TIPOS_SUELDO,
+<<<<<<< HEAD
+=======
+  detectarDuplicados,
+  edad,
+  esContratista,
+  eliminarTrabajador,
+>>>>>>> e59e00221a52e9104b27b8f0550560c659ba2360
   fechaPE,
   guardarTrabajador,
   hoy,
@@ -16,10 +23,26 @@ import {
   useTrabajadores,
 } from "@/lib/storage";
 import { getSesion } from "@/lib/auth";
+<<<<<<< HEAD
 import { crearAdelanto, listarAdelantos, type Adelanto } from "@/lib/adelantos";
 import type { TipoAfp, TipoSueldo, Trabajador } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
+=======
+import { HORA_TARDANZA, aplicarAlias, leerMarcaciones, resumirAsistencia, textoCsv, type AsistenciaMap } from "@/lib/asistencia";
+import { MODOS_LIQUIDACION, cambiarConfig, cambiarModo, liquidacionDe, liquidar, type ResultadoLiquidacion } from "@/lib/liquidacion";
+import { CerrarSemana } from "@/components/planilla/CerrarSemana";
+import { Contratistas } from "@/components/planilla/Contratistas";
+import { ContratistasMaestro } from "@/components/planilla/ContratistasMaestro";
+import { FichaTrabajador } from "@/components/planilla/FichaTrabajador";
+import { HistorialPlanilla } from "@/components/planilla/HistorialPlanilla";
+import { LiquidacionCelda } from "@/components/planilla/LiquidacionCelda";
+import { useHistorialPlanilla } from "@/components/planilla/useHistorialPlanilla";
+import { useAdelantosPendientes } from "@/components/planilla/useAdelantosPendientes";
+import { adelantosADescontar, pendientesDe, type PendientesTrabajador } from "@/lib/adelantos";
+import type { FilaCierre } from "@/lib/historial";
+import type { AsistenciaPeriodo, LiquidacionPeriodo, ModoLiquidacion, TipoAfp, TipoSueldo, Trabajador } from "@/lib/types";
+>>>>>>> e59e00221a52e9104b27b8f0550560c659ba2360
 
 type Tab = "trabajadores" | "planilla" | "historial";
 type Asistencia = Map<string, { nombre: string; fechas: Map<string, string[]> }>;
@@ -106,8 +129,18 @@ function calcular(t: Trabajador, asistenciaMap: Asistencia, adelantoMonto: numbe
 }
 
 export default function PlanillaPage() {
+<<<<<<< HEAD
   const trabajadores = useTrabajadores();
   const soloLectura =!!getSesion()?.soloLectura;
+=======
+  const maestro = useTrabajadores();
+  // Contratistas: mismo maestro, pero fuera de la lista de operarios y de la planilla del periodo
+  const trabajadores = useMemo(() => maestro.filter((t) => !esContratista(t)), [maestro]);
+  const nContratistas = maestro.length - trabajadores.length;
+  const sesion = getSesion();
+  const soloLectura = !!sesion?.soloLectura; // Gerencia: ver sin editar
+  const puedeEditar = !soloLectura && ["creador", "planilla", "admin"].includes(sesion?.rol ?? "");
+>>>>>>> e59e00221a52e9104b27b8f0550560c659ba2360
   const [tab, setTab] = useState<Tab>("trabajadores");
   const [asistencia, setAsistencia] = useState<Asistencia>(new Map());
   const [adelantos, setAdelantos] = useState<Adelanto[]>([]);
@@ -125,6 +158,7 @@ export default function PlanillaPage() {
   const [editando, setEditando] = useState<{ form: Trabajador; idOriginal?: string } | null>(null);
   const [verInactivos, setVerInactivos] = useState(false);
 
+<<<<<<< HEAD
   const supabase = useMemo(() => createClient(), []);
 
 const cargarAdelantos = useCallback(async () => {
@@ -155,6 +189,15 @@ const cargarHistorial = useCallback(async () => {
         if (dniKey) m[dniKey] = (m[dniKey] || 0) + a.monto;
       }
     }
+=======
+  const liq = useMemo(() => liquidacionDe(liquidaciones, periodo), [liquidaciones, periodo]);
+  const incompletos = trabajadores.filter((t) => t.activo && !t.fechaIngreso);
+  const duplicados = useMemo(() => detectarDuplicados(maestro), [maestro]);
+  // Asistencia guardada en Supabase para el periodo elegido
+  const delPeriodo = useMemo(() => {
+    const m = new Map<string, AsistenciaPeriodo>();
+    asistencia.filter((a) => a.periodo === normalizarPeriodo(periodo)).forEach((a) => m.set(a.id, a));
+>>>>>>> e59e00221a52e9104b27b8f0550560c659ba2360
     return m;
   }, [adelantos, trabajadores]);
 
@@ -287,14 +330,28 @@ const cargarHistorial = useCallback(async () => {
         </button>
       )}
 
+<<<<<<< HEAD
       <Tabs<Tab> value={tab} onChange={setTab} tabs={[
         { id: "trabajadores", label: "Trabajadores", icon: <Users size={16} />, count: incompletos.length },
         { id: "planilla", label: "Planilla del periodo", icon: <Calculator size={16} /> },
         { id: "historial", label: "Historial", icon: <History size={16} />, count: historial.length }
       ]} />
+=======
+      <Tabs<Tab>
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { id: "trabajadores", label: "Trabajadores", icon: <Users size={16} />, count: incompletos.length },
+          { id: "planilla", label: "Planilla del periodo", icon: <Calculator size={16} /> },
+          { id: "historial", label: "Historial", icon: <Archive size={16} /> },
+          { id: "contratistas", label: "Contratistas / Concesiones", icon: <Building2 size={16} /> },
+        ]}
+      />
+>>>>>>> e59e00221a52e9104b27b8f0550560c659ba2360
 
       {tab === "trabajadores" && (
         <Card>
+<<<<<<< HEAD
           <CardHeader title="Maestro de trabajadores" subtitle={`${trabajadores.filter((t) => t.activo).length} activo(s) · ${adelantos.length} adelantos pendientes`} action={<label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={verInactivos} onChange={(e) => setVerInactivos(e.target.checked)} /> Mostrar inactivos</label>} />
           <Table head={["N°", "Trabajador", "Cargo", "F. ingreso", "Sueldo", "Pensión", "Estado", ""]}>
             {listaMaestro.map((t) => (
@@ -310,6 +367,84 @@ const cargarHistorial = useCallback(async () => {
               </tr>
             ))}
           </Table>
+=======
+          <CardHeader
+            title="Maestro de trabajadores"
+            subtitle={`${trabajadores.filter((t) => t.activo).length} activo(s) · ${trabajadores.filter((t) => !t.activo).length} inactivo(s)${nContratistas ? ` · ${nContratistas} contratista(s) en la pestaña Contratistas / Concesiones` : ""}`}
+            action={
+              <div className="flex flex-wrap items-center gap-3">
+                <Input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar nombre, DNI, N°, cargo…" className="w-60" />
+                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700">
+                  <input type="checkbox" checked={verInactivos} onChange={(e) => setVerInactivos(e.target.checked)} className="h-4 w-4 accent-red-600" /> Mostrar inactivos
+                </label>
+              </div>
+            }
+          />
+          {listaMaestro.length === 0 ? (
+            <div className="p-5">
+              <Empty icon={<Users size={28} />} text={trabajadores.length ? "Ningún trabajador coincide." : "Aún no hay trabajadores. Regístrelos o importe la asistencia del reloj."} />
+            </div>
+          ) : (
+            <Table head={["N°", "Trabajador", "Cargo / sede", "F. ingreso", "Sueldo", "Pensión", "Estado", ""]}>
+              {listaMaestro.map((t) => (
+                <tr key={t.id} className={cn("transition hover:bg-slate-50", !t.activo && "bg-slate-100 text-slate-400")}>
+                  <Td className="font-mono text-base">{t.id}</Td>
+                  <Td>
+                    <p className={cn("font-semibold", t.activo ? "text-slate-900" : "text-slate-500 line-through decoration-slate-300")}>{t.nombre}</p>
+                    <p className="text-xs text-slate-500">
+                      DNI {t.dni || "-"}
+                      {edad(t.fechaNacimiento) !== null ? ` · ${edad(t.fechaNacimiento)} años` : ""}
+                      {t.celular ? ` · ${t.celular}` : ""}
+                    </p>
+                  </Td>
+                  <Td>
+                    {t.cargo}
+                    {t.sede && <p className="text-xs text-slate-500">{t.sede}</p>}
+                  </Td>
+                  <Td>
+                    {t.fechaIngreso ? (
+                      <>
+                        <p>{fechaPE(t.fechaIngreso)}</p>
+                        <p className="text-xs text-slate-500">{antiguedad(t.fechaIngreso)}</p>
+                      </>
+                    ) : (
+                      <span className="text-xs font-semibold text-orange-600">Sin registrar</span>
+                    )}
+                  </Td>
+                  <Td className="text-right">
+                    {soles(t.sueldo)}
+                    <p className="text-xs text-slate-500">{sueldoDe(t).label}</p>
+                  </Td>
+                  <Td>
+                    <p>{afpLabel(t)}</p>
+                    <p className="text-xs text-slate-500">{t.afpPorcentaje}%</p>
+                  </Td>
+                  <Td>
+                    <Badge estado={t.activo ? "ACTIVO" : "INACTIVO"} />
+                    {!t.activo && t.fechaBaja && <p className="mt-1 text-[11px] text-red-600">Baja {fechaPE(t.fechaBaja)}</p>}
+                  </Td>
+                  <Td>
+                    <div className="flex gap-1">
+                      <Button size="md" variant={t.activo ? "secondary" : "ghost"} onClick={() => setFicha({ form: { ...t }, idOriginal: t.id })} title="Ficha del trabajador">
+                        <Pencil size={15} /> Ficha
+                      </Button>
+                      {puedeEditar && !t.fechaIngreso && (
+                        <Button
+                          size="md"
+                          variant="ghost"
+                          title="Eliminar (registro incompleto)"
+                          onClick={() => confirm(`¿Eliminar a ${t.nombre} (N° ${t.id})? No tiene ficha completa.`) && ejecutar(() => eliminarTrabajador(t.id), "Trabajador eliminado")}
+                        >
+                          <Trash2 size={15} className="text-red-600" />
+                        </Button>
+                      )}
+                    </div>
+                  </Td>
+                </tr>
+              ))}
+            </Table>
+          )}
+>>>>>>> e59e00221a52e9104b27b8f0550560c659ba2360
         </Card>
       )}
 
@@ -371,9 +506,23 @@ const cargarHistorial = useCallback(async () => {
         </Card>
       )}
 
+<<<<<<< HEAD
       <Modal open={!!editando} onClose={() => setEditando(null)} title={editando?.idOriginal? `Editar N° ${editando.idOriginal}` : "Registrar trabajador"}>
         {editando && <FormTrabajador form={editando.form} onChange={(form: any) => setEditando({...editando, form })} onCancel={() => setEditando(null)} onSave={guardar} />}
       </Modal>
+=======
+      {tab === "contratistas" && (
+        <div className="space-y-6">
+          <ContratistasMaestro trabajadores={maestro} soloLectura={!puedeEditar} />
+          <div>
+            <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-slate-900">
+              <Building2 size={18} className="text-amber-500" /> Concesiones / servicios externos
+            </h2>
+            <Contratistas soloLectura={!puedeEditar} />
+          </div>
+        </div>
+      )}
+>>>>>>> e59e00221a52e9104b27b8f0550560c659ba2360
 
       <Modal open={!!boletaSel} onClose={() => setBoletaSel(null)} title="Boleta de pago">
         {boletaSel && (
