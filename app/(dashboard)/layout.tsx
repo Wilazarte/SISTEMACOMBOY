@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, Bell, Calculator, CloudUpload, Eye, KeyRound, Receipt, LayoutDashboard, Loader2, LogOut, Menu, Search, Truck, ShieldAlert, ShoppingCart, UserCircle2, Users, Warehouse, X } from "lucide-react";
 import { Badge, Toaster, cn, toast } from "@/components/ui";
 import { DocViewerHost, abrirDoc, type DocRef } from "@/components/doc-viewer";
@@ -11,7 +11,7 @@ import { inicioDe, logout, puedeVer, useSesion } from "@/lib/auth";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
 import { KEYS, detenerDatos, getCotizaciones, getFacturas, getGuias, getOrdenes, getPendientes, getProcesados, useDatos, useStore } from "@/lib/storage";
 import type { OrdenDespacho, Requerimiento } from "@/lib/types";
-import { odsNuevas } from "@/lib/ventas";
+import { avisoOD, odsNuevas } from "@/lib/ventas";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, pronto: true },
@@ -73,6 +73,22 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       router.replace("/login");
     }
   }, [listo, sesion, router]);
+
+  // Almacén: aviso con detalle cuando Ventas genera una orden de despacho (en vivo)
+  const odsAvisadas = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!sesion || !datos.listo || !["creador", "almacen"].includes(sesion.rol)) return;
+    const nuevas = odsNuevas(ods);
+    if (odsAvisadas.current === null) {
+      odsAvisadas.current = new Set(nuevas.map((o) => o.id)); // las que ya había al entrar: solo la campana
+      return;
+    }
+    for (const o of nuevas)
+      if (!odsAvisadas.current.has(o.id)) {
+        odsAvisadas.current.add(o.id);
+        toast(`Nueva orden de despacho: ${avisoOD(o)}`);
+      }
+  }, [ods, sesion, datos.listo]);
 
   useEffect(() => {
     if (datos.listo && sesion?.rol === "creador") setLocales(contarDatosLocales());
@@ -257,7 +273,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               href="/dashboard/almacen?tab=despacho"
               onClick={() => window.dispatchEvent(new Event("erp:ir-despacho"))}
               className="relative flex items-center gap-2 rounded-full p-2 text-azul-900 hover:bg-plomo-100"
-              title={nuevasOD ? `${nuevasOD} nueva(s) orden(es) de despacho` : "Órdenes de despacho"}
+              title={nuevasOD ? `${nuevasOD} nueva(s) orden(es) de despacho:\n${odsNuevas(ods).map(avisoOD).join("\n")}` : "Órdenes de despacho"}
               aria-label="Órdenes de despacho nuevas"
             >
               {veCompras ? <Truck size={20} /> : <Bell size={20} />}

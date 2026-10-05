@@ -124,7 +124,7 @@ export function OrdenesDespacho({ vista = "almacen" }: { vista?: "almacen" | "ve
             <Empty icon={<Truck size={28} />} text="No hay órdenes de despacho" />
           </div>
         ) : (
-          <Table head={["Código", "Fecha", "Cliente", "Venta origen", "Lugar entrega", "Estado", ...(vista === "ventas" ? ["Seguimiento"] : []), "Acciones"]}>
+          <Table head={["Código", "Fecha", "Cliente", "Venta origen", "Lugar entrega", "Encargado / quien recoge", "Estado", ...(vista === "ventas" ? ["Seguimiento"] : []), "Acciones"]}>
             {lista.map((o) => (
               <tr key={o.id} className="cursor-pointer hover:bg-plomo-50" onClick={() => setSelId(o.id)}>
                 <Td className="font-mono font-semibold text-azul-900">
@@ -144,6 +144,17 @@ export function OrdenesDespacho({ vista = "almacen" }: { vista?: "almacen" | "ve
                     <p className="text-xs text-plomo-500">
                       {o.agenciaNombre} · guía {o.guiaNro}
                     </p>
+                  )}
+                  {o.clienteDireccionEntrega && <p className="max-w-[220px] truncate text-xs text-plomo-500" title={o.clienteDireccionEntrega}>{o.clienteDireccionEntrega}</p>}
+                </Td>
+                <Td>
+                  {o.lugar === "ENTREGA_ENCARGADO" ? (
+                    <span className="inline-flex flex-col rounded-lg bg-[#EEF2F7] px-2.5 py-1 text-xs font-semibold text-azul-900 ring-1 ring-inset ring-[#C9D4E3]">
+                      Encargado: {o.encargadoNombre} - DNI {o.encargadoDni}
+                      {o.encargadoTelefono && <span className="font-normal text-plomo-600">Tel. {o.encargadoTelefono}</span>}
+                    </span>
+                  ) : (
+                    <span className="text-plomo-500">-</span>
                   )}
                 </Td>
                 <Td>
@@ -189,7 +200,8 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
     return p ? [...SEDES].sort((a, b) => stockDisponible(b, p.productoNombre, p.unidad) - stockDisponible(a, p.productoNombre, p.unidad))[0] : SEDES[0];
   });
   const [cant, setCant] = useState<Record<string, number>>(() => Object.fromEntries(od.items.map((l) => [l.id, pendienteLinea(l)])));
-  const [recibidoPor, setRecibidoPor] = useState("");
+  // Si recoge un encargado del cliente, ya se sabe quién recibe
+  const [recibidoPor, setRecibidoPor] = useState(od.lugar === "ENTREGA_ENCARGADO" ? `${od.encargadoNombre ?? ""} DNI ${od.encargadoDni ?? ""}`.trim() : "");
   const [firma, setFirma] = useState<ArchivoAdjunto | undefined>();
   const [guia, setGuia] = useState(od.guiaNro ?? "");
   const [foto, setFoto] = useState<ArchivoAdjunto | undefined>();
@@ -314,7 +326,16 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
                 {od.direccionDestino && <li>Destino: {od.direccionDestino}</li>}
               </ul>
             )}
-            {od.lugar !== "ENVIO_AGENCIA" && od.direccionDestino && <p className="text-plomo-600">{od.direccionDestino}</p>}
+            {od.lugar === "ENTREGA_ENCARGADO" && (
+              <ul className="mt-1 space-y-0.5 text-plomo-600">
+                <li>Recoge: {od.encargadoNombre}</li>
+                <li>DNI: {od.encargadoDni}</li>
+                {od.encargadoTelefono && <li>Teléfono: {od.encargadoTelefono}</li>}
+              </ul>
+            )}
+            {od.lugar !== "ENVIO_AGENCIA" && od.lugar !== "ENTREGA_ENCARGADO" && (od.clienteDireccionEntrega || od.direccionDestino) && (
+              <p className="text-plomo-600">{od.clienteDireccionEntrega || od.direccionDestino}</p>
+            )}
             {od.recibidoPor && <p className="mt-2 text-plomo-600">Recibió: {od.recibidoPor}</p>}
             {od.firmaCliente && (
               // eslint-disable-next-line @next/next/no-img-element

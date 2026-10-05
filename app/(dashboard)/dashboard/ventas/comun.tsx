@@ -5,7 +5,7 @@ import { Plus, Search, Trash2, UserPlus } from "lucide-react";
 import { Button, Field, Input, Select, cn } from "@/components/ui";
 import { UNIDADES } from "@/lib/empresa";
 import { KEYS, cargarCondicionesPago, r2, soles, useStore } from "@/lib/storage";
-import { LARGO_DOC, LUGARES_ENTREGA, calcularLinea, lineaVacia, totalesVenta, validarDocumento } from "@/lib/ventas";
+import { DETALLE_LUGAR, LARGO_DOC, LUGARES_ENTREGA, lugarConDireccion, calcularLinea, lineaVacia, totalesVenta, validarDocumento } from "@/lib/ventas";
 import type { Cliente, CondicionPago, DatosDespacho, LugarEntrega, LineaVenta, StockItem, TipoDocCliente } from "@/lib/types";
 
 /** Datos de Ventas sincronizados con Supabase (tiempo real). */
@@ -284,34 +284,42 @@ export function FormCliente({
 
 export const CUENTAS_COBRO = ["Caja principal", "BCP Soles", "Interbank Soles", "BBVA Soles", "Yape / Plin"];
 
-/** Datos de despacho (obligatorio para emitir): lugar de entrega y, si es por agencia, agencia y guía. */
-export function DatosDespachoForm({ value, onChange }: { value: DatosDespacho; onChange: (d: DatosDespacho) => void }) {
+/**
+ * Datos de despacho (obligatorios): 6 lugares de entrega en grilla 3×2 y los datos de cada uno
+ * (agencia y guía · dirección del cliente · encargado que recoge).
+ */
+export function DatosDespachoForm({ value, onChange, direccionCliente }: { value: DatosDespacho; onChange: (d: DatosDespacho) => void; direccionCliente?: string }) {
   const set = <K extends keyof DatosDespacho>(k: K, v: DatosDespacho[K]) => onChange({ ...value, [k]: v });
-  const agencia = value.lugar === "ENVIO_AGENCIA";
+  const elegir = (k: LugarEntrega) =>
+    onChange({ ...value, lugar: k, clienteDireccion: lugarConDireccion(k) && !value.clienteDireccion?.trim() ? direccionCliente ?? "" : value.clienteDireccion });
+  const falta = (v?: string) => cn(!v?.trim() && "border-red-300");
   return (
     <fieldset className="rounded-xl border border-plomo-200 p-4">
-      <legend className="px-1 text-[12px] font-semibold uppercase tracking-wider text-plomo-500">Datos de despacho *</legend>
-      <div role="radiogroup" aria-label="Lugar de entrega" className="flex flex-wrap gap-2">
+      <legend className="px-1 text-[12px] font-semibold uppercase tracking-wider text-plomo-500">Datos de despacho * (obligatorio)</legend>
+      <div role="radiogroup" aria-label="Lugar de entrega" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {(Object.keys(LUGARES_ENTREGA) as LugarEntrega[]).map((k) => (
           <label
             key={k}
             className={cn(
-              "flex cursor-pointer items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition",
+              "flex cursor-pointer items-start gap-2.5 rounded-lg border px-3.5 py-2.5 text-sm transition",
               value.lugar === k ? "border-azul-900 bg-azul-900 text-white" : "border-plomo-200 bg-white text-azul-900 hover:bg-plomo-50"
             )}
           >
-            <input type="radio" name="lugar-entrega" value={k} checked={value.lugar === k} onChange={() => set("lugar", k)} className="accent-corp" />
-            {LUGARES_ENTREGA[k]}
+            <input type="radio" name="lugar-entrega" value={k} checked={value.lugar === k} onChange={() => elegir(k)} className="mt-0.5 accent-corp" />
+            <span>
+              <span className="block font-semibold">{LUGARES_ENTREGA[k]}</span>
+              {DETALLE_LUGAR[k] && <span className={cn("block text-xs", value.lugar === k ? "text-white/70" : "text-plomo-500")}>{DETALLE_LUGAR[k]}</span>}
+            </span>
           </label>
         ))}
       </div>
-      {agencia && (
+      {value.lugar === "ENVIO_AGENCIA" && (
         <div className="mt-3 grid gap-3 md:grid-cols-4">
           <Field label="Nombre agencia *">
-            <Input value={value.agenciaNombre} onChange={(e) => set("agenciaNombre", e.target.value)} placeholder="Ej: Shalom, Marvisur" className={cn(!value.agenciaNombre.trim() && "border-red-300")} />
+            <Input value={value.agenciaNombre} onChange={(e) => set("agenciaNombre", e.target.value)} placeholder="Ej: Shalom, Marvisur" className={falta(value.agenciaNombre)} />
           </Field>
           <Field label="N° guía *">
-            <Input value={value.guiaNro} onChange={(e) => set("guiaNro", e.target.value.toUpperCase())} placeholder="Ej: 0045-123456" className={cn(!value.guiaNro.trim() && "border-red-300")} />
+            <Input value={value.guiaNro} onChange={(e) => set("guiaNro", e.target.value.toUpperCase())} placeholder="Ej: 0045-123456" className={falta(value.guiaNro)} />
           </Field>
           <Field label="Costo envío S/">
             <Input type="number" min={0} step="0.01" value={value.costoEnvio || ""} onChange={(e) => set("costoEnvio", parseFloat(e.target.value) || 0)} />
@@ -321,7 +329,33 @@ export function DatosDespachoForm({ value, onChange }: { value: DatosDespacho; o
           </Field>
         </div>
       )}
-      {!value.lugar && <p className="mt-2 text-xs text-plomo-500">Obligatorio para emitir: genera la Orden de Despacho para Almacén.</p>}
+      {lugarConDireccion(value.lugar) && (
+        <div className="mt-3">
+          <Field label="Dirección del cliente *" hint={direccionCliente ? "Tomada de la ficha del cliente; puede corregirla." : undefined}>
+            <Input value={value.clienteDireccion ?? ""} onChange={(e) => set("clienteDireccion", e.target.value)} placeholder="Av. / calle, número, distrito" className={falta(value.clienteDireccion)} />
+          </Field>
+        </div>
+      )}
+      {value.lugar === "ENTREGA_ENCARGADO" && (
+        <div className="mt-3 grid gap-3 md:grid-cols-3">
+          <Field label="Nombre completo de quien recoge *">
+            <Input value={value.encargadoNombre ?? ""} onChange={(e) => set("encargadoNombre", e.target.value)} className={falta(value.encargadoNombre)} />
+          </Field>
+          <Field label="DNI de quien recoge *">
+            <Input
+              value={value.encargadoDni ?? ""}
+              inputMode="numeric"
+              maxLength={8}
+              onChange={(e) => set("encargadoDni", e.target.value.replace(/\D/g, ""))}
+              className={cn((value.encargadoDni ?? "").length !== 8 && "border-red-300")}
+            />
+          </Field>
+          <Field label="Teléfono de quien recoge">
+            <Input value={value.encargadoTelefono ?? ""} inputMode="tel" onChange={(e) => set("encargadoTelefono", e.target.value)} />
+          </Field>
+        </div>
+      )}
+      {!value.lugar && <p className="mt-2 text-xs text-plomo-500">Obligatorio: genera la Orden de Despacho para Almacén.</p>}
     </fieldset>
   );
 }

@@ -319,7 +319,14 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
             <p className="text-sm text-plomo-600">
               Al aprobar se genera la <b>Orden de Despacho</b> y se notifica a Almacén. Indique dónde se entrega el pedido.
             </p>
-            <DatosDespachoForm value={aprobar.despacho} onChange={(despacho) => setAprobar({ ...aprobar, despacho })} />
+            <DatosDespachoForm
+              value={aprobar.despacho}
+              onChange={(despacho) => setAprobar({ ...aprobar, despacho })}
+              direccionCliente={(() => {
+                const c = clientes.find((x) => x.id === aprobar.np.clienteId);
+                return c?.direccionesEntrega[0] || c?.direccionFiscal || aprobar.np.lugarObra || "";
+              })()}
+            />
             <div className="flex justify-end gap-2 border-t border-plomo-100 pt-4">
               <Button variant="secondary" onClick={() => setAprobar(null)}>
                 Cancelar

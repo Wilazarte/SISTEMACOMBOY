@@ -995,18 +995,54 @@ export function pdfOrdenDespacho(o: OrdenDespacho): void {
         // LUGAR DE ENTREGA
         y = tituloSeccion(doc, y, "LUGAR DE ENTREGA");
         let x = M;
-        (Object.keys(LUGARES_ENTREGA) as LugarEntrega[]).forEach((k) => (x = casilla(doc, x, y, o.lugar === k, LUGARES_ENTREGA[k])));
+        // Fila 1: Oficina Arequipa / Secocha / Envío por agencia
+        (["OFICINA_AREQUIPA", "SECOCHA", "ENVIO_AGENCIA"] as LugarEntrega[]).forEach((k) => (x = casilla(doc, x, y, o.lugar === k, LUGARES_ENTREGA[k])));
         y += 5;
-        const det: [string, string][] =
-          o.lugar === "ENVIO_AGENCIA"
-            ? [
-                ["Agencia", o.agenciaNombre || "-"],
-                ["N° guía", o.guiaNro || "-"],
-                ["Costo envío", o.costoEnvio ? soles(o.costoEnvio) : "-"],
-                ["Destino", o.direccionDestino || "-"],
-              ]
-            : [["Dirección", o.direccionDestino || o.lugarEntrega || "-"]];
-        y = datosGrid(doc, y, det, o.lugar === "ENVIO_AGENCIA" ? 4 : 1);
+        if (o.lugar === "ENVIO_AGENCIA") {
+          y = datosGrid(
+            doc,
+            y,
+            [
+              ["Agencia", o.agenciaNombre || "-"],
+              ["N° guía", o.guiaNro || "-"],
+              ["Costo envío", o.costoEnvio ? soles(o.costoEnvio) : "-"],
+              ["Destino", o.direccionDestino || "-"],
+            ],
+            4
+          );
+        } else if (o.lugar === "OFICINA_AREQUIPA" || o.lugar === "SECOCHA" || !o.lugar) {
+          y = datosGrid(doc, y, [["Dirección", o.lugar === "OFICINA_AREQUIPA" ? EMPRESA.direccion : o.direccionDestino || o.lugarEntrega || "-"]], 1);
+        }
+        // Filas 2-4: con línea para completar (o el dato si es la opción elegida)
+        const linea = (k: LugarEntrega, campos: [string, string | undefined][]) => {
+          const marcada = o.lugar === k;
+          let xx = casilla(doc, M, y, marcada, `${LUGARES_ENTREGA[k]}:`) - 4;
+          campos.forEach(([label, valor]) => {
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(7.5);
+            doc.setTextColor(...AZUL);
+            doc.text(`${label}:`, xx, y);
+            xx += doc.getTextWidth(`${label}: `) + 0.5;
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(...NEGRO);
+            const v = marcada && valor ? valor : "";
+            const ancho = Math.max(doc.getTextWidth(v) + 2, k === "ENTREGA_ENCARGADO" ? 32 : 110);
+            if (v) doc.text(v, xx, y);
+            doc.setDrawColor(...BORDE);
+            doc.setLineWidth(0.2);
+            doc.line(xx, y + 0.8, xx + ancho, y + 0.8);
+            xx += ancho + 4;
+          });
+          y += 5.2;
+        };
+        linea("LOCAL_COMERCIAL_CLIENTE", [["Dirección", o.clienteDireccionEntrega]]);
+        linea("OFICINA_CLIENTE", [["Dirección", o.clienteDireccionEntrega]]);
+        linea("ENTREGA_ENCARGADO", [
+          ["Nombre", o.encargadoNombre],
+          ["DNI", o.encargadoDni],
+          ["Tel", o.encargadoTelefono],
+        ]);
+        y += 1;
         // ESTADOS ALMACÉN
         y = tituloSeccion(doc, y + 1, "ESTADOS ALMACÉN");
         x = M;

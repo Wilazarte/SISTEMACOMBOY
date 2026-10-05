@@ -305,7 +305,14 @@ export function Comprobantes({ preNp, onListo }: { preNp?: string; onListo: () =
                 <Truck size={16} /> Despacho: la orden <b>{npConOD.odNumero}</b> se generó al aprobar {npConOD.numero} y queda vinculada a este comprobante.
               </div>
             ) : (
-              <DatosDespachoForm value={form.despacho ?? despachoVacio()} onChange={(despacho) => setForm({ ...form, despacho })} />
+              <DatosDespachoForm
+                value={form.despacho ?? despachoVacio()}
+                onChange={(despacho) => setForm({ ...form, despacho })}
+                direccionCliente={(() => {
+                  const c = clientes.find((x) => x.id === form.clienteId);
+                  return form.lugarEntrega || c?.direccionesEntrega[0] || c?.direccionFiscal || "";
+                })()}
+              />
             )}
             <LineasEditor items={form.items} onChange={(items) => setForm({ ...form, items })} stock={stock} />
             <div className="flex flex-wrap items-start gap-4">

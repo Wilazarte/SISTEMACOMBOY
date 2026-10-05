@@ -525,7 +525,13 @@ export type EstadoOD =
   | "DESPACHADO_PARCIAL"
   | "DESPACHADO_TOTAL";
 
-export type LugarEntrega = "OFICINA_AREQUIPA" | "SECOCHA" | "ENVIO_AGENCIA";
+export type LugarEntrega =
+  | "OFICINA_AREQUIPA"
+  | "SECOCHA"
+  | "ENVIO_AGENCIA"
+  | "LOCAL_COMERCIAL_CLIENTE"
+  | "OFICINA_CLIENTE"
+  | "ENTREGA_ENCARGADO";
 
 /** Datos de despacho que Ventas llena antes de emitir (obligatorios). */
 export interface DatosDespacho {
@@ -534,6 +540,12 @@ export interface DatosDespacho {
   guiaNro: string;
   costoEnvio: number;
   direccionDestino: string;
+  /** LOCAL_COMERCIAL_CLIENTE / OFICINA_CLIENTE: dirección del cliente (obligatoria). */
+  clienteDireccion?: string;
+  /** ENTREGA_ENCARGADO: quien recoge (nombre y DNI obligatorios). */
+  encargadoNombre?: string;
+  encargadoDni?: string;
+  encargadoTelefono?: string;
 }
 
 export interface ArchivoAdjunto {
@@ -591,6 +603,10 @@ export interface OrdenDespacho {
   guiaNro?: string;
   costoEnvio?: number;
   direccionDestino?: string;
+  clienteDireccionEntrega?: string;
+  encargadoNombre?: string;
+  encargadoDni?: string;
+  encargadoTelefono?: string;
   observacion?: string;
   creadoPor?: string; // Ventas
   atendidoPor?: string; // Almacén

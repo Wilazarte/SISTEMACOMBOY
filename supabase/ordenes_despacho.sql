@@ -27,7 +27,10 @@ create policy almacen_escribir on public.almacen for all to authenticated
   using (public.mi_rol() in ('creador', 'tesoreria', 'almacen'))
   with check (public.mi_rol() in ('creador', 'tesoreria', 'almacen'));
 
--- 5) Vista de solo lectura v_ordenes_despacho (una fila por OD, columnas como tabla)
+-- 5) Vista de solo lectura v_ordenes_despacho (una fila por OD, columnas como tabla).
+--    lugar_entrega: OFICINA_AREQUIPA, SECOCHA, ENVIO_AGENCIA, LOCAL_COMERCIAL_CLIENTE, OFICINA_CLIENTE, ENTREGA_ENCARGADO
+--    (la validación de cada opción la hace el ERP antes de guardar; no hay enum que alterar).
+drop view if exists public.v_ordenes_despacho;
 create or replace view public.v_ordenes_despacho with (security_invoker = true) as
 select
   'OD-' || lpad(substring(data->>'numero' from '(\d+)$')::int::text, 3, '0') || '-' || left(data->>'fecha', 4) as codigo,
@@ -43,6 +46,10 @@ select
   data->>'agenciaNombre' as agencia_nombre,
   data->>'guiaNro' as guia_nro,
   nullif(data->>'costoEnvio', '')::numeric as costo_envio,
+  data->>'clienteDireccionEntrega' as cliente_direccion_entrega,
+  data->>'encargadoNombre' as encargado_nombre,
+  data->>'encargadoDni' as encargado_dni,
+  data->>'encargadoTelefono' as encargado_telefono,
   data->>'estado' as estado,
   data->>'observacion' as observacion,
   data->>'atendidoPor' as atendido_por,

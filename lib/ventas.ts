@@ -380,7 +380,7 @@ async function crearODdeNP(np: NotaPedido, datos: DatosDespacho, usuario: string
     npNumero: np.numero,
     comprobanteId: comp?.id,
     comprobanteNumero: comp?.numero,
-    evento: nuevoEvento(rol, "Orden de despacho generada", `${estado === "Aprobada" ? "Al aprobar" : "Desde"} ${np.numero} · ${LUGARES_ENTREGA[despacho.lugar as LugarEntrega]}`),
+    evento: nuevoEvento(rol, "Orden de despacho generada", `${estado === "Aprobada" ? "Al aprobar" : "Desde"} ${np.numero} · ${resumenDespacho(despacho)}`),
   });
   await esperarGuardado(); // descarta errores anteriores
   escribir(KEYS.DESPACHOS, [od, ...getDespachos()]);
@@ -440,6 +440,10 @@ function armarOD(d: {
     guiaNro: d.despacho.guiaNro || undefined,
     costoEnvio: d.despacho.lugar === "ENVIO_AGENCIA" ? d.despacho.costoEnvio : undefined,
     direccionDestino: d.despacho.direccionDestino || d.direccion,
+    clienteDireccionEntrega: d.despacho.clienteDireccion || undefined,
+    encargadoNombre: d.despacho.encargadoNombre || undefined,
+    encargadoDni: d.despacho.encargadoDni || undefined,
+    encargadoTelefono: d.despacho.encargadoTelefono || undefined,
     creadoPor: d.creadoPor,
     vistoAlmacen: false, // campana de Almacén: "1 nueva orden"
     postVentaStatus: null,
@@ -509,14 +513,71 @@ export const LUGARES_ENTREGA: Record<LugarEntrega, string> = {
   OFICINA_AREQUIPA: "Oficina Arequipa",
   SECOCHA: "Secocha",
   ENVIO_AGENCIA: "Envío por agencia",
+  LOCAL_COMERCIAL_CLIENTE: "Local comercial del cliente",
+  OFICINA_CLIENTE: "Oficina del cliente",
+  ENTREGA_ENCARGADO: "Entrega a encargado del cliente",
 };
 
-export const despachoVacio = (): DatosDespacho => ({ lugar: "", agenciaNombre: "", guiaNro: "", costoEnvio: 0, direccionDestino: "" });
+/** Detalle bajo cada opción del formulario. */
+export const DETALLE_LUGAR: Partial<Record<LugarEntrega, string>> = {
+  OFICINA_AREQUIPA: "El Nazareno Mz. A Lt. 25",
+  SECOCHA: "Taller Principal",
+  ENVIO_AGENCIA: "Shalom, Marvisur…",
+  LOCAL_COMERCIAL_CLIENTE: "Dejar en su local",
+  OFICINA_CLIENTE: "Dejar en su oficina",
+  ENTREGA_ENCARGADO: "Recoge una persona enviada",
+};
 
-/** Lugar de entrega obligatorio; si es ENVIO_AGENCIA, agencia y N° de guía también. */
+export const lugarConDireccion = (l: DatosDespacho["lugar"] | undefined) => l === "LOCAL_COMERCIAL_CLIENTE" || l === "OFICINA_CLIENTE";
+
+export const despachoVacio = (): DatosDespacho => ({
+  lugar: "",
+  agenciaNombre: "",
+  guiaNro: "",
+  costoEnvio: 0,
+  direccionDestino: "",
+  clienteDireccion: "",
+  encargadoNombre: "",
+  encargadoDni: "",
+  encargadoTelefono: "",
+});
+
+/** Resumen de la entrega para listas y avisos: "Entrega a encargado Juan Pérez (DNI 45879632)". */
+export function resumenEntrega(o: Pick<OrdenDespacho, "lugar" | "agenciaNombre" | "guiaNro" | "clienteDireccionEntrega" | "encargadoNombre" | "encargadoDni">): string {
+  if (!o.lugar) return "";
+  if (o.lugar === "ENTREGA_ENCARGADO") return `Entrega a encargado ${o.encargadoNombre ?? ""}${o.encargadoDni ? ` (DNI ${o.encargadoDni})` : ""}`;
+  if (o.lugar === "ENVIO_AGENCIA") return `Agencia ${o.agenciaNombre ?? ""}${o.guiaNro ? ` · guía ${o.guiaNro}` : ""}`;
+  if (lugarConDireccion(o.lugar)) return `${LUGARES_ENTREGA[o.lugar]}: ${o.clienteDireccionEntrega ?? ""}`;
+  return LUGARES_ENTREGA[o.lugar];
+}
+
+export const resumenDespacho = (d: DatosDespacho): string =>
+  resumenEntrega({
+    lugar: (d.lugar || undefined) as LugarEntrega | undefined,
+    agenciaNombre: d.agenciaNombre,
+    guiaNro: d.guiaNro,
+    clienteDireccionEntrega: d.clienteDireccion,
+    encargadoNombre: d.encargadoNombre,
+    encargadoDni: d.encargadoDni,
+  });
+
+/** Lugar de entrega obligatorio y sus datos según la opción. */
 export function validarDespacho(d?: DatosDespacho): DatosDespacho {
-  if (!d || !d.lugar || !(d.lugar in LUGARES_ENTREGA)) throw new ErpError("Datos de despacho: seleccione el lugar de entrega (Oficina Arequipa, Secocha o Envío por agencia).");
-  if (d.lugar !== "ENVIO_AGENCIA") return { ...despachoVacio(), lugar: d.lugar };
+  if (!d || !d.lugar || !(d.lugar in LUGARES_ENTREGA)) throw new ErpError("Datos de despacho: seleccione el lugar de entrega.");
+  const base = { ...despachoVacio(), lugar: d.lugar };
+  if (lugarConDireccion(d.lugar)) {
+    const clienteDireccion = (d.clienteDireccion ?? "").trim();
+    if (!clienteDireccion) throw new ErpError(`${LUGARES_ENTREGA[d.lugar]}: indique la dirección del cliente.`);
+    return { ...base, clienteDireccion, direccionDestino: clienteDireccion };
+  }
+  if (d.lugar === "ENTREGA_ENCARGADO") {
+    const encargadoNombre = (d.encargadoNombre ?? "").trim().toUpperCase();
+    const encargadoDni = (d.encargadoDni ?? "").replace(/\D/g, "");
+    if (!encargadoNombre) throw new ErpError("Entrega a encargado: indique el nombre completo de quien recoge.");
+    if (!/^\d{8}$/.test(encargadoDni)) throw new ErpError("Entrega a encargado: el DNI de quien recoge debe tener 8 dígitos.");
+    return { ...base, encargadoNombre, encargadoDni, encargadoTelefono: (d.encargadoTelefono ?? "").trim() };
+  }
+  if (d.lugar !== "ENVIO_AGENCIA") return base;
   const agenciaNombre = d.agenciaNombre.trim();
   const guiaNro = d.guiaNro.trim().toUpperCase();
   if (!agenciaNombre) throw new ErpError("Envío por agencia: indique el nombre de la agencia (Shalom, Marvisur…).");
@@ -541,6 +602,10 @@ export const ESTADOS_OD: Record<EstadoAlmacen, string> = {
   DEJADO_EN_AGENCIA: "En agencia",
   ANULADO: "Anulado",
 };
+
+/** Texto de aviso para Almacén: "NP-0002 GRUPO MINER CEJURO S.R.L. - Entrega a encargado JUAN PÉREZ (DNI …)". */
+export const avisoOD = (o: OrdenDespacho): string =>
+  `${o.npNumero || o.comprobanteNumero || o.numero} ${o.cliente}${o.lugar ? ` - ${resumenEntrega(o)}` : ""}`;
 
 /** Órdenes nuevas que Almacén aún no abrió (campana). */
 export const odsNuevas = (ods: OrdenDespacho[]) => ods.filter((o) => o.vistoAlmacen === false && estadoOD(o) === "PENDIENTE");
@@ -735,7 +800,7 @@ export async function emitirComprobante(
         creadoPor: vendedor,
         comprobanteId: c.id,
         comprobanteNumero: numero,
-        evento: nuevoEvento(rol, "Orden de despacho generada", `Desde ${numero} · ${LUGARES_ENTREGA[c.despacho!.lugar as LugarEntrega]}`),
+        evento: nuevoEvento(rol, "Orden de despacho generada", `Desde ${numero} · ${resumenDespacho(c.despacho!)}`),
       });
   c.odId = od.id;
   c.odNumero = od.numero;
