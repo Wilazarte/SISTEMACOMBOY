@@ -16,4 +16,10 @@ export const EMPRESA = {
 
 export const SEDES = ["Adm Aqp", "Taller Principal Aqp", "Sucursal Secocha", "Area Comercial", "Gerencia"];
 
+/** Almacenes físicos (ingreso de compras, equipos terminados de Producción, despacho). */
+export const ALMACENES = ["Almacen Aqp", "Planta Arequipa", "Suc Secocha", "Adm Aqp"];
+export const ALMACEN_DEFECTO = "Almacen Aqp";
+/** Todas las ubicaciones donde puede haber stock (almacenes + sedes de requerimientos). */
+export const SEDES_STOCK = Array.from(new Set([...ALMACENES, ...SEDES]));
+
 export const UNIDADES = ["UND", "KG", "M", "M2", "GLN", "LT", "CAJA", "PAR", "JGO", "ROLLO", "BOLSA"];

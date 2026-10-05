@@ -137,6 +137,8 @@ const COLORES: Record<string, string> = {
   DISPONIBLE: "bg-emerald-50 text-emerald-800 ring-emerald-200",
   EN_QC: "bg-red-50 text-vino ring-red-200",
   VENDIDO: "bg-azul-900 text-white ring-azul-900",
+  EN_FABRICACION: "bg-amber-50 text-amber-800 ring-amber-200",
+  QC_APROBADO: "bg-emerald-50 text-emerald-800 ring-emerald-200",
   PEDIDO_ALISTADO: "bg-[#EEF2F7] text-azul-700 ring-[#C9D4E3]",
   PEDIDO_ENTREGADO: "bg-emerald-50 text-emerald-800 ring-emerald-200",
   DEJADO_EN_AGENCIA: "bg-red-50 text-vino ring-red-200",
@@ -158,6 +160,8 @@ const ETIQUETA: Record<string, string> = {
   GASTO_TESORERIA: "GASTO TESORERIA",
   PEDIDO_ALISTADO: "ALISTADO",
   EN_QC: "EN QC",
+  EN_FABRICACION: "EN FABRICACIÓN",
+  QC_APROBADO: "QC APROBADO",
   PEDIDO_ENTREGADO: "ENTREGADO",
   DEJADO_EN_AGENCIA: "EN AGENCIA",
 };

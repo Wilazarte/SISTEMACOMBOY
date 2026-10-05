@@ -84,6 +84,8 @@ export interface OrdenCompra {
   formaPago: FormaPago;
   tiempoEntrega: string;
   lugarEntrega: string;
+  /** Almacén donde ingresa la mercadería (repuestos) al dar el V°B°. */
+  almacenIngreso?: string;
   items: ItemPrecio[];
   subtotal: number;
   igv: number;

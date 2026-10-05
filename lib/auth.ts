@@ -140,8 +140,12 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
   if (ruta === "/dashboard") return true; // solo redirige al primer módulo permitido
   // Módulo Creador: por rol, no por módulos (gerencia tiene "*" pero no debe entrar)
   if (ruta === RUTA_CREADOR || ruta.startsWith(`${RUTA_CREADOR}/`)) return puedeEditarAsistencia(sesion);
+  // Producción: también Almacén (registra las órdenes de producción y el QC)
+  if (ruta === RUTA_PRODUCCION || ruta.startsWith(`${RUTA_PRODUCCION}/`)) if (sesion.rol === "almacen") return true;
   return sesion.modulos.some((m) => m === "*" || ruta === m || ruta.startsWith(`${m}/`));
 }
+
+export const RUTA_PRODUCCION = "/dashboard/produccion";
 
 /** Primer módulo al que entra el usuario tras el login. */
 export function inicioDe(sesion: Sesion): string {

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, Bell, Calculator, CloudUpload, Eye, KeyRound, Receipt, LayoutDashboard, Loader2, LogOut, Menu, Search, Truck, ShieldAlert, ShoppingCart, UserCircle2, Users, Warehouse, X } from "lucide-react";
+import { AlertTriangle, Bell, Factory, Calculator, CloudUpload, Eye, KeyRound, Receipt, LayoutDashboard, Loader2, LogOut, Menu, Search, Truck, ShieldAlert, ShoppingCart, UserCircle2, Users, Warehouse, X } from "lucide-react";
 import { Badge, Toaster, cn, toast } from "@/components/ui";
 import { DocViewerHost, abrirDoc, type DocRef } from "@/components/doc-viewer";
 import { ObservacionesGerencia } from "@/components/ObservacionesGerencia";
@@ -15,6 +15,7 @@ import { avisoOD, getDespachos, odsNuevas } from "@/lib/ventas";
 
 const NAV: { href: string; label: string; icon: typeof LayoutDashboard; pronto?: boolean; activo?: boolean }[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard/produccion", label: "Producción", icon: Factory },
   { href: "/dashboard/almacen", label: "Almacén", icon: Warehouse },
   { href: "/dashboard/ventas", label: "Ventas", icon: Receipt },
   { href: "/dashboard/compras", label: "Tesorería / Compras", icon: ShoppingCart },

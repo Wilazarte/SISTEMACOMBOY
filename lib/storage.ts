@@ -65,6 +65,8 @@ export const KEYS = {
   HUELLAS_ALIAS: "planilla_huellas_alias",
   BOLETAS: "planilla_boletas",
   EQUIPOS: "almacen_equipos_terminados",
+  PRODUCCION: "almacen_ordenes_produccion",
+  MOVIMIENTOS: "almacen_movimientos",
   // Contable (tabla contable)
   CONTABLE_ASIENTOS: "contable_asientos",
   CONTABLE_PLAN: "contable_plan_cuentas",
@@ -186,6 +188,8 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.HUELLAS_ALIAS]: { tabla: "planilla", tipo: "huella_alias", forma: "objeto" },
   [KEYS.BOLETAS]: { tabla: "planilla", tipo: "boleta", forma: "lista" },
   [KEYS.EQUIPOS]: { tabla: "almacen", tipo: "EQUIPO_TERMINADO", forma: "lista" },
+  [KEYS.PRODUCCION]: { tabla: "almacen", tipo: "ORDEN_PRODUCCION", forma: "lista" },
+  [KEYS.MOVIMIENTOS]: { tabla: "almacen", tipo: "MOVIMIENTO_ALMACEN", forma: "lista" },
   [KEYS.CONTABLE_ASIENTOS]: { tabla: "contable", tipo: "ASIENTO_DIARIO", forma: "lista" },
   [KEYS.CONTABLE_PLAN]: { tabla: "contable", tipo: "PLAN_CUENTAS", forma: "lista" },
   [KEYS.CONTABLE_CIERRES]: { tabla: "contable", tipo: "CIERRE_MENSUAL", forma: "lista" },
@@ -592,7 +596,7 @@ function evento(usuario: Rol, accion: string, detalle?: string): EventoHistorial
 export const nuevoEvento = evento;
 
 /** Series con correlativo atómico en Supabase (siguiente_numero). */
-export type Serie = "REQ" | "OC" | "DJ" | "NP" | "F001" | "B001" | "OD" | "BOL" | "GST" | "RCT" | "EQ";
+export type Serie = "REQ" | "OC" | "DJ" | "NP" | "F001" | "B001" | "OD" | "BOL" | "GST" | "RCT" | "EQ" | "OP";
 
 /** Actualiza la caché de contadores sin enviarla: el servidor ya tiene el valor. */
 function fijarContador(serie: Serie, n: number): void {
@@ -637,7 +641,7 @@ export function previewNumero(serie: Serie): string {
 function formatear(serie: Serie, n: number): string {
   if (serie === "REQ") return `REQ-ALM-${String(n).padStart(3, "0")}`;
   if (serie === "OC") return `OC-${new Date().getFullYear()}-${String(n).padStart(4, "0")}`;
-  if (serie === "EQ") return `EQ-${new Date().getFullYear()}-${String(n).padStart(4, "0")}`;
+  if (serie === "EQ" || serie === "OP") return `${serie}-${new Date().getFullYear()}-${String(n).padStart(4, "0")}`;
   if (serie === "DJ") return `DJ-${String(n).padStart(3, "0")}`;
   return `${serie}-${String(n).padStart(4, "0")}`; // NP-0001, F001-0001, B001-0001, OD-0001
 }
@@ -945,7 +949,8 @@ export async function urlVoucher(ruta: string): Promise<string> {
  * Si la OC falla, el archivo subido se elimina (no quedan bauchers huérfanos).
  */
 export async function emitirOrdenCompra(
-  data: Pick<OrdenCompra, "fecha" | "cotizacionId" | "formaPago" | "tiempoEntrega" | "lugarEntrega" | "cuentaOrigenPago" | "voucherMonto">,
+  data: Pick<OrdenCompra, "fecha" | "cotizacionId" | "formaPago" | "tiempoEntrega" | "lugarEntrega" | "cuentaOrigenPago" | "voucherMonto"> &
+    Partial<Pick<OrdenCompra, "almacenIngreso">>,
   voucher: File | null,
   rol: Rol
 ): Promise<OrdenCompra> {
@@ -973,7 +978,7 @@ function validarOrdenCompra(data: Pick<OrdenCompra, "cotizacionId" | "tiempoEntr
 
 export async function crearOrdenCompra(
   data: Pick<OrdenCompra, "fecha" | "cotizacionId" | "formaPago" | "tiempoEntrega" | "lugarEntrega"> &
-    Partial<Pick<OrdenCompra, "cuentaOrigenPago" | "voucherUrl" | "voucherNombre" | "voucherTipo" | "voucherMonto">>,
+    Partial<Pick<OrdenCompra, "cuentaOrigenPago" | "voucherUrl" | "voucherNombre" | "voucherTipo" | "voucherMonto" | "almacenIngreso">>,
   rol: Rol
 ): Promise<OrdenCompra> {
   validarOrdenCompra(data);
@@ -1655,7 +1660,16 @@ export function descontarStock(sede: string, items: { nombre: string; unidad: st
 }
 
 /** Sede donde ingresa la mercadería de una OC: la del REQ; si no existe, el lugar de entrega. */
-export const sedeIngresoOC = (oc: OrdenCompra): string => buscarReq(oc.reqId)?.sede || oc.lugarEntrega;
+export const sedeIngresoOC = (oc: OrdenCompra): string => oc.almacenIngreso || buscarReq(oc.reqId)?.sede || oc.lugarEntrega;
+
+/** Traslado de un repuesto entre sedes (botón "Transferir desde…" del despacho). */
+export function transferirStock(nombre: string, unidad: string, cantidad: number, deSede: string, aSede: string): void {
+  if (deSede === aSede) throw new ErpError("Elija una sede distinta.");
+  if (!(cantidad > 0)) throw new ErpError("Cantidad inválida.");
+  const costo = getStock().find((s) => claveStock(s.sede, s.nombre, s.unidad) === claveStock(deSede, nombre, unidad))?.costoUnit ?? 0;
+  descontarStock(deSede, [{ nombre, unidad, cantidad }]);
+  ingresarStock(aSede, [{ nombre, unidad, cantidad, precioUnit: costo }]);
+}
 
 /**
  * Totales de una compra. FACTURA: precios sin IGV (se suma 18 %).

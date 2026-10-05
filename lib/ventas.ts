@@ -1097,7 +1097,7 @@ export function registrarDespacho(id: string, mov: Omit<MovimientoDespacho, "fec
     .filter(({ it }) => it.productoNombre && !equipos.some((e) => e.it.id === it.id))
     .map(({ it, cantidad }) => ({ nombre: it.productoNombre, unidad: it.unidad, cantidad }));
   if (salidas.length) descontarStock(mov.sede, salidas);
-  if (equipos.length) marcarEquiposVendidos(equipos.map((e) => e.eq!.codigo_chasis), od.numero);
+  if (equipos.length) marcarEquiposVendidos(equipos.map((e) => e.eq!.codigo_chasis), od.numero, od.cliente, mov.sede, mov.responsable.trim() || String(rol));
 
   let actualizada!: OrdenDespacho;
   actualizarOD(id, (o) => {
