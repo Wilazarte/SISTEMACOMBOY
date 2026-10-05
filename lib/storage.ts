@@ -11,6 +11,7 @@ import { getSesion, rolNegocio } from "./auth";
 import { createClient } from "./supabase/client";
 import type {
   AliasHuellas,
+  ServicioContratista,
   CondicionPago,
   EstadoCivil,
   AsistenciaPeriodo,
@@ -1098,6 +1099,7 @@ export const TIPOS_SUELDO: Record<TipoSueldo, { label: string; divisor: number }
   SEMANAL: { label: "Semanal", divisor: 6 }, // 6 días laborables
   QUINCENAL: { label: "Quincenal", divisor: 15 },
   MENSUAL: { label: "Mensual", divisor: 30 },
+  POR_CONTRATO: { label: "Por contrato", divisor: 30 }, // contratistas: no entran a la planilla del periodo
 };
 
 export const AFP_OPTIONS: Record<TipoAfp, { label: string; porc: number }> = {
@@ -1157,7 +1159,17 @@ const CAMPOS_FICHA_TEXTO = [
   "emergenciaCelular",
   "observacionesMedicas",
   "motivoBaja",
+  "empresa",
+  "formaPagoContrato",
 ] as const;
+export const SERVICIOS_CONTRATISTA: Record<ServicioContratista, string> = {
+  ASESORIA: "Asesoría",
+  TRAMITE: "Trámite",
+  CONSTRUCCION: "Construcción",
+  IMPLEMENTACION: "Implementación",
+  OTRO: "Otro",
+};
+export const FORMAS_PAGO_CONTRATISTA = ["AL CONTADO", "ADELANTO + SALDO", "POR AVANCE", "MENSUAL", "AL TÉRMINO"];
 export const ESTADOS_CIVILES: EstadoCivil[] = ["SOLTERO", "CASADO", "CONVIVIENTE", "DIVORCIADO", "VIUDO"];
 
 /** Campos opcionales de la ficha: se conservan solo si tienen valor (los registros antiguos no los tienen). */
@@ -1170,6 +1182,10 @@ function fichaOpcional(t: Partial<Trabajador>): Partial<Trabajador> {
   if (typeof t.fechaNacimiento === "string" && FECHA_RE.test(t.fechaNacimiento)) r.fechaNacimiento = t.fechaNacimiento;
   if (typeof t.fechaBaja === "string" && FECHA_RE.test(t.fechaBaja)) r.fechaBaja = t.fechaBaja;
   if (t.estadoCivil && ESTADOS_CIVILES.includes(t.estadoCivil)) r.estadoCivil = t.estadoCivil;
+  if (t.esContratista === true) r.esContratista = true;
+  if (typeof t.ruc === "string" && /^\d{11}$/.test(t.ruc.trim())) r.ruc = t.ruc.trim();
+  if (t.tipoServicio && t.tipoServicio in SERVICIOS_CONTRATISTA) r.tipoServicio = t.tipoServicio;
+  if (typeof t.fechaFinContrato === "string" && FECHA_RE.test(t.fechaFinContrato)) r.fechaFinContrato = t.fechaFinContrato;
   const hijos = Number(t.nroHijos);
   if (t.nroHijos !== undefined && t.nroHijos !== null && Number.isInteger(hijos) && hijos >= 0) r.nroHijos = hijos;
   return r;
@@ -1198,7 +1214,7 @@ function validarTrabajador(t: Trabajador): void {
   if (!t.nombre) throw new ErpError("Ingrese el nombre completo.");
   if (t.dni && !/^\d{8}$/.test(t.dni)) throw new ErpError("DNI inválido (8 dígitos).");
   if (!t.fechaIngreso || !FECHA_RE.test(t.fechaIngreso)) throw new ErpError("Ingrese la fecha de ingreso.");
-  if (t.fechaIngreso > hoy()) throw new ErpError("La fecha de ingreso no puede ser futura.");
+  if (t.fechaIngreso > hoy() && !esContratista(t)) throw new ErpError("La fecha de ingreso no puede ser futura."); // un contrato puede empezar después
   if (!(t.tipoSueldo in TIPOS_SUELDO)) throw new ErpError("Seleccione el tipo de sueldo.");
   if (!(t.sueldo > 0)) throw new ErpError("El sueldo debe ser mayor a 0.");
   if (!(t.afpTipo in AFP_OPTIONS)) throw new ErpError("Seleccione el sistema de pensiones.");
@@ -1257,6 +1273,66 @@ export function cambiarEstadoTrabajador(id: string, activo: boolean, baja?: { fe
 
 export function eliminarTrabajador(id: string): void {
   escribir(KEYS.TRABAJADORES, getTrabajadores().filter((t) => t.id !== id));
+}
+
+// ---------------------------------------------------------------------
+// Contratistas en el maestro (no entran a la planilla diaria)
+// ---------------------------------------------------------------------
+
+/** Contratista: marcado como tal, con cargo "Contratista" o pago POR CONTRATO. */
+export const esContratista = (t: Pick<Trabajador, "esContratista" | "cargo" | "tipoSueldo">): boolean =>
+  t.esContratista === true || (t.cargo ?? "").trim().toUpperCase() === "CONTRATISTA" || t.tipoSueldo === "POR_CONTRATO";
+
+/** Siguiente N° para un contratista nuevo: C1, C2... (no choca con las huellas del reloj). */
+export function siguienteIdContratista(lista: Trabajador[] = getTrabajadores()): string {
+  const max = lista.reduce((m, t) => Math.max(m, /^C(\d+)$/i.test(t.id) ? Number(t.id.slice(1)) : 0), 0);
+  return `C${max + 1}`;
+}
+
+export interface DatosContratista {
+  nombre: string;
+  documento: string; // DNI (8) o RUC (11)
+  tipoServicio: ServicioContratista;
+  empresa: string;
+  monto: number;
+  sede: string;
+  fechaInicio: string;
+  fechaFin: string;
+  formaPago: string;
+}
+
+/** Registra o edita un contratista en el mismo maestro de trabajadores (esContratista = true). */
+export function guardarContratista(d: DatosContratista, idOriginal?: string): Trabajador {
+  const doc = d.documento.trim();
+  if (!d.nombre.trim()) throw new ErpError("Ingrese el nombre del contratista.");
+  if (doc && !/^\d{8}$/.test(doc) && !/^\d{11}$/.test(doc)) throw new ErpError("DNI (8 dígitos) o RUC (11 dígitos) inválido.");
+  if (doc.length === 11 && !rucValido(doc)) throw new ErpError("RUC inválido (dígito verificador).");
+  if (!(d.tipoServicio in SERVICIOS_CONTRATISTA)) throw new ErpError("Seleccione el tipo de servicio.");
+  if (!(Number(d.monto) > 0)) throw new ErpError("El monto contratado debe ser mayor a 0.");
+  if (!FECHA_RE.test(d.fechaInicio)) throw new ErpError("Indique la fecha de inicio.");
+  if (d.fechaFin && (!FECHA_RE.test(d.fechaFin) || d.fechaFin < d.fechaInicio)) throw new ErpError("La fecha de fin debe ser posterior al inicio.");
+  const lista = getTrabajadores();
+  const anterior = idOriginal ? lista.find((t) => t.id === idOriginal) : undefined;
+  const base: Trabajador = anterior ?? { ...trabajadorVacio(), id: siguienteIdContratista(lista), afpTipo: "SIN", afpPorcentaje: 0 };
+  return guardarTrabajador(
+    {
+      ...base,
+      nombre: d.nombre,
+      dni: doc.length === 8 ? doc : doc ? "" : base.dni,
+      ruc: doc.length === 11 ? doc : undefined,
+      cargo: "Contratista",
+      esContratista: true,
+      tipoServicio: d.tipoServicio,
+      empresa: d.empresa.trim() || undefined,
+      sueldo: Math.round(Number(d.monto) * 100) / 100,
+      tipoSueldo: "POR_CONTRATO",
+      sede: d.sede || undefined,
+      fechaIngreso: d.fechaInicio,
+      fechaFinContrato: d.fechaFin || undefined,
+      formaPagoContrato: d.formaPago || undefined,
+    },
+    idOriginal
+  );
 }
 
 // ---------------------------------------------------------------------

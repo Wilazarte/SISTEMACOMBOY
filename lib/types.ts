@@ -154,7 +154,7 @@ export type TipoDoc = "REQ" | "COTI" | "OC" | "FACTURA" | "GUIA";
 // Módulo de Planilla — Trabajadores
 // =====================================================================
 
-export type TipoSueldo = "DIARIO" | "SEMANAL" | "QUINCENAL" | "MENSUAL";
+export type TipoSueldo = "DIARIO" | "SEMANAL" | "QUINCENAL" | "MENSUAL" | "POR_CONTRATO";
 
 export type TipoAfp = "AFP_INTEGRA" | "AFP_PRIMA" | "AFP_HABITAT" | "AFP_PROFUTURO" | "ONP" | "SIN";
 
@@ -184,7 +184,16 @@ export interface Trabajador {
   observacionesMedicas?: string; // alergias, condiciones
   fechaBaja?: string; // YYYY-MM-DD (al dar de baja)
   motivoBaja?: string;
+  // ---- Contratista (mismo maestro, pero fuera de la planilla diaria) ----
+  esContratista?: boolean; // también cuenta cargo "Contratista" o tipoSueldo POR_CONTRATO
+  ruc?: string; // RUC del contratista (11 dígitos); el DNI va en dni
+  tipoServicio?: ServicioContratista;
+  empresa?: string;
+  fechaFinContrato?: string; // inicio = fechaIngreso; monto contratado = sueldo
+  formaPagoContrato?: string;
 }
+
+export type ServicioContratista = "ASESORIA" | "TRAMITE" | "CONSTRUCCION" | "IMPLEMENTACION" | "OTRO";
 
 export type EstadoCivil = "SOLTERO" | "CASADO" | "CONVIVIENTE" | "DIVORCIADO" | "VIUDO";
 

@@ -11,6 +11,7 @@ import {
   TIPOS_SUELDO,
   detectarDuplicados,
   edad,
+  esContratista,
   eliminarTrabajador,
   fechaPE,
   getAliasHuellas,
@@ -31,6 +32,7 @@ import { HORA_TARDANZA, aplicarAlias, leerMarcaciones, resumirAsistencia, textoC
 import { MODOS_LIQUIDACION, cambiarConfig, cambiarModo, liquidacionDe, liquidar, type ResultadoLiquidacion } from "@/lib/liquidacion";
 import { CerrarSemana } from "@/components/planilla/CerrarSemana";
 import { Contratistas } from "@/components/planilla/Contratistas";
+import { ContratistasMaestro } from "@/components/planilla/ContratistasMaestro";
 import { FichaTrabajador } from "@/components/planilla/FichaTrabajador";
 import { HistorialPlanilla } from "@/components/planilla/HistorialPlanilla";
 import { LiquidacionCelda } from "@/components/planilla/LiquidacionCelda";
@@ -140,7 +142,10 @@ function CampoBloqueado({ valor, alerta }: { valor: number | string; alerta?: bo
 }
 
 export default function PlanillaPage() {
-  const trabajadores = useTrabajadores();
+  const maestro = useTrabajadores();
+  // Contratistas: mismo maestro, pero fuera de la lista de operarios y de la planilla del periodo
+  const trabajadores = useMemo(() => maestro.filter((t) => !esContratista(t)), [maestro]);
+  const nContratistas = maestro.length - trabajadores.length;
   const sesion = getSesion();
   const soloLectura = !!sesion?.soloLectura; // Gerencia: ver sin editar
   const puedeEditar = !soloLectura && ["creador", "planilla", "admin"].includes(sesion?.rol ?? "");
@@ -166,7 +171,7 @@ export default function PlanillaPage() {
 
   const liq = useMemo(() => liquidacionDe(liquidaciones, periodo), [liquidaciones, periodo]);
   const incompletos = trabajadores.filter((t) => t.activo && !t.fechaIngreso);
-  const duplicados = useMemo(() => detectarDuplicados(trabajadores), [trabajadores]);
+  const duplicados = useMemo(() => detectarDuplicados(maestro), [maestro]);
   // Asistencia guardada en Supabase para el periodo elegido
   const delPeriodo = useMemo(() => {
     const m = new Map<string, AsistenciaPeriodo>();
@@ -379,7 +384,7 @@ export default function PlanillaPage() {
           { id: "trabajadores", label: "Trabajadores", icon: <Users size={16} />, count: incompletos.length },
           { id: "planilla", label: "Planilla del periodo", icon: <Calculator size={16} /> },
           { id: "historial", label: "Historial", icon: <Archive size={16} /> },
-          { id: "contratistas", label: "Contratistas", icon: <Building2 size={16} /> },
+          { id: "contratistas", label: "Contratistas / Concesiones", icon: <Building2 size={16} /> },
         ]}
       />
 
@@ -388,7 +393,7 @@ export default function PlanillaPage() {
         <Card>
           <CardHeader
             title="Maestro de trabajadores"
-            subtitle={`${trabajadores.filter((t) => t.activo).length} activo(s) · ${trabajadores.filter((t) => !t.activo).length} inactivo(s)`}
+            subtitle={`${trabajadores.filter((t) => t.activo).length} activo(s) · ${trabajadores.filter((t) => !t.activo).length} inactivo(s)${nContratistas ? ` · ${nContratistas} contratista(s) en la pestaña Contratistas / Concesiones` : ""}`}
             action={
               <div className="flex flex-wrap items-center gap-3">
                 <Input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar nombre, DNI, N°, cargo…" className="w-60" />
@@ -651,7 +656,17 @@ export default function PlanillaPage() {
 
       {tab === "historial" && <HistorialPlanilla lista={historial.lista} cargando={historial.cargando} error={historial.error} />}
 
-      {tab === "contratistas" && <Contratistas soloLectura={!puedeEditar} />}
+      {tab === "contratistas" && (
+        <div className="space-y-6">
+          <ContratistasMaestro trabajadores={maestro} soloLectura={!puedeEditar} />
+          <div>
+            <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-slate-900">
+              <Building2 size={18} className="text-amber-500" /> Concesiones / servicios externos
+            </h2>
+            <Contratistas soloLectura={!puedeEditar} />
+          </div>
+        </div>
+      )}
 
       {/* FICHA DEL TRABAJADOR (registrar / editar / baja / eliminar / historial de pagos) */}
       {ficha && <FichaTrabajador inicial={ficha.form} idOriginal={ficha.idOriginal} soloLectura={!puedeEditar} onClose={() => setFicha(null)} />}
