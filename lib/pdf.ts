@@ -14,9 +14,62 @@ import type { ConcesionContratista } from "./types";
 import type { ComprobanteVenta, Cotizacion, Factura, Guia, LineaVenta, NotaPedido, OrdenCompra, OrdenDespacho, Requerimiento } from "./types";
 
 type RGB = [number, number, number];
-const AZUL: RGB = [15, 42, 82];
-const AMBAR: RGB = [217, 119, 6];
+// Plantilla corporativa COMBOY VID
+const AZUL: RGB = [15, 36, 64]; // #0F2440
+const ROJO: RGB = [185, 28, 28]; // #B91C1C
+const NEGRO: RGB = [0, 0, 0];
 const GRIS: RGB = [100, 116, 139];
+const BORDE: RGB = [209, 213, 219]; // #D1D5DB
+const PLOMO_50: RGB = [248, 250, 252];
+const PLOMO_200: RGB = [226, 232, 240];
+
+const PT = 25.4 / 72; // 1 pt en mm
+const M = 14; // margen lateral (mm)
+/** Alto del footer negro (mm). El contenido nunca baja de aquí. */
+const ALTO_PIE = 19;
+
+// ------------------------------------------------------------- Logo (public/logo-comboy.png)
+let logo: { data: string; w: number; h: number } | null = null;
+
+/** Precarga el logo como dataURL (jsPDF dibuja síncrono; el PDF se abre en el mismo clic). */
+export async function cargarLogo(): Promise<void> {
+  if (logo || typeof window === "undefined") return;
+  try {
+    const blob = await (await fetch("/logo-comboy.png")).blob();
+    const data = await new Promise<string>((ok, mal) => {
+      const r = new FileReader();
+      r.onload = () => ok(String(r.result));
+      r.onerror = mal;
+      r.readAsDataURL(blob);
+    });
+    const img = new Image();
+    await new Promise((ok, mal) => {
+      img.onload = ok;
+      img.onerror = mal;
+      img.src = data;
+    });
+    logo = { data, w: img.naturalWidth, h: img.naturalHeight };
+  } catch {
+    logo = null; // sin logo se dibuja el nombre en texto
+  }
+}
+void cargarLogo();
+
+/** Logo con object-fit: contain dentro de la caja (x, y, w, h). */
+function dibujarLogo(doc: jsPDF, x: number, y: number, w: number, h: number): void {
+  const src = logo ?? (EMPRESA.logoDataUrl ? { data: EMPRESA.logoDataUrl, w: 4, h: 1 } : null);
+  if (src) {
+    const k = Math.min(w / src.w, h / src.h);
+    doc.addImage(src.data, "PNG", x, y + (h - src.h * k) / 2, src.w * k, src.h * k, "logo-comboy", "FAST");
+    return;
+  }
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(26);
+  doc.setTextColor(...AZUL);
+  doc.text("COMBOY", x, y + h / 2 + 3);
+  doc.setTextColor(...ROJO);
+  doc.text("VID", x + doc.getTextWidth("COMBOY "), y + h / 2 + 3);
+}
 
 interface Bloque {
   titulo: string;
@@ -32,6 +85,12 @@ interface Bloque {
   qr?: string;
   qrTexto?: string[];
   firmas: string[];
+  /** Columnas de la sección de datos (por defecto 3). */
+  columnas?: number;
+  /** Página horizontal (tablas anchas, ej. planilla). */
+  horizontal?: boolean;
+  /** Casillero de huella digital junto a la firma indicada (índice). */
+  huellaEn?: number;
 }
 
 /** Dibuja un QR con rectángulos (síncrono: no bloquea la ventana del PDF). */
@@ -48,185 +107,262 @@ function finalY(doc: jsPDF): number {
   return (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
 }
 
-function cabecera(doc: jsPDF, titulo: string, numero: string, estado?: string): number {
+/**
+ * Cabecera corporativa: logo 260×65 pt + datos de la empresa debajo (izquierda 60 %),
+ * cuadro con título / subtítulo / estado (derecha 38 %) y franja roja de 8 pt.
+ */
+function cabecera(doc: jsPDF, titulo: string, subtitulo: string, estado?: string): number {
   const W = doc.internal.pageSize.getWidth();
-  doc.setFillColor(...AZUL);
-  doc.rect(0, 0, W, 4, "F");
+  const ancho = W - 2 * M;
+  const top = 10;
 
-  if (EMPRESA.logoDataUrl) {
-    doc.addImage(EMPRESA.logoDataUrl, "PNG", 14, 10, 24, 24);
-  } else {
-    doc.setFillColor(...AZUL);
-    doc.roundedRect(14, 10, 24, 24, 3, 3, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(15);
-    doc.text("CV", 26, 25, { align: "center" });
-    doc.setFillColor(...AMBAR);
-    doc.rect(14, 31, 24, 3, "F");
+  // Izquierda 60 %
+  dibujarLogo(doc, M, top, 260 * PT, 65 * PT);
+  let y = top + 65 * PT + 6 * PT + 2.6;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...AZUL);
+  doc.text(EMPRESA.nombreComercial, M, y);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...NEGRO);
+  for (const l of [`RUC ${EMPRESA.ruc}`, `Dirección: ${EMPRESA.direccion}`, `Tel: ${EMPRESA.telefono} • Email: ${EMPRESA.email}`]) {
+    y += 3.1;
+    doc.text(l, M, y);
   }
 
-  doc.setTextColor(...AZUL);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.text(EMPRESA.razonSocial, 42, 16);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(...GRIS);
-  doc.text(EMPRESA.nombreComercial, 42, 21);
-  doc.text(`RUC ${EMPRESA.ruc} · ${EMPRESA.direccion}`, 42, 25.5);
-  doc.text(`${EMPRESA.telefono} · ${EMPRESA.email}`, 42, 30);
-
-  // Recuadro tipo comprobante
-  const bx = W - 72;
-  doc.setDrawColor(...AZUL);
-  doc.setLineWidth(0.6);
-  doc.roundedRect(bx, 9, 58, 26, 2, 2, "S");
+  // Derecha 38 %: cuadro del documento
+  const bw = ancho * 0.38;
+  const bx = W - M - bw;
+  const cx = bx + bw / 2;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
-  doc.setTextColor(...AZUL);
-  const lineas = doc.splitTextToSize(titulo, 54) as string[];
-  doc.text(lineas, bx + 29, 15, { align: "center" });
+  const lt = doc.splitTextToSize(titulo.toUpperCase(), bw - 8) as string[];
   doc.setFontSize(11);
-  doc.setTextColor(...AMBAR);
-  doc.text(numero, bx + 29, 15 + lineas.length * 4.5 + 2, { align: "center" });
+  const ls = doc.splitTextToSize(subtitulo, bw - 8) as string[];
+  const alto = 10 * PT * 2 + lt.length * 3.6 + 1.4 + ls.length * 4.4 + (estado ? 8 : 0);
+  doc.setDrawColor(...AZUL);
+  doc.setLineWidth(2 * PT);
+  doc.roundedRect(bx, top, bw, alto, 10 * PT, 10 * PT, "S");
+  let yy = top + 10 * PT + 3;
+  doc.setFontSize(9);
+  doc.setTextColor(...AZUL);
+  doc.text(lt, cx, yy, { align: "center" });
+  yy += lt.length * 3.6 + 1.4 + 1;
+  doc.setFontSize(11);
+  doc.setTextColor(...ROJO);
+  doc.text(ls, cx, yy, { align: "center" });
+  yy += ls.length * 4.4;
   if (estado) {
+    doc.setFont("helvetica", "bold");
     doc.setFontSize(7);
-    doc.setTextColor(...GRIS);
-    doc.text(`Estado: ${estado}`, bx + 29, 33, { align: "center" });
+    const txt = `ESTADO: ${estado.toUpperCase()}`;
+    const pw = doc.getTextWidth(txt) + 6;
+    doc.setLineWidth(1 * PT);
+    doc.roundedRect(cx - pw / 2, yy - 0.8, pw, 4.4, 2.2, 2.2, "S");
+    doc.setTextColor(...AZUL);
+    doc.text(txt, cx, yy + 2.2, { align: "center" });
   }
-  doc.setDrawColor(226, 232, 240);
-  doc.setLineWidth(0.3);
-  doc.line(14, 40, W - 14, 40);
-  return 45;
+
+  // Franja roja
+  const yb = Math.max(y + 3, top + alto) + 10 * PT;
+  doc.setFillColor(...ROJO);
+  doc.rect(M, yb, ancho, 8 * PT, "F");
+  return yb + 8 * PT + 10 * PT + 2;
 }
 
-function datosGrid(doc: jsPDF, y: number, datos: [string, string][]): number {
+/** Sección de datos compacta: label 8 pt bold azul + valor 7.5 pt negro, en columnas, línea plomo debajo. */
+function datosGrid(doc: jsPDF, y: number, datos: [string, string][], columnas = 3): number {
+  if (!datos.length) return y;
   const W = doc.internal.pageSize.getWidth();
-  const col = (W - 28) / 2;
-  doc.setFontSize(8.5);
+  const col = (W - 2 * M) / columnas;
   let yy = y;
-  for (let i = 0; i < datos.length; i += 2) {
-    let alto = 5;
-    for (let j = 0; j < 2; j++) {
+  for (let i = 0; i < datos.length; i += columnas) {
+    let alto = 3.6;
+    for (let j = 0; j < columnas; j++) {
       const par = datos[i + j];
       if (!par) continue;
-      const x = 14 + j * col;
+      const x = M + j * col;
       doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
       doc.setTextColor(...AZUL);
-      doc.text(`${par[0]}:`, x, yy);
+      const label = `${par[0]}: `;
+      const lw = Math.min(doc.getTextWidth(label), col * 0.45);
+      doc.text(label, x, yy);
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(30, 41, 59);
-      const val = doc.splitTextToSize(par[1] || "-", col - 34) as string[];
-      doc.text(val, x + 32, yy);
-      alto = Math.max(alto, val.length * 4 + 1.5);
+      doc.setTextColor(...NEGRO);
+      const val = doc.splitTextToSize(par[1] || "-", col - lw - 3) as string[];
+      doc.text(val, x + lw, yy);
+      alto = Math.max(alto, val.length * 3.1 + 0.5);
     }
     yy += alto;
   }
-  return yy + 2;
+  doc.setDrawColor(...PLOMO_200);
+  doc.setLineWidth(1 * PT);
+  doc.line(M, yy - 1, W - M, yy - 1);
+  return yy + 3;
 }
 
-function firmas(doc: jsPDF, y: number, nombres: string[]): void {
+/** Tabla corporativa: cabecera azul 7.5 pt, filas 7.5 pt con borde #D1D5DB y alternado #F8FAFC. */
+function tabla(doc: jsPDF, y: number, head: string[], body: (string | number)[][], alinearDerecha: number[] = []): number {
+  const columnStyles: Record<number, { halign: "right" }> = {};
+  alinearDerecha.forEach((c) => (columnStyles[c] = { halign: "right" }));
+  autoTable(doc, {
+    startY: y,
+    head: [head.map((h) => h.toUpperCase())],
+    body,
+    theme: "grid",
+    headStyles: { fillColor: AZUL, textColor: 255, fontStyle: "bold", fontSize: 7.5, lineColor: AZUL },
+    styles: { fontSize: 7.5, cellPadding: 1.5, lineColor: BORDE, lineWidth: 0.2, textColor: NEGRO },
+    alternateRowStyles: { fillColor: PLOMO_50 },
+    columnStyles,
+    margin: { left: M, right: M, top: 14, bottom: ALTO_PIE + 6 },
+  });
+  return finalY(doc) + 4;
+}
+
+/** Totales a la derecha (8 pt); el último en caja azul redondeada, blanco, 9 pt bold. */
+function bloqueTotales(doc: jsPDF, y: number, filas: [string, string][]): number {
+  const W = doc.internal.pageSize.getWidth();
+  const w = 74;
+  const x = W - M - w;
+  filas.forEach(([k, v], i) => {
+    if (y > doc.internal.pageSize.getHeight() - ALTO_PIE - 10) {
+      doc.addPage();
+      y = 20;
+    }
+    const ultimo = i === filas.length - 1;
+    if (ultimo) {
+      y += 1;
+      doc.setFillColor(...AZUL);
+      doc.roundedRect(x, y - 4.2, w, 6.6, 8 * PT, 8 * PT, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.text(k, x + 2.5, y);
+      doc.text(v, W - M - 2.5, y, { align: "right" });
+      y += 6.6;
+    } else {
+      doc.setTextColor(...NEGRO);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.text(k, x + 2.5, y);
+      doc.text(v, W - M - 2.5, y, { align: "right" });
+      y += 4 * PT + 3.2;
+    }
+  });
+  return y + 2;
+}
+
+function firmas(doc: jsPDF, y: number, nombres: string[], huellaEn?: number): void {
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
-  let yy = Math.max(y + 22, H - 40);
-  if (yy > H - 20) {
+  const tope = H - ALTO_PIE - 12;
+  let yy = Math.max(y + 22, tope);
+  if (yy > tope) {
     doc.addPage();
-    yy = 60;
+    yy = tope;
   }
-  const ancho = (W - 28) / nombres.length;
+  const ancho = (W - 2 * M) / nombres.length;
   nombres.forEach((n, i) => {
-    const cx = 14 + ancho * i + ancho / 2;
-    doc.setDrawColor(...GRIS);
+    const cx = M + ancho * i + ancho / 2;
+    doc.setDrawColor(...AZUL);
+    doc.setLineWidth(0.3);
     doc.line(cx - 25, yy, cx + 25, yy);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(30, 41, 59);
-    doc.text(n, cx, yy + 4.5, { align: "center" });
+    doc.setFontSize(7.5);
+    doc.setTextColor(...AZUL);
+    doc.text(n, cx, yy + 4, { align: "center" });
+    if (huellaEn === i) {
+      // Casillero de huella digital a la derecha de la firma
+      doc.setDrawColor(...BORDE);
+      doc.roundedRect(cx + 28, yy - 22, 17, 22, 1.5, 1.5, "S");
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6);
+      doc.setTextColor(...GRIS);
+      doc.text("Huella digital", cx + 36.5, yy + 3, { align: "center" });
+    }
   });
 }
 
+/** Footer negro con borde rojo: ÁREA INFORMÁTICA - COMBOY VID (todas las páginas). */
 function pie(doc: jsPDF): void {
   const n = doc.getNumberOfPages();
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
+  const generado = new Date().toLocaleString("es-PE");
+  const y0 = H - ALTO_PIE;
   for (let i = 1; i <= n; i++) {
     doc.setPage(i);
+    doc.setFillColor(...ROJO);
+    doc.rect(0, y0, W, 3 * PT, "F");
+    doc.setFillColor(...NEGRO);
+    doc.rect(0, y0 + 3 * PT, W, ALTO_PIE - 3 * PT, "F");
+    const cx = W / 2;
+    let y = y0 + 3 * PT + 10 * PT + 2.2;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(255, 255, 255);
+    doc.text("ÁREA INFORMÁTICA - COMBOY VID", cx, y, { align: "center", charSpace: 0.5 * PT });
+    y += 4 * PT + 2.6;
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(...GRIS);
-    doc.text(`Generado por ERP ${EMPRESA.razonSocial} · ${new Date().toLocaleString("es-PE")}`, 14, H - 8);
-    doc.text(`Página ${i} de ${n}`, W - 14, H - 8, { align: "right" });
+    doc.setFontSize(6.5);
+    doc.text(
+      `COMBOY VID • ${EMPRESA.nombreComercial} • RUC ${EMPRESA.ruc} • Contacto: ${EMPRESA.email} • Tel: ${EMPRESA.telefono}`,
+      cx,
+      y,
+      { align: "center" }
+    );
+    y += 3 * PT + 2.2;
+    doc.setFontSize(5.5);
+    doc.setTextColor(226, 232, 240);
+    doc.text(`Documento generado: ${generado} • Página ${i} de ${n}`, cx, y, { align: "center" });
+    y += 2 * PT + 2;
+    doc.setTextColor(160, 160, 160);
+    doc.text("DOCUMENTO OFICIAL • NO MODIFICABLE • REGISTRO HISTORIAL", cx, y, { align: "center" });
   }
 }
 
 function construir(b: Bloque): jsPDF {
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const doc = new jsPDF({ unit: "mm", format: "a4", orientation: b.horizontal ? "landscape" : "portrait" });
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
   let y = cabecera(doc, b.titulo, b.numero, b.estado);
-  y = datosGrid(doc, y, b.datos);
-
-  const columnStyles: Record<number, { halign: "right" }> = {};
-  (b.alinearDerecha ?? []).forEach((c) => (columnStyles[c] = { halign: "right" }));
-  autoTable(doc, {
-    startY: y,
-    head: [b.head],
-    body: b.body,
-    theme: "grid",
-    headStyles: { fillColor: AZUL, textColor: 255, fontStyle: "bold", fontSize: 8 },
-    styles: { fontSize: 8, cellPadding: 1.8 },
-    alternateRowStyles: { fillColor: [248, 250, 252] },
-    columnStyles,
-    margin: { left: 14, right: 14 },
-  });
-  y = finalY(doc) + 4;
-
-  if (b.totales?.length) {
-    const W = doc.internal.pageSize.getWidth();
-    b.totales.forEach(([k, v], i) => {
-      const ultimo = i === b.totales!.length - 1;
-      if (ultimo) {
-        doc.setFillColor(...AZUL);
-        doc.rect(W - 84, y - 4, 70, 6.5, "F");
-        doc.setTextColor(255, 255, 255);
-      } else {
-        doc.setTextColor(30, 41, 59);
-      }
-      doc.setFont("helvetica", ultimo ? "bold" : "normal");
-      doc.setFontSize(9);
-      doc.text(k, W - 82, y);
-      doc.text(v, W - 16, y, { align: "right" });
-      y += 6.5;
-    });
-  }
+  y = datosGrid(doc, y, b.datos, b.columnas ?? 3);
+  y = tabla(doc, y, b.head, b.body, b.alinearDerecha);
+  if (b.totales?.length) y = bloqueTotales(doc, y, b.totales);
 
   if (b.notas?.length) {
-    y += 3;
+    y += 2;
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
+    doc.setFontSize(7.5);
     doc.setTextColor(...GRIS);
     b.notas.forEach((n) => {
-      const l = doc.splitTextToSize(n, doc.internal.pageSize.getWidth() - 28) as string[];
-      doc.text(l, 14, y);
-      y += l.length * 4;
+      const l = doc.splitTextToSize(n, W - 2 * M) as string[];
+      if (y + l.length * 3.4 > H - ALTO_PIE - 6) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.text(l, M, y);
+      y += l.length * 3.4 + 0.6;
     });
   }
 
   if (b.qr) {
-    const H = doc.internal.pageSize.getHeight();
-    if (y + 34 > H - 45) {
+    if (y + 34 > H - ALTO_PIE - 26) {
       doc.addPage();
       y = 20;
     }
     y += 3;
-    dibujarQR(doc, b.qr, 14, y, 28);
+    dibujarQR(doc, b.qr, M, y, 26);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(30, 41, 59);
-    (b.qrTexto ?? []).forEach((t, i) => doc.text(t, 46, y + 4 + i * 4.2));
-    y += 31;
+    doc.setFontSize(7.5);
+    doc.setTextColor(...NEGRO);
+    (b.qrTexto ?? []).forEach((t, i) => doc.text(t, M + 30, y + 4 + i * 3.8));
+    y += 29;
   }
 
-  firmas(doc, y, b.firmas);
+  firmas(doc, y, b.firmas, b.huellaEn);
   pie(doc);
   return doc;
 }
@@ -288,6 +424,73 @@ export function pdfContratoConcesion(c: ConcesionContratista, tipoServicio: stri
   );
 }
 
+export interface DatosBoleta {
+  periodo: string;
+  id: string;
+  nombre: string;
+  dni: string;
+  cargo: string;
+  sede?: string;
+  fechaIngreso: string;
+  pension: string;
+  afpPorcentaje: number;
+  sueldo: string;
+  sueldoDiario: number;
+  valorHora: string;
+  modo: string;
+  basicoDetalle: string;
+  basico: number;
+  horasExtra: string;
+  montoExtra: number;
+  bruto: number;
+  descuentoAfp: number;
+  adelantos: number;
+  totalPagar: number;
+}
+
+/** Boleta individual de pago (Planilla del periodo): se descarga como PDF. */
+export function pdfBoletaPago(d: DatosBoleta): void {
+  const doc = construir({
+    titulo: "BOLETA DE PAGO",
+    numero: `${d.nombre.toUpperCase()} - ${d.periodo}`,
+    estado: "EMITIDA",
+    datos: [
+      ["Trabajador", d.nombre],
+      ["DNI", d.dni || "-"],
+      ["N° trabajador", d.id],
+      ["Cargo", d.cargo || "-"],
+      ["Sede", d.sede || "-"],
+      ["Fecha ingreso", d.fechaIngreso ? fechaPE(d.fechaIngreso) : "-"],
+      ["Sueldo", d.sueldo],
+      ["Sueldo diario", soles(d.sueldoDiario)],
+      ["Valor hora", d.valorHora],
+      ["Periodo", d.periodo],
+      ["Liquidación", d.modo],
+      ["Pensión", `${d.pension} (${d.afpPorcentaje}%)`],
+    ],
+    head: ["Tipo", "Concepto", "Detalle", "Importe"],
+    body: [
+      ["INGRESO", "Remuneración básica", d.basicoDetalle, soles(d.basico)],
+      ["INGRESO", "Horas extra", d.horasExtra, soles(d.montoExtra)],
+      ["", "Remuneración bruta", "", soles(d.bruto)],
+      ["DESCUENTO", `Aporte ${d.pension}`, `${d.afpPorcentaje}% de la remuneración bruta`, `- ${soles(d.descuentoAfp)}`],
+      ["DESCUENTO", "Adelantos de sueldo", "Descontados en este periodo", `- ${soles(d.adelantos)}`],
+    ],
+    alinearDerecha: [3],
+    totales: [
+      ["Total ingresos", soles(d.bruto)],
+      ["Total descuentos", `- ${soles(d.descuentoAfp + d.adelantos)}`],
+      ["NETO A PAGAR", soles(d.totalPagar)],
+    ],
+    notas: ["Declaro haber recibido el importe neto indicado en esta boleta, conforme a la liquidación del periodo."],
+    qr: [EMPRESA.ruc, "BOLETA", d.periodo, d.id, d.dni || "-", d.totalPagar.toFixed(2)].join("|"),
+    qrTexto: [`Boleta de pago · ${d.periodo}`, `${d.nombre} · DNI ${d.dni || "-"}`, `Neto a pagar ${soles(d.totalPagar)}`],
+    firmas: ["Firma del trabajador", "Firma del empleador"],
+    huellaEn: 0,
+  });
+  doc.save(`BOLETA_${d.id}_${d.nombre.replace(/\s+/g, "_")}.pdf`);
+}
+
 /** Planilla cerrada (historial): copia fiel de lo guardado al cerrar la semana. */
 export function pdfPlanillaHistorial(h: HistorialPlanilla, detalle: HistorialDetalle[]): void {
   const horas = (n: number) => n.toLocaleString("es-PE", { maximumFractionDigits: 2 });
@@ -328,6 +531,8 @@ export function pdfPlanillaHistorial(h: HistorialPlanilla, detalle: HistorialDet
         ["TOTAL PAGADO", soles(h.total_pagar)],
       ],
       firmas: ["Elaborado por", "Gerencia"],
+      horizontal: true,
+      columnas: 4,
     }),
     `PLANILLA_${h.periodo.replace(/\s+/g, "_")}`
   );
@@ -613,7 +818,7 @@ export function pdfComprobanteVenta(c: ComprobanteVenta): void {
 
 /** Ticket 80 mm con IGV discriminado. */
 export function pdfTicketVenta(c: ComprobanteVenta): void {
-  const alto = 150 + c.items.length * 10;
+  const alto = 178 + c.items.length * 10;
   const doc = new jsPDF({ unit: "mm", format: [80, alto] });
   const cx = 40;
   let y = 8;
@@ -638,8 +843,10 @@ export function pdfTicketVenta(c: ComprobanteVenta): void {
     doc.text(v, 76, y, { align: "right" });
     y += bold ? 5 : 4;
   };
-  linea(EMPRESA.razonSocial, 10, true);
-  linea(`RUC ${EMPRESA.ruc}`, 8, true);
+  dibujarLogo(doc, 8, 4, 64, 16);
+  y = 24;
+  linea(EMPRESA.nombreComercial, 8, true);
+  linea(`RUC ${EMPRESA.ruc}`, 7.5, true);
   linea(EMPRESA.direccion);
   linea(EMPRESA.telefono);
   y += 1;
@@ -666,6 +873,21 @@ export function pdfTicketVenta(c: ComprobanteVenta): void {
   y += 31;
   linea("Representación impresa. Estado SUNAT: NO ENVIADO.", 6.5);
   linea("¡Gracias por su compra!", 8, true);
+  // Footer negro ÁREA INFORMÁTICA (al pie del ticket)
+  y = Math.max(y + 2, alto - 22);
+  doc.setFillColor(...ROJO);
+  doc.rect(0, y, 80, 3 * PT, "F");
+  doc.setFillColor(...NEGRO);
+  doc.rect(0, y + 3 * PT, 80, alto - y, "F");
+  doc.setTextColor(255, 255, 255);
+  y += 5;
+  linea("ÁREA INFORMÁTICA - COMBOY VID", 8, true);
+  linea(`${EMPRESA.nombreComercial} • RUC ${EMPRESA.ruc}`, 5.5);
+  linea(`${EMPRESA.email} • Tel: ${EMPRESA.telefono}`, 5.5);
+  doc.setTextColor(226, 232, 240);
+  linea(`Documento generado: ${new Date().toLocaleString("es-PE")}`, 5);
+  doc.setTextColor(160, 160, 160);
+  linea("DOCUMENTO OFICIAL • NO MODIFICABLE • REGISTRO HISTORIAL", 5);
   abrir(doc, `${c.numero || "borrador"}-ticket`);
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { pdfBoletaPago } from "@/lib/pdf";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, Archive, Building2, Calculator, Copy, Eye, FileDown, HandCoins, Lock, Pencil, Plus, Trash2, Upload, Users } from "lucide-react";
@@ -270,36 +271,30 @@ export default function PlanillaPage() {
     }
   };
 
-  const descargarPDF = async (t: TrabajadorCalc) => {
-    const { jsPDF } = await import("jspdf");
-    const doc = new jsPDF();
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text("CV COMBOY VID E.I.R.L.", 20, 20);
-    doc.setFontSize(10);
-    doc.text(`BOLETA DE PAGO - ${periodo}`, 20, 27);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.text(`Trabajador: ${t.nombre} | DNI: ${t.dni || "-"} | N°: ${t.id}${t.sede ? ` | Sede: ${t.sede}` : ""}`, 20, 38);
-    doc.text(`Cargo: ${t.cargo} | Ingreso: ${fechaPE(t.fechaIngreso)} | ${afpLabel(t)} (${t.afpPorcentaje}%)`, 20, 44);
-    doc.text(
-      `Sueldo ${sueldoDe(t).label} ${soles(t.sueldo)} | Diario ${soles(t.liq.sueldoDiario)} | Hora ${valorHoraTxt(t.valorHora)} | Liquidación: ${MODOS_LIQUIDACION[t.liq.modo].label}`,
-      20,
-      50
-    );
-    doc.line(20, 55, 190, 55);
-    doc.text(`Básico (${t.liq.modo === "HORAS" ? `${horasTxt(t.horas)} h` : `${t.dias} días`}): ${soles(t.liq.basico)}`, 20, 63);
-    doc.text(`Horas extra (${horasTxt(t.liq.horasExtra)} h): ${soles(t.liq.montoExtra)}`, 20, 69);
-    doc.text(`Remuneración bruta: ${soles(t.bruto)}`, 20, 75);
-    doc.text(`Descuento ${afpLabel(t)} (${t.afpPorcentaje}%): - ${soles(t.descuentoAfp)}`, 20, 81);
-    doc.text(`Adelantos descontados: - ${soles(t.adelantosDescuento)}`, 20, 87);
-    doc.setFont("helvetica", "bold");
-    doc.text(`NETO A PAGAR: ${soles(t.totalPagar)}`, 20, 97);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.text("Firma Trabajador _________________ Firma Empleador _________________", 20, 120);
-    doc.save(`BOLETA_${t.id}_${t.nombre.replace(/\s+/g, "_")}.pdf`);
-  };
+  const descargarPDF = (t: TrabajadorCalc) =>
+    pdfBoletaPago({
+      periodo: normalizarPeriodo(periodo),
+      id: t.id,
+      nombre: t.nombre,
+      dni: t.dni,
+      cargo: t.cargo,
+      sede: t.sede,
+      fechaIngreso: t.fechaIngreso,
+      pension: afpLabel(t),
+      afpPorcentaje: t.afpPorcentaje,
+      sueldo: `${sueldoDe(t).label} ${soles(t.sueldo)}`,
+      sueldoDiario: t.liq.sueldoDiario,
+      valorHora: valorHoraTxt(t.valorHora),
+      modo: MODOS_LIQUIDACION[t.liq.modo].label,
+      basicoDetalle: t.liq.modo === "HORAS" ? `${horasTxt(t.horas)} h` : `${t.dias} días`,
+      basico: t.liq.basico,
+      horasExtra: `${horasTxt(t.liq.horasExtra)} h`,
+      montoExtra: t.liq.montoExtra,
+      bruto: t.bruto,
+      descuentoAfp: t.descuentoAfp,
+      adelantos: t.adelantosDescuento,
+      totalPagar: t.totalPagar,
+    });
 
   const importarBtn = !puedeEditar ? null : (
     <label
