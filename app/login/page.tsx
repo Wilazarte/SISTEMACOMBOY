@@ -124,13 +124,13 @@ export default function LoginPage() {
 
       {/* Derecha: formulario */}
       <main className="flex w-full flex-1 items-center justify-center bg-plomo-50 px-4 py-10 sm:px-8 lg:w-1/2">
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-[440px]">
           {selectedModulo && (
-            <div key={selectedModulo} data-bienvenida className="mb-4 animate-aparecer text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <h2 className="text-[13px] font-bold uppercase tracking-wide text-[#0f2238]">BIENVENIDO AL SISTEMA ERP COMBOY VID</h2>
-              <p className="mt-1 text-[14px] font-bold text-[#dc2626]">{ENCARGADOS_LOGIN[selectedModulo.toLowerCase()]?.nombre}</p>
-              <p className="text-[12px] font-medium text-slate-600">{ENCARGADOS_LOGIN[selectedModulo.toLowerCase()]?.cargo}</p>
-              <div className="mx-auto mt-2 h-[2px] w-16 rounded-full bg-[#dc2626]"></div>
+            <div key={selectedModulo} data-bienvenida className="mb-6 animate-aparecer rounded-xl border border-slate-100 bg-white/95 p-5 text-center shadow-[0_8px_30px_rgba(0,0,0,0.12)] backdrop-blur animate-in fade-in zoom-in-95 duration-300">
+              <h2 className="text-[18px] font-extrabold uppercase leading-tight tracking-[0.02em] text-[#0f2238] md:text-[20px]">BIENVENIDO AL SISTEMA ERP COMBOY VID</h2>
+              <p className="mt-2 text-[18px] font-black uppercase tracking-wide text-[#dc2626] md:text-[22px]">{ENCARGADOS_LOGIN[selectedModulo.toLowerCase()]?.nombre}</p>
+              <p className="mt-1 text-[13px] font-semibold text-slate-600 md:text-[14px]">{ENCARGADOS_LOGIN[selectedModulo.toLowerCase()]?.cargo}</p>
+              <div className="mx-auto mt-3 h-[3px] w-24 rounded-full bg-[#dc2626]"></div>
             </div>
           )}
 
