@@ -1549,6 +1549,13 @@ export function unirDuplicado(duplicadoId: string, originalId: string): void {
   escribir(KEYS.TRABAJADORES, lista.filter((t) => t.id !== duplicadoId));
 }
 
+/** Importar asistencia › "Vincular": la huella del reloj es de este trabajador (se recuerda para las próximas importaciones). */
+export function vincularHuella(huella: string, trabajadorId: string): void {
+  if (!getTrabajadores().some((t) => t.id === trabajadorId)) throw new ErpError("Trabajador no encontrado.");
+  if (!huella.trim()) throw new ErpError("Huella inválida.");
+  escribir(KEYS.HUELLAS_ALIAS, { ...getAliasHuellas(), [huella.trim()]: trabajadorId });
+}
+
 /** Registra en bloque los N° de huella que llegan del reloj y aún no existen. Devuelve cuántos se crearon. */
 export function registrarDesdeAsistencia(nuevos: { id: string; nombre: string }[]): number {
   const lista = getTrabajadores();

@@ -28,6 +28,7 @@ import {
   trabajadorVacio,
   unirDuplicado,
   useStore,
+  vincularHuella,
   useTrabajadores,
 } from "@/lib/storage";
 import { getSesion } from "@/lib/auth";
@@ -38,6 +39,7 @@ import { AdelantosTrabajador } from "@/components/planilla/AdelantosTrabajador";
 import { PagarSemanaFiltrada } from "@/components/planilla/PagarSemanaFiltrada";
 import { EditarListaSemana } from "@/components/planilla/EditarListaSemana";
 import { enLista, listaDe, type ListaSemana } from "@/lib/listaSemana";
+import { emparejar, sinHuellas, type NoEncontrado } from "@/lib/emparejarReloj";
 import { Contratistas } from "@/components/planilla/Contratistas";
 import { ContratistasMaestro } from "@/components/planilla/ContratistasMaestro";
 import { FichaTrabajador } from "@/components/planilla/FichaTrabajador";
@@ -245,6 +247,10 @@ export default function PlanillaPage() {
   const [adelantoDe, setAdelantoDe] = useState<TrabajadorCalc | null>(null);
   const [soloAsistencia, setSoloAsistencia] = useState(true);
   const [editarLista, setEditarLista] = useState(false);
+  // Huellas del reloj sin trabajador seguro (se vinculan a mano) y el último Excel, para reprocesarlo al vincular
+  const [noEncontrados, setNoEncontrados] = useState<NoEncontrado[]>([]);
+  const [ultimasFilas, setUltimasFilas] = useState<Record<string, unknown>[] | null>(null);
+  const [eleccion, setEleccion] = useState<Record<string, string>>({});
   const listas = useStore<ListaSemana[]>(KEYS.LISTAS_SEMANA, []);
 
   const liq = useMemo(() => liquidacionDe(liquidaciones, periodo), [liquidaciones, periodo]);
@@ -314,35 +320,59 @@ export default function PlanillaPage() {
         ? XLSX.read(textoCsv(datos), { type: "string", raw: true })
         : XLSX.read(datos, { type: "array", raw: true });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const filas = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "", raw: true });
-
-      // Agrupa por trabajador y por fecha; las huellas unidas (duplicados) se suman al trabajador original
-      const { asistencia: mapa, nombres, desde, hasta } = aplicarAlias(leerMarcaciones(filas), getAliasHuellas());
-      if (mapa.size === 0) {
-        toast("No se encontraron marcaciones. Verifique las columnas N° / Nombre / Tiempo (DD/MM/YYYY HH:mm:ss).", "error");
-        return;
-      }
-      const creados = registrarDesdeAsistencia([...nombres].map(([id, nombre]) => ({ id, nombre })));
-      // DÍAS / HORAS / TARD. se guardan en Supabase con origen RELOJ (única vía además del Módulo Creador)
-      const n = await importarAsistenciaReloj(
-        periodo,
-        [...mapa].map(([trabajador, fechas]) => {
-          const r = resumirAsistencia(fechas);
-          // S/ por hora: se guardan las horas reales de las marcas (los demás: pago por día)
-          const porHora = maestro.find((x) => x.id === trabajador)?.tipoSueldo === "POR_HORA";
-          return { trabajador, ...r, ...(porHora ? { horas: horasReales(fechas) } : {}) };
-        })
-      );
-      setExcel({ asistencia: mapa, desde, hasta });
-      setRango({ desde, hasta });
-      setTab("planilla");
-      toast(
-        `Asistencia del ${fechaPE(desde)} al ${fechaPE(hasta)} importada en ${normalizarPeriodo(periodo)}: ${n} trabajador(es)${creados ? ` · ${creados} nuevo(s) por completar` : ""}`
-      );
+      await procesarAsistencia(XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "", raw: true }));
     } catch (err) {
       toast(err instanceof Error && err.name !== "SyntaxError" ? err.message : "No se pudo leer el archivo de asistencia.", "error");
     } finally {
       setImportando(false);
+    }
+  };
+
+  /**
+   * Importa las marcaciones: une cada huella con su trabajador (alias de huellas, alias por nombre, N° de huella,
+   * o por nombre con 2+ palabras en común). Las dudosas no se importan: quedan en "no encontrados" para vincular.
+   */
+  const procesarAsistencia = async (filas: Record<string, unknown>[]) => {
+    const leidas = leerMarcaciones(filas);
+    const emp = emparejar(leidas, maestro, getAliasHuellas());
+    // Agrupa por trabajador y por fecha; las huellas unidas (duplicados / por nombre) se suman al trabajador
+    const { asistencia: mapa, nombres, desde, hasta } = aplicarAlias(sinHuellas(leidas, emp.noEncontrados.map((x) => x.huella)), emp.alias);
+    setUltimasFilas(filas);
+    setNoEncontrados(emp.noEncontrados);
+    setEleccion(Object.fromEntries(emp.noEncontrados.map((x) => [x.huella, x.candidatos[0]?.id ?? ""])));
+    if (mapa.size === 0) {
+      if (!emp.noEncontrados.length) toast("No se encontraron marcaciones. Verifique las columnas N° / Nombre / Tiempo (DD/MM/YYYY HH:mm:ss).", "error");
+      setTab("planilla");
+      return;
+    }
+    const creados = registrarDesdeAsistencia([...nombres].map(([id, nombre]) => ({ id, nombre })));
+    // DÍAS / HORAS / TARD. se guardan en Supabase con origen RELOJ (única vía además del Módulo Creador)
+    const n = await importarAsistenciaReloj(
+      periodo,
+      [...mapa].map(([trabajador, fechas]) => {
+        const r = resumirAsistencia(fechas);
+        // S/ por hora: se guardan las horas reales de las marcas (los demás: pago por día)
+        const porHora = maestro.find((x) => x.id === trabajador)?.tipoSueldo === "POR_HORA";
+        return { trabajador, ...r, ...(porHora ? { horas: horasReales(fechas) } : {}) };
+      })
+    );
+    setExcel({ asistencia: mapa, desde, hasta });
+    setRango({ desde, hasta });
+    setTab("planilla");
+    const unidos = emp.porNombre.length ? ` · ${emp.porNombre.length} unido(s) por nombre (${emp.porNombre.map((x) => `${x.nombre} → N° ${x.id}`).join(", ")})` : "";
+    toast(
+      `Asistencia del ${fechaPE(desde)} al ${fechaPE(hasta)} importada en ${normalizarPeriodo(periodo)}: ${n} trabajador(es)${creados ? ` · ${creados} nuevo(s) por completar` : ""}${unidos}${emp.noEncontrados.length ? ` · ${emp.noEncontrados.length} sin vincular` : ""}`
+    );
+  };
+
+  /** "Vincular" (o "Crear nuevo"): guarda la decisión y vuelve a procesar el mismo Excel para que entre a la planilla. */
+  const resolverHuella = async (x: NoEncontrado, trabajadorId: string | null) => {
+    try {
+      if (trabajadorId) vincularHuella(x.huella, trabajadorId);
+      else registrarDesdeAsistencia([{ id: x.huella, nombre: x.nombre }]);
+      if (ultimasFilas) await procesarAsistencia(ultimasFilas);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "No se pudo vincular.", "error");
     }
   };
 
@@ -596,6 +626,61 @@ export default function PlanillaPage() {
             </div>
           </div>
           {adelantos.error && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">Adelantos: {adelantos.error} (la planilla se calcula sin descontarlos).</p>}
+          {noEncontrados.length > 0 && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" data-no-encontrados>
+              <p className="font-semibold">Trabajadores del reloj no encontrados ({noEncontrados.length}) — su asistencia aún no se importó:</p>
+              <ul className="mt-2 space-y-2">
+                {noEncontrados.map((x) => {
+                  const sug = x.candidatos.find((c) => c.id === eleccion[x.huella]) ?? x.candidatos[0];
+                  return (
+                    <li key={x.huella} data-huella={x.huella} className="flex flex-wrap items-center gap-2 rounded-lg bg-white px-3 py-2">
+                      <span>
+                        - <b>{x.nombre}</b> <span className="text-xs text-plomo-500">(huella {x.huella})</span>
+                        {sug && (
+                          <>
+                            {" "}
+                            ¿es <b>{sug.nombre}</b> <span className="text-xs text-plomo-500">(N° {sug.id})</span>?
+                          </>
+                        )}
+                      </span>
+                      <span className="flex-1" />
+                      {puedeEditar && (
+                        <>
+                          <select
+                            value={eleccion[x.huella] ?? ""}
+                            onChange={(e) => setEleccion((m) => ({ ...m, [x.huella]: e.target.value }))}
+                            className="rounded-lg border border-plomo-200 px-2 py-1.5 text-xs"
+                            aria-label={`Trabajador para ${x.nombre}`}
+                          >
+                            {x.candidatos.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                N° {c.id} · {c.nombre}
+                              </option>
+                            ))}
+                            <optgroup label="Otros trabajadores">
+                              {trabajadores
+                                .filter((t) => t.activo && !x.candidatos.some((c) => c.id === t.id))
+                                .map((t) => (
+                                  <option key={t.id} value={t.id}>
+                                    N° {t.id} · {t.nombre}
+                                  </option>
+                                ))}
+                            </optgroup>
+                          </select>
+                          <Button size="sm" onClick={() => eleccion[x.huella] && resolverHuella(x, eleccion[x.huella])} disabled={!eleccion[x.huella]}>
+                            Vincular
+                          </Button>
+                          <Button size="sm" variant="secondary" onClick={() => resolverHuella(x, null)} title="No es ninguno: registrar como trabajador nuevo">
+                            Crear nuevo
+                          </Button>
+                        </>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
 
           {/* Modo de cálculo */}
           <Card>
