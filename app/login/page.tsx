@@ -12,6 +12,17 @@ const TARJETAS: { id: ModuloLogin; titulo: string; desc: string; icon: LucideIco
   { id: "gerencia", titulo: "Gerencia", desc: "Reportes y analíticas", icon: BarChart3 },
 ];
 
+/** Encargado que se muestra encima del login al elegir el módulo. */
+const ENCARGADOS_LOGIN: Record<string, { nombre: string; cargo: string }> = {
+  "tesoreria / compras": { nombre: "LIZBETH CAHUANA APFATA", cargo: "Tesorera - Módulo de Compras" },
+  tesoreria: { nombre: "LIZBETH CAHUANA APFATA", cargo: "Tesorera - Módulo de Compras" },
+  compras: { nombre: "LIZBETH CAHUANA APFATA", cargo: "Tesorera - Módulo de Compras" },
+  "almacén": { nombre: "JOSE MANUEL ORTIZ ARAPA", cargo: "Jefe de Almacén" },
+  almacen: { nombre: "JOSE MANUEL ORTIZ ARAPA", cargo: "Jefe de Almacén" },
+  planilla: { nombre: "Encargado de Planilla", cargo: "RRHH - Planilla" },
+  gerencia: { nombre: "Gerencia General", cargo: "Gerencia - COMBOY VID" },
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const { sesion } = useSesion();
@@ -112,8 +123,18 @@ export default function LoginPage() {
       </aside>
 
       {/* Derecha: formulario */}
-      <main className="flex w-full flex-1 items-center justify-center bg-white px-4 py-10 sm:px-8 lg:w-1/2">
+      <main className="flex w-full flex-1 items-center justify-center bg-plomo-50 px-4 py-10 sm:px-8 lg:w-1/2">
         <div className="w-full max-w-sm">
+          {selectedModulo && (
+            <div key={selectedModulo} data-bienvenida className="mb-4 animate-aparecer text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <h2 className="text-[13px] font-bold uppercase tracking-wide text-[#0f2238]">BIENVENIDO AL SISTEMA ERP COMBOY VID</h2>
+              <p className="mt-1 text-[14px] font-bold text-[#dc2626]">{ENCARGADOS_LOGIN[selectedModulo.toLowerCase()]?.nombre}</p>
+              <p className="text-[12px] font-medium text-slate-600">{ENCARGADOS_LOGIN[selectedModulo.toLowerCase()]?.cargo}</p>
+              <div className="mx-auto mt-2 h-[2px] w-16 rounded-full bg-[#dc2626]"></div>
+            </div>
+          )}
+
+          <div className="rounded-xl border border-plomo-200 border-t-[3px] border-t-[#dc2626] bg-white p-7 shadow-[0_4px_12px_rgba(15,36,64,0.06)]">
           <h2 className="font-serif text-3xl text-azul-900">Iniciar sesión</h2>
           <p className="mt-1 text-sm text-plomo-500">Ingrese con el usuario asignado a su área.</p>
 
@@ -181,6 +202,7 @@ export default function LoginPage() {
               {enviando ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />} Ingresar
             </button>
           </form>
+          </div>
 
           <p className="mt-6 flex items-center justify-center gap-1.5 text-xs text-plomo-500">
             <ShieldCheck size={14} /> Acceso restringido por módulo según su usuario
