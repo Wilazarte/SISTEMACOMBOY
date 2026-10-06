@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-const MOTIVOS = ["PRODUCCION PLUS 4000", "MANTENIMIENTO", "TALLER"];
+import { MOTIVOS_RETIRO, errorChasis } from "@/lib/motivosRetiro";
+
+const MOTIVOS: readonly string[] = MOTIVOS_RETIRO;
 
 /**
  * POST /api/almacen/retiro-produccion
  * Retiro de repuestos para producción / mantenimiento / taller (consumo interno, sin OD ni guía).
- * Body: { producto_id, cantidad_a_retirar, chasis_ot, motivo, solicitante, autoriza, op_id?, equipo_id? }
+ * Body: { producto_id, cantidad_a_retirar, chasis_ot?, motivo, solicitante, autoriza, op_id?, equipo_id? }
+ * chasis_ot es obligatorio solo para PRODUCCION PLUS 4000 y MANTENIMIENTO EQUIPO; en los demás motivos
+ * (consumo general de taller, herramientas, insumos de soldadura, oficina / limpieza) puede ir null.
  * Usa la sesión del usuario (RLS) y la función retiro_produccion() de Supabase: valida stock, descuenta,
  * genera el Vale de Producción Interno (VPI-000001) y anota el kardex SALIDA-PRODUCCION. Todo o nada.
  */
@@ -22,12 +26,13 @@ export async function POST(req: Request) {
   const faltan = [
     !txt(b.producto_id) && "producto_id",
     !(cantidad > 0) && "cantidad_a_retirar",
-    !txt(b.chasis_ot) && "chasis_ot",
     !MOTIVOS.includes(txt(b.motivo)) && "motivo",
     !txt(b.solicitante) && "solicitante",
     !txt(b.autoriza) && "autoriza",
   ].filter(Boolean);
   if (faltan.length) return NextResponse.json({ error: `Datos inválidos: ${faltan.join(", ")}.` }, { status: 400 });
+  const eChasis = errorChasis(txt(b.motivo), txt(b.chasis_ot));
+  if (eChasis) return NextResponse.json({ error: eChasis }, { status: 400 });
 
   const sb = createClient();
   const {
@@ -38,7 +43,7 @@ export async function POST(req: Request) {
   const { data, error } = await sb.rpc("retiro_produccion", {
     p_stock_id: txt(b.producto_id),
     p_cantidad: cantidad,
-    p_chasis: txt(b.chasis_ot).toUpperCase(),
+    p_chasis: txt(b.chasis_ot).toUpperCase() || null,
     p_motivo: txt(b.motivo),
     p_solicitante: txt(b.solicitante),
     p_autoriza: txt(b.autoriza),

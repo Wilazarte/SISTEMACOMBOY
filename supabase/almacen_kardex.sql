@@ -6,7 +6,7 @@
 --   tipo 'stock'            -> productos (sede, nombre, unidad, cantidad, costoUnit, actualizado)
 --   tipo 'KARDEX'           -> movimientos: tipo_movimiento = SALDO_INICIAL | INGRESO | SALIDA-VENTA |
 --                              SALIDA-PRODUCCION | TRANSFERENCIA | AJUSTE, documento, chasis, cantidad (+/-), saldo, usuario
---   tipo 'VALE_PRODUCCION'  -> vales VPI-000001 (consumo por chasis / OT)
+--   tipo 'VALE_PRODUCCION'  -> vales VPI-000001 (con chasis = costo del equipo; chasis NULL = consumo general de taller)
 -- =====================================================================
 
 -- 1) Numeración: serie VPI (Almacén y creador)
@@ -60,7 +60,10 @@ select id,
        data ->> 'unidad'                       as unidad,
        data ->> 'tipo_movimiento'              as tipo_movimiento,
        data ->> 'documento'                    as documento,
-       data ->> 'chasis'                       as chasis,
+       -- sin chasis = gasto general de taller (herramientas, insumos de soldadura, oficina…)
+       case when data ->> 'tipo_movimiento' = 'SALIDA-PRODUCCION' and coalesce(data ->> 'chasis', '') = '' then 'CONSUMO GENERAL'
+            else data ->> 'chasis' end         as chasis,
+       data ->> 'motivo'                       as motivo,
        (data ->> 'cantidad')::numeric          as cantidad,
        (data ->> 'saldo')::numeric             as saldo,
        data ->> 'usuario'                      as usuario,
@@ -83,6 +86,7 @@ declare
   vpi text;
   ahora text := to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
   quien text;
+  chasis text;
 begin
   if rol is null or rol not in ('creador', 'almacen') then
     raise exception 'Su usuario no puede retirar stock de almacén' using errcode = '42501';
@@ -90,11 +94,17 @@ begin
   if p_cantidad is null or p_cantidad <= 0 then
     raise exception 'Indique la cantidad a retirar' using errcode = '22023';
   end if;
-  if coalesce(btrim(p_chasis), '') = '' then
-    raise exception 'Indique el chasis u OT' using errcode = '22023';
-  end if;
-  if p_motivo is null or p_motivo not in ('PRODUCCION PLUS 4000', 'MANTENIMIENTO', 'TALLER') then
+  if p_motivo is null or p_motivo not in ('PRODUCCION PLUS 4000', 'MANTENIMIENTO EQUIPO', 'CONSUMO GENERAL TALLER', 'HERRAMIENTAS',
+                                          'INSUMOS SOLDADURA', 'USO OFICINA / LIMPIEZA') then
     raise exception 'Motivo inválido' using errcode = '22023';
+  end if;
+  -- Chasis: obligatorio solo si el retiro va al costo de un equipo; en los demás motivos es NULL (consumo general de taller)
+  chasis := nullif(upper(btrim(coalesce(p_chasis, ''))), '');
+  if chasis is null and p_motivo = 'PRODUCCION PLUS 4000' then
+    raise exception 'Indique chasis PLUS' using errcode = '22023';
+  end if;
+  if chasis is null and p_motivo = 'MANTENIMIENTO EQUIPO' then
+    raise exception 'Indique el chasis del equipo' using errcode = '22023';
   end if;
   if coalesce(btrim(p_solicitante), '') = '' or coalesce(btrim(p_autoriza), '') = '' then
     raise exception 'Indique solicitante y quién autoriza' using errcode = '22023';
@@ -121,13 +131,13 @@ begin
   insert into public.almacen (tipo, id, data)
   values ('KARDEX', gen_random_uuid()::text, jsonb_build_object(
     'fecha', ahora, 'sede', st.data ->> 'sede', 'stock_id', p_stock_id, 'producto', st.data ->> 'nombre', 'unidad', st.data ->> 'unidad',
-    'tipo_movimiento', 'SALIDA-PRODUCCION', 'documento', vpi, 'chasis', upper(btrim(p_chasis)), 'motivo', p_motivo,
+    'tipo_movimiento', 'SALIDA-PRODUCCION', 'documento', vpi, 'chasis', chasis, 'motivo', p_motivo,
     'cantidad', -p_cantidad, 'saldo', saldo, 'usuario', coalesce(quien, 'almacen')));
 
   insert into public.almacen (tipo, id, data)
   values ('VALE_PRODUCCION', vpi, jsonb_build_object(
     'id', vpi, 'fecha', ahora, 'stock_id', p_stock_id, 'sede', st.data ->> 'sede', 'producto', st.data ->> 'nombre', 'unidad', st.data ->> 'unidad',
-    'cantidad', p_cantidad, 'chasis_ot', upper(btrim(p_chasis)), 'op_id', p_op_id, 'equipo_id', p_equipo_id, 'motivo', p_motivo,
+    'cantidad', p_cantidad, 'chasis_ot', chasis, 'op_id', case when chasis is null then null else p_op_id end, 'equipo_id', case when chasis is null then null else p_equipo_id end, 'motivo', p_motivo,
     'solicitante', btrim(p_solicitante), 'autoriza', btrim(p_autoriza), 'usuario', coalesce(quien, 'almacen'), 'saldo', saldo));
 
   return jsonb_build_object('vpi', vpi, 'saldo', saldo);

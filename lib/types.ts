@@ -364,7 +364,7 @@ export interface ValeProduccion {
   producto: string;
   unidad: string;
   cantidad: number;
-  chasis_ot: string;
+  chasis_ot: string | null; // null = consumo general de taller (no va al costo de un equipo)
   op_id?: string | null;
   equipo_id?: string | null;
   motivo: string;

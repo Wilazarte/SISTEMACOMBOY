@@ -5,7 +5,7 @@ import { FileDown, FileSpreadsheet, History, PackageMinus, Truck, Upload } from 
 import { Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, cn, ejecutar, toast } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { SEDES_STOCK, SEDE_REPUESTOS } from "@/lib/empresa";
-import { AUTORIZA_DEFECTO, ETIQUETA_KARDEX, MOTIVOS_RETIRO, kardexDe, retiroProduccion, type MotivoRetiro } from "@/lib/inventario";
+import { AUTORIZA_DEFECTO, ETIQUETA_KARDEX, ETIQUETA_MOTIVO, MOTIVOS_RETIRO, errorChasis, kardexDe, requiereChasis, retiroProduccion, textoChasis, type MotivoRetiro } from "@/lib/inventario";
 import { prepararSaldos, type PlanSaldos } from "@/lib/reglasStock";
 import { KEYS, importarSaldosStock, soles, useStore } from "@/lib/storage";
 import { normalizarChasis } from "@/lib/utils/chasis";
@@ -167,7 +167,9 @@ function KardexModal({ item, onClose }: { item: StockItem; onClose: () => void }
                   <span className={cn("inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset", color[m.tipo_movimiento])}>{ETIQUETA_KARDEX[m.tipo_movimiento]}</span>
                 </td>
                 <td className="break-all px-2.5 py-1.5 font-mono">{m.documento}</td>
-                <td className="px-2.5 py-1.5 font-mono">{m.chasis || "-"}</td>
+                <td className={cn("px-2.5 py-1.5", m.tipo_movimiento === "SALIDA-PRODUCCION" ? (m.chasis ? "font-mono font-semibold text-azul-900" : "text-[10px] font-semibold text-amber-700") : "font-mono")}>
+                  {m.tipo_movimiento === "SALIDA-PRODUCCION" ? textoChasis(m.chasis) : m.chasis || "-"}
+                </td>
                 <td className={cn("px-2.5 py-1.5 text-right font-semibold", m.cantidad < 0 ? "text-red-600" : "text-emerald-700")}>
                   {m.cantidad > 0 ? "+" : ""}
                   {num(m.cantidad)}
@@ -214,10 +216,10 @@ function RetiroProduccionModal({ item, onClose }: { item: StockItem; onClose: ()
     setEnviando(true);
     try {
       const r = await retiroProduccion(
-        { producto_id: item.id, cantidad_a_retirar: n, chasis_ot: chasis, motivo, solicitante, autoriza, op_id: vinculo?.op ?? null, equipo_id: vinculo?.eq ?? null },
+        { producto_id: item.id, cantidad_a_retirar: n, chasis_ot: chasis.trim() || null, motivo, solicitante, autoriza, op_id: chasis.trim() ? vinculo?.op ?? null : null, equipo_id: chasis.trim() ? vinculo?.eq ?? null : null },
         item.cantidad
       );
-      toast(`${r.vpi}: ${num(n)} ${item.unidad} de ${item.nombre} para ${chasis.toUpperCase()} · saldo ${num(r.saldo)}`);
+      toast(`${r.vpi}: ${num(n)} ${item.unidad} de ${item.nombre} para ${chasis.trim() ? chasis.toUpperCase() : `${motivo} (consumo general)`} · saldo ${num(r.saldo)}`);
       onClose();
     } catch (e) {
       toast(e instanceof Error ? e.message : "No se pudo registrar el retiro.", "error");
@@ -230,7 +232,7 @@ function RetiroProduccionModal({ item, onClose }: { item: StockItem; onClose: ()
     <Modal open onClose={() => !enviando && onClose()} title={`Retiro para producción · ${item.nombre}`} wide>
       <div className="space-y-4 text-sm">
         <p className="text-plomo-600">
-          Consumo interno: genera un <b>Vale de Producción Interno (VPI)</b>, descuenta el stock y queda en el kardex como <b>SALIDA-PRODUCCION</b> con el chasis. No genera Orden de
+          Consumo interno: genera un <b>Vale de Producción Interno (VPI)</b>, descuenta el stock y queda en el kardex como <b>SALIDA-PRODUCCION</b>: con chasis va al costo del equipo; sin chasis, a CONSUMO GENERAL de taller. No genera Orden de
           Despacho ni Guía de Remisión.
         </p>
         <div className="grid gap-3 md:grid-cols-3">
@@ -241,7 +243,7 @@ function RetiroProduccionModal({ item, onClose }: { item: StockItem; onClose: ()
             <Input type="number" min={0} step="1" value={cantidad} onChange={(e) => setCantidad(e.target.value)} className={cn(excede && "border-red-400")} />
             {excede && <span className="mt-1 block text-xs font-semibold text-red-600">Stock insuficiente: hay {num(item.cantidad)}.</span>}
           </Field>
-          <Field label="Chasis / OT *">
+          <Field label={requiereChasis(motivo) ? "Chasis / OT *" : "Chasis / OT (opcional)"}>
             <Input value={chasis} list="chasis-ot" onChange={(e) => setChasis(e.target.value.toUpperCase())} placeholder="Ej: PLUS-2026-008" className="font-mono" />
             <datalist id="chasis-ot">
               {opciones.map((o) => (
@@ -250,6 +252,11 @@ function RetiroProduccionModal({ item, onClose }: { item: StockItem; onClose: ()
                 </option>
               ))}
             </datalist>
+            {!chasis.trim() && (
+              <span className={cn("mt-1 block text-xs", requiereChasis(motivo) ? "font-semibold text-red-600" : "text-plomo-500")}>
+                {requiereChasis(motivo) ? errorChasis(motivo, chasis) : "Sin chasis: va a CONSUMO GENERAL (gasto de taller)."}
+              </span>
+            )}
             {chasis && (
               <span className={cn("mt-1 block text-xs", vinculo ? "text-emerald-700" : "text-amber-700")}>
                 {vinculo ? `Vinculado a ${vinculo.etiqueta}` : "No está en Producción / Equipos: se registra igual con este código."}
@@ -257,7 +264,7 @@ function RetiroProduccionModal({ item, onClose }: { item: StockItem; onClose: ()
             )}
           </Field>
           <Field label="Motivo *">
-            <Select value={motivo} onChange={(e) => setMotivo(e.target.value as MotivoRetiro)} options={MOTIVOS_RETIRO.map((m) => ({ value: m, label: m }))} />
+            <Select value={motivo} onChange={(e) => setMotivo(e.target.value as MotivoRetiro)} options={MOTIVOS_RETIRO.map((m) => ({ value: m, label: ETIQUETA_MOTIVO[m] }))} />
           </Field>
           <Field label="Solicitante *">
             <Input value={solicitante} onChange={(e) => setSolicitante(e.target.value)} />
@@ -270,7 +277,7 @@ function RetiroProduccionModal({ item, onClose }: { item: StockItem; onClose: ()
           <Button variant="secondary" onClick={onClose} disabled={enviando}>
             Cancelar
           </Button>
-          <Button onClick={guardar} disabled={enviando || !(n > 0) || excede || !chasis.trim() || !solicitante.trim() || !autoriza.trim()}>
+          <Button onClick={guardar} disabled={enviando || !(n > 0) || excede || !!errorChasis(motivo, chasis) || !solicitante.trim() || !autoriza.trim()}>
             <PackageMinus size={16} /> {enviando ? "Registrando…" : "Registrar retiro (VPI)"}
           </Button>
         </div>

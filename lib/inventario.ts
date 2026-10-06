@@ -9,14 +9,14 @@ import { normalizarChasis } from "./utils/chasis";
 import { ErpError, KEYS, getKardex, getValesProduccion, recargarDatos } from "./storage";
 import type { MovimientoKardex, StockItem, ValeProduccion } from "./types";
 
-export const MOTIVOS_RETIRO = ["PRODUCCION PLUS 4000", "MANTENIMIENTO", "TALLER"] as const;
-export type MotivoRetiro = (typeof MOTIVOS_RETIRO)[number];
+export { ETIQUETA_MOTIVO, MOTIVOS_CON_CHASIS, MOTIVOS_RETIRO, errorChasis, requiereChasis, textoChasis, type MotivoRetiro } from "./motivosRetiro";
+import { MOTIVOS_RETIRO, errorChasis, type MotivoRetiro } from "./motivosRetiro";
 export const AUTORIZA_DEFECTO = "Jose Manuel";
 
 export interface DatosRetiro {
   producto_id: string;
   cantidad_a_retirar: number;
-  chasis_ot: string;
+  chasis_ot: string | null; // obligatorio solo para PRODUCCION PLUS 4000 / MANTENIMIENTO EQUIPO
   motivo: MotivoRetiro;
   solicitante: string;
   autoriza: string;
@@ -28,14 +28,15 @@ export async function retiroProduccion(d: DatosRetiro, disponible: number): Prom
   if (!d.producto_id) throw new ErpError("Elija el producto.");
   if (!(d.cantidad_a_retirar > 0)) throw new ErpError("Indique la cantidad a retirar.");
   if (d.cantidad_a_retirar > disponible + 1e-9) throw new ErpError(`Stock insuficiente: hay ${disponible}, se pide ${d.cantidad_a_retirar}.`);
-  if (!d.chasis_ot.trim()) throw new ErpError("Indique el chasis u OT (ej. PLUS-2026-008).");
   if (!MOTIVOS_RETIRO.includes(d.motivo)) throw new ErpError("Elija el motivo.");
+  const eChasis = errorChasis(d.motivo, d.chasis_ot);
+  if (eChasis) throw new ErpError(eChasis);
   if (!d.solicitante.trim()) throw new ErpError("Indique el solicitante.");
   if (!d.autoriza.trim()) throw new ErpError("Indique quién autoriza.");
   const res = await fetch("/api/almacen/retiro-produccion", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...d, chasis_ot: d.chasis_ot.trim().toUpperCase() }),
+    body: JSON.stringify({ ...d, chasis_ot: (d.chasis_ot ?? "").trim().toUpperCase() || null }),
   });
   const json = (await res.json().catch(() => ({}))) as { vpi?: string; saldo?: number; error?: string };
   if (!res.ok || !json.vpi) throw new ErpError(json.error ?? `No se pudo registrar el retiro (HTTP ${res.status}).`);
@@ -51,10 +52,11 @@ export function kardexDe(item: StockItem, kardex: MovimientoKardex[] = getKardex
     .sort((a, b) => b.fecha.localeCompare(a.fecha));
 }
 
-/** Consumo de repuestos de un chasis / OT (vales de producción). */
+/** Consumo de repuestos de un chasis / OT (solo vales CON chasis: los de consumo general no van al equipo). */
 export function consumosDeChasis(chasis: string, opId?: string, vales: ValeProduccion[] = getValesProduccion()): ValeProduccion[] {
   const c = normalizarChasis(chasis);
   return vales
+    .filter((v) => !!normalizarChasis(v.chasis_ot))
     .filter((v) => (c && normalizarChasis(v.chasis_ot) === c) || (opId && (v.op_id === opId || normalizarChasis(v.chasis_ot) === normalizarChasis(opId))))
     .sort((a, b) => a.fecha.localeCompare(b.fecha));
 }
