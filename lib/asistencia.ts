@@ -32,33 +32,35 @@ function fechaValida(y: number, m: number, d: number): string {
   return `${y}-${dos(m)}-${dos(d)}`;
 }
 
+/** "2:02:10 p. m." -> "14:02:10" (siempre HH:mm:ss; sin segundos -> :00). */
 export function limpiarHora(texto: string): string {
-  const m = /(\d{1,2}):(\d{2})(?::\d{2}(?:\.\d+)?)?\s*([ap])?\.?\s*m?\.?/i.exec(texto);
+  const m = /(\d{1,2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?\s*([ap])?\.?\s*m?\.?/i.exec(texto);
   if (!m) return "";
   let h = Number(m[1]);
   const min = Number(m[2]);
-  const ampm = m[3]?.toLowerCase();
+  const seg = Number(m[3] ?? 0);
+  const ampm = m[4]?.toLowerCase();
   if (ampm === "p" && h < 12) h += 12;
   if (ampm === "a" && h === 12) h = 0;
-  if (h > 23 || min > 59) return "";
-  return `${dos(h)}:${dos(min)}`;
+  if (h > 23 || min > 59 || seg > 59) return "";
+  return `${dos(h)}:${dos(min)}:${dos(seg)}`;
 }
 
 function desdeSerie(v: number): Marca {
-  const totalMin = Math.floor(Math.round(v * 86400) / 60);
-  const dias = Math.floor(totalMin / 1440);
-  const min = totalMin - dias * 1440;
+  const totalSeg = Math.round(v * 86400);
+  const dias = Math.floor(totalSeg / 86400);
+  const seg = totalSeg - dias * 86400;
   const f = new Date(Date.UTC(1899, 11, 30) + dias * 86400000);
   return {
     fecha: v >= 1? `${f.getUTCFullYear()}-${dos(f.getUTCMonth() + 1)}-${dos(f.getUTCDate())}` : "",
-    hora: `${dos(Math.floor(min / 60))}:${dos(min % 60)}`,
+    hora: `${dos(Math.floor(seg / 3600))}:${dos(Math.floor((seg % 3600) / 60))}:${dos(seg % 60)}`,
   };
 }
 
 export function leerMarca(v: unknown): Marca {
   if (typeof v === "number" && isFinite(v)) return desdeSerie(v);
   if (v instanceof Date &&!isNaN(v.getTime())) {
-    return { fecha: `${v.getFullYear()}-${dos(v.getMonth() + 1)}-${dos(v.getDate())}`, hora: `${dos(v.getHours())}:${dos(v.getMinutes())}` };
+    return { fecha: `${v.getFullYear()}-${dos(v.getMonth() + 1)}-${dos(v.getDate())}`, hora: `${dos(v.getHours())}:${dos(v.getMinutes())}:${dos(v.getSeconds())}` };
   }
   const s = String(v?? "").trim();
   if (!s) return { fecha: "", hora: "" };
@@ -88,6 +90,7 @@ const COLUMNAS = {
   tiempo: ["tiempo", "fechahora", "fechayhora", "marcacion", "marca", "datetime", "checktime", "registro", "horario"],
   fecha: ["fecha", "date", "dia"],
   hora: ["hora", "time", "hour"],
+  estado: ["estado", "tipo", "state", "evento", "tipomarcacion", "entradasalida", "marcaciontipo", "checktype"],
 };
 
 function columna(cabeceras: string[], tipo: keyof typeof COLUMNAS): string | undefined {
@@ -101,6 +104,7 @@ export function leerMarcaciones(filas: Record<string, unknown>[]): Marcaciones {
   const cTiempo = columna(cabeceras, "tiempo");
   const cFecha = columna(cabeceras, "fecha");
   const cHora = columna(cabeceras, "hora");
+  const cEstado = columna(cabeceras, "estado");
   const asistencia: AsistenciaMap = new Map();
   const nombres = new Map<string, string>();
   let desde = "";
@@ -120,7 +124,10 @@ export function leerMarcaciones(filas: Record<string, unknown>[]): Marcaciones {
     const dias = asistencia.get(numero)!;
     if (!dias.has(m.fecha)) dias.set(m.fecha, []);
     const horas = dias.get(m.fecha)!;
-    if (!horas.includes(m.hora)) horas.push(m.hora);
+    // Entrada / Salida del reloj (si viene): "08:14:41|E", "14:04:42|S"
+    const est = clave(String((cEstado ? r[cEstado] : "") ?? ""));
+    const tag = /^(ent|in|checkin|cin|e$)/.test(est) ? "|E" : /^(sal|out|checkout|cout|s$)/.test(est) ? "|S" : "";
+    if (!horas.some((x) => x.slice(0, 8) === m.hora)) horas.push(m.hora + tag);
     marcas++;
     if (!desde || m.fecha < desde) desde = m.fecha;
     if (!hasta || m.fecha > hasta) hasta = m.fecha;
@@ -128,20 +135,35 @@ export function leerMarcaciones(filas: Record<string, unknown>[]): Marcaciones {
   return { asistencia, nombres, desde, hasta, marcas };
 }
 
-const aMinutos = (h: string) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5));
+const aSegundos = (h: string) => Number(h.slice(0, 2)) * 3600 + Number(h.slice(3, 5)) * 60 + Number(h.slice(6, 8) || 0);
 
 /**
- * Horas REALES del reloj (personal por hora / medio tiempo): por cada día, suma de los tramos
- * entrada → salida en el orden de las marcas (08:00-12:00 + 13:00-17:00 = 8 h). Una marca sin pareja no suma.
- * No usa la jornada ni las 9 h de referencia.
+ * Horas REALES del reloj (personal por hora / medio tiempo), con segundos: por cada día, suma de los tramos
+ * Entrada → Salida. Si el Excel trae la columna Estado (Entrada / Salida) se empareja por estado; si no, por
+ * orden (1ª-2ª, 3ª-4ª…). Una marca sin pareja no suma. No usa la jornada ni las 9 h de referencia.
+ * Ej.: 14:02:10 → 18:03:53 = 4.03 h. Se devuelve con 4 decimales (el pago usa el valor exacto).
  */
 export function horasReales(fechas: Map<string, string[]>): number {
-  let minutos = 0;
+  let segundos = 0;
   fechas.forEach((marcas) => {
-    const hs = Array.from(new Set(marcas.map(limpiarHora).filter(Boolean))).sort();
-    for (let i = 0; i + 1 < hs.length; i += 2) minutos += Math.max(0, aMinutos(hs[i + 1]) - aMinutos(hs[i]));
+    const ms = marcas
+      .map((x) => ({ h: limpiarHora(x), e: x.endsWith("|E") ? "E" : x.endsWith("|S") ? "S" : "" }))
+      .filter((x) => x.h)
+      .sort((a, b) => a.h.localeCompare(b.h));
+    if (ms.length && ms.every((x) => x.e)) {
+      let abierta: string | null = null;
+      for (const x of ms) {
+        if (x.e === "E") abierta ??= x.h;
+        else if (abierta) {
+          segundos += Math.max(0, aSegundos(x.h) - aSegundos(abierta));
+          abierta = null;
+        }
+      }
+    } else {
+      for (let i = 0; i + 1 < ms.length; i += 2) segundos += Math.max(0, aSegundos(ms[i + 1].h) - aSegundos(ms[i].h));
+    }
   });
-  return Math.round((minutos / 60) * 100) / 100;
+  return Math.round((segundos / 3600) * 10000) / 10000;
 }
 
 /**
@@ -157,7 +179,7 @@ export function resumirAsistencia(fechas: Map<string, string[]>): { dias: number
     const horas = marcas.map(limpiarHora).filter(Boolean).sort();
     if (horas.length === 0) return;
     dias++;
-    const entrada = horas[0];
+    const entrada = horas[0].slice(0, 5); // HH:mm (08:20:59 no es tardanza)
     if (entrada > HORA_TARDANZA) tardanzas++;
   });
   return { dias, horas: dias * HORAS_DIA, tardanzas };

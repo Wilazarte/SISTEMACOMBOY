@@ -24,18 +24,20 @@ function Boton({ children, onClick, title, disabled }: { children: React.ReactNo
 
 /** Número editable: se guarda al salir del campo o con Enter (no en cada tecla). */
 function Numero({ valor, entero, onGuardar, disabled, sufijo }: { valor: number; entero?: boolean; onGuardar: (n: number) => void; disabled?: boolean; sufijo: string }) {
+  // Se muestra con 2 decimales (26.4814 h -> 26.48); el cálculo usa el valor exacto mientras no se edite
+  const mostrado = entero ? valor : h2(valor);
   return (
     <label className="inline-flex items-center gap-1">
       <input
-        key={valor}
+        key={mostrado}
         type="number"
         min={0}
         step={entero ? 1 : 0.25}
-        defaultValue={valor}
+        defaultValue={mostrado}
         disabled={disabled}
         onBlur={(e) => {
           const n = entero ? parseInt(e.target.value) : parseFloat(e.target.value);
-          if (!Number.isNaN(n) && n !== valor) onGuardar(n);
+          if (!Number.isNaN(n) && n !== mostrado) onGuardar(n);
         }}
         onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
         className="w-16 rounded-lg border border-plomo-200 px-2 py-1.5 text-right text-sm font-semibold text-azul-900 disabled:bg-plomo-100"

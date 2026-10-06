@@ -147,7 +147,7 @@ export function liquidar(
  * básico = S/ hora (ficha) × horas del reloj (o ajuste manual) · extra = S/ hora × horas extra manuales (+2h).
  */
 export function liquidarPorHora(sueldoHora: number, horasReloj: number, ajuste?: AjusteLiquidacion): ResultadoLiquidacion {
-  const horas = ajuste?.horas ?? r2(horasReloj);
+  const horas = ajuste?.horas ?? Math.round(horasReloj * 10000) / 10000; // exacto: 26.4814 h × S/ 12 = S/ 317.78
   const horasExtra = ajuste?.horasExtra ?? 0;
   const basico = r2(sueldoHora * horas);
   const montoExtra = r2(sueldoHora * horasExtra);

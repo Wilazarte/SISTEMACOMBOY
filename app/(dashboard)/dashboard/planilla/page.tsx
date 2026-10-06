@@ -54,6 +54,7 @@ type Tab = "trabajadores" | "planilla" | "historial" | "contratistas";
 type TrabajadorCalc = Trabajador & {
   reloj: { dias: number; horas: number; tardanzas: number }; // asistencia del reloj (bloqueada)
   tieneAsistencia: boolean; // tiene_asistencia_semana: horas (o días) > 0 en el reloj del periodo
+  sinHorasReloj: boolean; // S/ por hora: el periodo guardado no tiene horas (edición manual o import antiguo)
   liq: ResultadoLiquidacion; // días / horas a pagar y montos
   dias: number;
   horas: number;
@@ -168,6 +169,7 @@ function calcular(t: Trabajador, liq: LiquidacionPeriodo, asistenciaExterna?: As
     ...t,
     reloj,
     tieneAsistencia: reloj.horas > 0 || reloj.dias > 0,
+    sinHorasReloj: porHora && !fechas && !!registro && (registro.horas === null || registro.horas === undefined),
     liq: r,
     dias: r.dias,
     horas: r.horas,
@@ -806,6 +808,11 @@ export default function PlanillaPage() {
                         <CampoBloqueado valor={`${horasTxt(t.reloj.horas)} h`} />
                         <CampoBloqueado valor={`${t.reloj.tardanzas} tard`} alerta={t.reloj.tardanzas > 0} />
                       </div>
+                      {t.sinHorasReloj && (
+                        <p className="mt-1 max-w-[180px] whitespace-normal rounded bg-amber-50 px-1.5 py-1 text-[10px] font-semibold text-amber-800" data-sin-horas>
+                          Sin horas del reloj: vuelva a importar la asistencia de esta semana
+                        </p>
+                      )}
                     </Td>
                     <Td>
                       <LiquidacionCelda periodo={periodo} trabajadorId={t.id} liq={liq} r={t.liq} editable={puedeEditar && !pagado(t)} />

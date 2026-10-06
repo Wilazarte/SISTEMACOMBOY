@@ -451,7 +451,8 @@ begin
   values ('asistencia', per || '|' || trab, jsonb_build_object(
     'id', per || '|' || trab, 'periodo', per, 'trabajador', trab, 'dias', p_dias, 'tardanzas', p_tardanzas,
     'origen_edicion', 'CREADOR', 'updated_by', auth.uid(), 'updated_by_creator_id', auth.uid(), 'fecha', now()))
-  on conflict (tipo, id) do update set data = excluded.data;
+  -- conserva las horas importadas del reloj (personal por hora): solo cambia días / tardanzas
+  on conflict (tipo, id) do update set data = public.planilla.data || excluded.data;
 end $$;
 
 revoke all on function public.importar_asistencia(text, jsonb) from public, anon;
