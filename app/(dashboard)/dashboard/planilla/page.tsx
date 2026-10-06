@@ -36,6 +36,8 @@ import { MODOS_LIQUIDACION, cambiarConfig, cambiarModo, liquidacionDe, liquidar,
 import { CerrarSemana } from "@/components/planilla/CerrarSemana";
 import { AdelantosTrabajador } from "@/components/planilla/AdelantosTrabajador";
 import { PagarSemanaFiltrada } from "@/components/planilla/PagarSemanaFiltrada";
+import { EditarListaSemana } from "@/components/planilla/EditarListaSemana";
+import { enLista, listaDe, type ListaSemana } from "@/lib/listaSemana";
 import { Contratistas } from "@/components/planilla/Contratistas";
 import { ContratistasMaestro } from "@/components/planilla/ContratistasMaestro";
 import { FichaTrabajador } from "@/components/planilla/FichaTrabajador";
@@ -51,6 +53,7 @@ type Tab = "trabajadores" | "planilla" | "historial" | "contratistas";
 
 type TrabajadorCalc = Trabajador & {
   reloj: { dias: number; horas: number; tardanzas: number }; // asistencia del reloj (bloqueada)
+  tieneAsistencia: boolean; // tiene_asistencia_semana: horas (o días) > 0 en el reloj del periodo
   liq: ResultadoLiquidacion; // días / horas a pagar y montos
   dias: number;
   horas: number;
@@ -159,6 +162,7 @@ function calcular(t: Trabajador, liq: LiquidacionPeriodo, asistenciaExterna?: As
   return {
     ...t,
     reloj,
+    tieneAsistencia: reloj.horas > 0 || reloj.dias > 0,
     liq: r,
     dias: r.dias,
     horas: r.horas,
@@ -232,6 +236,9 @@ export default function PlanillaPage() {
   const [filtro, setFiltro] = useState<FiltroSueldo>("DIARIO");
   const [rango, setRango] = useState(semanaActual);
   const [adelantoDe, setAdelantoDe] = useState<TrabajadorCalc | null>(null);
+  const [soloAsistencia, setSoloAsistencia] = useState(true);
+  const [editarLista, setEditarLista] = useState(false);
+  const listas = useStore<ListaSemana[]>(KEYS.LISTAS_SEMANA, []);
 
   const liq = useMemo(() => liquidacionDe(liquidaciones, periodo), [liquidaciones, periodo]);
   const incompletos = trabajadores.filter((t) => t.activo && !t.fechaIngreso);
@@ -256,12 +263,16 @@ export default function PlanillaPage() {
     return new Set(historial.lista.filter((h) => h.periodo.startsWith(pre)).map((h) => h.periodo.slice(pre.length)));
   }, [historial.lista, periodo]);
   const pagado = (t: Trabajador) => periodoCerrado || gruposPagados.has("TODOS") || gruposPagados.has(grupoDe(filtroDe(t)));
-  // Lo que se ve en la tabla: solo el tipo de sueldo filtrado
-  const visibles = calculados.filter((t) => filtro === "TODOS" || filtroDe(t) === filtro);
-  // "Pagar planilla" (cierra la semana): todos los que aún no se pagaron
-  const filasCierre = calculados.filter((t) => !pagado(t)).map(filaCierre);
-  // "Pagar semana filtrada": solo los del filtro que aún no se pagaron
-  const filasFiltradas = visibles.filter((t) => !pagado(t)).map(filaCierre);
+  // Lista de pago de la semana: con asistencia + agregados a mano - quitados (Editar lista manual)
+  const listaSem = listaDe(listas, periodo);
+  const incluido = (t: TrabajadorCalc) => enLista(t.id, t.tieneAsistencia, listaSem);
+  // Lo que se ve en la tabla: el tipo de sueldo filtrado y, con "Solo con asistencia", solo los de la lista
+  const visibles = calculados.filter((t) => (filtro === "TODOS" || filtroDe(t) === filtro) && (!soloAsistencia || incluido(t)));
+  const aPagar = visibles.filter(incluido);
+  // "Pagar planilla" (cierra la semana): los de la lista que aún no se pagaron
+  const filasCierre = calculados.filter((t) => incluido(t) && !pagado(t)).map(filaCierre);
+  // "Pagar semana filtrada": solo los visibles y marcados en la lista que aún no se pagaron
+  const filasFiltradas = aPagar.filter((t) => !pagado(t)).map(filaCierre);
   const filtroActual = FILTROS_SUELDO.find((x) => x.id === filtro)!;
   const filtroPagado = periodoCerrado || gruposPagados.has("TODOS") || gruposPagados.has(filtroActual.grupo) || (filtro === "TODOS" && gruposPagados.size > 0 && filasFiltradas.length === 0);
   const listaMaestro = trabajadores
@@ -271,13 +282,13 @@ export default function PlanillaPage() {
       return !q || t.nombre.includes(q) || t.dni.includes(q) || t.id === q || (t.cargo ?? "").toUpperCase().includes(q);
     })
     .sort((a, b) => Number(b.activo) - Number(a.activo) || a.id.localeCompare(b.id, undefined, { numeric: true }));
-  // Totales solo de los trabajadores filtrados
+  // Totales solo de los filtrados que están en la lista de pago
   const totales = {
-    basico: r2(visibles.reduce((a, b) => a + b.liq.basico, 0)),
-    extra: r2(visibles.reduce((a, b) => a + b.liq.montoExtra, 0)),
-    afp: r2(visibles.reduce((a, b) => a + b.descuentoAfp, 0)),
-    adelantos: r2(visibles.reduce((a, b) => a + b.adelantosDescuento, 0)),
-    pagar: r2(visibles.reduce((a, b) => a + b.totalPagar, 0)),
+    basico: r2(aPagar.reduce((a, b) => a + b.liq.basico, 0)),
+    extra: r2(aPagar.reduce((a, b) => a + b.liq.montoExtra, 0)),
+    afp: r2(aPagar.reduce((a, b) => a + b.descuentoAfp, 0)),
+    adelantos: r2(aPagar.reduce((a, b) => a + b.adelantosDescuento, 0)),
+    pagar: r2(aPagar.reduce((a, b) => a + b.totalPagar, 0)),
   };
 
   // IMPORTAR ASISTENCIA — formato del reloj: N° | Nombre | Tiempo (DD/MM/YYYY HH:mm:ss) | Estado
@@ -598,7 +609,37 @@ export default function PlanillaPage() {
                       </button>
                     );
                   })}
+                  <button
+                    type="button"
+                    onClick={() => setEditarLista(true)}
+                    className="rounded-full border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
+                    title="Elegir a mano a quién se paga esta semana"
+                  >
+                    ✏️ Editar lista manual
+                    {listaSem && (listaSem.agregados.length > 0 || listaSem.quitados.length > 0) && (
+                      <span className="ml-1 text-xs font-normal">
+                        (+{listaSem.agregados.length} / −{listaSem.quitados.length})
+                      </span>
+                    )}
+                  </button>
                 </div>
+              </div>
+              <div>
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-plomo-500">Asistencia</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={soloAsistencia}
+                  data-solo-asistencia
+                  onClick={() => setSoloAsistencia((v) => !v)}
+                  className="inline-flex items-center gap-2 rounded-full border border-plomo-200 bg-white py-1.5 pl-1.5 pr-4 text-sm font-semibold text-azul-900"
+                  title={soloAsistencia ? "Mostrando solo los de la lista de pago (con asistencia o agregados a mano)" : "Mostrando todos los trabajadores"}
+                >
+                  <span className={cn("relative h-6 w-11 rounded-full transition", soloAsistencia ? "bg-emerald-600" : "bg-plomo-200")}>
+                    <span className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all", soloAsistencia ? "left-[22px]" : "left-0.5")} />
+                  </span>
+                  {soloAsistencia ? "✓ Solo con asistencia" : "Todos"}
+                </button>
               </div>
               <div>
                 <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-plomo-500">Modo de cálculo</span>
@@ -664,7 +705,7 @@ export default function PlanillaPage() {
           <Card>
             <CardHeader
               title={`Planilla · ${normalizarPeriodo(periodo)}`}
-              subtitle={`${filtroActual.label} · ${visibles.length} trabajador(es) · liquidación por ${MODOS_LIQUIDACION[liq.modo].label.toLowerCase()} · ${visibles.filter((c) => c.liq.manual).length} con ajuste manual${gruposPagados.size ? ` · pagado: ${[...gruposPagados].join(", ")}` : ""}`}
+              subtitle={`${filtroActual.label} · ${visibles.length} trabajador(es)${aPagar.length !== visibles.length ? ` (${aPagar.length} en la lista de pago)` : ""} · liquidación por ${MODOS_LIQUIDACION[liq.modo].label.toLowerCase()} · ${visibles.filter((c) => c.liq.manual).length} con ajuste manual${gruposPagados.size ? ` · pagado: ${[...gruposPagados].join(", ")}` : ""}`}
               action={
                 <div className="flex flex-wrap gap-2">
                   {importarBtn}
@@ -701,12 +742,36 @@ export default function PlanillaPage() {
             />
             {visibles.length === 0 ? (
               <div className="p-5">
-                <Empty icon={<Calculator size={28} />} text={calculados.length ? `No hay trabajadores con ${filtroActual.label}.` : "No hay trabajadores activos."} />
+                <Empty
+                  icon={<Calculator size={28} />}
+                  text={
+                    !calculados.length
+                      ? "No hay trabajadores activos."
+                      : soloAsistencia
+                        ? `Ningún trabajador ${filtro === "TODOS" ? "" : `con ${filtroActual.label} `}tiene asistencia en esta semana. Importe la asistencia, use "Editar lista manual" o cambie a "Todos".`
+                        : `No hay trabajadores con ${filtroActual.label}.`
+                  }
+                />
               </div>
             ) : (
-              <Table head={["Trabajador", "Reloj 🔒", "A liquidar", "Básico", "H. extra", "AFP / ONP", "Adelantos", "Total a pagar", "Boleta"]}>
+              <Table head={["", "Trabajador", "Reloj 🔒", "A liquidar", "Básico", "H. extra", "AFP / ONP", "Adelantos", "Total a pagar", "Boleta"]}>
                 {visibles.map((t) => (
-                  <tr key={t.id} className="align-top">
+                  <tr key={t.id} className={cn("align-top", !incluido(t) && "bg-plomo-50 opacity-50")}>
+                    <Td className="w-8 px-2 text-center text-base">
+                      {!incluido(t) ? (
+                        <span data-asist="fuera" className="text-slate-400" title="No incluido en la lista de pago de esta semana">
+                          —
+                        </span>
+                      ) : t.tieneAsistencia ? (
+                        <span data-asist="reloj" className="text-emerald-600" title="Con asistencia registrada esta semana">
+                          ✅
+                        </span>
+                      ) : (
+                        <span data-asist="manual" className="rounded bg-amber-100 px-1" title="Agregado manual - sin asistencia registrada esta semana">
+                          ✏️
+                        </span>
+                      )}
+                    </Td>
                     <Td>
                       <p className="font-semibold text-azul-900">
                         <span className="mr-1 font-mono text-xs text-slate-400">{t.id}</span>
@@ -790,6 +855,23 @@ export default function PlanillaPage() {
 
       {/* FICHA DEL TRABAJADOR (registrar / editar / baja / eliminar / historial de pagos) */}
       {ficha && <FichaTrabajador inicial={ficha.form} idOriginal={ficha.idOriginal} soloLectura={!puedeEditar} onClose={() => setFicha(null)} />}
+
+      {/* LISTA MANUAL DE PAGO DE LA SEMANA */}
+      {editarLista && (
+        <EditarListaSemana
+          periodo={normalizarPeriodo(periodo)}
+          filas={calculados.map((t) => ({
+            id: t.id,
+            nombre: t.nombre,
+            tipo: FILTROS_SUELDO.find((x) => x.id === filtroDe(t))!.label,
+            horas: t.reloj.horas,
+            tieneAsistencia: t.tieneAsistencia,
+            marcado: incluido(t),
+            pagado: pagado(t),
+          }))}
+          onClose={() => setEditarLista(false)}
+        />
+      )}
 
       {/* ADELANTOS DEL TRABAJADOR (columna ADELANTOS) */}
       {adelantoDe && (

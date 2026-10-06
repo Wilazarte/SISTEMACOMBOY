@@ -64,6 +64,7 @@ export const KEYS = {
   CONTRATISTAS: "planilla_contratistas",
   HUELLAS_ALIAS: "planilla_huellas_alias",
   BOLETAS: "planilla_boletas",
+  LISTAS_SEMANA: "planilla_listas_semana", // lista manual de quién se paga cada semana
   EQUIPOS: "almacen_equipos_terminados",
   PRODUCCION: "almacen_ordenes_produccion",
   MOVIMIENTOS: "almacen_movimientos",
@@ -187,6 +188,7 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.CONTRATISTAS]: { tabla: "planilla", tipo: "contratista", forma: "lista" },
   [KEYS.HUELLAS_ALIAS]: { tabla: "planilla", tipo: "huella_alias", forma: "objeto" },
   [KEYS.BOLETAS]: { tabla: "planilla", tipo: "boleta", forma: "lista" },
+  [KEYS.LISTAS_SEMANA]: { tabla: "planilla", tipo: "lista_semana", forma: "lista" },
   [KEYS.EQUIPOS]: { tabla: "almacen", tipo: "EQUIPO_TERMINADO", forma: "lista" },
   [KEYS.PRODUCCION]: { tabla: "almacen", tipo: "ORDEN_PRODUCCION", forma: "lista" },
   [KEYS.MOVIMIENTOS]: { tabla: "almacen", tipo: "MOVIMIENTO_ALMACEN", forma: "lista" },
