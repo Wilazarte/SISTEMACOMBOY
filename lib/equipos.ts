@@ -9,8 +9,8 @@
 import { ALMACENES, ALMACEN_DEFECTO } from "./empresa";
 import { ErpError, KEYS, escribir, hoy, leer, siguienteNumero, uid, type Serie } from "./storage";
 
-export const TIPOS_EQUIPO = ["DUMPER", "MINICARGADOR", "MIXER", "LOCOMOTORA", "OTRO"] as const;
-export const MARCAS_MOTOR = ["KUBOTA", "YANMAR", "HONDA", "LOMBARDINI", "OTRO"] as const;
+export const TIPOS_EQUIPO = ["REMOLCADOR ECO-MINE 3000", "REMOLCADOR ECO-MINE 3500 PRO", "REMOLCADOR ELECTRIC 4000", "COCHE MINERO", "OTRO"] as const;
+export const MARCAS_MOTOR = ["RONCO", "ROMI", "TRANSVERSAL", "OTRO"] as const;
 /** Almacenes donde quedan los equipos terminados (Almacen Aqp por defecto). */
 export const SEDES_EQUIPO: readonly string[] = ALMACENES;
 export const SEDE_EQUIPO_DEFECTO = ALMACEN_DEFECTO;
@@ -225,9 +225,9 @@ export type DatosEquipo = Pick<
 >;
 
 export const equipoVacio = (): DatosEquipo => ({
-  tipo_equipo: "DUMPER",
+  tipo_equipo: "REMOLCADOR ECO-MINE 3000",
   modelo: "",
-  marca_motor: "KUBOTA",
+  marca_motor: "RONCO",
   serie_motor: "",
   codigo_chasis: "",
   color: "",
