@@ -90,7 +90,7 @@ export default function LoginPage() {
       <aside className="flex w-full flex-col justify-center bg-[#0f2238] px-6 py-10 text-white sm:px-10 lg:w-1/2 lg:px-14">
         <div className="mx-auto w-full max-w-lg">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img ref={imgRef} src={logo} onError={() => setLogo("/logo-comboy.png")} alt="COMBOY VID" className="h-24 w-auto rounded-xl bg-white object-contain px-5 py-3 shadow-lg shadow-black/20 sm:h-28" />
+          <img ref={imgRef} src={logo} onError={() => setLogo("/logo-comboy.png")} alt="COMBOY VID" className="h-32 w-auto rounded-2xl bg-white object-contain px-6 py-4 shadow-2xl shadow-black/40 motion-safe:animate-flotar sm:h-40" />
           <h1 className="mt-8 font-serif text-3xl font-light leading-tight sm:text-[38px]">Sistema de gestión ERP COMBOY VID</h1>
           <p className="mt-3 text-sm leading-relaxed text-white/60">Plataforma integral para la gestión minera: compras, tesorería, almacén, planilla y gerencia en un solo lugar.</p>
 
@@ -127,6 +127,8 @@ export default function LoginPage() {
         <div className="w-full max-w-[440px]">
           {selectedModulo && (
             <div key={selectedModulo} data-bienvenida className="mb-6 animate-aparecer rounded-xl border border-slate-100 bg-white/95 p-5 text-center shadow-[0_8px_30px_rgba(0,0,0,0.12)] backdrop-blur animate-in fade-in zoom-in-95 duration-300">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={logo} alt="COMBOY VID" className="mx-auto mb-4 h-20 w-auto object-contain drop-shadow-[0_10px_12px_rgba(15,34,56,0.25)] motion-safe:animate-flotar md:h-24" />
               <h2 className="text-[18px] font-extrabold uppercase leading-tight tracking-[0.02em] text-[#0f2238] md:text-[20px]">BIENVENIDO AL SISTEMA ERP COMBOY VID</h2>
               <p className="mt-2 text-[18px] font-black uppercase tracking-wide text-[#dc2626] md:text-[22px]">{ENCARGADOS_LOGIN[selectedModulo.toLowerCase()]?.nombre}</p>
               <p className="mt-1 text-[13px] font-semibold text-slate-600 md:text-[14px]">{ENCARGADOS_LOGIN[selectedModulo.toLowerCase()]?.cargo}</p>

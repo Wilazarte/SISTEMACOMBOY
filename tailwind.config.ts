@@ -13,8 +13,10 @@ const config: Config = {
       // Entrada suave (fade + subir), ej. bienvenida del login al elegir módulo
       keyframes: {
         aparecer: { "0%": { opacity: "0", transform: "translateY(8px)" }, "100%": { opacity: "1", transform: "translateY(0)" } },
+        // Logo flotante del login
+        flotar: { "0%, 100%": { transform: "translateY(0)" }, "50%": { transform: "translateY(-10px)" } },
       },
-      animation: { aparecer: "aparecer 300ms ease-out both" },
+      animation: { aparecer: "aparecer 300ms ease-out both", flotar: "flotar 4s ease-in-out infinite" },
       fontFamily: {
         serif: ["var(--font-serif)"],
         sans: ["var(--font-sans)"],
