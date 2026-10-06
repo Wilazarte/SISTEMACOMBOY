@@ -16,7 +16,7 @@ export const HORAS_JORNADA = 8;
 export const liquidacionVacia = (periodo: string): LiquidacionPeriodo => ({
   id: normalizarPeriodo(periodo),
   periodo: normalizarPeriodo(periodo),
-  modo: "HORAS",
+  modo: "DIAS", // pago por día (el reloj guarda 9 h de referencia por día: en HORAS se pagaría de más)
   horasJornada: HORAS_JORNADA,
   recargoExtra: 0,
   ajustes: {},

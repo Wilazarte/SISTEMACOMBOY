@@ -239,14 +239,15 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
 }
 
 // ---------------------------------------------------------------- Table
-export function Table({ head, children, empty }: { head: string[]; children: ReactNode; empty?: boolean }) {
+/** `compacto`: menos relleno y cabeceras que pueden partirse (tablas anchas, ej. planilla del periodo). */
+export function Table({ head, children, empty, compacto }: { head: string[]; children: ReactNode; empty?: boolean; compacto?: boolean }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[720px] text-left text-sm">
-        <thead className="bg-azul-900 text-[11px] font-semibold uppercase tracking-widest text-white">
+      <table className={cn("w-full min-w-[720px] text-left text-sm", compacto && "[&_td]:px-2 [&_td]:py-2")}>
+        <thead className={cn("bg-azul-900 font-semibold uppercase text-white", compacto ? "text-[10px] tracking-wide" : "text-[11px] tracking-widest")}>
           <tr>
             {head.map((h) => (
-              <th key={h} className="whitespace-nowrap px-4 py-2.5">
+              <th key={h} className={compacto ? "px-2 py-2 leading-tight" : "whitespace-nowrap px-4 py-2.5"}>
                 {h}
               </th>
             ))}

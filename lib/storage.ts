@@ -98,10 +98,14 @@ export const uid = (): string =>
     ? crypto.randomUUID()
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
+/** Fecha de hoy (YYYY-MM-DD) en Perú (America/Lima), aunque la PC tenga otra zona horaria. */
 export const hoy = (): string => {
-  const d = new Date();
-  const off = d.getTimezoneOffset() * 60000;
-  return new Date(d.getTime() - off).toISOString().slice(0, 10);
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  } catch {
+    const d = new Date();
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  }
 };
 
 /**
@@ -677,7 +681,7 @@ async function reservarCodigo(tipo: "BOL" | "GST" | "RCT"): Promise<{ codigo: st
 
 /** Boleta de pago emitida: un código por trabajador y periodo (al volver a descargarla se reutiliza). */
 export interface BoletaEmitida {
-  id: string; // `${periodo}|${trabajadorId}`
+  id: string; // `BOL|${periodo}|${trabajadorId}` (antes: `${periodo}|${trabajadorId}`)
   codigo: string;
   correlativo: number;
   anio: number;
@@ -691,10 +695,13 @@ export interface BoletaEmitida {
 export const getBoletas = () => leer<BoletaEmitida[]>(KEYS.BOLETAS, []);
 
 export async function codigoBoleta(periodo: string, trabajadorId: string, nombre: string, totalPagar: number): Promise<string> {
-  const id = `${periodo}|${trabajadorId}`;
-  const previa = getBoletas().find((b) => b.id === id);
+  // "BOL|<periodo>|<N°>": el id "<periodo>|<N°>" es el mismo de la asistencia del trabajador y, si la tabla planilla
+  // conserva una clave primaria solo por id (instalaciones antiguas), chocaba: duplicate key … "planilla_pkey".
+  const id = `BOL|${periodo}|${trabajadorId}`;
+  const anterior = `${periodo}|${trabajadorId}`; // boletas emitidas antes de este cambio
+  const previa = getBoletas().find((b) => b.id === id || (b.id === anterior && b.periodo === periodo && b.trabajadorId === trabajadorId));
   if (previa) {
-    if (previa.totalPagar !== totalPagar) escribir(KEYS.BOLETAS, getBoletas().map((b) => (b.id === id ? { ...b, totalPagar, nombre } : b)));
+    if (previa.totalPagar !== totalPagar) escribir(KEYS.BOLETAS, getBoletas().map((b) => (b.id === previa.id ? { ...b, totalPagar, nombre } : b)));
     return previa.codigo;
   }
   const c = await reservarBoletaAnual(periodo);
@@ -1541,6 +1548,18 @@ export function detectarDuplicados(lista: Trabajador[]): Duplicado[] {
       r.push({ duplicado, original, motivo: mismoDni ? `mismo DNI ${a.dni}` : "mismo nombre" });
     })
   );
+  // Creado desde el reloj con nombre corto ("DARWIN 27") y sin ficha: si sus palabras están en el nombre de UN solo
+  // trabajador con ficha ("DARWIN MIGUEL DIAZ ARAPA"), es la misma persona con otra huella.
+  const palabras = (n: string) => nombreBase(n).replace(/[^A-Z ]/g, " ").split(/\s+/).filter((w) => w.length >= 3);
+  lista
+    .filter((a) => !a.fechaIngreso && !vistos.has(a.id) && palabras(a.nombre).length > 0)
+    .forEach((a) => {
+      const pa = palabras(a.nombre);
+      const cands = lista.filter((b) => b.id !== a.id && !!b.fechaIngreso && pa.every((w) => palabras(b.nombre).includes(w)));
+      if (cands.length !== 1 || vistos.has(cands[0].id)) return;
+      vistos.add(a.id);
+      r.push({ duplicado: a, original: cands[0], motivo: `"${a.nombre}" (reloj) está en "${cands[0].nombre}"` });
+    });
   return r;
 }
 

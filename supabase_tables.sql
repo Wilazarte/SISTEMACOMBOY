@@ -107,6 +107,20 @@ begin
 
     -- Clave usada al guardar (upsert por tipo + id)
     execute format('create unique index if not exists %I on public.%I (tipo, id)', t || '_tipo_id_uidx', t);
+
+    -- Tablas antiguas con clave primaria SOLO por id: choca entre tipos (duplicate key … planilla_pkey).
+    -- Se cambia a (tipo, id) en el mismo paso (ver supabase/fix_planilla_pkey.sql)
+    select c.conname, array_agg(a.attname::text order by a.attname::text) as cols into col
+      from pg_constraint c join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any (c.conkey)
+     where c.conrelid = ('public.' || t)::regclass and c.contype = 'p' group by c.conname;
+    if not found or col.cols <> array['id', 'tipo'] then
+      execute format('update public.%I set tipo = ''sin_tipo'' where tipo is null', t);
+      execute format('alter table public.%I alter column tipo set not null, alter column id set not null', t);
+      if found then
+        execute format('alter table public.%I drop constraint %I', t, col.conname);
+      end if;
+      execute format('alter table public.%I add primary key (tipo, id)', t);
+    end if;
   end loop;
 end $$;
 

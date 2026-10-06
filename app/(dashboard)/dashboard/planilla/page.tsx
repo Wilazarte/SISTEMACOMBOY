@@ -41,6 +41,7 @@ import { AdelantosTrabajador } from "@/components/planilla/AdelantosTrabajador";
 import { PagarSemanaFiltrada } from "@/components/planilla/PagarSemanaFiltrada";
 import { EditarListaSemana } from "@/components/planilla/EditarListaSemana";
 import { enLista, listaDe, type ListaSemana } from "@/lib/listaSemana";
+import { periodoDeFecha } from "@/lib/periodo";
 import { emparejar, sinHuellas, type DetalleHuella, type NoEncontrado } from "@/lib/emparejarReloj";
 import { ResultadoImportacion } from "@/components/planilla/ResultadoImportacion";
 import { Contratistas } from "@/components/planilla/Contratistas";
@@ -162,12 +163,8 @@ function calcular(t: Trabajador, liq: LiquidacionPeriodo, asistenciaExterna?: As
   const reloj = fechas
     ? { ...resumirAsistencia(fechas), ...(porHora ? { horas: horasReales(fechas) } : {}) }
     : { dias: registro?.dias ?? 0, horas: registro?.horas ?? (porHora ? 0 : (registro?.dias ?? 0) * liq.horasJornada), tardanzas: registro?.tardanzas ?? 0 };
-  // Por hora + modo HORAS: básico = S/ hora × horas importadas (sin jornada); extra solo manual
-  const divisor = porHora ? 1 / (liq.horasJornada > 0 ? liq.horasJornada : 8) : sueldoDe(t).divisor;
-  const r =
-    porHora && liq.modo === "HORAS"
-      ? liquidarPorHora(t.sueldo, reloj.horas, liq.ajustes[t.id])
-      : liquidar(t.sueldo, divisor, reloj, liq, liq.ajustes[t.id]);
+  // S/ por hora (cualquier modo): básico = S/ hora × horas reales del reloj (sin jornada); extra solo manual
+  const r = porHora ? liquidarPorHora(t.sueldo, reloj.horas, liq.ajustes[t.id]) : liquidar(t.sueldo, sueldoDe(t).divisor, reloj, liq, liq.ajustes[t.id]);
   const descuentoAfp = r2(r.bruto * ((t.afpPorcentaje || 0) / 100));
   const neto = r2(r.bruto - descuentoAfp);
   return {
@@ -238,7 +235,14 @@ export default function PlanillaPage() {
   const asistencia = useStore<AsistenciaPeriodo[]>(KEYS.ASISTENCIA, []);
   const liquidaciones = useStore<LiquidacionPeriodo[]>(KEYS.LIQUIDACIONES, []);
   useStore(KEYS.HUELLAS_ALIAS, {}); // mantiene el alias de huellas al día (Realtime)
-  const [periodo, setPeriodo] = useState("SEMANA 14 - ABRIL 2026");
+  // Vacío al entrar: se completa solo al importar el reloj (SEMANA 41 - OCTUBRE 2026); si el usuario lo escribe, se respeta
+  const [periodo, setPeriodoEstado] = useState("");
+  const [periodoManual, setPeriodoManual] = useState(false);
+  const setPeriodo = (v: string) => {
+    setPeriodoEstado(v);
+    setPeriodoManual(v.trim() !== "");
+  };
+  const sinPeriodo = !normalizarPeriodo(periodo);
   const [importando, setImportando] = useState(false);
   const [excel, setExcel] = useState<ExcelImportado | null>(null);
   const [boletaSel, setBoletaSel] = useState<TrabajadorCalc | null>(null);
@@ -273,6 +277,15 @@ export default function PlanillaPage() {
         .map((t) => conAdelantos(calcular(t, liq, excel?.asistencia, delPeriodo.get(idAsistencia(periodo, t.id))), adelantos.grupos)),
     [trabajadores, liq, excel, delPeriodo, periodo, adelantos.grupos]
   );
+  // Periodos con asistencia o ya pagados (sugerencias del campo Periodo), del más reciente al más antiguo
+  const periodosConocidos = useMemo(() => {
+    const num = (p: string) => {
+      const m = /SEMANA\s+(\d+).*?(\d{4})/.exec(p);
+      return m ? Number(m[2]) * 100 + Number(m[1]) : 0;
+    };
+    const set = new Set<string>([...asistencia.map((a) => a.periodo), ...historial.lista.map((h) => h.periodo.split(" · ")[0])].filter(Boolean));
+    return [...set].sort((a, b) => num(b) - num(a) || b.localeCompare(a));
+  }, [asistencia, historial.lista]);
   const periodoCerrado = historial.lista.some((h) => h.periodo === normalizarPeriodo(periodo));
   // Pagos por tipo de sueldo ya hechos en este periodo ("SEMANA 14 - ABRIL 2026 · DIARIO")
   const gruposPagados = useMemo(() => {
@@ -346,6 +359,10 @@ export default function PlanillaPage() {
     setNoEncontrados(emp.noEncontrados);
     setEleccion(Object.fromEntries(emp.noEncontrados.map((x) => [x.huella, x.candidatos[0]?.id ?? ""])));
     setDetalleImport(emp.detalle);
+    // Periodo: el que escribió el usuario; si no, la semana ISO de la primera fecha del reloj
+    const per = periodoManual && normalizarPeriodo(periodo) ? normalizarPeriodo(periodo) : periodoDeFecha(desde || leidas.desde);
+    if (per && per !== normalizarPeriodo(periodo)) setPeriodoEstado(per);
+    console.info("[planilla] importar asistencia", { periodo: per, desde, hasta, huellas: leidas.asistencia.size, unidos: emp.porNombre.length, sinVincular: emp.noEncontrados.length });
     if (mapa.size === 0) {
       if (!emp.noEncontrados.length) toast("No se encontraron marcaciones. Verifique las columnas N° / Nombre / Tiempo (DD/MM/YYYY HH:mm:ss).", "error");
       setTab("planilla");
@@ -353,8 +370,9 @@ export default function PlanillaPage() {
     }
     const creados = registrarDesdeAsistencia([...nombres].map(([id, nombre]) => ({ id, nombre })));
     // DÍAS / HORAS / TARD. se guardan en Supabase con origen RELOJ (única vía además del Módulo Creador)
+    if (!per) throw new Error("Indique el periodo (ej. SEMANA 41 - OCTUBRE 2026) antes de importar.");
     const n = await importarAsistenciaReloj(
-      periodo,
+      per,
       [...mapa].map(([trabajador, fechas]) => {
         const r = resumirAsistencia(fechas);
         // S/ por hora: se guardan las horas reales de las marcas (los demás: pago por día)
@@ -367,7 +385,7 @@ export default function PlanillaPage() {
     setTab("planilla");
     const unidos = emp.porNombre.length ? ` · ${emp.porNombre.length} unido(s) por nombre (${emp.porNombre.map((x) => `${x.nombre} → N° ${x.id}`).join(", ")})` : "";
     toast(
-      `Asistencia del ${fechaPE(desde)} al ${fechaPE(hasta)} importada en ${normalizarPeriodo(periodo)}: ${n} trabajador(es)${creados ? ` · ${creados} nuevo(s) por completar` : ""}${unidos}${emp.noEncontrados.length ? ` · ${emp.noEncontrados.length} sin vincular` : ""}`
+      `Asistencia del ${fechaPE(desde)} al ${fechaPE(hasta)} importada en ${per}: ${n} trabajador(es)${creados ? ` · ${creados} nuevo(s) por completar` : ""}${unidos}${emp.noEncontrados.length ? ` · ${emp.noEncontrados.length} sin vincular` : ""}`
     );
   };
 
@@ -375,7 +393,13 @@ export default function PlanillaPage() {
   const resolverHuella = async (x: NoEncontrado | { huella: string; nombre: string }, trabajadorId: string | null | "QUITAR") => {
     try {
       if (trabajadorId === "QUITAR") desvincularHuella(x.huella);
-      else if (trabajadorId) vincularHuella(x.huella, trabajadorId);
+      else if (trabajadorId) {
+        // Si la huella ya tiene un registro incompleto (creado por el reloj), se fusiona: se borra y su huella queda unida
+        const suelto = getTrabajadores().find((t) => t.id === x.huella && t.id !== trabajadorId && !t.fechaIngreso);
+        if (suelto) unirDuplicado(x.huella, trabajadorId);
+        else vincularHuella(x.huella, trabajadorId);
+        console.info("[planilla] huella vinculada", { huella: x.huella, trabajador: trabajadorId, fusion: !!suelto });
+      }
       else registrarDesdeAsistencia([{ id: x.huella, nombre: x.nombre }]);
       if (ultimasFilas) await procesarAsistencia(ultimasFilas);
     } catch (err) {
@@ -587,9 +611,21 @@ export default function PlanillaPage() {
           <div className="grid gap-3 lg:grid-cols-4">
             <label className="block rounded-xl border border-plomo-200 bg-white p-3 shadow-sm">
               <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-plomo-500">Periodo</span>
-              <Input value={periodo} onChange={(e) => setPeriodo(e.target.value)} className="font-semibold" />
+              <Input
+                value={periodo}
+                onChange={(e) => setPeriodo(e.target.value)}
+                list="periodos-planilla"
+                placeholder="Se completa al importar (ej. SEMANA 41 - OCTUBRE 2026)"
+                className="font-semibold"
+                data-periodo
+              />
+              <datalist id="periodos-planilla">
+                {periodosConocidos.map((p) => (
+                  <option key={p} value={p} />
+                ))}
+              </datalist>
               <span className="mt-2 block text-[13px] font-semibold text-azul-900" data-semana>
-                {etiquetaSemana(periodo, rango.desde, rango.hasta)}
+                {sinPeriodo ? "Importe la asistencia o elija un periodo" : etiquetaSemana(periodo, rango.desde, rango.hasta)}
               </span>
               <span className="mt-1 flex items-center gap-1.5">
                 <input
@@ -633,6 +669,18 @@ export default function PlanillaPage() {
             </div>
           </div>
           {adelantos.error && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">Adelantos: {adelantos.error} (la planilla se calcula sin descontarlos).</p>}
+          {calculados.some((t) => !(t.sueldo > 0)) && (
+            <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900" data-sin-sueldo>
+              ⚠️ Sin sueldo definido (se pagan S/ 0.00):{" "}
+              <b>
+                {calculados
+                  .filter((t) => !(t.sueldo > 0))
+                  .map((t) => `N° ${t.id} ${t.nombre}`)
+                  .join(" · ")}
+              </b>
+              . Complete el sueldo en su ficha (pestaña Trabajadores).
+            </p>
+          )}
           {(noEncontrados.length > 0 || detalleImport.length > 0) && (
             <ResultadoImportacion
               detalle={detalleImport}
@@ -675,7 +723,9 @@ export default function PlanillaPage() {
                 <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-plomo-500">Tipo de sueldo</span>
                 <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrar por tipo de sueldo">
                   {FILTROS_SUELDO.map((f) => {
-                    const n = f.id === "TODOS" ? calculados.length : calculados.filter((t) => filtroDe(t) === f.id).length;
+                    // Cuenta lo que se verá con ese filtro (con "Solo con asistencia": solo los de la lista de pago)
+                    const base = soloAsistencia ? calculados.filter(incluido) : calculados;
+                    const n = f.id === "TODOS" ? base.length : base.filter((t) => filtroDe(t) === f.id).length;
                     return (
                       <button
                         key={f.id}
@@ -779,7 +829,7 @@ export default function PlanillaPage() {
                 </label>
               )}
               <p className="min-w-[240px] flex-1 text-xs text-plomo-500">
-                {MODOS_LIQUIDACION[liq.modo].ayuda}. Sueldo diario = mensual / 30 (diario: el mismo); sueldo hora = diario / {liq.horasJornada}. Tardanza: entrada después de las{" "}
+                {MODOS_LIQUIDACION[liq.modo].ayuda}. Sueldo diario = mensual / 26 · quincenal / 13 · semanal / 6 (diario: el mismo); sueldo hora = diario / {liq.horasJornada} (por hora: el de su ficha). Tardanza: entrada después de las{" "}
                 {HORA_TARDANZA}. Los botones ajustan solo esta planilla: lo del reloj 🔒 no cambia.
               </p>
             </div>
@@ -792,7 +842,10 @@ export default function PlanillaPage() {
               action={
                 <div className="flex flex-wrap gap-2">
                   {importarBtn}
-                  {puedeEditar && (
+                  {puedeEditar &&
+                    (sinPeriodo ? (
+                      <span className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">Indique el periodo para pagar</span>
+                    ) : (
                     <PagarSemanaFiltrada
                       periodo={normalizarPeriodo(periodo)}
                       grupo={filtroActual.grupo}
@@ -805,8 +858,8 @@ export default function PlanillaPage() {
                         void adelantos.recargar();
                       }}
                     />
-                  )}
-                  {puedeEditar && (
+                    ))}
+                  {puedeEditar && !sinPeriodo && (
                     <CerrarSemana
                       periodo={normalizarPeriodo(periodo)}
                       filas={filasCierre}
@@ -837,7 +890,7 @@ export default function PlanillaPage() {
                 />
               </div>
             ) : (
-              <Table head={["", "Trabajador", "Reloj 🔒", "A liquidar", "Básico", "H. extra", "AFP / ONP", "Adelantos", "Total a pagar", "Boleta"]}>
+              <Table compacto head={["", "Trabajador", "Reloj 🔒", "A liquidar (ajuste manual)", "Básico", "H. extra", "AFP / ONP", "Adelantos", "Total a pagar", "Acciones"]}>
                 {visibles.map((t) => (
                   <tr key={t.id} className={cn("align-top", !incluido(t) && "bg-plomo-50 opacity-50")}>
                     <Td className="w-8 px-2 text-center text-base">
@@ -855,7 +908,7 @@ export default function PlanillaPage() {
                         </span>
                       )}
                     </Td>
-                    <Td>
+                    <Td className="min-w-[170px] max-w-[230px] whitespace-normal">
                       <p className="font-semibold text-azul-900">
                         <span className="mr-1 font-mono text-xs text-slate-400">{t.id}</span>
                         {t.nombre}
@@ -873,8 +926,9 @@ export default function PlanillaPage() {
                         )}
                       </p>
                     </Td>
-                    <Td className="whitespace-nowrap text-xs">
-                      <div className="flex flex-wrap gap-1">
+                    <Td className="text-xs">
+                      {/* Lo del reloj (bloqueado): días · horas · tardanzas, en una columna angosta */}
+                      <div className="flex w-[74px] flex-col gap-0.5 [&_.readonly-field]:px-1.5 [&_.readonly-field]:text-xs">
                         <CampoBloqueado valor={`${t.reloj.dias} d`} />
                         <CampoBloqueado valor={`${horasTxt(t.reloj.horas)} h`} />
                         <CampoBloqueado valor={`${t.reloj.tardanzas} tard`} alerta={t.reloj.tardanzas > 0} />

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Link2, Unlink, X } from "lucide-react";
 import { Button, cn } from "@/components/ui";
 import { fechaPE } from "@/lib/storage";
@@ -38,6 +39,12 @@ export function ResultadoImportacion({
   antiguos?: { id: string; nombre: string; dias: number; horas: number; origen: string }[];
   onLimpiar?: (ids: string[]) => void;
 }) {
+  // Plegada por defecto (para ver la planilla debajo); se abre sola si hay vínculos guardados, huellas de más de 7 días o asistencia antigua
+  const revisar = detalle.some((d) => d.vinculoGuardado || d.dias > 7) || antiguos.length > 0;
+  const [abierto, setAbierto] = useState(revisar);
+  useEffect(() => {
+    if (revisar) setAbierto(true);
+  }, [revisar]);
   const nombreDe = (id: string | null) => (id ? trabajadores.find((t) => t.id === id)?.nombre ?? "" : "");
   const activos = trabajadores.filter((t) => t.activo);
 
@@ -98,13 +105,15 @@ export function ResultadoImportacion({
       {detalle.length > 0 && (
         <div className="rounded-xl border border-plomo-200 bg-white shadow-sm" data-resultado-importacion>
           <div className="flex items-center justify-between border-b border-plomo-100 px-4 py-2.5">
-            <p className="text-sm font-semibold text-azul-900">
-              Resultado de la importación · {detalle.length} huella(s) del reloj · {detalle.filter((d) => d.destino).length} importada(s)
-            </p>
+            <button type="button" onClick={() => setAbierto((v) => !v)} className="text-left text-sm font-semibold text-azul-900 hover:underline" data-toggle-resultado>
+              {abierto ? "▾" : "▸"} Resultado de la importación · {detalle.length} huella(s) del reloj · {detalle.filter((d) => d.destino).length} importada(s)
+              {!abierto && <span className="ml-2 text-xs font-normal text-plomo-500">(ver detalle por huella)</span>}
+            </button>
             <button type="button" onClick={onCerrar} className="rounded p-1 text-plomo-500 hover:bg-plomo-100" aria-label="Cerrar resultado">
               <X size={16} />
             </button>
           </div>
+          {abierto && (
           <div className="max-h-[320px] overflow-y-auto">
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-plomo-50 text-left uppercase tracking-wide text-plomo-500">
@@ -155,6 +164,7 @@ export function ResultadoImportacion({
               </tbody>
             </table>
           </div>
+          )}
           {antiguos.length > 0 && (
             <div className="border-t border-plomo-100 bg-amber-50 px-4 py-2.5 text-xs text-amber-900" data-antiguos>
               <p className="font-semibold">
