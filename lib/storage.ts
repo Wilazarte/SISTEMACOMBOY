@@ -598,7 +598,7 @@ function evento(usuario: Rol, accion: string, detalle?: string): EventoHistorial
 export const nuevoEvento = evento;
 
 /** Series con correlativo atómico en Supabase (siguiente_numero). */
-export type Serie = "REQ" | "OC" | "DJ" | "NP" | "F001" | "B001" | "OD" | "BOL" | "GST" | "RCT" | "EQ" | "OP";
+export type Serie = "REQ" | "OC" | "DJ" | "NP" | "F001" | "B001" | "OD" | "BOL" | "GST" | "RCT" | "EQ" | "OP" | `BOL_${number}`;
 
 /** Actualiza la caché de contadores sin enviarla: el servidor ya tiene el valor. */
 function fijarContador(serie: Serie, n: number): void {
@@ -687,9 +687,33 @@ export async function codigoBoleta(periodo: string, trabajadorId: string, nombre
     if (previa.totalPagar !== totalPagar) escribir(KEYS.BOLETAS, getBoletas().map((b) => (b.id === id ? { ...b, totalPagar, nombre } : b)));
     return previa.codigo;
   }
-  const c = await reservarCodigo("BOL");
+  const c = await reservarBoletaAnual(periodo);
   escribir(KEYS.BOLETAS, [...getBoletas(), { id, ...c, periodo, trabajadorId, nombre, totalPagar, fecha: new Date().toISOString() }]);
   return c.codigo;
+}
+
+/** Año de la boleta: el del periodo ("SEMANA 14 - ABRIL 2026" -> 2026); sin año, el actual. */
+export function anioDePeriodo(periodo: string): number {
+  const m = periodo.match(/\b(20\d{2})\b/);
+  return m ? Number(m[1]) : new Date().getFullYear();
+}
+
+/**
+ * Correlativo de boleta que se REINICIA cada año: contador BOL_2026, BOL_2027… en Supabase (atómico y
+ * compartido entre PCs). Un año nuevo no tiene contador -> empieza en 0 y la primera boleta sale BOL-001-AAAA.
+ * Si aún no se ejecutó supabase/boleta_anual.sql, usa el contador global BOL (como antes) para no bloquear la boleta.
+ */
+async function reservarBoletaAnual(periodo: string): Promise<{ codigo: string; correlativo: number; anio: number }> {
+  const anio = anioDePeriodo(periodo);
+  let n: number;
+  try {
+    n = await siguiente(`BOL_${anio}`);
+  } catch (e) {
+    if (!/serie inv/i.test((e as Error).message)) throw e;
+    const g = await reservarCodigo("BOL");
+    return { codigo: generarCodigo("BOL", g.correlativo, anio), correlativo: g.correlativo, anio };
+  }
+  return { codigo: generarCodigo("BOL", n, anio), correlativo: n, anio };
 }
 
 /** Código GST del gasto de Tesorería (se asigna una sola vez). */
