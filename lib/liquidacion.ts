@@ -95,6 +95,7 @@ export interface ResultadoLiquidacion {
   montoExtra: number;
   bruto: number;
   manual: boolean; // tiene ajuste manual
+  porHora?: boolean; // S/ por hora en modo HORAS: horas reales del reloj × S/ hora (sin jornada)
 }
 
 /**
@@ -138,5 +139,29 @@ export function liquidar(
     montoExtra,
     bruto: r2(basico + montoExtra),
     manual: !!ajuste && usados.some((k) => ajuste[k] !== undefined),
+  };
+}
+
+/**
+ * Personal S/ por hora (medio tiempo) en modo HORAS: NO usa la jornada.
+ * básico = S/ hora (ficha) × horas del reloj (o ajuste manual) · extra = S/ hora × horas extra manuales (+2h).
+ */
+export function liquidarPorHora(sueldoHora: number, horasReloj: number, ajuste?: AjusteLiquidacion): ResultadoLiquidacion {
+  const horas = ajuste?.horas ?? r2(horasReloj);
+  const horasExtra = ajuste?.horasExtra ?? 0;
+  const basico = r2(sueldoHora * horas);
+  const montoExtra = r2(sueldoHora * horasExtra);
+  return {
+    modo: "HORAS",
+    dias: 0,
+    horas,
+    horasExtra,
+    sueldoDiario: 0,
+    sueldoHora,
+    basico,
+    montoExtra,
+    bruto: r2(basico + montoExtra),
+    manual: !!ajuste && (ajuste.horas !== undefined || ajuste.horasExtra !== undefined),
+    porHora: true,
   };
 }

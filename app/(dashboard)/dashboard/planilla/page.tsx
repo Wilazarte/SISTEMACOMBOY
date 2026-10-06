@@ -31,8 +31,8 @@ import {
   useTrabajadores,
 } from "@/lib/storage";
 import { getSesion } from "@/lib/auth";
-import { HORA_TARDANZA, aplicarAlias, leerMarcaciones, resumirAsistencia, textoCsv, type AsistenciaMap } from "@/lib/asistencia";
-import { MODOS_LIQUIDACION, cambiarConfig, cambiarModo, liquidacionDe, liquidar, type ResultadoLiquidacion } from "@/lib/liquidacion";
+import { HORA_TARDANZA, aplicarAlias, horasReales, leerMarcaciones, resumirAsistencia, textoCsv, type AsistenciaMap } from "@/lib/asistencia";
+import { MODOS_LIQUIDACION, cambiarConfig, cambiarModo, liquidacionDe, liquidar, liquidarPorHora, type ResultadoLiquidacion } from "@/lib/liquidacion";
 import { CerrarSemana } from "@/components/planilla/CerrarSemana";
 import { AdelantosTrabajador } from "@/components/planilla/AdelantosTrabajador";
 import { PagarSemanaFiltrada } from "@/components/planilla/PagarSemanaFiltrada";
@@ -151,12 +151,17 @@ function antiguedad(fechaIngreso: string): string {
  */
 function calcular(t: Trabajador, liq: LiquidacionPeriodo, asistenciaExterna?: AsistenciaMap | null, registro?: AsistenciaPeriodo): TrabajadorCalc {
   const fechas = asistenciaExterna?.get(t.id);
+  const porHora = t.tipoSueldo === "POR_HORA";
+  // S/ por hora: horas REALES del reloj (marcas), nunca días × jornada
   const reloj = fechas
-    ? resumirAsistencia(fechas)
-    : { dias: registro?.dias ?? 0, horas: registro?.horas ?? (registro?.dias ?? 0) * liq.horasJornada, tardanzas: registro?.tardanzas ?? 0 };
-  // Por hora: el sueldo ya es S/ por hora -> diario = hora × jornada del periodo
-  const divisor = t.tipoSueldo === "POR_HORA" ? 1 / (liq.horasJornada > 0 ? liq.horasJornada : 8) : sueldoDe(t).divisor;
-  const r = liquidar(t.sueldo, divisor, reloj, liq, liq.ajustes[t.id]);
+    ? { ...resumirAsistencia(fechas), ...(porHora ? { horas: horasReales(fechas) } : {}) }
+    : { dias: registro?.dias ?? 0, horas: registro?.horas ?? (porHora ? 0 : (registro?.dias ?? 0) * liq.horasJornada), tardanzas: registro?.tardanzas ?? 0 };
+  // Por hora + modo HORAS: básico = S/ hora × horas importadas (sin jornada); extra solo manual
+  const divisor = porHora ? 1 / (liq.horasJornada > 0 ? liq.horasJornada : 8) : sueldoDe(t).divisor;
+  const r =
+    porHora && liq.modo === "HORAS"
+      ? liquidarPorHora(t.sueldo, reloj.horas, liq.ajustes[t.id])
+      : liquidar(t.sueldo, divisor, reloj, liq, liq.ajustes[t.id]);
   const descuentoAfp = r2(r.bruto * ((t.afpPorcentaje || 0) / 100));
   const neto = r2(r.bruto - descuentoAfp);
   return {
@@ -319,7 +324,12 @@ export default function PlanillaPage() {
       // DÍAS / HORAS / TARD. se guardan en Supabase con origen RELOJ (única vía además del Módulo Creador)
       const n = await importarAsistenciaReloj(
         periodo,
-        [...mapa].map(([trabajador, fechas]) => ({ trabajador, ...resumirAsistencia(fechas) }))
+        [...mapa].map(([trabajador, fechas]) => {
+          const r = resumirAsistencia(fechas);
+          // S/ por hora: se guardan las horas reales de las marcas (los demás: pago por día)
+          const porHora = maestro.find((x) => x.id === trabajador)?.tipoSueldo === "POR_HORA";
+          return { trabajador, ...r, ...(porHora ? { horas: horasReales(fechas) } : {}) };
+        })
       );
       setExcel({ asistencia: mapa, desde, hasta });
       setRango({ desde, hasta });
@@ -779,7 +789,15 @@ export default function PlanillaPage() {
                         {pagado(t) && !periodoCerrado && <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">PAGADO</span>}
                       </p>
                       <p className="text-xs text-plomo-500">
-                        {soles(t.sueldo)} {sueldoDe(t).label.toLowerCase()} · diario {soles(t.liq.sueldoDiario)} · hora {valorHoraTxt(t.valorHora)}
+                        {t.liq.porHora ? (
+                          <>
+                            {soles(t.sueldo)} por hora · horas del reloj (sin jornada)
+                          </>
+                        ) : (
+                          <>
+                            {soles(t.sueldo)} {sueldoDe(t).label.toLowerCase()} · diario {soles(t.liq.sueldoDiario)} · hora {valorHoraTxt(t.valorHora)}
+                          </>
+                        )}
                       </p>
                     </Td>
                     <Td className="whitespace-nowrap text-xs">

@@ -131,6 +131,20 @@ export function leerMarcaciones(filas: Record<string, unknown>[]): Marcaciones {
 const aMinutos = (h: string) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3, 5));
 
 /**
+ * Horas REALES del reloj (personal por hora / medio tiempo): por cada día, suma de los tramos
+ * entrada → salida en el orden de las marcas (08:00-12:00 + 13:00-17:00 = 8 h). Una marca sin pareja no suma.
+ * No usa la jornada ni las 9 h de referencia.
+ */
+export function horasReales(fechas: Map<string, string[]>): number {
+  let minutos = 0;
+  fechas.forEach((marcas) => {
+    const hs = Array.from(new Set(marcas.map(limpiarHora).filter(Boolean))).sort();
+    for (let i = 0; i + 1 < hs.length; i += 2) minutos += Math.max(0, aMinutos(hs[i + 1]) - aMinutos(hs[i]));
+  });
+  return Math.round((minutos / 60) * 100) / 100;
+}
+
+/**
  * PAGO POR DÍA:
  * dias = cantidad de fechas con al menos 1 marca.
  * horas = dias * 9 (para reporte, no para pago). Ya no importa si hizo 8h o 9h.

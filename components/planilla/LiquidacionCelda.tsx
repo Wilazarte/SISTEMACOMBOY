@@ -88,11 +88,34 @@ export function LiquidacionCelda({ periodo, trabajadorId, liq, r, editable }: { 
               <Boton onClick={() => set({ horas: h2(r.horas + 1) })} title="Sumar una hora">
                 +1 h
               </Boton>
-              <Boton onClick={() => set({ horas: h2(r.horas + j) })} title={`Sumar una jornada completa (${j} h)`}>
-                +{txt(j)}h
+              {!r.porHora && (
+                <>
+                  <Boton onClick={() => set({ horas: h2(r.horas + j) })} title={`Sumar una jornada completa (${j} h)`}>
+                    +{txt(j)}h
+                  </Boton>
+                  <Boton onClick={() => set({ horas: h2(r.horas + j / 2) })} title={`Sumar media jornada (${txt(j / 2)} h)`}>
+                    +{txt(j / 2)}h
+                  </Boton>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      )}
+      {/* S/ por hora: horas extra solo manuales (S/ hora × horas extra), sin jornada */}
+      {liq.modo === "HORAS" && r.porHora && (
+        <div className="flex flex-wrap items-center gap-1" data-horas-extra>
+          <Numero valor={r.horasExtra} sufijo="h extra" disabled={!editable} onGuardar={(horasExtra) => set({ horasExtra })} />
+          {editable && (
+            <>
+              <Boton onClick={() => set({ horasExtra: Math.max(0, h2(r.horasExtra - 1)) })} title="Quitar una hora extra" disabled={r.horasExtra <= 0}>
+                −1 h
               </Boton>
-              <Boton onClick={() => set({ horas: h2(r.horas + j / 2) })} title={`Sumar media jornada (${txt(j / 2)} h)`}>
-                +{txt(j / 2)}h
+              <Boton onClick={() => set({ horasExtra: h2(r.horasExtra + 1) })} title="Sumar una hora extra">
+                +1 h
+              </Boton>
+              <Boton onClick={() => set({ horasExtra: h2(r.horasExtra + 2) })} title="Sumar 2 horas extra">
+                +2 h
               </Boton>
             </>
           )}
