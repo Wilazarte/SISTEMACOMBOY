@@ -9,14 +9,14 @@ import { normalizarChasis } from "./utils/chasis";
 import { ErpError, KEYS, getKardex, getValesProduccion, recargarDatos } from "./storage";
 import type { MovimientoKardex, StockItem, ValeProduccion } from "./types";
 
-export { ETIQUETA_MOTIVO, MOTIVOS_CON_CHASIS, MOTIVOS_RETIRO, errorChasis, requiereChasis, textoChasis, type MotivoRetiro } from "./motivosRetiro";
+export { ETIQUETA_MOTIVO, MOTIVOS_RETIRO, REQUIERE_CHASIS, errorChasis, requiereChasis, textoChasis, type MotivoRetiro } from "./motivosRetiro";
 import { MOTIVOS_RETIRO, errorChasis, type MotivoRetiro } from "./motivosRetiro";
 export const AUTORIZA_DEFECTO = "Jose Manuel";
 
 export interface DatosRetiro {
   producto_id: string;
   cantidad_a_retirar: number;
-  chasis_ot: string | null; // obligatorio solo para PRODUCCION PLUS 4000 / MANTENIMIENTO EQUIPO
+  chasis_ot: string | null; // obligatorio solo para PRODUCCION - … / MANTENIMIENTO EQUIPO
   motivo: MotivoRetiro;
   solicitante: string;
   autoriza: string;

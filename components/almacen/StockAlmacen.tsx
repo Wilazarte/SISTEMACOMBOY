@@ -193,7 +193,7 @@ function RetiroProduccionModal({ item, onClose }: { item: StockItem; onClose: ()
   const sesion = getSesion();
   const [cantidad, setCantidad] = useState("1");
   const [chasis, setChasis] = useState("");
-  const [motivo, setMotivo] = useState<MotivoRetiro>("PRODUCCION PLUS 4000");
+  const [motivo, setMotivo] = useState<MotivoRetiro>("PRODUCCION - PLUS 4000");
   const [solicitante, setSolicitante] = useState(sesion?.nombre ?? "");
   const [autoriza, setAutoriza] = useState(AUTORIZA_DEFECTO);
   const [enviando, setEnviando] = useState(false);

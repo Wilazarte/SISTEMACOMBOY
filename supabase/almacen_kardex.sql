@@ -73,7 +73,9 @@ select id,
 
 -- 4) Retiro para producción: todo o nada (bloquea la fila del producto: dos PCs no pueden dejar el stock en negativo)
 create or replace function public.retiro_produccion(
-  p_stock_id text, p_cantidad numeric, p_chasis text, p_motivo text, p_solicitante text, p_autoriza text,
+  p_stock_id text, p_cantidad numeric,
+  p_chasis text,  -- NULL permitido (consumo general de taller, herramientas, insumos, oficina)
+  p_motivo text, p_solicitante text, p_autoriza text,
   p_op_id text default null, p_equipo_id text default null
 ) returns jsonb
 language plpgsql security definer set search_path = public as $$
@@ -94,17 +96,15 @@ begin
   if p_cantidad is null or p_cantidad <= 0 then
     raise exception 'Indique la cantidad a retirar' using errcode = '22023';
   end if;
-  if p_motivo is null or p_motivo not in ('PRODUCCION PLUS 4000', 'MANTENIMIENTO EQUIPO', 'CONSUMO GENERAL TALLER', 'HERRAMIENTAS',
-                                          'INSUMOS SOLDADURA', 'USO OFICINA / LIMPIEZA') then
+  if p_motivo is null or p_motivo not in ('PRODUCCION - PLUS 4000', 'PRODUCCION - ECO MINE', 'PRODUCCION - COCHE MINERO', 'MANTENIMIENTO EQUIPO',
+                                          'CONSUMO GENERAL TALLER', 'HERRAMIENTAS', 'INSUMOS SOLDADURA', 'USO OFICINA / LIMPIEZA') then
     raise exception 'Motivo inválido' using errcode = '22023';
   end if;
   -- Chasis: obligatorio solo si el retiro va al costo de un equipo; en los demás motivos es NULL (consumo general de taller)
   chasis := nullif(upper(btrim(coalesce(p_chasis, ''))), '');
-  if chasis is null and p_motivo = 'PRODUCCION PLUS 4000' then
-    raise exception 'Indique chasis PLUS' using errcode = '22023';
-  end if;
-  if chasis is null and p_motivo = 'MANTENIMIENTO EQUIPO' then
-    raise exception 'Indique el chasis del equipo' using errcode = '22023';
+  -- PRODUCCION - PLUS 4000 / ECO MINE / COCHE MINERO y MANTENIMIENTO EQUIPO van al costo del equipo
+  if chasis is null and (p_motivo like 'PRODUCCION%' or p_motivo like 'MANTENIMIENTO EQUIPO%') then
+    raise exception 'Indique el chasis u OT' using errcode = '22023';
   end if;
   if coalesce(btrim(p_solicitante), '') = '' or coalesce(btrim(p_autoriza), '') = '' then
     raise exception 'Indique solicitante y quién autoriza' using errcode = '22023';

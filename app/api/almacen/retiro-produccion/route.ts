@@ -9,7 +9,7 @@ const MOTIVOS: readonly string[] = MOTIVOS_RETIRO;
  * POST /api/almacen/retiro-produccion
  * Retiro de repuestos para producción / mantenimiento / taller (consumo interno, sin OD ni guía).
  * Body: { producto_id, cantidad_a_retirar, chasis_ot?, motivo, solicitante, autoriza, op_id?, equipo_id? }
- * chasis_ot es obligatorio solo para PRODUCCION PLUS 4000 y MANTENIMIENTO EQUIPO; en los demás motivos
+ * chasis_ot es obligatorio solo para PRODUCCION - … (PLUS 4000, ECO MINE, COCHE MINERO) y MANTENIMIENTO EQUIPO; en los demás motivos
  * (consumo general de taller, herramientas, insumos de soldadura, oficina / limpieza) puede ir null.
  * Usa la sesión del usuario (RLS) y la función retiro_produccion() de Supabase: valida stock, descuenta,
  * genera el Vale de Producción Interno (VPI-000001) y anota el kardex SALIDA-PRODUCCION. Todo o nada.
