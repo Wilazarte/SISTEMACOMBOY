@@ -29,6 +29,8 @@ import {
   unirDuplicado,
   useStore,
   vincularHuella,
+  desvincularHuella,
+  getTrabajadores,
   useTrabajadores,
 } from "@/lib/storage";
 import { getSesion } from "@/lib/auth";
@@ -39,7 +41,8 @@ import { AdelantosTrabajador } from "@/components/planilla/AdelantosTrabajador";
 import { PagarSemanaFiltrada } from "@/components/planilla/PagarSemanaFiltrada";
 import { EditarListaSemana } from "@/components/planilla/EditarListaSemana";
 import { enLista, listaDe, type ListaSemana } from "@/lib/listaSemana";
-import { emparejar, sinHuellas, type NoEncontrado } from "@/lib/emparejarReloj";
+import { emparejar, sinHuellas, type DetalleHuella, type NoEncontrado } from "@/lib/emparejarReloj";
+import { ResultadoImportacion } from "@/components/planilla/ResultadoImportacion";
 import { Contratistas } from "@/components/planilla/Contratistas";
 import { ContratistasMaestro } from "@/components/planilla/ContratistasMaestro";
 import { FichaTrabajador } from "@/components/planilla/FichaTrabajador";
@@ -251,6 +254,7 @@ export default function PlanillaPage() {
   const [noEncontrados, setNoEncontrados] = useState<NoEncontrado[]>([]);
   const [ultimasFilas, setUltimasFilas] = useState<Record<string, unknown>[] | null>(null);
   const [eleccion, setEleccion] = useState<Record<string, string>>({});
+  const [detalleImport, setDetalleImport] = useState<DetalleHuella[]>([]);
   const listas = useStore<ListaSemana[]>(KEYS.LISTAS_SEMANA, []);
 
   const liq = useMemo(() => liquidacionDe(liquidaciones, periodo), [liquidaciones, periodo]);
@@ -334,12 +338,14 @@ export default function PlanillaPage() {
    */
   const procesarAsistencia = async (filas: Record<string, unknown>[]) => {
     const leidas = leerMarcaciones(filas);
-    const emp = emparejar(leidas, maestro, getAliasHuellas());
+    const lista = getTrabajadores(); // al día (tras "Crear nuevo" / "Vincular")
+    const emp = emparejar(leidas, lista, getAliasHuellas());
     // Agrupa por trabajador y por fecha; las huellas unidas (duplicados / por nombre) se suman al trabajador
     const { asistencia: mapa, nombres, desde, hasta } = aplicarAlias(sinHuellas(leidas, emp.noEncontrados.map((x) => x.huella)), emp.alias);
     setUltimasFilas(filas);
     setNoEncontrados(emp.noEncontrados);
     setEleccion(Object.fromEntries(emp.noEncontrados.map((x) => [x.huella, x.candidatos[0]?.id ?? ""])));
+    setDetalleImport(emp.detalle);
     if (mapa.size === 0) {
       if (!emp.noEncontrados.length) toast("No se encontraron marcaciones. Verifique las columnas N° / Nombre / Tiempo (DD/MM/YYYY HH:mm:ss).", "error");
       setTab("planilla");
@@ -352,7 +358,7 @@ export default function PlanillaPage() {
       [...mapa].map(([trabajador, fechas]) => {
         const r = resumirAsistencia(fechas);
         // S/ por hora: se guardan las horas reales de las marcas (los demás: pago por día)
-        const porHora = maestro.find((x) => x.id === trabajador)?.tipoSueldo === "POR_HORA";
+        const porHora = lista.find((x) => x.id === trabajador)?.tipoSueldo === "POR_HORA";
         return { trabajador, ...r, ...(porHora ? { horas: horasReales(fechas) } : {}) };
       })
     );
@@ -366,9 +372,10 @@ export default function PlanillaPage() {
   };
 
   /** "Vincular" (o "Crear nuevo"): guarda la decisión y vuelve a procesar el mismo Excel para que entre a la planilla. */
-  const resolverHuella = async (x: NoEncontrado, trabajadorId: string | null) => {
+  const resolverHuella = async (x: NoEncontrado | { huella: string; nombre: string }, trabajadorId: string | null | "QUITAR") => {
     try {
-      if (trabajadorId) vincularHuella(x.huella, trabajadorId);
+      if (trabajadorId === "QUITAR") desvincularHuella(x.huella);
+      else if (trabajadorId) vincularHuella(x.huella, trabajadorId);
       else registrarDesdeAsistencia([{ id: x.huella, nombre: x.nombre }]);
       if (ultimasFilas) await procesarAsistencia(ultimasFilas);
     } catch (err) {
@@ -626,60 +633,39 @@ export default function PlanillaPage() {
             </div>
           </div>
           {adelantos.error && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">Adelantos: {adelantos.error} (la planilla se calcula sin descontarlos).</p>}
-          {noEncontrados.length > 0 && (
-            <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900" data-no-encontrados>
-              <p className="font-semibold">Trabajadores del reloj no encontrados ({noEncontrados.length}) — su asistencia aún no se importó:</p>
-              <ul className="mt-2 space-y-2">
-                {noEncontrados.map((x) => {
-                  const sug = x.candidatos.find((c) => c.id === eleccion[x.huella]) ?? x.candidatos[0];
-                  return (
-                    <li key={x.huella} data-huella={x.huella} className="flex flex-wrap items-center gap-2 rounded-lg bg-white px-3 py-2">
-                      <span>
-                        - <b>{x.nombre}</b> <span className="text-xs text-plomo-500">(huella {x.huella})</span>
-                        {sug && (
-                          <>
-                            {" "}
-                            ¿es <b>{sug.nombre}</b> <span className="text-xs text-plomo-500">(N° {sug.id})</span>?
-                          </>
-                        )}
-                      </span>
-                      <span className="flex-1" />
-                      {puedeEditar && (
-                        <>
-                          <select
-                            value={eleccion[x.huella] ?? ""}
-                            onChange={(e) => setEleccion((m) => ({ ...m, [x.huella]: e.target.value }))}
-                            className="rounded-lg border border-plomo-200 px-2 py-1.5 text-xs"
-                            aria-label={`Trabajador para ${x.nombre}`}
-                          >
-                            {x.candidatos.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                N° {c.id} · {c.nombre}
-                              </option>
-                            ))}
-                            <optgroup label="Otros trabajadores">
-                              {trabajadores
-                                .filter((t) => t.activo && !x.candidatos.some((c) => c.id === t.id))
-                                .map((t) => (
-                                  <option key={t.id} value={t.id}>
-                                    N° {t.id} · {t.nombre}
-                                  </option>
-                                ))}
-                            </optgroup>
-                          </select>
-                          <Button size="sm" onClick={() => eleccion[x.huella] && resolverHuella(x, eleccion[x.huella])} disabled={!eleccion[x.huella]}>
-                            Vincular
-                          </Button>
-                          <Button size="sm" variant="secondary" onClick={() => resolverHuella(x, null)} title="No es ninguno: registrar como trabajador nuevo">
-                            Crear nuevo
-                          </Button>
-                        </>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
+          {(noEncontrados.length > 0 || detalleImport.length > 0) && (
+            <ResultadoImportacion
+              detalle={detalleImport}
+              noEncontrados={noEncontrados}
+              trabajadores={maestro}
+              eleccion={eleccion}
+              setEleccion={setEleccion}
+              editable={puedeEditar}
+              onVincular={(x, id) => resolverHuella(x, id)}
+              onCrear={(x) => resolverHuella(x, null)}
+              onDesvincular={(huella) => resolverHuella({ huella, nombre: "" }, "QUITAR")}
+              onCerrar={() => setDetalleImport([])}
+              antiguos={
+                excel
+                  ? [...delPeriodo.values()]
+                      .filter((a) => !excel.asistencia.has(a.trabajador) && !noEncontrados.some((x) => x.huella === a.trabajador))
+                      .map((a) => ({
+                        id: a.trabajador,
+                        nombre: maestro.find((t) => t.id === a.trabajador)?.nombre ?? "",
+                        dias: a.dias,
+                        horas: a.horas ?? 0,
+                        origen: a.origen_edicion ?? "-",
+                      }))
+                      .filter((a) => a.dias > 0 || a.horas > 0)
+                  : []
+              }
+              onLimpiar={(ids) =>
+                ejecutarAsync(
+                  () => importarAsistenciaReloj(periodo, ids.map((trabajador) => ({ trabajador, dias: 0, horas: 0, tardanzas: 0 }))),
+                  `${ids.length} trabajador(es) puestos en 0 en ${normalizarPeriodo(periodo)}`
+                )
+              }
+            />
           )}
 
           {/* Modo de cálculo */}

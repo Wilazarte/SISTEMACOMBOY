@@ -1556,6 +1556,13 @@ export function vincularHuella(huella: string, trabajadorId: string): void {
   escribir(KEYS.HUELLAS_ALIAS, { ...getAliasHuellas(), [huella.trim()]: trabajadorId });
 }
 
+/** Quita el vínculo guardado de una huella (vuelve a unirse por N° de huella o por nombre). */
+export function desvincularHuella(huella: string): void {
+  const alias = { ...getAliasHuellas() };
+  delete alias[huella];
+  escribir(KEYS.HUELLAS_ALIAS, alias);
+}
+
 /** Registra en bloque los N° de huella que llegan del reloj y aún no existen. Devuelve cuántos se crearon. */
 export function registrarDesdeAsistencia(nuevos: { id: string; nombre: string }[]): number {
   const lista = getTrabajadores();
