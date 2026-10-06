@@ -8,9 +8,9 @@
 
 import { ErpError, KEYS, escribir, hoy, leer, siguienteNumero } from "./storage";
 
-export const TIPOS_EQUIPO = ["DUMPER", "MINICARGADOR", "MIXER", "LOCOMOTORA", "OTRO"] as const;
-export const MARCAS_MOTOR = ["KUBOTA", "YANMAR", "HONDA", "LOMBARDINI", "OTRO"] as const;
-export const SEDES_EQUIPO = ["Planta Arequipa", "Lima", "Mina"] as const;
+export const TIPOS_EQUIPO = ["REMOLCADOR ECO-MINE 3000","WH174MN-2 260380186", "REMOLCADOR ECO-MINE 3500 PRO", "COCHE MINERO", "REMOLCADOR ELECTRICO", "OTRO"] as const;
+export const MARCAS_MOTOR = ["RONCO", "ROMI", "TRANSVERSAL", "OTRO"] as const;
+export const SEDES_EQUIPO = ["Planta Arequipa", "Suc Secocha", "Almacen Aqp"] as const;
 
 export type TipoEquipo = (typeof TIPOS_EQUIPO)[number];
 export type MarcaMotor = (typeof MARCAS_MOTOR)[number];
@@ -47,9 +47,9 @@ export type DatosEquipo = Pick<
 >;
 
 export const equipoVacio = (): DatosEquipo => ({
-  tipo_equipo: "DUMPER",
+  tipo_equipo: "REMOLCADOR ECO-MINE 3000",
   modelo: "",
-  marca_motor: "KUBOTA",
+  marca_motor: "RONCO",
   serie_motor: "",
   codigo_chasis: "",
   color: "",

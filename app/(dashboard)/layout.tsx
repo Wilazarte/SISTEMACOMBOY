@@ -163,8 +163,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <div className="flex h-[72px] items-center gap-3 border-b border-white/10 px-5">
           <Logo className="text-[26px] lg:hidden" claro />
           <div className="hidden lg:block">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/80">ERP Corporativo</p>
-            <p className="mt-1 text-[10px] uppercase tracking-[0.3em] text-white/40">Soluciones mineras</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-white/80"> AREA INFORMATICA </p>
+            <p className="mt-1 text-[10px] uppercase tracking-[0.3em] text-white/40">COMBOY VID</p>
           </div>
           <button className="ml-auto lg:hidden" onClick={() => setMenu(false)} aria-label="Cerrar menú">
             <X size={18} />
@@ -342,7 +342,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
       </main>
       <footer className="border-t border-plomo-200 bg-white px-6 py-4 text-center text-[12px] tracking-wide text-plomo-500 lg:px-8">
-        <span className="font-serif text-azul-900">COMBOY</span> <span className="font-serif text-corp">VID</span> © 2025 • ERP Corporativo • Lima, Perú • v3.2.1
+        <span className="font-serif text-azul-900">COMBOY</span> <span className="font-serif text-corp">VID</span> © 2025 • ERP COMBOYVID • Arequipa, Perú • v3.2.1 - Area Informativa
       </footer>
       <DocViewerHost />
       <Toaster />
