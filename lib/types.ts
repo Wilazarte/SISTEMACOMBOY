@@ -336,6 +336,44 @@ export interface StockItem {
   actualizado: string; // ISO
 }
 
+/** Kardex de almacén: cada entrada / salida de un producto con su saldo. */
+export type TipoKardex = "SALDO_INICIAL" | "INGRESO" | "SALIDA-VENTA" | "SALIDA-PRODUCCION" | "TRANSFERENCIA" | "AJUSTE";
+
+export interface MovimientoKardex {
+  id: string;
+  fecha: string; // ISO
+  sede: string;
+  stock_id?: string;
+  producto: string;
+  unidad: string;
+  tipo_movimiento: TipoKardex;
+  documento: string; // OC / factura / OD / VPI / import
+  chasis?: string; // SALIDA-PRODUCCION: chasis u OT
+  motivo?: string;
+  cantidad: number; // + entra / - sale
+  saldo: number; // stock del producto en la sede después del movimiento
+  usuario: string;
+}
+
+/** Vale de Producción Interno (retiro de repuestos para producción / mantenimiento / taller). */
+export interface ValeProduccion {
+  id: string; // VPI-000001
+  fecha: string; // ISO
+  stock_id: string;
+  sede: string;
+  producto: string;
+  unidad: string;
+  cantidad: number;
+  chasis_ot: string;
+  op_id?: string | null;
+  equipo_id?: string | null;
+  motivo: string;
+  solicitante: string;
+  autoriza: string;
+  usuario: string;
+  saldo: number;
+}
+
 // =====================================================================
 // Asistencia por periodo (DÍAS / TARD. de la planilla)
 // Solo se escribe con Importar asistencia (RELOJ) o el Módulo Creador (CREADOR).

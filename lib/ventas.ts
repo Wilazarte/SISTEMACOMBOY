@@ -1096,7 +1096,7 @@ export function registrarDespacho(id: string, mov: Omit<MovimientoDespacho, "fec
   const salidas = conItem
     .filter(({ it }) => it.productoNombre && !equipos.some((e) => e.it.id === it.id))
     .map(({ it, cantidad }) => ({ nombre: it.productoNombre, unidad: it.unidad, cantidad }));
-  if (salidas.length) descontarStock(mov.sede, salidas);
+  if (salidas.length) descontarStock(mov.sede, salidas, { tipo: "SALIDA-VENTA", documento: od.numero });
   if (equipos.length) marcarEquiposVendidos(equipos.map((e) => e.eq!.codigo_chasis), od.numero, od.cliente, mov.sede, mov.responsable.trim() || String(rol));
 
   let actualizada!: OrdenDespacho;

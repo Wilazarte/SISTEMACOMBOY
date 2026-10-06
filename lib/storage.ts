@@ -31,6 +31,9 @@ import type {
   Requerimiento,
   Rol,
   StockItem,
+  MovimientoKardex,
+  TipoKardex,
+  ValeProduccion,
   TipoAfp,
   TipoSueldo,
   Trabajador,
@@ -68,6 +71,8 @@ export const KEYS = {
   EQUIPOS: "almacen_equipos_terminados",
   PRODUCCION: "almacen_ordenes_produccion",
   MOVIMIENTOS: "almacen_movimientos",
+  KARDEX: "almacen_kardex",
+  VALES_PRODUCCION: "almacen_vales_produccion",
   // Contable (tabla contable)
   CONTABLE_ASIENTOS: "contable_asientos",
   CONTABLE_PLAN: "contable_plan_cuentas",
@@ -192,6 +197,8 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.EQUIPOS]: { tabla: "almacen", tipo: "EQUIPO_TERMINADO", forma: "lista" },
   [KEYS.PRODUCCION]: { tabla: "almacen", tipo: "ORDEN_PRODUCCION", forma: "lista" },
   [KEYS.MOVIMIENTOS]: { tabla: "almacen", tipo: "MOVIMIENTO_ALMACEN", forma: "lista" },
+  [KEYS.KARDEX]: { tabla: "almacen", tipo: "KARDEX", forma: "lista" },
+  [KEYS.VALES_PRODUCCION]: { tabla: "almacen", tipo: "VALE_PRODUCCION", forma: "lista" },
   [KEYS.CONTABLE_ASIENTOS]: { tabla: "contable", tipo: "ASIENTO_DIARIO", forma: "lista" },
   [KEYS.CONTABLE_PLAN]: { tabla: "contable", tipo: "PLAN_CUENTAS", forma: "lista" },
   [KEYS.CONTABLE_CIERRES]: { tabla: "contable", tipo: "CIERRE_MENSUAL", forma: "lista" },
@@ -374,6 +381,9 @@ async function descargar(key: StoreKey): Promise<Fila[]> {
     if (!data || data.length < 1000) return filas;
   }
 }
+
+/** Vuelve a leer del servidor (tras una operación hecha en Supabase, ej. retiro para producción). */
+export const recargarDatos = (...keys: StoreKey[]) => Promise.all(keys.map((k) => recargar(k)));
 
 async function recargar(key: StoreKey): Promise<void> {
   try {
@@ -1210,7 +1220,8 @@ export function darVistoBueno(ocId: string, vb: Omit<VistoBueno, "fecha">, rol: 
     vistoBueno: { ...vb, fecha: ahora },
     historial: [...o.historial, evento(rol, "Visto bueno de ingreso a almacén", `${vb.recibidoPor} · stock de ${sede}`)],
   }));
-  ingresarStock(sede, oc.items);
+  const guia = getGuias().find((g) => g.ocId === ocId);
+  ingresarStock(sede, oc.items, { tipo: "INGRESO", documento: [oc.numero, guia?.facturaNumero ?? "", guia ? `GR ${guia.numero}` : ""].filter(Boolean).join(" · ") });
   escribir(
     KEYS.GUIAS,
     getGuias().map((g) =>
@@ -1655,23 +1666,80 @@ export function crearProveedor(data: Pick<Proveedor, "razonSocial" | "ruc">): Pr
 const claveStock = (sede: string, nombre: string, unidad: string): string =>
   `${sede}|${nombre.trim().replace(/\s+/g, " ").toUpperCase()}|${unidad}`;
 
+// ---------------------------------------------------------------------
+// KARDEX: cada movimiento de stock (ingreso por V°B°, salida por venta / producción, transferencia)
+// ---------------------------------------------------------------------
+
+export const getKardex = () => leer<MovimientoKardex[]>(KEYS.KARDEX, []);
+export const getValesProduccion = () => leer<ValeProduccion[]>(KEYS.VALES_PRODUCCION, []);
+
+/** Referencia del movimiento para el kardex. */
+export type RefKardex = { tipo: TipoKardex; documento: string; chasis?: string; motivo?: string };
+
+const usuarioActual = () => getSesion()?.usuario ?? "sistema";
+
+function anotarKardex(movs: Omit<MovimientoKardex, "id" | "fecha" | "usuario">[]): void {
+  if (!movs.length) return;
+  const fecha = new Date().toISOString();
+  const usuario = usuarioActual();
+  escribir(KEYS.KARDEX, [...movs.map((m) => ({ ...m, id: uid(), fecha, usuario })), ...getKardex()]);
+}
+
 /** Suma cantidades al stock de la sede (mismo producto + unidad) y actualiza el último costo sin IGV. */
-function ingresarStock(sede: string, items: { nombre: string; unidad: string; cantidad: number; precioUnit: number }[]): void {
+function ingresarStock(sede: string, items: { nombre: string; unidad: string; cantidad: number; precioUnit: number }[], ref?: RefKardex): void {
   const ahora = new Date().toISOString();
   const stock = getStock();
+  const movs: Omit<MovimientoKardex, "id" | "fecha" | "usuario">[] = [];
   items.forEach((i) => {
     const nombre = i.nombre.trim().replace(/\s+/g, " ").toUpperCase();
     const k = claveStock(sede, nombre, i.unidad);
-    const existente = stock.find((s) => claveStock(s.sede, s.nombre, s.unidad) === k);
+    let existente = stock.find((s) => claveStock(s.sede, s.nombre, s.unidad) === k);
     if (existente) {
       existente.cantidad = r2(existente.cantidad + i.cantidad);
       existente.costoUnit = i.precioUnit;
       existente.actualizado = ahora;
     } else {
-      stock.push({ id: uid(), sede, nombre, unidad: i.unidad, cantidad: i.cantidad, costoUnit: i.precioUnit, actualizado: ahora });
+      existente = { id: uid(), sede, nombre, unidad: i.unidad, cantidad: i.cantidad, costoUnit: i.precioUnit, actualizado: ahora };
+      stock.push(existente);
     }
+    if (ref) movs.push({ sede, stock_id: existente.id, producto: nombre, unidad: i.unidad, tipo_movimiento: ref.tipo, documento: ref.documento, chasis: ref.chasis, motivo: ref.motivo, cantidad: i.cantidad, saldo: existente.cantidad });
   });
   escribir(KEYS.STOCK, stock);
+  anotarKardex(movs);
+}
+
+/**
+ * Importa saldos de almacén (Excel "Current Balances"): si el producto ya existe en la sede se SUMA la cantidad
+ * (no se duplica) y se conserva su último costo; si es nuevo entra con costo 0 ("Sin valorizar").
+ * Cada producto deja un movimiento SALDO_INICIAL en el kardex. El mismo archivo no se puede importar dos veces.
+ */
+export function importarSaldosStock(productos: { nombre: string; unidad: string; sede: string; cantidad: number }[], documento: string): { nuevos: number; actualizados: number } {
+  if (!productos.length) throw new ErpError("No hay productos para importar.");
+  if (getKardex().some((k) => k.tipo_movimiento === "SALDO_INICIAL" && k.documento === documento))
+    throw new ErpError(`El archivo "${documento}" ya fue importado: volver a importarlo duplicaría las cantidades.`);
+  const ahora = new Date().toISOString();
+  const stock = getStock();
+  const movs: Omit<MovimientoKardex, "id" | "fecha" | "usuario">[] = [];
+  let nuevos = 0;
+  let actualizados = 0;
+  productos.forEach((p) => {
+    const nombre = p.nombre.trim().replace(/\s+/g, " ").toUpperCase();
+    const cantidad = Math.max(0, Math.round(p.cantidad));
+    let e = stock.find((s) => claveStock(s.sede, s.nombre, s.unidad) === claveStock(p.sede, nombre, p.unidad));
+    if (e) {
+      e.cantidad = r2(e.cantidad + cantidad);
+      e.actualizado = ahora;
+      actualizados++;
+    } else {
+      e = { id: uid(), sede: p.sede, nombre, unidad: p.unidad, cantidad, costoUnit: 0, actualizado: ahora };
+      stock.push(e);
+      nuevos++;
+    }
+    movs.push({ sede: p.sede, stock_id: e.id, producto: nombre, unidad: p.unidad, tipo_movimiento: "SALDO_INICIAL", documento, cantidad, saldo: e.cantidad });
+  });
+  escribir(KEYS.STOCK, stock);
+  anotarKardex(movs);
+  return { nuevos, actualizados };
 }
 
 /** Cantidad disponible de un producto en una sede. */
@@ -1681,7 +1749,7 @@ export function stockDisponible(sede: string, nombre: string, unidad: string): n
 }
 
 /** Salida de stock (despacho). Valida todo antes de escribir: si falta stock no descuenta nada. */
-export function descontarStock(sede: string, items: { nombre: string; unidad: string; cantidad: number }[]): void {
+export function descontarStock(sede: string, items: { nombre: string; unidad: string; cantidad: number }[], ref?: RefKardex): void {
   const stock = getStock();
   const ahora = new Date().toISOString();
   for (const i of items) {
@@ -1698,6 +1766,13 @@ export function descontarStock(sede: string, items: { nombre: string; unidad: st
     existente.actualizado = ahora;
   });
   escribir(KEYS.STOCK, stock);
+  if (ref)
+    anotarKardex(
+      items.map((i) => {
+        const e = stock.find((s) => claveStock(s.sede, s.nombre, s.unidad) === claveStock(sede, i.nombre, i.unidad))!;
+        return { sede, stock_id: e.id, producto: e.nombre, unidad: e.unidad, tipo_movimiento: ref.tipo, documento: ref.documento, chasis: ref.chasis, motivo: ref.motivo, cantidad: -i.cantidad, saldo: e.cantidad };
+      })
+    );
 }
 
 /** Sede donde ingresa la mercadería de una OC: la del REQ; si no existe, el lugar de entrega. */
@@ -1708,8 +1783,8 @@ export function transferirStock(nombre: string, unidad: string, cantidad: number
   if (deSede === aSede) throw new ErpError("Elija una sede distinta.");
   if (!(cantidad > 0)) throw new ErpError("Cantidad inválida.");
   const costo = getStock().find((s) => claveStock(s.sede, s.nombre, s.unidad) === claveStock(deSede, nombre, unidad))?.costoUnit ?? 0;
-  descontarStock(deSede, [{ nombre, unidad, cantidad }]);
-  ingresarStock(aSede, [{ nombre, unidad, cantidad, precioUnit: costo }]);
+  descontarStock(deSede, [{ nombre, unidad, cantidad }], { tipo: "TRANSFERENCIA", documento: `A ${aSede}` });
+  ingresarStock(aSede, [{ nombre, unidad, cantidad, precioUnit: costo }], { tipo: "TRANSFERENCIA", documento: `DE ${deSede}` });
 }
 
 /**
@@ -1930,7 +2005,7 @@ export function registrarCompra(
   };
 
   escribir(KEYS.COMPRAS, [compra, ...getCompras()]);
-  ingresarStock(data.sede, items);
+  ingresarStock(data.sede, items, { tipo: "INGRESO", documento: `${data.tipoComprobante === "BOLETA" ? "Boleta" : "Factura"} ${numero}` });
   return compra;
 }
 

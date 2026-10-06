@@ -1,0 +1,300 @@
+IMPORTACIÓN DE SALDOS DE ALMACÉN · ALMACEN_saldos_13.xlsx · 2026-10-06T21:16:50.385Z
+Documento kardex: IMPORT ALMACEN_saldos_13.xlsx
+Filas leídas: 292 · Productos: 292 · Con stock: 269 · En 0: 23 · Avisos: 0 · Errores: 0
+Unidades: PZA 273 · UND 14 · LT 2 · ROLLO 2 · PAR 1
+Sedes: Taller Principal Aqp
+Total unidades en stock: 21121
+
+FILA	NIVEL	PRODUCTO	DETALLE
+3	OK	3/8"-16 MACHO ROSCAR	Taller Principal Aqp · 1 PZA
+4	OK	ABRAZADERA BATERIA	Taller Principal Aqp · 5 PZA
+5	OK	ABRAZADERA DE CATALIZADOR	Taller Principal Aqp · 1 PZA
+6	OK	ABRAZADERA DE MUELLE	Taller Principal Aqp · 35 PZA
+7	OK	ABRAZADERA POMO LIQUIDO DE FRENO	Taller Principal Aqp · 23 UND
+8	OK	ACEITE MOTUL 7100 (20W 50)	Taller Principal Aqp · 33 LT
+9	OK	ACEITE TRASMISION 140	Taller Principal Aqp · 24 LT
+10	OK	AFLOJATODO	Taller Principal Aqp · 7 UND
+11	OK	ALAMBRE N#8	Taller Principal Aqp · 5 PZA
+12	OK	ALDABAS	Taller Principal Aqp · 3 PZA
+13	OK	ALTERNADOR 18P (300CG)	Taller Principal Aqp · 0 PZA · sin stock
+14	OK	AMORTIGUADOR (MONOSHOP )	Taller Principal Aqp · 30 PZA
+15	OK	AMORTIGUADOR DOBLE RESORTE	Taller Principal Aqp · 6 PZA
+16	OK	ANTIRRESPINGO DE SOLDAR	Taller Principal Aqp · 13 PZA
+17	OK	ARAÑA BOCAMAZA	Taller Principal Aqp · 4 PZA
+18	OK	ARRANCADOR HHCG 250	Taller Principal Aqp · 3 PZA
+19	OK	ARTICULACION	Taller Principal Aqp · 54 PZA
+20	OK	ASIENTO BULL	Taller Principal Aqp · 20 PZA
+21	OK	BAL LIQUIDO PARA RADIADOR	Taller Principal Aqp · 3 UND
+22	OK	BALDE LIQUIDO FRENO	Taller Principal Aqp · 3 UND
+23	OK	BARRA TELESCOPICA AZUL	Taller Principal Aqp · 14 PZA
+24	OK	BARRA TELESCOPICA ROJO	Taller Principal Aqp · 9 PZA
+25	OK	BASE CARDAN ( TRANSVERSAL)	Taller Principal Aqp · 2 PZA
+26	OK	BATERIA 12V 9PLACAS	Taller Principal Aqp · 1 PZA
+27	OK	BATERIA 500 U1R	Taller Principal Aqp · 10 UND (unidad del nombre)
+28	OK	BENDIX (300CG) 20P 3H	Taller Principal Aqp · 44 PZA
+29	OK	BENIX	Taller Principal Aqp · 44 PZA
+30	OK	BOBINAS	Taller Principal Aqp · 91 PZA
+31	OK	BOCAMASA COCHE	Taller Principal Aqp · 0 PZA · sin stock
+32	OK	BOCAMAZA DELAN. PLOMO	Taller Principal Aqp · 12 PZA
+33	OK	BOCAMAZA NEGRO	Taller Principal Aqp · 11 PZA
+34	OK	BOCINA	Taller Principal Aqp · 12 PZA
+35	OK	BOMBA DE FRENO (MADRE)	Taller Principal Aqp · 10 PZA
+36	OK	BOMBA FRENO ZAPATA	Taller Principal Aqp · 0 PZA · sin stock
+37	OK	BOQUILLA DE CATALIZADOR	Taller Principal Aqp · 13 PZA
+38	OK	BOQUILLA DE MIG 1.0	Taller Principal Aqp · 4 PZA
+39	OK	BRIDA	Taller Principal Aqp · 77 PZA
+40	OK	BROCA 1/8	Taller Principal Aqp · 3 PZA
+41	OK	BUJIA	Taller Principal Aqp · 35 PZA
+42	OK	CABALLO (CHASIS)	Taller Principal Aqp · 20 PZA
+43	OK	CABEZAL COMPLETO	Taller Principal Aqp · 1 PZA
+44	OK	CABLE DE ACELERADOR	Taller Principal Aqp · 39 PZA
+45	OK	CABLE DE BATERIA NEGRO X METRO	Taller Principal Aqp · 415 PZA
+46	OK	CABLE DE BATERIA ROJO X METRO	Taller Principal Aqp · 334 PZA
+47	OK	CABLE DE VELOCIMETRO	Taller Principal Aqp · 2 PZA
+48	OK	CABLE EMBRIAGUE	Taller Principal Aqp · 38 PZA
+49	OK	CABLE EMBRIAGUE SOLO	Taller Principal Aqp · 473 PZA
+50	OK	CABLE FRENO DE MANO	Taller Principal Aqp · 12 PZA
+51	OK	CABLE FRENO DELANTERO	Taller Principal Aqp · 37 PZA
+52	OK	CABLE RUSTER 1.5 M	Taller Principal Aqp · 1 PZA
+53	OK	CABLE RUSTER 2 M	Taller Principal Aqp · 2 PZA
+54	OK	CADENA	Taller Principal Aqp · 10 PZA
+55	OK	CAJA FILTRO DE AIRE	Taller Principal Aqp · 64 PZA
+56	OK	CAJA RETRO	Taller Principal Aqp · 48 PZA
+57	OK	CAMARA 500-12	Taller Principal Aqp · 18 PZA
+58	OK	CAÑERIA DE FRENO	Taller Principal Aqp · 0 PZA · sin stock
+59	OK	CARBON BRUSH 2PCS	Taller Principal Aqp · 5 PZA
+60	OK	CARBURADOR ROMI	Taller Principal Aqp · 24 PZA
+61	OK	CARBURADOR ORIGINAL	Taller Principal Aqp · 15 PZA
+62	OK	CARDAN 1 . 10 CM	Taller Principal Aqp · 105 PZA
+63	OK	CARDAN 50CM	Taller Principal Aqp · 2 PZA
+64	OK	CARDAN 52.5 CM	Taller Principal Aqp · 12 PZA
+65	OK	CARDAN 60CM	Taller Principal Aqp · 20 PZA
+66	OK	CARDAN DE CAJA RETRO	Taller Principal Aqp · 0 PZA · sin stock
+67	OK	CASCOS BLANCOS	Taller Principal Aqp · 4 PZA
+68	OK	CASCOS AZULES	Taller Principal Aqp · 9 PZA
+69	OK	CATALIZADOR ARMADO	Taller Principal Aqp · 32 PZA
+70	OK	CATALIZADOR EURO 4	Taller Principal Aqp · 0 UND (unidad del nombre) · sin stock
+71	OK	CDI	Taller Principal Aqp · 7 PZA
+72	OK	CERAMICA 8 1/2 171826	Taller Principal Aqp · 21 PZA
+73	OK	CHANCHITO	Taller Principal Aqp · 19 PZA
+74	OK	CHAPA CONFIGURADA	Taller Principal Aqp · 0 PZA · sin stock
+75	OK	CHAPA DE CONTACTO	Taller Principal Aqp · 26 PZA
+76	OK	CHAPA DE TANQUE	Taller Principal Aqp · 8 PZA
+77	OK	CHASCOSA	Taller Principal Aqp · 5 PZA
+78	OK	CHASIS CUADRO POSTERIOR	Taller Principal Aqp · 1 PZA
+79	OK	CILINDRO ZS 74MM	Taller Principal Aqp · 0 PZA · sin stock
+80	OK	CINTA NEGRA	Taller Principal Aqp · 195 PZA
+81	OK	CINTILLO 4.8X300 MM	Taller Principal Aqp · 7 PZA
+82	OK	CINTURON DE BARRA TELESCOPICA	Taller Principal Aqp · 8 PZA
+83	OK	COCHE MINERO Z20	Taller Principal Aqp · 3 PZA
+84	OK	CODO 1"	Taller Principal Aqp · 96 PZA
+85	OK	CODO DE 2"	Taller Principal Aqp · 50 PZA
+86	OK	COMANDO COMPLETO	Taller Principal Aqp · 15 PZA
+87	OK	COMANDO DERECHO	Taller Principal Aqp · 0 PZA · sin stock
+88	OK	COMANDO IZQUIERDO	Taller Principal Aqp · 0 PZA · sin stock
+89	OK	CONTRATUERCA M10	Taller Principal Aqp · 2000 PZA
+90	OK	COPA CENTRIFUGA	Taller Principal Aqp · 5 PZA
+91	OK	CORONA REDUCIDA 93 CM	Taller Principal Aqp · 32 PZA
+92	OK	CORONAS DEFECTUOSAS	Taller Principal Aqp · 6 PZA
+93	OK	CREMALLERA COMP	Taller Principal Aqp · 4 PZA
+94	OK	CRUCETA 20 X 50	Taller Principal Aqp · 0 PZA · sin stock
+95	OK	CULATA ZS 300CC	Taller Principal Aqp · 0 PZA · sin stock
+96	OK	DIFUSORES DE GAS DE SOLD	Taller Principal Aqp · 2 PZA
+97	OK	DISCO DE 7"	Taller Principal Aqp · 81 PZA
+98	OK	DISCO DE CORTE 14	Taller Principal Aqp · 10 PZA
+99	OK	DISCO DE CORTE 4"	Taller Principal Aqp · 88 PZA
+100	OK	DISCO DE DESBASTE 4"	Taller Principal Aqp · 11 PZA
+101	OK	DISCO DESGASTE DE 7"	Taller Principal Aqp · 14 PZA
+102	OK	DISCO FLAP	Taller Principal Aqp · 49 PZA
+103	OK	EJE CORONA 37 CM ( 6D)	Taller Principal Aqp · 6 PZA
+104	OK	EJE CORONA 73CM ( 6D)	Taller Principal Aqp · 32 PZA
+105	OK	EJE CORONA 39CM (6D)	Taller Principal Aqp · 6 PZA
+106	OK	EJE CORONA 41.50 (6D)	Taller Principal Aqp · 1 PZA
+107	OK	EJE CORONA 44CM (6D)	Taller Principal Aqp · 6 PZA
+108	OK	EJE CORONA ESTRIADO	Taller Principal Aqp · 50 PZA
+109	OK	EJE CORONA OBSERVACIO (6D)	Taller Principal Aqp · 13 PZA
+110	OK	EJE DE ARANQUE	Taller Principal Aqp · 74 PZA
+111	OK	EJE DELANTERO 33CM	Taller Principal Aqp · 0 PZA · sin stock
+112	OK	EMPAQUE COMPLETO-MOTOR	Taller Principal Aqp · 0 PZA · sin stock
+113	OK	EMPAQUE CULATA	Taller Principal Aqp · 7 PZA
+114	OK	ESCOBILLAS DE COPA 3"	Taller Principal Aqp · 7 PZA
+115	OK	ESMALTE BLANCO	Taller Principal Aqp · 1 PZA
+116	OK	ESPALDAR AZUL	Taller Principal Aqp · 9 PZA
+117	OK	ESPALDAR ROJO	Taller Principal Aqp · 4 PZA
+118	OK	ESPARRAGO 10.9 COCHE	Taller Principal Aqp · 1 PZA
+119	OK	ESPARRAGO G10.9 (M10X50)	Taller Principal Aqp · 71 PZA
+120	OK	ESPARRAGO G8.8 (M10X50)	Taller Principal Aqp · 1600 PZA
+121	OK	ESPARRAGO TUERCA COCHE	Taller Principal Aqp · 121 PZA
+122	OK	ESTRACTOR DE SEGURO DE VALVULA	Taller Principal Aqp · 1 PZA
+123	OK	FILTRO -COMBUSTIBLE	Taller Principal Aqp · 25 PZA
+124	OK	FILTRO AIRE CONICO	Taller Principal Aqp · 4 PZA
+125	OK	FILTRO DE AIRE	Taller Principal Aqp · 60 PZA
+126	OK	FOCOS LED CUADRADO	Taller Principal Aqp · 33 PZA
+127	OK	FUSIBLE 15 AMP	Taller Principal Aqp · 8 PZA
+128	OK	GLOSS AZUL MARINO	Taller Principal Aqp · 1 PZA
+129	OK	GLOSS GRIS	Taller Principal Aqp · 2 PZA
+130	OK	GLOSS NEGRO	Taller Principal Aqp · 0 PZA · sin stock
+131	OK	GOLDEN BRIDGE J505-	Taller Principal Aqp · 3 PZA
+132	OK	GOLDEN BRIDGE MG50-6 -1.0	Taller Principal Aqp · 5 PZA
+133	OK	GRIFO DE COMBUSTIBLE	Taller Principal Aqp · 10 PZA
+134	OK	GUANTES BADANA	Taller Principal Aqp · 1 PZA
+135	OK	GUANTES NYLON	Taller Principal Aqp · 10 PZA
+136	OK	HACHES	Taller Principal Aqp · 54 PZA
+137	OK	HOJA DE CIERRA CINTA	Taller Principal Aqp · 1 PZA
+138	OK	INSERTO CARBURADO PARA ROSCADO	Taller Principal Aqp · 2 PZA
+139	OK	INSERTO CARBURADO TRIANGULAR	Taller Principal Aqp · 9 PZA
+140	OK	INSERTO CARBURADOR ROMBO	Taller Principal Aqp · 7 PZA
+141	OK	JEBE DE FRENO	Taller Principal Aqp · 192 PZA
+142	OK	JEBE DE MUELLE	Taller Principal Aqp · 33 PZA
+143	OK	KIT DE FRENO	Taller Principal Aqp · 24 PZA
+144	OK	KIT RETEN MOTOR	Taller Principal Aqp · 3 PZA
+145	OK	LENTES DE SEGURIDAD OSCUROS	Taller Principal Aqp · 12 PZA
+146	OK	LENTES TRASPARENTE	Taller Principal Aqp · 11 PZA
+147	OK	LIJA PARA METAL 50-2 1/2	Taller Principal Aqp · 3 PZA
+148	OK	LIMA REDONDA 12"	Taller Principal Aqp · 1 PZA
+149	OK	LIMPIA CONTACTO	Taller Principal Aqp · 22 PZA
+150	OK	LLANTA C/CAMARA 500-12	Taller Principal Aqp · 6 PZA
+151	OK	LLANTA COMPLETA-500X12	Taller Principal Aqp · 54 PZA
+152	OK	LLANTA DE COCHE	Taller Principal Aqp · 1 PZA
+153	OK	LLANTA TRACTOR 500-12	Taller Principal Aqp · 0 UND (unidad del nombre) · sin stock
+154	OK	LLAVE ALEN	Taller Principal Aqp · 1 PZA
+155	OK	LLAVE TORRE	Taller Principal Aqp · 1 PZA
+156	OK	M8 *1.25 MACHO DE ROSCAR	Taller Principal Aqp · 1 PZA
+157	OK	MANG DE AGUA X20	Taller Principal Aqp · 11 PZA
+158	OK	MANG COMBUSTIBLE	Taller Principal Aqp · 2 PZA
+159	OK	MANG.CORRUGADA ABIETAX100MTS	Taller Principal Aqp · 2 PZA
+160	OK	MANGUERA CORRUGADA	Taller Principal Aqp · 1 PZA
+161	OK	MANGUERA RADIADOR 1/2 " (ROLLO)	Taller Principal Aqp · 10 ROLLO (unidad del nombre)
+162	OK	MANIJA EMBRIAGUE	Taller Principal Aqp · 0 PZA · sin stock
+163	OK	MANIJA FRENO	Taller Principal Aqp · 0 PZA · sin stock
+164	OK	MASCARA AZUL	Taller Principal Aqp · 12 PZA
+165	OK	MASCARA ROJO	Taller Principal Aqp · 8 PZA
+166	OK	MECHERO DE COBRE	Taller Principal Aqp · 3 PZA
+167	OK	MICA DE ESMERILAR SEGPRO	Taller Principal Aqp · 9 PZA
+168	OK	MICA PARA CARETA SOLDAR	Taller Principal Aqp · 9 PZA
+169	OK	MOTOR ROMI	Taller Principal Aqp · 36 PZA
+170	OK	MOTOR RONCO	Taller Principal Aqp · 6 PZA
+171	OK	MUELLE 93CM ( 7 HOJAS)	Taller Principal Aqp · 45 PZA
+172	OK	NIPLE 2"	Taller Principal Aqp · 44 PZA
+173	OK	NIPLES 1"	Taller Principal Aqp · 83 PZA
+174	OK	PALANCA FRENO DE MANO POST.	Taller Principal Aqp · 82 PZA
+175	OK	PASTA PARA SOLDAR	Taller Principal Aqp · 10 PZA
+176	OK	PEDAL DE ARRANQUE	Taller Principal Aqp · 2 PZA
+177	OK	PEDAL DE CAMBIO	Taller Principal Aqp · 14 PZA
+178	OK	PERNO 3/8 X 1/2"	Taller Principal Aqp · 154 PZA
+179	OK	PERNO 3/8X1"	Taller Principal Aqp · 400 PZA
+180	OK	PERNO BATERIA M6X15 (G8.8)	Taller Principal Aqp · 30 PZA
+181	OK	PERNO CAJA RETRO M6X35	Taller Principal Aqp · 114 PZA
+182	OK	PERNO M10X140	Taller Principal Aqp · 50 PZA
+183	OK	PERNO M12X125 (AMARILLO)	Taller Principal Aqp · 30 PZA
+184	OK	PERNO M12X90	Taller Principal Aqp · 400 PZA
+185	OK	PERNO M8X100	Taller Principal Aqp · 114 PZA
+186	OK	PERNO M8X25	Taller Principal Aqp · 120 PZA
+187	OK	PERNO M8X50 (MITAD HILO)	Taller Principal Aqp · 200 PZA
+188	OK	PERNO MUELLE M12X110 (G8.8)	Taller Principal Aqp · 116 UND (unidad del nombre)
+189	OK	PERNO N# 10 M6X 10 (G8.8)	Taller Principal Aqp · 1820 PZA
+190	OK	PERNO N#10 M6X40 (G8.8)	Taller Principal Aqp · 94 UND (unidad del nombre)
+191	OK	PERNO N#10 M6X50 (G8.8)	Taller Principal Aqp · 106 PZA
+192	OK	PERNO N#13 M8X16	Taller Principal Aqp · 98 PZA
+193	OK	PERNO N#13 M8X25	Taller Principal Aqp · 20 PZA
+194	OK	PERNO S.P. DELANTERO M8X100 ( G8.8)	Taller Principal Aqp · 75 PZA
+195	OK	PIN	Taller Principal Aqp · 1 PZA
+196	OK	PIÑON ATAQUE 11P	Taller Principal Aqp · 0 PZA · sin stock
+197	OK	PINTURA EN SPRAY BLANCO	Taller Principal Aqp · 13 PZA
+198	OK	PINTURA EN SPRAY NEGRO	Taller Principal Aqp · 8 PZA
+199	OK	PLAQUITAS DE CARBURO	Taller Principal Aqp · 17 PZA
+200	OK	PLASMA CNC MAYOR	Taller Principal Aqp · 7 PZA
+201	OK	PLASMA CNC MENOR	Taller Principal Aqp · 10 PZA
+202	OK	PLATINA FRENO 3 HUECOS	Taller Principal Aqp · 0 PZA · sin stock
+203	OK	PLATINA DE FOCO CUADRADO	Taller Principal Aqp · 142 PZA
+204	OK	PLATINA PARA FILTRO DE AIRE	Taller Principal Aqp · 72 PZA
+205	OK	PLATINA SUJETADOR MUELLE	Taller Principal Aqp · 20 PZA
+206	OK	PLATINA SWICH FRENO	Taller Principal Aqp · 26 UND (unidad del nombre)
+207	OK	PORTA DIFUSOR PARA ANTORCHA	Taller Principal Aqp · 3 PZA
+208	OK	PORTA FUSIBLE MOTO	Taller Principal Aqp · 58 PZA
+209	OK	PORTA RADIADOR	Taller Principal Aqp · 17 PZA
+210	OK	PORTA RELAY	Taller Principal Aqp · 237 PZA
+211	OK	PUNTA DE CONTACTO	Taller Principal Aqp · 7 PZA
+212	OK	PUNTA DE CONTACTO 0.8	Taller Principal Aqp · 3 PZA
+213	OK	PUNTA DE CONTACTO1.2	Taller Principal Aqp · 11 PZA
+214	OK	PUNTA DE CONTACTO1.6	Taller Principal Aqp · 1 PZA
+215	OK	RADIADOR ROMY	Taller Principal Aqp · 7 PZA
+216	OK	RADIADOR RONCO	Taller Principal Aqp · 54 PZA
+217	OK	RAMAL CONFIGURADO	Taller Principal Aqp · 16 PZA
+218	OK	RAMALES SIN CONFIGURAR	Taller Principal Aqp · 88 PZA
+219	OK	RELAY 12V	Taller Principal Aqp · 343 PZA
+220	OK	REMOLCADOR ROMI AZUL	Taller Principal Aqp · 2 PZA
+221	OK	REMOLCADOR RONCO AZUL	Taller Principal Aqp · 1 PZA
+222	OK	REMOLCADOR TRANSVERSAL AZUL	Taller Principal Aqp · 4 PZA
+223	OK	REMOLCADOR TRANSVERSAL ROJO	Taller Principal Aqp · 3 PZA
+224	OK	RESORTE COCHE	Taller Principal Aqp · 0 PZA · sin stock
+225	OK	RESORTE DE FRENO	Taller Principal Aqp · 13 PZA
+226	OK	RESORTE DE MUELLE	Taller Principal Aqp · 37 PZA
+227	OK	RESORTE DE MUELLE DELGADO	Taller Principal Aqp · 33 PZA
+228	OK	RETEN 55X75X8	Taller Principal Aqp · 12 PZA
+229	OK	RODAJE DE COCHE	Taller Principal Aqp · 3 PZA
+230	OK	RODAJE 30204	Taller Principal Aqp · 34 PZA
+231	OK	RODAJE 30206	Taller Principal Aqp · 10 PZA
+232	OK	RODAJE 32009	Taller Principal Aqp · 5 PZA
+233	OK	RODAJE 32909	Taller Principal Aqp · 20 PZA
+234	OK	RODAJE 6204	Taller Principal Aqp · 24 PZA
+235	OK	RODAJE 6304	Taller Principal Aqp · 16 PZA
+236	OK	ROLLO CAÑERIAS FRENO	Taller Principal Aqp · 2 ROLLO (unidad del nombre)
+237	OK	SELENIO	Taller Principal Aqp · 8 PZA
+238	OK	SILICONA LIMPIA RENUEVA	Taller Principal Aqp · 10 UND
+239	OK	SILICONA BARRA	Taller Principal Aqp · 6 UND
+240	OK	SOPORTE DE MOTOR	Taller Principal Aqp · 17 PZA
+241	OK	SUPER BLUE	Taller Principal Aqp · 2 PZA
+242	OK	SUPER CUT-46	Taller Principal Aqp · 6 PZA
+243	OK	SUPERCITO 6011 (1/8"X14")	Taller Principal Aqp · 3 PZA
+244	OK	SUPERCITO 7018 (1/8"X14")	Taller Principal Aqp · 1 PZA
+245	OK	SWITCH DE FRENO POSTERIOR	Taller Principal Aqp · 108 PZA
+246	OK	TABLERO CARGUERO	Taller Principal Aqp · 34 PZA
+247	OK	TANQUE AGUA METAL	Taller Principal Aqp · 8 PZA
+248	OK	TANQUE DE COMBIUSTIBLE ROJO	Taller Principal Aqp · 8 PZA
+249	OK	TANQUE DE COMBUSTIBLE AZUL	Taller Principal Aqp · 9 PZA
+250	OK	TANQUE DE REFRIGERANTE 1/2"	Taller Principal Aqp · 19 PZA
+251	OK	TANQUE DE REFRIGERANTE 1"	Taller Principal Aqp · 3 PZA
+252	OK	TAPA POST. CHASIS	Taller Principal Aqp · 13 PZA
+253	OK	TAPA CIEGA	Taller Principal Aqp · 53 PZA
+254	OK	TAPA LATERAL (ROJO)	Taller Principal Aqp · 10 PAR (unidad del nombre)
+255	OK	TAPABARRO AZUL	Taller Principal Aqp · 20 PZA
+256	OK	TAPABARRO ROJO	Taller Principal Aqp · 9 PZA
+257	OK	TAPAS LATERALES (AZUL)	Taller Principal Aqp · 40 PZA
+258	OK	TAPON DE OIDO EN BOLSA	Taller Principal Aqp · 103 PZA
+259	OK	TERMINAL DE BATERIA	Taller Principal Aqp · 358 PZA
+260	OK	TERMOSWITH DE VENTILADOR	Taller Principal Aqp · 15 PZA
+261	OK	TIMON MOTO	Taller Principal Aqp · 10 PZA
+262	OK	TIMONES	Taller Principal Aqp · 0 PZA · sin stock
+263	OK	TIP DE CONTACTO 1.2-0.045	Taller Principal Aqp · 3 PZA
+264	OK	TIZA DE CALDELERO	Taller Principal Aqp · 1 PZA
+265	OK	TORNILLO MASCARA T15MM	Taller Principal Aqp · 70 PZA
+266	OK	TRAPO INDUSTRIAL X KILO	Taller Principal Aqp · 3 PZA
+267	OK	TUERCA 3/8	Taller Principal Aqp · 680 PZA
+268	OK	TUERCA ESPALDAR M5X44	Taller Principal Aqp · 110 PZA
+269	OK	TUERCA M10	Taller Principal Aqp · 2000 PZA
+270	OK	TUERCA M12	Taller Principal Aqp · 120 PZA
+271	OK	TUERCA M6	Taller Principal Aqp · 320 PZA
+272	OK	TUERCA M8 (H. GRUESO )	Taller Principal Aqp · 186 PZA
+273	OK	TUERCA M8 (H.FINO )	Taller Principal Aqp · 130 PZA
+274	OK	TUERCA M8 DORADO	Taller Principal Aqp · 83 PZA
+275	OK	UNION UNIVERSAL 1"	Taller Principal Aqp · 53 PZA
+276	OK	VALVULA PASO 1"	Taller Principal Aqp · 16 PZA
+277	OK	VARILLA FRENO	Taller Principal Aqp · 1 PZA
+278	OK	VENTILADOR	Taller Principal Aqp · 10 PZA
+279	OK	VIBRADOR	Taller Principal Aqp · 0 PZA · sin stock
+280	OK	VIDRIO TRANSPARENTE DE SOLDAR	Taller Principal Aqp · 8 PZA
+281	OK	VIDRIOS DE SOLDAR OCURO	Taller Principal Aqp · 43 PZA
+282	OK	VOLANDA M11	Taller Principal Aqp · 1000 PZA
+283	OK	VOLANDA M20-M26	Taller Principal Aqp · 100 UND (unidad del nombre)
+284	OK	VOLANDA PLANA 3/8	Taller Principal Aqp · 200 PZA
+285	OK	VOLANDA PLANA M12	Taller Principal Aqp · 200 PZA
+286	OK	VOLANDA PLANA M6	Taller Principal Aqp · 409 PZA
+287	OK	VOLANDA PLANA M8	Taller Principal Aqp · 160 UND (unidad del nombre)
+288	OK	VOLANDA PRESION 3/8	Taller Principal Aqp · 100 PZA
+289	OK	VOLANDA PRESION M12	Taller Principal Aqp · 180 PZA
+290	OK	VOLANDA PRESION M6	Taller Principal Aqp · 310 PZA
+291	OK	VOLANDA PRESION M9.5	Taller Principal Aqp · 196 PZA
+292	OK	VOLANTE BENDIX	Taller Principal Aqp · 30 PZA
+293	OK	YUGO DE CAJA RETRO	Taller Principal Aqp · 33 PZA
+294	OK	ZAPATA DE FRENO POST.	Taller Principal Aqp · 3 PZA

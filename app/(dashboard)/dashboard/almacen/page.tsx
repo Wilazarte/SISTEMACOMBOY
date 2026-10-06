@@ -25,6 +25,7 @@ import { pdfActaIngreso, pdfRequerimiento } from "@/lib/pdf";
 import type { EstadoReq, Factura, Guia, ItemReq, OrdenCompra, OrdenDespacho, Requerimiento, Rol, StockItem } from "@/lib/types";
 import { OrdenesDespacho } from "./despacho";
 import { EquiposTerminados } from "@/components/almacen/EquiposTerminados";
+import { StockAlmacen } from "@/components/almacen/StockAlmacen";
 import { estadoOD } from "@/lib/ventas";
 
 type Tab = "nuevo" | "lista" | "ingresos" | "stock" | "despacho";
@@ -87,7 +88,7 @@ export default function AlmacenPage() {
       {tab === "nuevo" && <NuevoReq rol={rol} onCreado={() => setTab("lista")} />}
       {tab === "lista" && <ListaReq reqs={todos} rol={rol} />}
       {tab === "ingresos" && <Ingresos rol={rol} porVB={porVB} ordenes={ordenes} facturas={facturas} guias={guias} />}
-      {tab === "stock" && <Stock stock={stock} rol={rol} />}
+      {tab === "stock" && <Stock stock={stock} rol={rol} onIrDespacho={() => setTab("despacho")} />}
       {tab === "despacho" && <OrdenesDespacho />}
     </div>
   );
@@ -490,49 +491,14 @@ function Ingresos({ rol, porVB, ordenes, facturas, guias }: { rol: Rol; porVB: O
 // =====================================================================
 // STOCK (alimentado por las compras registradas y por el V°B° de ingresos)
 // =====================================================================
-function Stock({ stock, rol }: { stock: StockItem[]; rol: Rol }) {
-  const [sede, setSede] = useState("");
-  const [q, setQ] = useState("");
+function Stock({ stock, rol, onIrDespacho }: { stock: StockItem[]; rol: Rol; onIrDespacho: () => void }) {
   const [nuevoEquipo, setNuevoEquipo] = useState(false);
   const cerrarNuevo = useCallback(() => setNuevoEquipo(false), []);
   const puedeRegistrar = puede(rol, "req.crear") && !getSesion()?.soloLectura; // Almacén y creador
-  const lista = stock
-    .filter((s) => (!sede || s.sede === sede) && (!q || s.nombre.toLowerCase().includes(q.toLowerCase())))
-    .sort((a, b) => a.sede.localeCompare(b.sede) || a.nombre.localeCompare(b.nombre));
-  const valorizado = lista.reduce((a, s) => a + s.cantidad * s.costoUnit, 0);
   return (
     <div className="space-y-6">
-    <EquiposTerminados puedeRegistrar={puedeRegistrar} nuevo={nuevoEquipo} onNuevoCerrado={cerrarNuevo} />
-    <Card>
-      <CardHeader
-        title="Stock de almacén"
-        subtitle={`${lista.length} producto(s) · Valorizado ${soles(valorizado)} (último costo: sin IGV en factura/OC, con IGV en boleta)`}
-        action={
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <div className="w-48">
-              <Input placeholder="Buscar producto…" value={q} onChange={(e) => setQ(e.target.value)} />
-            </div>
-
-            <div className="w-48">
-              <Select value={sede} onChange={(e) => setSede(e.target.value)} placeholder="Todas las sedes" options={SEDES.map((s) => ({ value: s, label: s }))} />
-            </div>
-          </div>
-        }
-      />
-      <Table head={["Sede", "Producto", "Unidad", "Cantidad", "Último costo", "Valorizado", "Actualizado"]} empty={lista.length === 0}>
-        {lista.map((s) => (
-          <tr key={s.id} className="hover:bg-plomo-50">
-            <Td>{s.sede}</Td>
-            <Td className="font-medium text-azul-900">{s.nombre}</Td>
-            <Td>{s.unidad}</Td>
-            <Td className="text-right font-semibold">{s.cantidad}</Td>
-            <Td className="text-right">{soles(s.costoUnit)}</Td>
-            <Td className="text-right">{soles(s.cantidad * s.costoUnit)}</Td>
-            <Td>{new Date(s.actualizado).toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric" })}</Td>
-          </tr>
-        ))}
-      </Table>
-    </Card>
+      <EquiposTerminados puedeRegistrar={puedeRegistrar} nuevo={nuevoEquipo} onNuevoCerrado={cerrarNuevo} />
+      <StockAlmacen stock={stock} puedeOperar={puedeRegistrar} onIrDespacho={onIrDespacho} />
     </div>
   );
 }

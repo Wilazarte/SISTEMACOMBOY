@@ -14,7 +14,7 @@ export const EMPRESA = {
   logoDataUrl: "",
 };
 
-export const SEDES = ["Adm Aqp", "Taller Principal Aqp", "Sucursal Secocha", "Area Comercial", "Gerencia"];
+export const SEDES = ["Adm Aqp", "Taller Principal Aqp", "Sucursal Secocha", "Area Comercial", "Gerencia", "Oficina Lima"];
 
 /** Almacenes físicos (ingreso de compras, equipos terminados de Producción, despacho). */
 export const ALMACENES = ["Almacen Aqp", "Planta Arequipa", "Suc Secocha", "Adm Aqp"];
@@ -22,4 +22,7 @@ export const ALMACEN_DEFECTO = "Almacen Aqp";
 /** Todas las ubicaciones donde puede haber stock (almacenes + sedes de requerimientos). */
 export const SEDES_STOCK = Array.from(new Set([...ALMACENES, ...SEDES]));
 
-export const UNIDADES = ["UND", "KG", "M", "M2", "GLN", "LT", "CAJA", "PAR", "JGO", "ROLLO", "BOLSA"];
+export const UNIDADES = ["UND", "PZA", "KG", "M", "M2", "GLN", "LT", "CAJA", "PAR", "JGO", "ROLLO", "BOLSA"];
+
+/** Sede por defecto del stock de repuestos (importación de saldos del almacén). */
+export const SEDE_REPUESTOS = "Taller Principal Aqp";

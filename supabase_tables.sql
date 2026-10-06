@@ -342,9 +342,9 @@ begin
     raise exception 'Su usuario no puede codificar gastos' using errcode = '42501';
   elsif (serie in ('BOL', 'RCT') or serie ~ '^BOL_[0-9]{4}$') and rol not in ('creador', 'planilla') then
     raise exception 'Su usuario no puede emitir boletas ni requerimientos de contratista' using errcode = '42501';
-  elsif serie in ('EQ', 'OP') and rol not in ('creador', 'almacen') then
+  elsif serie in ('EQ', 'OP', 'VPI') and rol not in ('creador', 'almacen') then
     raise exception 'Su usuario no puede registrar producción ni equipos terminados' using errcode = '42501';
-  elsif (serie not in ('REQ', 'OC', 'DJ', 'NP', 'F001', 'B001', 'OD', 'BOL', 'GST', 'RCT', 'EQ', 'OP') and serie !~ '^BOL_[0-9]{4}$') or rol is null then
+  elsif (serie not in ('REQ', 'OC', 'DJ', 'NP', 'F001', 'B001', 'OD', 'BOL', 'GST', 'RCT', 'EQ', 'OP', 'VPI') and serie !~ '^BOL_[0-9]{4}$') or rol is null then
     raise exception 'Serie inválida: %', serie using errcode = '22023';
   end if;
 

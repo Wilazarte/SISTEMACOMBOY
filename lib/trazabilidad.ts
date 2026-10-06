@@ -7,6 +7,7 @@ import { codigoDesdeNumero } from "./utils/codigos";
 import { equipoDeLinea, getMovimientos, sedeEquipo, type EquipoTerminado } from "./equipos";
 import { getOrdenesProduccion } from "./produccion";
 import { estadoOD, getDespachos } from "./ventas";
+import { consumosDeChasis } from "./inventario";
 
 export interface PasoTraza {
   titulo: string;
@@ -33,6 +34,11 @@ export function trazabilidadEquipo(e: EquipoTerminado): PasoTraza[] {
   } else {
     pasos.push({ titulo: "Registro en almacén", detalle: `Registrado por ${e.creado_por}${e.qc_aprobado ? " · QC aprobado" : ""}`, fecha: e.fecha_fabricacion || undefined, hecho: true });
   }
+
+  // Consumo de repuestos para este chasis / OP (Vales de Producción Interno)
+  consumosDeChasis(e.codigo_chasis, e.op_id).forEach((v) =>
+    pasos.push({ titulo: `Consumo ${v.id}`, detalle: `${v.cantidad} ${v.unidad} ${v.producto} · ${v.motivo} · ${v.solicitante}`, fecha: v.fecha, hecho: true })
+  );
 
   const ingreso = movs.find((m) => m.tipo === "INGRESO");
   const sedeIngreso = ingreso?.a_sede ?? (movs.find((m) => m.tipo === "TRANSFERENCIA")?.de_sede || sedeEquipo(e));
