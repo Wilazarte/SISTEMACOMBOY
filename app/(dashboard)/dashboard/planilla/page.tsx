@@ -323,7 +323,7 @@ export default function PlanillaPage() {
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-serif text-[36px] font-light leading-tight text-azul-900 lg:text-[42px]">Planilla</h1>
+          <h1 className="font-serif text-2xl font-light leading-tight text-azul-900 lg:text-3xl">Planilla</h1>
           <p className="mt-1 text-[13px] text-plomo-600">Trabajadores, liquidación del periodo, historial y contratistas</p>
         </div>
         <div className="flex flex-wrap gap-2">

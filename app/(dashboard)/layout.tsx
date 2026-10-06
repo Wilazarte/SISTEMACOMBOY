@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, Bell, Factory, Calculator, CloudUpload, Eye, KeyRound, Receipt, LayoutDashboard, Loader2, LogOut, Menu, Search, Truck, ShieldAlert, ShoppingCart, UserCircle2, Users, Warehouse, X } from "lucide-react";
-import { Badge, Toaster, cn, toast } from "@/components/ui";
+import { Badge, ID_BARRA_PESTANAS, Toaster, cn, toast } from "@/components/ui";
 import { DocViewerHost, abrirDoc, type DocRef } from "@/components/doc-viewer";
 import { ObservacionesGerencia } from "@/components/ObservacionesGerencia";
 import { Header } from "@/components/Header";
@@ -46,6 +46,19 @@ function buscar(q: string): Resultado[] {
 }
 
 /** Logotipo: COMBOY azul + VID rojo, serif. */
+/** Flujo de trabajo de cada módulo (subtítulo del header, para ubicarse rápido). */
+const FLUJOS: [string, string][] = [
+  ["/dashboard/compras", "Requerimiento → Cotización → Orden de Compra → Factura → Guía → V°B° Almacén"],
+  ["/dashboard/almacen", "Requerimiento → V°B° Ingreso → Stock → Orden de Despacho → Entrega"],
+  ["/dashboard/produccion", "Orden de Producción → QC firmado → Ingreso a Almacén → Venta → Despacho"],
+  ["/dashboard/ventas", "Nota de Pedido → Aprobación → Orden de Despacho → Factura / Boleta → Cobro"],
+  ["/dashboard/planilla", "Trabajadores → Planilla del periodo → Historial → Contratistas"],
+  ["/dashboard/contable", "Libro Diario → Mayor → Balance → Estados Financieros"],
+  ["/dashboard/creador", "Asistencia → Edición manual → Planilla"],
+  ["/dashboard", "Resumen → Compras → Almacén → Ventas → Contable"],
+];
+const flujoDe = (ruta: string) => FLUJOS.find(([r]) => ruta === r || ruta.startsWith(`${r}/`))?.[1] ?? "";
+
 function Logo({ className, claro }: { className?: string; claro?: boolean }) {
   return (
     <Link href="/dashboard" className={cn("flex items-baseline gap-2 font-serif font-bold leading-none tracking-tight", className)} aria-label="COMBOY VID - inicio">
@@ -238,7 +251,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <button className="text-azul-900 lg:hidden" onClick={() => setMenu(true)} aria-label="Abrir menú">
           <Menu size={22} />
         </button>
-        <Logo className="hidden text-[42px] sm:flex" />
+        <div className="hidden min-w-0 max-w-[50%] sm:block">
+          <Logo className="text-[34px]" />
+          {flujoDe(path) && <div title={flujoDe(path)} className="mt-0.5 truncate text-[11px] uppercase tracking-widest text-plomo-500">FLUJO: {flujoDe(path)}</div>}
+        </div>
         <div className="ml-auto flex flex-1 items-center justify-end gap-3">
           <div className={cn("relative w-full max-w-md", !buscador && "invisible")}>
             <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-plomo-500" />
@@ -329,6 +345,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         ) : (
           <div className="space-y-6">
             <Header sesion={sesion} />
+            {/* Pestañas del módulo (components/ui Tabs se dibuja aquí): fijas al hacer scroll */}
+            <div id={ID_BARRA_PESTANAS} className="sticky top-[75px] z-10 bg-plomo-50 pt-1 empty:hidden" />
             {sesion.soloLectura && (
               <div className="flex w-full items-center gap-2 rounded-xl border border-plomo-200 bg-white px-5 py-2.5 text-sm text-azul-700 shadow-[0_4px_12px_rgba(15,36,64,0.06)]">
                 <Eye size={16} /> Modo solo lectura: puede revisar todo y registrar observaciones, pero no guardar, editar ni eliminar.

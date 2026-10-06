@@ -49,7 +49,7 @@ export default function CreadorPage() {
   return (
     <div className="w-full space-y-6">
       <div>
-        <h1 className="flex items-center gap-3 font-serif text-[36px] font-light leading-tight text-azul-900 lg:text-[42px]">
+        <h1 className="flex items-center gap-3 font-serif text-2xl font-light leading-tight text-azul-900 lg:text-3xl">
           <KeyRound size={22} className="text-corp" /> Módulo Creador
         </h1>
         <p className="mt-1 text-[13px] text-plomo-600">Edición manual de asistencia: corrige DÍAS y TARD. de la planilla. Queda registrado como origen CREADOR.</p>

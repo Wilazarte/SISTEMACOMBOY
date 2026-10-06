@@ -78,7 +78,7 @@ export default function ContablePage() {
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-serif text-[36px] font-light leading-tight text-azul-900 lg:text-[42px]">Contable</h1>
+          <h1 className="font-serif text-2xl font-light leading-tight text-azul-900 lg:text-3xl">Contable</h1>
           <p className="mt-1 text-[13px] text-plomo-600">Libro Diario, Mayor, Balance de comprobación y Estados Financieros · asientos automáticos desde Ventas, Compras y Planilla</p>
         </div>
         {puedeGenerar && (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { createPortal } from "react-dom";
 import { AlertCircle, CheckCircle2, Clock, X } from "lucide-react";
 import type { EventoHistorial } from "@/lib/types";
 
@@ -175,6 +176,9 @@ export function Badge({ estado }: { estado: string }) {
 }
 
 // ---------------------------------------------------------------- Tabs
+/** Contenedor del layout (debajo de la tarjeta "Bienvenido") donde se muestran las pestañas del módulo. */
+export const ID_BARRA_PESTANAS = "erp-pestanas";
+
 export function Tabs<T extends string>({
   tabs,
   value,
@@ -184,15 +188,18 @@ export function Tabs<T extends string>({
   value: T;
   onChange: (id: T) => void;
 }) {
-  return (
-    <div className="flex gap-1 overflow-x-auto rounded-xl border border-plomo-200 bg-white p-1 shadow-[0_4px_12px_rgba(15,36,64,0.06)]">
+  // Las pestañas se dibujan en la barra fija del layout (si existe); si no, en su lugar.
+  const [destino, setDestino] = useState<HTMLElement | null>(null);
+  useEffect(() => setDestino(document.getElementById(ID_BARRA_PESTANAS)), []);
+  const barra = (
+    <div className="flex gap-2 overflow-x-auto rounded-xl border border-plomo-200 bg-white px-2 py-2 shadow-sm">
       {tabs.map((t) => (
         <button
           key={t.id}
           onClick={() => onChange(t.id)}
           className={cn(
-            "flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition",
-            value === t.id ? "bg-azul-900 text-white shadow-sm" : "text-plomo-600 hover:bg-plomo-100 hover:text-azul-900"
+            "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition",
+            value === t.id ? "bg-[#0f2238] text-white shadow-sm" : "text-plomo-600 hover:bg-plomo-100 hover:text-[#0f2238]"
           )}
         >
           {t.icon}
@@ -204,6 +211,7 @@ export function Tabs<T extends string>({
       ))}
     </div>
   );
+  return destino ? createPortal(barra, destino) : barra;
 }
 
 // ---------------------------------------------------------------- Modal

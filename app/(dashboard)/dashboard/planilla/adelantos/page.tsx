@@ -104,7 +104,7 @@ export default function AdelantosPage() {
           <Link href="/dashboard/planilla" className="mb-1 inline-flex items-center gap-1.5 text-sm font-medium text-plomo-500 hover:text-azul-900">
             <ArrowLeft size={16} /> Planilla
           </Link>
-          <h1 className="font-serif text-[36px] font-light leading-tight text-azul-900 lg:text-[42px]">Adelantos</h1>
+          <h1 className="font-serif text-2xl font-light leading-tight text-azul-900 lg:text-3xl">Adelantos</h1>
           <p className="mt-1 text-[13px] text-plomo-600">Adelantos de sueldo a los trabajadores. El monto se descontará en la planilla.</p>
         </div>
       </div>
