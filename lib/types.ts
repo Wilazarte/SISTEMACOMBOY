@@ -139,7 +139,7 @@ export interface Factura {
   archivos?: ArchivoGasto[];
 }
 
-export type TipoGasto = "REPRESENTACION" | "SERVICIO_BASICO" | "TRANSPORTE" | "COMPRA_SIN_REQ" | "OTROS";
+export type TipoGasto = "REPRESENTACION" | "SERVICIO_BASICO" | "TRANSPORTE" | "COMPRA_SIN_REQ" | "OTROS" | "PLANILLA";
 export type ComprobanteGasto = "FACTURA" | "BOLETA" | "DJ" | "RECIBO";
 export interface ArchivoGasto {
   tipo: "FACTURA" | "GUIA";
@@ -176,7 +176,7 @@ export type TipoDoc = "REQ" | "COTI" | "OC" | "FACTURA" | "GUIA";
 // Módulo de Planilla — Trabajadores
 // =====================================================================
 
-export type TipoSueldo = "DIARIO" | "SEMANAL" | "QUINCENAL" | "MENSUAL" | "POR_CONTRATO";
+export type TipoSueldo = "DIARIO" | "SEMANAL" | "QUINCENAL" | "MENSUAL" | "POR_HORA" | "POR_CONTRATO";
 
 export type TipoAfp = "AFP_INTEGRA" | "AFP_PRIMA" | "AFP_HABITAT" | "AFP_PROFUTURO" | "ONP" | "SIN";
 

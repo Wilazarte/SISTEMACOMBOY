@@ -20,11 +20,22 @@ export interface Adelanto {
   planilla_id: string | null; // planilla_historial.id donde se descontó
   planilla_periodo?: string | null; // "SEMANA 2 - OCTUBRE 2026"
   descontado_en: string | null;
+  // Columnas opcionales (supabase/adelantos_semana.sql)
+  trabajador_id?: string | null;
+  semana?: string | null;
+  sede?: string | null;
   created_at?: string;
   updated_at?: string;
 }
 
 export type DatosAdelanto = Pick<Adelanto, "trabajador_nombre" | "dni" | "fecha" | "monto" | "motivo" | "estado">;
+/** Datos extra que se guardan si la tabla ya tiene las columnas (supabase/adelantos_semana.sql). */
+export type ExtrasAdelanto = { trabajador_id?: string; semana?: string; sede?: string };
+
+// La tabla no tiene alguna columna extra (aún no se ejecutó adelantos_semana.sql)
+const sinColumna = (e: { code?: string }) => e.code === "PGRST204" || e.code === "42703";
+const extrasLimpios = (x?: ExtrasAdelanto) =>
+  Object.fromEntries(Object.entries(x ?? {}).filter(([, v]) => typeof v === "string" && v.trim() !== "").map(([k, v]) => [k, String(v).trim()]));
 
 const COLUMNAS = "*";
 const MSG_FALTA_TABLA = "Falta la tabla adelantos en Supabase: ejecute supabase/adelantos.sql en el SQL Editor.";
@@ -53,6 +64,9 @@ const aAdelanto = (r: Record<string, unknown>): Adelanto => ({
   estado: estadoDe(r.estado),
   planilla_id: (r.planilla_id as string | null) ?? null,
   descontado_en: (r.descontado_en as string | null) ?? null,
+  trabajador_id: (r.trabajador_id as string | null) ?? null,
+  semana: (r.semana as string | null) ?? null,
+  sede: (r.sede as string | null) ?? null,
   created_at: r.created_at as string | undefined,
   updated_at: r.updated_at as string | undefined,
 });
@@ -89,16 +103,21 @@ export async function listarAdelantos(): Promise<Adelanto[]> {
   return lista;
 }
 
-export async function crearAdelanto(datos: DatosAdelanto): Promise<Adelanto> {
-  const { data, error } = await createClient().from("adelantos").insert(preparar(datos)).select(COLUMNAS).single();
+export async function crearAdelanto(datos: DatosAdelanto, extras?: ExtrasAdelanto): Promise<Adelanto> {
+  const limpio = preparar(datos);
+  const insertar = (fila: object) => createClient().from("adelantos").insert(fila).select(COLUMNAS).single();
+  let { data, error } = await insertar({ ...limpio, ...extrasLimpios(extras) });
+  if (error && sinColumna(error)) ({ data, error } = await insertar(limpio));
   if (error) throw errorAdelantos(error);
   return aAdelanto(data);
 }
 
-export async function editarAdelanto(id: string, datos: DatosAdelanto): Promise<Adelanto> {
+export async function editarAdelanto(id: string, datos: DatosAdelanto, extras?: ExtrasAdelanto): Promise<Adelanto> {
   const limpio = preparar(datos);
   // Solo si no está descontado (la base también lo bloquea con un trigger)
-  const { data, error } = await createClient().from("adelantos").update(limpio).eq("id", id).not("estado", "ilike", "descontado").select(COLUMNAS);
+  const actualizar = (fila: object) => createClient().from("adelantos").update(fila).eq("id", id).not("estado", "ilike", "descontado").select(COLUMNAS);
+  let { data, error } = await actualizar({ ...limpio, ...extrasLimpios(extras) });
+  if (error && sinColumna(error)) ({ data, error } = await actualizar(limpio));
   if (error) throw errorAdelantos(error);
   // Sin filas: no existe o la RLS no deja editarlo
   if (!data?.length) throw new ErpError("No se pudo actualizar: el adelanto ya fue descontado, no existe o su usuario no tiene permiso.");

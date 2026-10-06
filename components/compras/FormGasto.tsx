@@ -97,7 +97,7 @@ export function FormGasto({ rol, proveedores, onGuardado }: { rol: Rol; proveedo
               const tipoGasto = e.target.value as TipoGasto;
               setD((x) => ({ ...x, tipoGasto, detraccionPorc: DETRACCION_SUGERIDA[tipoGasto] }));
             }}
-            options={(Object.keys(TIPOS_GASTO) as TipoGasto[]).map((k) => ({ value: k, label: TIPOS_GASTO[k] }))}
+            options={(Object.keys(TIPOS_GASTO) as TipoGasto[]).filter((k) => k !== "PLANILLA").map((k) => ({ value: k, label: TIPOS_GASTO[k] }))}
           />
         </Field>
         <Field label="Fecha de gasto *" hint={fechaError ? `⚠ ${fechaError}` : "DD/MM/AAAA"}>

@@ -24,6 +24,7 @@ import {
   r2,
   registrarDesdeAsistencia,
   soles,
+  sumarDias,
   trabajadorVacio,
   unirDuplicado,
   useStore,
@@ -33,6 +34,8 @@ import { getSesion } from "@/lib/auth";
 import { HORA_TARDANZA, aplicarAlias, leerMarcaciones, resumirAsistencia, textoCsv, type AsistenciaMap } from "@/lib/asistencia";
 import { MODOS_LIQUIDACION, cambiarConfig, cambiarModo, liquidacionDe, liquidar, type ResultadoLiquidacion } from "@/lib/liquidacion";
 import { CerrarSemana } from "@/components/planilla/CerrarSemana";
+import { AdelantosTrabajador } from "@/components/planilla/AdelantosTrabajador";
+import { PagarSemanaFiltrada } from "@/components/planilla/PagarSemanaFiltrada";
 import { Contratistas } from "@/components/planilla/Contratistas";
 import { ContratistasMaestro } from "@/components/planilla/ContratistasMaestro";
 import { FichaTrabajador } from "@/components/planilla/FichaTrabajador";
@@ -72,6 +75,60 @@ const afpLabel = (t: Trabajador): string => AFP_OPTIONS[t.afpTipo as TipoAfp]?.l
 const horasTxt = (h: number) => h.toLocaleString("es-PE", { maximumFractionDigits: 2 });
 const valorHoraTxt = (v: number) => `S/ ${v.toFixed(4)}`;
 
+/** Filtro por tipo de sueldo de la planilla del periodo. */
+type FiltroSueldo = "TODOS" | "DIARIO" | "MENSUAL" | "POR_HORA";
+const FILTROS_SUELDO: { id: FiltroSueldo; label: string; grupo: string }[] = [
+  { id: "TODOS", label: "Todos", grupo: "TODOS" },
+  { id: "DIARIO", label: "S/ Diario", grupo: "DIARIO" },
+  { id: "MENSUAL", label: "S/ Mensual", grupo: "MENSUAL" },
+  { id: "POR_HORA", label: "S/ por Hora", grupo: "POR HORA" },
+];
+/** Diario: sueldo por día · Por hora: sueldo por hora · Mensual: sueldo fijo del periodo (mensual, quincenal o semanal). */
+const filtroDe = (t: Trabajador): Exclude<FiltroSueldo, "TODOS"> =>
+  t.tipoSueldo === "POR_HORA" ? "POR_HORA" : t.tipoSueldo === "MENSUAL" || t.tipoSueldo === "QUINCENAL" || t.tipoSueldo === "SEMANAL" ? "MENSUAL" : "DIARIO";
+const grupoDe = (f: FiltroSueldo) => FILTROS_SUELDO.find((x) => x.id === f)!.grupo;
+
+const MESES_TXT = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+/** Lunes a domingo de la semana actual. */
+function semanaActual(): { desde: string; hasta: string } {
+  const dia = (new Date().getDay() + 6) % 7; // lunes = 0
+  const desde = sumarDias(hoy(), -dia);
+  return { desde, hasta: sumarDias(desde, 6) };
+}
+/** "Semana 14 - 01 al 07 Abril 2026" (si cruza de mes: "30 Marzo al 05 Abril 2026"). */
+function etiquetaSemana(periodo: string, desde: string, hasta: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || !/^\d{4}-\d{2}-\d{2}$/.test(hasta)) return normalizarPeriodo(periodo);
+  const n = periodo.match(/SEMANA\s+(\d+)/i)?.[1];
+  const [y1, m1, d1] = desde.split("-");
+  const [y2, m2, d2] = hasta.split("-");
+  const ini = m1 === m2 && y1 === y2 ? d1 : `${d1} ${MESES_TXT[Number(m1) - 1]}${y1 !== y2 ? ` ${y1}` : ""}`;
+  return `${n ? `Semana ${n} - ` : ""}${ini} al ${d2} ${MESES_TXT[Number(m2) - 1]} ${y2}`;
+}
+
+/** Fila del historial (copia de la planilla tal como se ve) para pagar / cerrar. */
+const filaCierre = (t: TrabajadorCalc): FilaCierre => ({
+  trabajador_id: t.id,
+  nombre: t.nombre,
+  dni: t.dni || null,
+  cargo: t.cargo || null,
+  fecha_ingreso: t.fechaIngreso || null,
+  tipo_sueldo: sueldoDe(t).label,
+  pension: afpLabel(t),
+  afp_porcentaje: t.afpPorcentaje || 0,
+  sueldo: t.sueldo,
+  dias: t.dias,
+  horas: t.horas,
+  tardanzas: t.tardanzas,
+  valor_hora: Math.round(t.valorHora * 10000) / 10000,
+  bruto: t.bruto,
+  descuento_afp: t.descuentoAfp,
+  neto: t.neto,
+  adelantos: t.adelantosDescuento,
+  total_pagar: t.totalPagar,
+  adelanto_ids: t.adelantoIds,
+  origen: t.origen ?? null,
+});
+
 /** Antigüedad legible desde la fecha de ingreso. */
 function antiguedad(fechaIngreso: string): string {
   if (!fechaIngreso) return "-";
@@ -94,7 +151,9 @@ function calcular(t: Trabajador, liq: LiquidacionPeriodo, asistenciaExterna?: As
   const reloj = fechas
     ? resumirAsistencia(fechas)
     : { dias: registro?.dias ?? 0, horas: registro?.horas ?? (registro?.dias ?? 0) * liq.horasJornada, tardanzas: registro?.tardanzas ?? 0 };
-  const r = liquidar(t.sueldo, sueldoDe(t).divisor, reloj, liq, liq.ajustes[t.id]);
+  // Por hora: el sueldo ya es S/ por hora -> diario = hora × jornada del periodo
+  const divisor = t.tipoSueldo === "POR_HORA" ? 1 / (liq.horasJornada > 0 ? liq.horasJornada : 8) : sueldoDe(t).divisor;
+  const r = liquidar(t.sueldo, divisor, reloj, liq, liq.ajustes[t.id]);
   const descuentoAfp = r2(r.bruto * ((t.afpPorcentaje || 0) / 100));
   const neto = r2(r.bruto - descuentoAfp);
   return {
@@ -129,7 +188,7 @@ function conAdelantos(c: TrabajadorCalc, grupos: Map<string, PendientesTrabajado
     adelantosPendientes: r2(pendientes.reduce((s, a) => s + a.monto, 0)),
     adelantosDescuento: total,
     adelantoIds: descontar.map((a) => a.id),
-    totalPagar: r2(c.neto - total),
+    totalPagar: Math.max(0, r2(c.neto - total)), // nunca negativo
   };
 }
 
@@ -170,6 +229,9 @@ export default function PlanillaPage() {
   const [ficha, setFicha] = useState<{ form: Trabajador; idOriginal?: string } | null>(null);
   const [verInactivos, setVerInactivos] = useState(false);
   const [buscar, setBuscar] = useState("");
+  const [filtro, setFiltro] = useState<FiltroSueldo>("DIARIO");
+  const [rango, setRango] = useState(semanaActual);
+  const [adelantoDe, setAdelantoDe] = useState<TrabajadorCalc | null>(null);
 
   const liq = useMemo(() => liquidacionDe(liquidaciones, periodo), [liquidaciones, periodo]);
   const incompletos = trabajadores.filter((t) => t.activo && !t.fechaIngreso);
@@ -187,34 +249,21 @@ export default function PlanillaPage() {
         .map((t) => conAdelantos(calcular(t, liq, excel?.asistencia, delPeriodo.get(idAsistencia(periodo, t.id))), adelantos.grupos)),
     [trabajadores, liq, excel, delPeriodo, periodo, adelantos.grupos]
   );
-  // Copia de la planilla tal como se ve, para "Pagar planilla"
-  const filasCierre = useMemo<FilaCierre[]>(
-    () =>
-      calculados.map((t) => ({
-        trabajador_id: t.id,
-        nombre: t.nombre,
-        dni: t.dni || null,
-        cargo: t.cargo || null,
-        fecha_ingreso: t.fechaIngreso || null,
-        tipo_sueldo: sueldoDe(t).label,
-        pension: afpLabel(t),
-        afp_porcentaje: t.afpPorcentaje || 0,
-        sueldo: t.sueldo,
-        dias: t.dias,
-        horas: t.horas,
-        tardanzas: t.tardanzas,
-        valor_hora: Math.round(t.valorHora * 10000) / 10000,
-        bruto: t.bruto,
-        descuento_afp: t.descuentoAfp,
-        neto: t.neto,
-        adelantos: t.adelantosDescuento,
-        total_pagar: t.totalPagar,
-        adelanto_ids: t.adelantoIds,
-        origen: t.origen ?? null,
-      })),
-    [calculados]
-  );
   const periodoCerrado = historial.lista.some((h) => h.periodo === normalizarPeriodo(periodo));
+  // Pagos por tipo de sueldo ya hechos en este periodo ("SEMANA 14 - ABRIL 2026 · DIARIO")
+  const gruposPagados = useMemo(() => {
+    const pre = `${normalizarPeriodo(periodo)} · `;
+    return new Set(historial.lista.filter((h) => h.periodo.startsWith(pre)).map((h) => h.periodo.slice(pre.length)));
+  }, [historial.lista, periodo]);
+  const pagado = (t: Trabajador) => periodoCerrado || gruposPagados.has("TODOS") || gruposPagados.has(grupoDe(filtroDe(t)));
+  // Lo que se ve en la tabla: solo el tipo de sueldo filtrado
+  const visibles = calculados.filter((t) => filtro === "TODOS" || filtroDe(t) === filtro);
+  // "Pagar planilla" (cierra la semana): todos los que aún no se pagaron
+  const filasCierre = calculados.filter((t) => !pagado(t)).map(filaCierre);
+  // "Pagar semana filtrada": solo los del filtro que aún no se pagaron
+  const filasFiltradas = visibles.filter((t) => !pagado(t)).map(filaCierre);
+  const filtroActual = FILTROS_SUELDO.find((x) => x.id === filtro)!;
+  const filtroPagado = periodoCerrado || gruposPagados.has("TODOS") || gruposPagados.has(filtroActual.grupo) || (filtro === "TODOS" && gruposPagados.size > 0 && filasFiltradas.length === 0);
   const listaMaestro = trabajadores
     .filter((t) => verInactivos || t.activo)
     .filter((t) => {
@@ -222,12 +271,13 @@ export default function PlanillaPage() {
       return !q || t.nombre.includes(q) || t.dni.includes(q) || t.id === q || (t.cargo ?? "").toUpperCase().includes(q);
     })
     .sort((a, b) => Number(b.activo) - Number(a.activo) || a.id.localeCompare(b.id, undefined, { numeric: true }));
+  // Totales solo de los trabajadores filtrados
   const totales = {
-    basico: r2(calculados.reduce((a, b) => a + b.liq.basico, 0)),
-    extra: r2(calculados.reduce((a, b) => a + b.liq.montoExtra, 0)),
-    afp: r2(calculados.reduce((a, b) => a + b.descuentoAfp, 0)),
-    adelantos: r2(calculados.reduce((a, b) => a + b.adelantosDescuento, 0)),
-    pagar: r2(calculados.reduce((a, b) => a + b.totalPagar, 0)),
+    basico: r2(visibles.reduce((a, b) => a + b.liq.basico, 0)),
+    extra: r2(visibles.reduce((a, b) => a + b.liq.montoExtra, 0)),
+    afp: r2(visibles.reduce((a, b) => a + b.descuentoAfp, 0)),
+    adelantos: r2(visibles.reduce((a, b) => a + b.adelantosDescuento, 0)),
+    pagar: r2(visibles.reduce((a, b) => a + b.totalPagar, 0)),
   };
 
   // IMPORTAR ASISTENCIA — formato del reloj: N° | Nombre | Tiempo (DD/MM/YYYY HH:mm:ss) | Estado
@@ -261,6 +311,7 @@ export default function PlanillaPage() {
         [...mapa].map(([trabajador, fechas]) => ({ trabajador, ...resumirAsistencia(fechas) }))
       );
       setExcel({ asistencia: mapa, desde, hasta });
+      setRango({ desde, hasta });
       setTab("planilla");
       toast(
         `Asistencia del ${fechaPE(desde)} al ${fechaPE(hasta)} importada en ${normalizarPeriodo(periodo)}: ${n} trabajador(es)${creados ? ` · ${creados} nuevo(s) por completar` : ""}`
@@ -477,9 +528,32 @@ export default function PlanillaPage() {
             <label className="block rounded-xl border border-plomo-200 bg-white p-3 shadow-sm">
               <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-plomo-500">Periodo</span>
               <Input value={periodo} onChange={(e) => setPeriodo(e.target.value)} className="font-semibold" />
+              <span className="mt-2 block text-[13px] font-semibold text-azul-900" data-semana>
+                {etiquetaSemana(periodo, rango.desde, rango.hasta)}
+              </span>
+              <span className="mt-1 flex items-center gap-1.5">
+                <input
+                  type="date"
+                  aria-label="Inicio de semana"
+                  value={rango.desde}
+                  max={rango.hasta || undefined}
+                  onChange={(e) => setRango((r) => ({ ...r, desde: e.target.value }))}
+                  className="w-full rounded-lg border border-plomo-200 px-2 py-1.5 text-xs"
+                />
+                <span className="text-xs text-plomo-500">al</span>
+                <input
+                  type="date"
+                  aria-label="Fin de semana"
+                  value={rango.hasta}
+                  min={rango.desde || undefined}
+                  onChange={(e) => setRango((r) => ({ ...r, hasta: e.target.value }))}
+                  className="w-full rounded-lg border border-plomo-200 px-2 py-1.5 text-xs"
+                />
+              </span>
             </label>
             <div className="rounded-xl border border-plomo-200 bg-white p-3 text-sm shadow-sm">
-              Trabajadores activos: <b>{calculados.length}</b>
+              Trabajadores ({filtroActual.label}): <b>{visibles.length}</b>
+              {filtro !== "TODOS" && <span className="text-plomo-500"> de {calculados.length}</span>}
               <p className="text-xs text-plomo-500">
                 {excel
                   ? `Excel del ${fechaPE(excel.desde)} al ${fechaPE(excel.hasta)} · ${excel.asistencia.size} trabajador(es)`
@@ -495,7 +569,7 @@ export default function PlanillaPage() {
               </p>
             </div>
             <div className="rounded-xl bg-azul-900 p-3 text-sm text-white">
-              Total a pagar: <b className="text-xl text-white">{soles(totales.pagar)}</b>
+              Total a pagar{filtro !== "TODOS" ? ` (${filtroActual.label})` : ""}: <b className="text-xl text-white">{soles(totales.pagar)}</b>
             </div>
           </div>
           {adelantos.error && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">Adelantos: {adelantos.error} (la planilla se calcula sin descontarlos).</p>}
@@ -503,6 +577,29 @@ export default function PlanillaPage() {
           {/* Modo de cálculo */}
           <Card>
             <div className="flex flex-wrap items-end gap-4 p-4">
+              <div>
+                <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-plomo-500">Tipo de sueldo</span>
+                <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrar por tipo de sueldo">
+                  {FILTROS_SUELDO.map((f) => {
+                    const n = f.id === "TODOS" ? calculados.length : calculados.filter((t) => filtroDe(t) === f.id).length;
+                    return (
+                      <button
+                        key={f.id}
+                        type="button"
+                        data-filtro={f.id}
+                        aria-pressed={filtro === f.id}
+                        onClick={() => setFiltro(f.id)}
+                        className={cn(
+                          "rounded-full border px-4 py-2 text-sm font-semibold transition",
+                          filtro === f.id ? "border-[#0f2238] bg-[#0f2238] text-white" : "border-plomo-200 bg-white text-plomo-600 hover:border-[#0f2238] hover:text-[#0f2238]"
+                        )}
+                      >
+                        {f.label} <span className={cn("ml-1 text-xs", filtro === f.id ? "text-white/70" : "text-plomo-500")}>{n}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <div>
                 <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-plomo-500">Modo de cálculo</span>
                 <div className="inline-flex overflow-hidden rounded-xl border border-plomo-200">
@@ -567,15 +664,29 @@ export default function PlanillaPage() {
           <Card>
             <CardHeader
               title={`Planilla · ${normalizarPeriodo(periodo)}`}
-              subtitle={`Liquidación por ${MODOS_LIQUIDACION[liq.modo].label.toLowerCase()} · ${calculados.filter((c) => c.liq.manual).length} con ajuste manual`}
+              subtitle={`${filtroActual.label} · ${visibles.length} trabajador(es) · liquidación por ${MODOS_LIQUIDACION[liq.modo].label.toLowerCase()} · ${visibles.filter((c) => c.liq.manual).length} con ajuste manual${gruposPagados.size ? ` · pagado: ${[...gruposPagados].join(", ")}` : ""}`}
               action={
                 <div className="flex flex-wrap gap-2">
                   {importarBtn}
                   {puedeEditar && (
+                    <PagarSemanaFiltrada
+                      periodo={normalizarPeriodo(periodo)}
+                      grupo={filtroActual.grupo}
+                      etiqueta={filtroActual.label}
+                      filas={filasFiltradas}
+                      rango={rango}
+                      yaPagado={filtroPagado}
+                      onPagado={() => {
+                        void historial.recargar();
+                        void adelantos.recargar();
+                      }}
+                    />
+                  )}
+                  {puedeEditar && (
                     <CerrarSemana
                       periodo={normalizarPeriodo(periodo)}
                       filas={filasCierre}
-                      rango={excel ? { desde: excel.desde, hasta: excel.hasta } : undefined}
+                      rango={rango.desde && rango.hasta ? rango : undefined}
                       yaCerrado={periodoCerrado}
                       onCerrado={() => {
                         // Sin esperar a Realtime: el periodo aparece en el historial y los adelantos ya descontados salen de la planilla
@@ -588,18 +699,19 @@ export default function PlanillaPage() {
                 </div>
               }
             />
-            {calculados.length === 0 ? (
+            {visibles.length === 0 ? (
               <div className="p-5">
-                <Empty icon={<Calculator size={28} />} text="No hay trabajadores activos." />
+                <Empty icon={<Calculator size={28} />} text={calculados.length ? `No hay trabajadores con ${filtroActual.label}.` : "No hay trabajadores activos."} />
               </div>
             ) : (
               <Table head={["Trabajador", "Reloj 🔒", "A liquidar", "Básico", "H. extra", "AFP / ONP", "Adelantos", "Total a pagar", "Boleta"]}>
-                {calculados.map((t) => (
+                {visibles.map((t) => (
                   <tr key={t.id} className="align-top">
                     <Td>
                       <p className="font-semibold text-azul-900">
                         <span className="mr-1 font-mono text-xs text-slate-400">{t.id}</span>
                         {t.nombre}
+                        {pagado(t) && !periodoCerrado && <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">PAGADO</span>}
                       </p>
                       <p className="text-xs text-plomo-500">
                         {soles(t.sueldo)} {sueldoDe(t).label.toLowerCase()} · diario {soles(t.liq.sueldoDiario)} · hora {valorHoraTxt(t.valorHora)}
@@ -613,7 +725,7 @@ export default function PlanillaPage() {
                       </div>
                     </Td>
                     <Td>
-                      <LiquidacionCelda periodo={periodo} trabajadorId={t.id} liq={liq} r={t.liq} editable={puedeEditar && !periodoCerrado} />
+                      <LiquidacionCelda periodo={periodo} trabajadorId={t.id} liq={liq} r={t.liq} editable={puedeEditar && !pagado(t)} />
                     </Td>
                     <Td className="text-right">{soles(t.liq.basico)}</Td>
                     <Td className="text-right">{t.liq.montoExtra ? soles(t.liq.montoExtra) : <span className="text-slate-400">-</span>}</Td>
@@ -622,6 +734,13 @@ export default function PlanillaPage() {
                       <p className="text-[10px] text-plomo-500">{t.afpPorcentaje}%</p>
                     </Td>
                     <Td className="text-right">
+                      <button
+                        type="button"
+                        data-adelanto={t.id}
+                        onClick={() => setAdelantoDe(t)}
+                        title={t.adelantosPendientes > 0 ? "Ver / editar adelantos" : "Registrar adelanto"}
+                        className="rounded-md px-1.5 py-0.5 text-right transition hover:bg-red-50 hover:ring-1 hover:ring-red-200"
+                      >
                       {t.adelantosPendientes > 0 ? (
                         <>
                           <span className="font-semibold text-red-600">- {soles(t.adelantosDescuento)}</span>
@@ -632,8 +751,9 @@ export default function PlanillaPage() {
                           )}
                         </>
                       ) : (
-                        <span className="text-slate-400">-</span>
+                        <span className="text-slate-400 underline decoration-dotted underline-offset-4">-</span>
                       )}
+                      </button>
                     </Td>
                     <Td className="text-right text-base font-bold text-emerald-700">{soles(t.totalPagar)}</Td>
                     <Td>
@@ -670,6 +790,18 @@ export default function PlanillaPage() {
 
       {/* FICHA DEL TRABAJADOR (registrar / editar / baja / eliminar / historial de pagos) */}
       {ficha && <FichaTrabajador inicial={ficha.form} idOriginal={ficha.idOriginal} soloLectura={!puedeEditar} onClose={() => setFicha(null)} />}
+
+      {/* ADELANTOS DEL TRABAJADOR (columna ADELANTOS) */}
+      {adelantoDe && (
+        <AdelantosTrabajador
+          trabajador={adelantoDe}
+          periodo={normalizarPeriodo(periodo)}
+          pendientes={pendientesDe(adelantoDe, adelantos.grupos)}
+          editable={puedeEditar && !pagado(adelantoDe)}
+          onClose={() => setAdelantoDe(null)}
+          onCambio={() => void adelantos.recargar()}
+        />
+      )}
 
       {/* MODAL BOLETA */}
       <Modal open={!!boletaSel} onClose={() => setBoletaSel(null)} title="Boleta de pago">

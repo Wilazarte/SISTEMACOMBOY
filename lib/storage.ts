@@ -1227,6 +1227,7 @@ export const TIPOS_SUELDO: Record<TipoSueldo, { label: string; divisor: number }
   SEMANAL: { label: "Semanal", divisor: 6 }, // 6 días laborables
   QUINCENAL: { label: "Quincenal", divisor: 13 }, // 13 días laborables
   MENSUAL: { label: "Mensual", divisor: 26 }, // 26 días laborables
+  POR_HORA: { label: "Por hora", divisor: 1 / 8 }, // sueldo = S/ por hora; diario = hora × jornada (la planilla usa la jornada del periodo)
   POR_CONTRATO: { label: "Por contrato", divisor: 30 }, // contratistas: no entran a la planilla del periodo
 };
 
@@ -1686,6 +1687,7 @@ export const TIPOS_GASTO: Record<TipoGasto, string> = {
   TRANSPORTE: "Transporte / Agencia / Flete",
   COMPRA_SIN_REQ: "Compra sin requerimiento",
   OTROS: "Otros",
+  PLANILLA: "Planilla semanal (sueldos)",
 };
 
 export const COMPROBANTES_GASTO: Record<ComprobanteGasto, string> = {
@@ -1702,6 +1704,7 @@ export const DETRACCION_SUGERIDA: Record<TipoGasto, number> = {
   TRANSPORTE: 4,
   COMPRA_SIN_REQ: 10,
   OTROS: 12,
+  PLANILLA: 0,
 };
 export const PORCENTAJES_DETRACCION = [4, 10, 12];
 
@@ -1782,6 +1785,47 @@ export function registrarGastoTesoreria(d: DatosGasto, rol: Rol): Factura {
     ...(d.detraccion ? { detraccionPorc: d.detraccionPorc, detraccionMonto: monto } : {}),
     netoPagar: neto,
     ...(d.archivos.length ? { archivos: d.archivos } : {}),
+  };
+  escribir(KEYS.FACTURAS, [f, ...getFacturas()]);
+  return f;
+}
+
+/**
+ * EGRESO de Tesorería por el pago de una planilla semanal (ej. solo trabajadores con sueldo diario).
+ * Queda en Facturas como gasto de Tesorería tipo PLANILLA, ya PAGADA (no lleva comprobante de proveedor).
+ */
+export function registrarEgresoPlanilla(
+  d: { periodo: string; grupo: string; desde: string; hasta: string; total: number; trabajadores: number; historialId: string },
+  rol: Rol
+): Factura {
+  const total = r2(d.total);
+  if (!(total > 0)) throw new ErpError("El total a pagar debe ser mayor a 0.");
+  const numero = `PLLA ${d.periodo} ${d.grupo}`.toUpperCase();
+  if (getFacturas().some((f) => f.tipoGasto === "PLANILLA" && f.numero === numero)) throw new ErpError(`El egreso ${numero} ya está registrado en Tesorería.`);
+  const fecha = hoy();
+  const rango = d.desde && d.hasta ? ` · del ${fechaPE(d.desde)} al ${fechaPE(d.hasta)}` : "";
+  const f: Factura = {
+    id: uid(),
+    tipo: "FACTURA",
+    numero,
+    fecha,
+    fechaVencimiento: fecha,
+    ocId: "",
+    ocNumero: "-",
+    reqId: "",
+    reqNumero: "-",
+    proveedor: "PLANILLA DE TRABAJADORES",
+    ruc: "",
+    subtotal: total,
+    igv: 0,
+    total,
+    estadoPago: "PAGADA",
+    historial: [evento(rol, "Egreso por planilla semanal", `${d.periodo} · ${d.grupo} · ${d.trabajadores} trabajador(es)${rango} · historial ${d.historialId}`)],
+    esGastoTesoreria: true,
+    tipoGasto: "PLANILLA",
+    descripcion: `Pago planilla ${d.periodo} - ${d.grupo} (${d.trabajadores} trabajadores)${rango}`,
+    comprobanteGasto: "RECIBO",
+    netoPagar: total,
   };
   escribir(KEYS.FACTURAS, [f, ...getFacturas()]);
   return f;

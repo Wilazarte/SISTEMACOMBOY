@@ -255,6 +255,11 @@ create policy compras_escribir on public.compras for all to authenticated
     )
   );
 
+-- Planilla: solo el EGRESO por pago de planilla semanal (ver supabase/egreso_planilla.sql)
+create policy compras_egreso_planilla on public.compras for all to authenticated
+  using (public.mi_rol() = 'planilla' and tipo = 'factura' and data->>'tipoGasto' = 'PLANILLA')
+  with check (public.mi_rol() = 'planilla' and tipo = 'factura' and data->>'tipoGasto' = 'PLANILLA');
+
 -- almacen (stock y órdenes de despacho): lo ven Almacén, Compras y Ventas; lo mueven compras directas y
 -- ventas (tesorería: crea la orden de despacho al emitir) y V°B° / despachos (almacén)
 create policy almacen_select on public.almacen for select to authenticated
