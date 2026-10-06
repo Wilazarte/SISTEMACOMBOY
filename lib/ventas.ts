@@ -24,6 +24,7 @@ import {
   sumarDias,
   uid,
 } from "./storage";
+import { disponibleEquipo, equipoDeLinea, marcarEquiposVendidos, sedeEquipo } from "./equipos";
 import { asientoAjusteVenta, asientoDe, asientoNotaPedido, esAsientoContable, revertirAsiento, revertirAsientoId } from "./contable";
 import type {
   AsientoContable,
@@ -747,11 +748,18 @@ function asientoCobro(c: ComprobanteVenta, monto: number, medio: CobroVenta["med
 function lineaDespacho(l: LineaVenta): LineaDespacho {
   const porM2 = l.unidad === "M2" && l.m2 > 0;
   const nombre = l.productoNombre.trim().toUpperCase();
+  // Equipo terminado (fabricado): código EQ, chasis y sede donde está DISPONIBLE
+  const eq = equipoDeLinea(l);
   // Código y ubicación (sedes con stock) del producto en Almacén
-  const enStock = nombre ? getStock().filter((s) => s.nombre === nombre && s.unidad === l.unidad) : [];
+  const enStock = nombre && !eq ? getStock().filter((s) => s.nombre === nombre && s.unidad === l.unidad) : [];
   return {
-    codigo: enStock[0]?.id.slice(0, 8).toUpperCase() || (nombre ? "-" : "SERV"),
-    ubicacion: enStock.filter((s) => s.cantidad > 0).map((s) => s.sede).join(", ") || (nombre ? "Sin stock" : "-"),
+    codigo: eq ? eq.id : enStock[0]?.id.slice(0, 8).toUpperCase() || (nombre ? "-" : "SERV"),
+    codigo_chasis: eq?.codigo_chasis,
+    ubicacion: eq
+      ? eq.estado === "DISPONIBLE"
+        ? sedeEquipo(eq)
+        : `${sedeEquipo(eq)} (${eq.estado})`
+      : enStock.filter((s) => s.cantidad > 0).map((s) => s.sede).join(", ") || (nombre ? "Sin stock" : "-"),
     id: uid(),
     productoNombre: l.productoNombre.trim().toUpperCase(),
     descripcion: l.descripcion,
@@ -1072,12 +1080,24 @@ export function registrarDespacho(id: string, mov: Omit<MovimientoDespacho, "fec
     if (!it) throw new ErpError("Línea de despacho inválida.");
     if (l.cantidad > pendienteLinea(it) + 1e-9) throw new ErpError(`${it.descripcion}: máximo pendiente ${pendienteLinea(it)} ${it.unidad}.`);
   }
+  // Equipos terminados: se cuentan por chasis + sede + DISPONIBLE (no por stock de repuestos) y pasan a VENDIDO
+  const conItem = lineas.map((l) => ({ it: od.items.find((x) => x.id === l.lineaId)!, cantidad: l.cantidad }));
+  const equipos = conItem.map((x) => ({ ...x, eq: equipoDeLinea(x.it) })).filter((x) => x.eq);
+  for (const { it, eq, cantidad } of equipos) {
+    const disp = disponibleEquipo(eq!.codigo_chasis, mov.sede);
+    if (disp + 1e-9 < cantidad)
+      throw new ErpError(
+        `Equipo ${eq!.codigo_chasis} (${eq!.id}): no está DISPONIBLE en ${mov.sede}` +
+          (eq!.estado !== "DISPONIBLE" ? ` (estado ${eq!.estado})` : ` (está en ${sedeEquipo(eq!)})`) +
+          `. ${it.descripcion}`
+      );
+  }
   // Salida de stock solo de productos de Almacén (los servicios no mueven stock). Si falta stock, no se despacha nada.
-  const salidas = lineas
-    .map((l) => ({ it: od.items.find((x) => x.id === l.lineaId)!, cantidad: l.cantidad }))
-    .filter(({ it }) => it.productoNombre)
+  const salidas = conItem
+    .filter(({ it }) => it.productoNombre && !equipos.some((e) => e.it.id === it.id))
     .map(({ it, cantidad }) => ({ nombre: it.productoNombre, unidad: it.unidad, cantidad }));
   if (salidas.length) descontarStock(mov.sede, salidas);
+  if (equipos.length) marcarEquiposVendidos(equipos.map((e) => e.eq!.codigo_chasis), od.numero, od.cliente, mov.sede, mov.responsable.trim() || String(rol));
 
   let actualizada!: OrdenDespacho;
   actualizarOD(id, (o) => {

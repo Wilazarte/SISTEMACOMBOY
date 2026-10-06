@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, Bell, Calculator, CloudUpload, Eye, KeyRound, Receipt, LayoutDashboard, Loader2, LogOut, Menu, Search, Truck, ShieldAlert, ShoppingCart, UserCircle2, Users, Warehouse, X } from "lucide-react";
+import { AlertTriangle, Bell, Factory, Calculator, CloudUpload, Eye, KeyRound, Receipt, LayoutDashboard, Loader2, LogOut, Menu, Search, Truck, ShieldAlert, ShoppingCart, UserCircle2, Users, Warehouse, X } from "lucide-react";
 import { Badge, Toaster, cn, toast } from "@/components/ui";
 import { DocViewerHost, abrirDoc, type DocRef } from "@/components/doc-viewer";
 import { ObservacionesGerencia } from "@/components/ObservacionesGerencia";
+import { Header } from "@/components/Header";
 import { inicioDe, logout, puedeVer, useSesion, veDashboard } from "@/lib/auth";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
 import { KEYS, detenerDatos, getCotizaciones, getFacturas, getGuias, getOrdenes, getPendientes, getProcesados, useDatos, useStore } from "@/lib/storage";
@@ -15,6 +16,7 @@ import { avisoOD, getDespachos, odsNuevas } from "@/lib/ventas";
 
 const NAV: { href: string; label: string; icon: typeof LayoutDashboard; pronto?: boolean; activo?: boolean }[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard/produccion", label: "Producción", icon: Factory },
   { href: "/dashboard/almacen", label: "Almacén", icon: Warehouse },
   { href: "/dashboard/ventas", label: "Ventas", icon: Receipt },
   { href: "/dashboard/compras", label: "Tesorería / Compras", icon: ShoppingCart },
@@ -326,6 +328,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </div>
         ) : (
           <div className="space-y-6">
+            <Header sesion={sesion} />
             {sesion.soloLectura && (
               <div className="flex w-full items-center gap-2 rounded-xl border border-plomo-200 bg-white px-5 py-2.5 text-sm text-azul-700 shadow-[0_4px_12px_rgba(15,36,64,0.06)]">
                 <Eye size={16} /> Modo solo lectura: puede revisar todo y registrar observaciones, pero no guardar, editar ni eliminar.

@@ -10,6 +10,11 @@ const config: Config = {
         corp: "#B91C1C",
         plomo: { 50: "#F8FAFC", 100: "#F1F5F9", 200: "#E2E8F0", 500: "#64748B", 600: "#475569" },
       },
+      // Entrada suave (fade + subir), ej. bienvenida del login al elegir módulo
+      keyframes: {
+        aparecer: { "0%": { opacity: "0", transform: "translateY(8px)" }, "100%": { opacity: "1", transform: "translateY(0)" } },
+      },
+      animation: { aparecer: "aparecer 300ms ease-out both" },
       fontFamily: {
         serif: ["var(--font-serif)"],
         sans: ["var(--font-sans)"],

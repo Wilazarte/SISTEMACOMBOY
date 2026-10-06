@@ -512,11 +512,7 @@ function Stock({ stock, rol }: { stock: StockItem[]; rol: Rol }) {
             <div className="w-48">
               <Input placeholder="Buscar producto…" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
-            {puedeRegistrar && (
-              <Button onClick={() => setNuevoEquipo(true)}>
-                <Factory size={16} /> + Registrar Equipo Terminado
-              </Button>
-            )}
+
             <div className="w-48">
               <Select value={sede} onChange={(e) => setSede(e.target.value)} placeholder="Todas las sedes" options={SEDES.map((s) => ({ value: s, label: s }))} />
             </div>

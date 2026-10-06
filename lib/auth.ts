@@ -25,6 +25,10 @@ export interface Sesion {
   /** Rutas permitidas; "*" = todos los módulos. */
   modulos: string[];
   soloLectura: boolean;
+  /** Cargo del usuario (columna opcional perfiles.cargo). */
+  cargo?: string;
+  /** Nombre completo real (columna opcional perfiles.nombre_completo). */
+  nombreCompleto?: string;
 }
 
 /**
@@ -57,10 +61,10 @@ async function cargarSesion(): Promise<Sesion | null> {
     data: { user },
   } = await sb.auth.getUser();
   if (!user) return null;
-  const { data, error } = await sb.from("perfiles").select("usuario, rol, nombre, modulos, solo_lectura").eq("id", user.id).maybeSingle();
+  const { data, error } = await sb.from("perfiles").select("*").eq("id", user.id).maybeSingle();
   if (error) throw error;
   if (!data) return null;
-  return { usuario: data.usuario, rol: data.rol as RolAuth, nombre: data.nombre, modulos: data.modulos ?? [], soloLectura: !!data.solo_lectura };
+  return { usuario: data.usuario, rol: data.rol as RolAuth, nombre: data.nombre, modulos: data.modulos ?? [], soloLectura: !!data.solo_lectura, cargo: data.cargo ?? undefined, nombreCompleto: data.nombre_completo ?? undefined };
 }
 
 export async function login(usuario: string, pass: string): Promise<{ sesion?: Sesion; error?: string }> {
@@ -87,6 +91,12 @@ export async function login(usuario: string, pass: string): Promise<{ sesion?: S
 
 export async function logout(): Promise<void> {
   await createClient().auth.signOut();
+  try {
+    window.localStorage.removeItem("erp_modulo");
+    window.localStorage.removeItem("erp_usuario");
+  } catch {
+    /* almacenamiento bloqueado */
+  }
   fijar(null);
 }
 
@@ -140,8 +150,12 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
   if (ruta === "/dashboard") return true; // solo redirige al primer módulo permitido
   // Módulo Creador: por rol, no por módulos (gerencia tiene "*" pero no debe entrar)
   if (ruta === RUTA_CREADOR || ruta.startsWith(`${RUTA_CREADOR}/`)) return puedeEditarAsistencia(sesion);
+  // Producción: también Almacén (registra las órdenes de producción y el QC)
+  if (ruta === RUTA_PRODUCCION || ruta.startsWith(`${RUTA_PRODUCCION}/`)) if (sesion.rol === "almacen") return true;
   return sesion.modulos.some((m) => m === "*" || ruta === m || ruta.startsWith(`${m}/`));
 }
+
+export const RUTA_PRODUCCION = "/dashboard/produccion";
 
 /** Primer módulo al que entra el usuario tras el login. */
 export function inicioDe(sesion: Sesion): string {
@@ -152,3 +166,51 @@ export function inicioDe(sesion: Sesion): string {
 
 /** Rol de negocio; un rol desconocido (ej. uno antiguo de la tabla) queda sin permisos de escritura. */
 export const rolNegocio = (sesion: Sesion | null): Rol => (sesion ? ROL_NEGOCIO[sesion.rol as RolAuth] ?? "CONTADOR" : "CONTADOR");
+
+// =====================================================================
+// Módulos del login: el usuario elige su módulo ANTES de ingresar.
+// =====================================================================
+
+export type ModuloLogin = "tesoreria" | "almacen" | "planilla" | "gerencia";
+
+export const MODULOS_LOGIN: Record<ModuloLogin, { nombre: string; ruta: string }> = {
+  tesoreria: { nombre: "Tesorería / Compras", ruta: "/dashboard/compras" },
+  almacen: { nombre: "Almacén", ruta: "/dashboard/almacen" },
+  planilla: { nombre: "Planilla", ruta: "/dashboard/planilla" },
+  gerencia: { nombre: "Gerencia", ruta: "/dashboard" },
+};
+
+export const CLAVE_MODULO = "erp_modulo";
+export const CLAVE_USUARIO = "erp_usuario";
+
+/** El usuario pertenece al módulo: su rol es ese módulo, es creador, o tiene la ruta asignada en perfiles.modulos. */
+export function perteneceAModulo(sesion: Sesion, modulo: ModuloLogin): boolean {
+  if (sesion.rol === "creador" || sesion.rol === modulo) return true;
+  const ruta = MODULOS_LOGIN[modulo].ruta;
+  return ruta !== "/dashboard" && sesion.modulos.some((m) => ruta === m || ruta.startsWith(`${m}/`));
+}
+
+export function moduloGuardado(): ModuloLogin | null {
+  try {
+    const m = window.localStorage.getItem(CLAVE_MODULO);
+    return m && m in MODULOS_LOGIN ? (m as ModuloLogin) : null;
+  } catch {
+    return null;
+  }
+}
+
+const CARGOS: Record<RolAuth, string> = {
+  creador: "Administrador del sistema",
+  tesoreria: "Tesorera - Módulo de Compras",
+  almacen: "Jefe de Almacén",
+  planilla: "Jefe de RRHH",
+  gerencia: "Gerente General",
+};
+export const cargoDe = (s: Sesion): string => s.cargo?.trim() || CARGOS[s.rol] || s.rol;
+
+/** Responsables reales por rol, si perfiles.nombre_completo aún no está cargado. */
+const NOMBRES: Partial<Record<RolAuth, string>> = {
+  tesoreria: "LIZBETH CAHUANA APFATA",
+  almacen: "JOSE MANUEL ORTIZ ARAPA",
+};
+export const nombreDe = (s: Sesion): string => s.nombreCompleto?.trim() || NOMBRES[s.rol] || s.nombre;

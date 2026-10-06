@@ -57,7 +57,7 @@ import {
   validarVoucher,
   sumarDias,
 } from "@/lib/storage";
-import { SEDES, UNIDADES } from "@/lib/empresa";
+import { ALMACENES, ALMACEN_DEFECTO, SEDES, UNIDADES } from "@/lib/empresa";
 import { pdfCotizacion, pdfFactura, pdfOrdenCompra, pdfRequerimiento } from "@/lib/pdf";
 import { asientoOrdenCompra } from "@/lib/contable";
 import { getSesion } from "@/lib/auth";
@@ -805,6 +805,7 @@ function Ordenes({
   const [formaPago, setFormaPago] = useState<FormaPago>("CREDITO 30 DIAS");
   const [tiempo, setTiempo] = useState("");
   const [lugar, setLugar] = useState("");
+  const [almacenIngreso, setAlmacenIngreso] = useState(ALMACEN_DEFECTO);
   const [cuentaOrigen, setCuentaOrigen] = useState<CuentaOrigenPago>("caja_general");
   const [voucher, setVoucher] = useState<{ file: File; url: string } | null>(null);
   const [voucherMonto, setVoucherMonto] = useState("");
@@ -858,7 +859,7 @@ function Ordenes({
     const monto = voucherMonto === "" ? undefined : parseFloat(voucherMonto);
     const ok = await ejecutarAsync(async () => {
       const oc = await emitirOrdenCompra(
-        { cotizacionId: cotiId, fecha, formaPago, tiempoEntrega: tiempo, lugarEntrega: lugar, cuentaOrigenPago: cuentaOrigen, voucherMonto: monto },
+        { cotizacionId: cotiId, fecha, formaPago, tiempoEntrega: tiempo, lugarEntrega: lugar, cuentaOrigenPago: cuentaOrigen, voucherMonto: monto, almacenIngreso },
         voucher?.file ?? null,
         rol
       );
@@ -898,8 +899,11 @@ function Ordenes({
             <Field label="Tiempo de entrega">
               <Input value={tiempo} onChange={(e) => setTiempo(e.target.value)} placeholder="Ej: 5 días hábiles" />
             </Field>
-            <Field label="Lugar de entrega" className="md:col-span-3">
+            <Field label="Lugar de entrega" className="md:col-span-2">
               <Input value={lugar} onChange={(e) => setLugar(e.target.value)} />
+            </Field>
+            <Field label="Almacén de ingreso *" hint="Al dar el V°B° los repuestos se suman al stock de este almacén">
+              <Select value={almacenIngreso} onChange={(e) => setAlmacenIngreso(e.target.value)} options={ALMACENES.map((a) => ({ value: a, label: a }))} />
             </Field>
           </div>
           <div className="mx-5 mb-5 rounded-xl border border-plomo-200 p-4">

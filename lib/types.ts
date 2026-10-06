@@ -84,6 +84,8 @@ export interface OrdenCompra {
   formaPago: FormaPago;
   tiempoEntrega: string;
   lugarEntrega: string;
+  /** Almacén donde ingresa la mercadería (repuestos) al dar el V°B°. */
+  almacenIngreso?: string;
   items: ItemPrecio[];
   subtotal: number;
   igv: number;
@@ -567,6 +569,8 @@ export interface LineaDespacho {
   /** Código del producto en Almacén (id del stock) y ubicación (sedes con stock) al emitir. */
   codigo?: string;
   ubicacion?: string;
+  /** Equipo terminado (fabricado): se despacha por chasis, no por stock de repuestos. */
+  codigo_chasis?: string;
 }
 
 export interface MovimientoDespacho {

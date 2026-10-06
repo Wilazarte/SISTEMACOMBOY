@@ -6,6 +6,7 @@ import { Button, Field, Input, Select, cn } from "@/components/ui";
 import { UNIDADES } from "@/lib/empresa";
 import { KEYS, cargarCondicionesPago, r2, soles, useStore } from "@/lib/storage";
 import { DETALLE_LUGAR, LARGO_DOC, LUGARES_ENTREGA, lugarConDireccion, calcularLinea, lineaVacia, totalesVenta, validarDocumento } from "@/lib/ventas";
+import { normalizarEquipo, sedeEquipo, type EquipoTerminado } from "@/lib/equipos";
 import type { Cliente, CondicionPago, DatosDespacho, LugarEntrega, LineaVenta, StockItem, TipoDocCliente } from "@/lib/types";
 
 /** Datos de Ventas sincronizados con Supabase (tiempo real). */
@@ -60,8 +61,13 @@ export function LineasEditor({ items, onChange, stock }: { items: LineaVenta[]; 
     return Array.from(m.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
   }, [stock]);
 
+  // Equipos terminados DISPONIBLES (se venden por código de chasis)
+  const equipos = useStore<EquipoTerminado[]>(KEYS.EQUIPOS, []).map(normalizarEquipo).filter((e) => e.estado === "DISPONIBLE" && e.codigo_chasis);
+
   const set = (id: string, cambios: Partial<LineaVenta>) => onChange(items.map((l) => (l.id === id ? calcularLinea({ ...l, ...cambios }) : l)));
   const elegirProducto = (id: string, nombre: string) => {
+    const eq = equipos.find((e) => e.codigo_chasis === nombre.trim().toUpperCase());
+    if (eq) return set(id, { productoNombre: eq.codigo_chasis, unidad: "UND", cantidad: 1, descripcion: `${eq.tipo_equipo} ${eq.modelo} · chasis ${eq.codigo_chasis} · motor ${eq.marca_motor} ${eq.serie_motor}` });
     const p = productos.find((x) => x.nombre === nombre.trim().toUpperCase());
     const actual = items.find((l) => l.id === id);
     set(id, p ? { productoNombre: p.nombre, unidad: p.unidad, descripcion: actual?.descripcion || p.nombre } : { productoNombre: nombre });
@@ -121,6 +127,9 @@ export function LineasEditor({ items, onChange, stock }: { items: LineaVenta[]; 
         <datalist id="productos-almacen">
           {productos.map((p) => (
             <option key={`${p.nombre}|${p.unidad}`} value={p.nombre}>{`${p.unidad} · stock ${p.cantidad}`}</option>
+          ))}
+          {equipos.map((e) => (
+            <option key={e.id} value={e.codigo_chasis}>{`Equipo ${e.tipo_equipo} ${e.modelo} · ${sedeEquipo(e)} · DISPONIBLE`}</option>
           ))}
         </datalist>
       </div>

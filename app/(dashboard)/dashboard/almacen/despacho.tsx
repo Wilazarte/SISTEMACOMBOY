@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Building2, Camera, CheckCircle2, ClipboardCheck, Eraser, FileText, MapPin, PackageCheck, Save, Truck } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, Building2, Camera, CheckCircle2, ClipboardCheck, FileText, MapPin, PackageCheck, Save, Truck } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, Textarea, Timeline, cn, ejecutar, toast } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
-import { SEDES } from "@/lib/empresa";
+import { FirmaPad } from "@/components/FirmaPad";
+import { SEDES_STOCK as SEDES } from "@/lib/empresa";
 import { pdfOrdenDespacho } from "@/lib/pdf";
-import { KEYS, MAX_ARCHIVO, fechaPE, puede, r2, soles, stockDisponible, useRol, useStore } from "@/lib/storage";
+import { KEYS, MAX_ARCHIVO, fechaPE, puede, r2, soles, stockDisponible, transferirStock, useRol, useStore } from "@/lib/storage";
+import { disponibleEquipo, equipoDeLinea, registrarMovimiento, sedeEquipo, transferirEquipo, type EquipoTerminado } from "@/lib/equipos";
 import { codigoDesdeNumero } from "@/lib/utils/codigos";
 import {
   ESTADOS_OD,
@@ -195,9 +197,48 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
   const abierta = e === "PENDIENTE" || e === "PEDIDO_ALISTADO";
   const [obs, setObs] = useState(od.observacion ?? "");
   const [modo, setModo] = useState<Modo>(null);
+  useStore<EquipoTerminado[]>(KEYS.EQUIPOS, []); // en vivo: equipos terminados
+  /** Disponible en la sede: equipos terminados por chasis + sede + DISPONIBLE; repuestos por stock. */
+  const dispLinea = (l: OrdenDespacho["items"][number], s: string): number | null => {
+    const eq = equipoDeLinea(l);
+    if (eq) return disponibleEquipo(eq.codigo_chasis, s);
+    return l.productoNombre ? stockDisponible(s, l.productoNombre, l.unidad) : null;
+  };
+  /** Ubicación real: sede del equipo (si está DISPONIBLE) o sedes con stock del repuesto. */
+  const ubicacionLinea = (l: OrdenDespacho["items"][number]): string => {
+    const eq = equipoDeLinea(l);
+    if (eq) return eq.estado === "DISPONIBLE" ? sedeEquipo(eq) : `${sedeEquipo(eq)} (${eq.estado})`;
+    if (!l.productoNombre) return l.ubicacion ?? "-";
+    const sedes = SEDES.filter((x) => stockDisponible(x, l.productoNombre, l.unidad) > 0);
+    return sedes.length ? sedes.join(", ") : "Sin stock";
+  };
+  /** Otra sede con stock suficiente para lo que falta entregar de la línea. */
+  const otraSede = (l: OrdenDespacho["items"][number]): string | null => {
+    const eq = equipoDeLinea(l);
+    if (eq) return eq.estado === "DISPONIBLE" && sedeEquipo(eq) !== sede ? sedeEquipo(eq) : null;
+    if (!l.productoNombre) return null;
+    const falta = cant[l.id] ?? pendienteLinea(l);
+    return SEDES.find((x) => x !== sede && stockDisponible(x, l.productoNombre, l.unidad) + 1e-9 >= falta) ?? null;
+  };
+  const transferir = (l: OrdenDespacho["items"][number]) => {
+    const de = otraSede(l);
+    if (!de) return;
+    const eq = equipoDeLinea(l);
+    ejecutar(() => {
+      if (eq) transferirEquipo(eq.codigo_chasis, sede, usuario, od.numero);
+      else {
+        const cantidad = r2(cant[l.id] ?? pendienteLinea(l));
+        transferirStock(l.productoNombre, l.unidad, cantidad, de, sede);
+        registrarMovimiento({ tipo: "TRANSFERENCIA", producto: l.productoNombre, cantidad, de_sede: de, a_sede: sede, od: od.numero, usuario });
+      }
+    }, `${eq ? `Equipo ${eq.codigo_chasis}` : l.descripcion}: transferido de ${de} a ${sede}`);
+  };
   const [sede, setSede] = useState(() => {
-    const p = od.items.find((l) => l.productoNombre);
-    return p ? [...SEDES].sort((a, b) => stockDisponible(b, p.productoNombre, p.unidad) - stockDisponible(a, p.productoNombre, p.unidad))[0] : SEDES[0];
+    const p = od.items.find((l) => l.productoNombre || equipoDeLinea(l));
+    if (!p) return SEDES[0];
+    const eq = equipoDeLinea(p);
+    if (eq && sedeEquipo(eq)) return sedeEquipo(eq); // la sede real del equipo, aunque no esté en la lista
+    return [...SEDES].sort((a, b) => (dispLinea(p, b) ?? 0) - (dispLinea(p, a) ?? 0))[0];
   });
   const [cant, setCant] = useState<Record<string, number>>(() => Object.fromEntries(od.items.map((l) => [l.id, pendienteLinea(l)])));
   // Si recoge un encargado del cliente, ya se sabe quién recibe
@@ -209,7 +250,10 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
 
   const conPendiente = od.items.some((l) => pendienteLinea(l) > 0);
   const faltantes = modo
-    ? od.items.filter((l) => l.productoNombre && (cant[l.id] ?? 0) > 0 && stockDisponible(sede, l.productoNombre, l.unidad) + 1e-9 < (cant[l.id] ?? 0))
+    ? od.items.filter((l) => {
+        const d = dispLinea(l, sede);
+        return d !== null && (cant[l.id] ?? 0) > 0 && d + 1e-9 < (cant[l.id] ?? 0);
+      })
     : [];
 
   const cargarFoto = (file?: File) => {
@@ -276,11 +320,11 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
             </thead>
             <tbody className="bg-white [&>tr]:border-b [&>tr]:border-plomo-100">
               {od.items.map((l) => {
-                const disp = l.productoNombre ? stockDisponible(sede, l.productoNombre, l.unidad) : null;
+                const disp = dispLinea(l, sede);
                 const falta = !!modo && disp !== null && (cant[l.id] ?? 0) > disp + 1e-9;
                 return (
                   <tr key={l.id} className={cn(falta && "bg-red-50")}>
-                    <td className="px-3 py-2 font-mono text-xs">{l.codigo ?? "-"}</td>
+                    <td className="px-3 py-2 font-mono text-xs">{equipoDeLinea(l)?.id || l.codigo || "-"}</td>
                     <td className="px-3 py-2">
                       {l.descripcion}
                       {l.ancho > 0 && <span className="text-xs text-plomo-500"> · {l.ancho}×{l.alto} m × {l.cantidadPiezas}</span>}
@@ -289,8 +333,20 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
                       {l.solicitado} {l.unidad}
                       {l.despachado > 0 && <p className="text-xs text-plomo-500">entregado {l.despachado}</p>}
                     </td>
-                    <td className="px-3 py-2 text-plomo-600">{l.ubicacion ?? "-"}</td>
-                    {modo && <td className={cn("px-3 py-2 text-right", falta ? "font-bold text-red-600" : "text-plomo-600")}>{disp === null ? "-" : `${disp} ${l.unidad}`}</td>}
+                    <td className="px-3 py-2 text-plomo-600">
+                      {ubicacionLinea(l)}
+                      {equipoDeLinea(l) && <p className="font-mono text-[11px] text-plomo-500">Chasis {equipoDeLinea(l)!.codigo_chasis}</p>}
+                    </td>
+                    {modo && (
+                      <td className={cn("px-3 py-2 text-right", falta ? "font-bold text-red-600" : "text-plomo-600")}>
+                        {disp === null ? "-" : `${disp} ${l.unidad}`}
+                        {falta && habilitado && otraSede(l) && (
+                          <Button size="sm" variant="secondary" className="mt-1" onClick={() => transferir(l)}>
+                            <ArrowRightLeft size={12} /> Transferir desde {otraSede(l)}
+                          </Button>
+                        )}
+                      </td>
+                    )}
                     {modo && (
                       <td className="px-3 py-2">
                         <Input
@@ -359,7 +415,7 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
             </p>
             <div className="grid gap-3 md:grid-cols-3">
               <Field label="Almacén (sede) de salida">
-                <Select value={sede} onChange={(ev) => setSede(ev.target.value)} options={SEDES.map((x) => ({ value: x, label: x }))} />
+                <Select value={sede} onChange={(ev) => setSede(ev.target.value)} options={Array.from(new Set([...SEDES, sede])).map((x) => ({ value: x, label: x }))} />
               </Field>
               {modo === "ENTREGADO" ? (
                 <Field label="Recibido por (cliente) *" className="md:col-span-2">
@@ -389,7 +445,7 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
             {faltantes.length > 0 && (
               <div role="alert" className="flex items-start gap-2 rounded-lg bg-vino px-4 py-3 text-sm font-medium text-white">
                 <AlertTriangle size={18} className="shrink-0" />
-                Stock insuficiente en {sede}: {faltantes.map((l) => `${l.descripcion} (hay ${stockDisponible(sede, l.productoNombre, l.unidad)} ${l.unidad})`).join(", ")}. Cambie de sede o entregue
+                Stock insuficiente en {sede}: {faltantes.map((l) => `${l.descripcion} (hay ${dispLinea(l, sede) ?? 0} ${l.unidad}${equipoDeLinea(l) ? ` · el equipo está en ${ubicacionLinea(l)}` : ""})`).join(", ")}. Cambie de sede o entregue
                 menos (entrega parcial).
               </div>
             )}
@@ -438,73 +494,6 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
   );
 }
 
-/** Firma con el dedo / mouse (canvas) → PNG. */
-function FirmaPad({ onChange }: { onChange: (f?: ArchivoAdjunto) => void }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  const dibujando = useRef(false);
-  const trazo = useRef(false);
-  const [vacia, setVacia] = useState(true);
-
-  const pos = (ev: React.PointerEvent<HTMLCanvasElement>) => {
-    const c = ref.current!;
-    const r = c.getBoundingClientRect();
-    return { x: ((ev.clientX - r.left) * c.width) / r.width, y: ((ev.clientY - r.top) * c.height) / r.height };
-  };
-  const ctx = () => {
-    const g = ref.current!.getContext("2d")!;
-    g.lineWidth = 2.5;
-    g.lineCap = "round";
-    g.strokeStyle = "#0F2440";
-    return g;
-  };
-  const limpiar = () => {
-    const c = ref.current!;
-    c.getContext("2d")!.clearRect(0, 0, c.width, c.height);
-    trazo.current = false;
-    setVacia(true);
-    onChange(undefined);
-  };
-
-  return (
-    <div>
-      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-plomo-500">Firma del cliente *</p>
-      <div className="flex items-end gap-2">
-        <canvas
-          ref={ref}
-          width={600}
-          height={160}
-          aria-label="Firma del cliente"
-          className="h-32 w-full max-w-xl touch-none rounded-lg border-2 border-dashed border-plomo-200 bg-white"
-          onPointerDown={(ev) => {
-            dibujando.current = true;
-            ev.currentTarget.setPointerCapture(ev.pointerId);
-            const g = ctx();
-            const p = pos(ev);
-            g.beginPath();
-            g.moveTo(p.x, p.y);
-          }}
-          onPointerMove={(ev) => {
-            if (!dibujando.current) return;
-            const g = ctx();
-            const p = pos(ev);
-            g.lineTo(p.x, p.y);
-            g.stroke();
-            trazo.current = true;
-            setVacia(false);
-          }}
-          onPointerUp={() => {
-            dibujando.current = false;
-            if (trazo.current) onChange({ nombre: "firma-cliente.png", tipo: "image/png", url: ref.current!.toDataURL("image/png") });
-          }}
-        />
-        <Button type="button" variant="ghost" size="sm" onClick={limpiar} title="Borrar firma">
-          <Eraser size={14} />
-        </Button>
-      </div>
-      {vacia && <p className="mt-1 text-xs text-plomo-500">Firme dentro del recuadro.</p>}
-    </div>
-  );
-}
 
 /** Pasos del despacho: Pendiente → Alistado → Entregado / En agencia. */
 function Seguimiento({ od, grande }: { od: OrdenDespacho; grande?: boolean }) {

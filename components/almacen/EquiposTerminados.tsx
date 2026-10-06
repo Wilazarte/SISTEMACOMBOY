@@ -1,17 +1,21 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import QRCode from "qrcode";
-import { Camera, Factory, Pencil, Printer, Search, X } from "lucide-react";
-import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, Textarea, cn, ejecutarAsync, toast } from "@/components/ui";
+import { ArrowRightLeft, Camera, Factory, Pencil, Printer, Search, X } from "lucide-react";
+import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, Textarea, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { EMPRESA } from "@/lib/empresa";
 import {
   MARCAS_MOTOR,
   SEDES_EQUIPO,
+  sedeEquipo,
   TIPOS_EQUIPO,
   equipoVacio,
+  normalizarEquipo,
   guardarEquipo,
+  transferirEquipo,
   reducirFoto,
   type DatosEquipo,
   type EquipoTerminado,
@@ -19,13 +23,25 @@ import {
   type TipoEquipo,
 } from "@/lib/equipos";
 import { KEYS, fechaPE, hoy, useStore } from "@/lib/storage";
+import { trazabilidadEquipo } from "@/lib/trazabilidad";
 
-const fechaHora = (iso: string) => new Date(iso).toLocaleString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+const fechaHora = (iso?: string) => {
+  const d = iso ? new Date(iso) : null;
+  return d && !isNaN(d.getTime()) ? d.toLocaleString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-";
+};
 
-/** Sección "Equipos terminados" de Almacén › Stock: lista, alta (modal) y detalle con QR del chasis. */
+/**
+ * Sección "Equipos terminados" de Almacén › Stock. Los equipos los ingresa Producción (QC aprobado):
+ * aquí se visualizan (filtros por sede / estado), con trazabilidad, QR y transferencia de sede.
+ */
 export function EquiposTerminados({ puedeRegistrar, nuevo, onNuevoCerrado }: { puedeRegistrar: boolean; nuevo: boolean; onNuevoCerrado: () => void }) {
-  const equipos = useStore<EquipoTerminado[]>(KEYS.EQUIPOS, []);
+  const equipos = useStore<EquipoTerminado[]>(KEYS.EQUIPOS, []).map(normalizarEquipo);
+  useStore(KEYS.MOVIMIENTOS, []);
+  useStore(KEYS.PRODUCCION, []);
+  useStore(KEYS.DESPACHOS, []);
   const [q, setQ] = useState("");
+  const [sedeF, setSedeF] = useState("");
+  const [estadoF, setEstadoF] = useState<"" | "DISPONIBLE" | "EN_QC" | "VENDIDO">("DISPONIBLE");
   const [form, setForm] = useState<{ datos: DatosEquipo; id?: string } | null>(null);
   const [ver, setVer] = useState<string | null>(null);
 
@@ -38,27 +54,43 @@ export function EquiposTerminados({ puedeRegistrar, nuevo, onNuevoCerrado }: { p
 
   const t = q.trim().toUpperCase().replace(/\s+/g, "");
   const lista = equipos
+    .filter((e) => (!sedeF || sedeEquipo(e) === sedeF) && (!estadoF || e.estado === estadoF))
     .filter((e) => !t || [e.codigo_chasis, e.serie_motor, e.modelo, e.id].some((v) => v.replace(/\s+/g, "").toUpperCase().includes(t)))
     .sort((a, b) => b.id.localeCompare(a.id));
   const disponibles = equipos.filter((e) => e.estado === "DISPONIBLE").length;
+  const vendidos = equipos.filter((e) => e.estado === "VENDIDO").length;
   const sel = equipos.find((e) => e.id === ver) ?? null;
 
   return (
     <Card>
       <CardHeader
         title="Equipos terminados"
-        subtitle={`${equipos.length} equipo(s) fabricados · ${disponibles} disponible(s) · ${equipos.length - disponibles} en control de calidad`}
+        subtitle={`${equipos.length} equipo(s) fabricados · ${disponibles} disponible(s) · ${equipos.length - disponibles - vendidos} en control de calidad · ${vendidos} vendido(s)`}
         action={
           <div className="flex flex-wrap gap-2">
-            <div className="relative w-72">
+            <div className="relative w-64">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-plomo-500" />
               <Input placeholder="Buscar chasis, serie motor o modelo…" value={q} onChange={(e) => setQ(e.target.value)} className="pl-8" />
             </div>
-            {puedeRegistrar && (
-              <Button onClick={() => setForm({ datos: { ...equipoVacio(), supervisor_qc: getSesion()?.usuario ?? "" } })}>
-                <Factory size={16} /> + Registrar Equipo Terminado
-              </Button>
-            )}
+            <div className="w-40">
+              <Select value={sedeF} onChange={(e) => setSedeF(e.target.value)} placeholder="Todas las sedes" options={SEDES_EQUIPO.map((x) => ({ value: x, label: x }))} aria-label="Sede" />
+            </div>
+            <div className="w-40">
+              <Select
+                value={estadoF}
+                onChange={(e) => setEstadoF(e.target.value as typeof estadoF)}
+                placeholder="Todos los estados"
+                options={[
+                  { value: "DISPONIBLE", label: "Disponibles (stock)" },
+                  { value: "EN_QC", label: "En QC" },
+                  { value: "VENDIDO", label: "Vendidos" },
+                ]}
+                aria-label="Estado"
+              />
+            </div>
+            <Link href="/dashboard/produccion" className="inline-flex items-center gap-1.5 rounded-lg border border-plomo-200 bg-white px-4 py-2 text-sm font-medium text-azul-900 hover:bg-plomo-50">
+              <Factory size={16} /> Ingresan desde Producción
+            </Link>
           </div>
         }
       />
@@ -67,11 +99,11 @@ export function EquiposTerminados({ puedeRegistrar, nuevo, onNuevoCerrado }: { p
           <Empty icon={<Factory size={28} />} text={equipos.length ? "Ningún equipo coincide con la búsqueda." : "Aún no hay equipos terminados registrados."} />
         </div>
       ) : (
-        <Table head={["Código", "Sede", "Modelo", "Chasis / VIN", "Marca motor", "Serie motor", "Color", "QC", "Estado", "Actualizado"]}>
+        <Table head={["Código", "Sede", "Modelo", "Chasis / VIN", "Marca motor", "Serie motor", "Origen", "QC", "Estado", "Actualizado"]}>
           {lista.map((e) => (
             <tr key={e.id} className="cursor-pointer hover:bg-plomo-50" onClick={() => setVer(e.id)} title="Ver detalle y QR">
               <Td className="font-mono text-xs font-semibold text-azul-900">{e.id}</Td>
-              <Td>{e.sede}</Td>
+              <Td>{sedeEquipo(e)}</Td>
               <Td>
                 <p className="font-semibold text-azul-900">{e.modelo}</p>
                 <p className="text-xs text-plomo-500">{e.tipo_equipo}</p>
@@ -79,7 +111,15 @@ export function EquiposTerminados({ puedeRegistrar, nuevo, onNuevoCerrado }: { p
               <Td className="font-mono text-xs">{e.codigo_chasis}</Td>
               <Td>{e.marca_motor}</Td>
               <Td className="font-mono text-xs">{e.serie_motor}</Td>
-              <Td>{e.color}</Td>
+              <Td>
+                {e.origen === "PRODUCCION" ? (
+                  <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-800 ring-1 ring-inset ring-emerald-200" title={e.op_id}>
+                    PRODUCCIÓN
+                  </span>
+                ) : (
+                  <span className="text-xs text-plomo-500">Manual</span>
+                )}
+              </Td>
               <Td>
                 <span
                   className={cn(
@@ -103,11 +143,12 @@ export function EquiposTerminados({ puedeRegistrar, nuevo, onNuevoCerrado }: { p
       {sel && (
         <DetalleEquipo
           e={sel}
-          puedeEditar={puedeRegistrar}
+          puedeEditar={puedeRegistrar && sel.origen !== "PRODUCCION" && sel.estado !== "VENDIDO"}
+          puedeTransferir={puedeRegistrar && sel.estado === "DISPONIBLE"}
           onClose={() => setVer(null)}
           onEditar={() => {
             setVer(null);
-            setForm({ id: sel.id, datos: { ...sel, fecha_qc: sel.fecha_qc ?? hoy(), supervisor_qc: sel.supervisor_qc ?? getSesion()?.usuario ?? "", observaciones_qc: sel.observaciones_qc ?? "" } });
+            setForm({ id: sel.id, datos: { ...sel, sede: sedeEquipo(sel), fecha_qc: sel.fecha_qc ?? hoy(), supervisor_qc: sel.supervisor_qc ?? getSesion()?.usuario ?? "", observaciones_qc: sel.observaciones_qc ?? "" } });
           }}
         />
       )}
@@ -247,7 +288,21 @@ function FormEquipo({ inicial, id, onClose }: { inicial: DatosEquipo; id?: strin
   );
 }
 
-function DetalleEquipo({ e, puedeEditar, onClose, onEditar }: { e: EquipoTerminado; puedeEditar: boolean; onClose: () => void; onEditar: () => void }) {
+function DetalleEquipo({
+  e,
+  puedeEditar,
+  puedeTransferir,
+  onClose,
+  onEditar,
+}: {
+  e: EquipoTerminado;
+  puedeEditar: boolean;
+  puedeTransferir: boolean;
+  onClose: () => void;
+  onEditar: () => void;
+}) {
+  const [destino, setDestino] = useState("");
+  const pasos = trazabilidadEquipo(e);
   const [qr, setQr] = useState("");
   useEffect(() => {
     void QRCode.toDataURL(e.codigo_chasis, { errorCorrectionLevel: "M", margin: 1, width: 360, color: { dark: "#0F2440", light: "#FFFFFF" } }).then(setQr);
@@ -294,7 +349,8 @@ function DetalleEquipo({ e, puedeEditar, onClose, onEditar }: { e: EquipoTermina
           {fila("Marca de motor", e.marca_motor)}
           {fila("Serie de motor", e.serie_motor)}
           {fila("Color", e.color)}
-          {fila("Ubicación / sede", e.sede)}
+          {fila("Ubicación / sede", sedeEquipo(e))}
+          {e.vendido_od && fila("Vendido (salida de almacén)", `${e.vendido_od}${e.fecha_venta ? ` · ${fechaHora(e.fecha_venta)}` : ""}`)}
           {fila("Fabricado", fechaHora(e.fecha_fabricacion))}
           {e.qc_aprobado && fila("Fecha QC", e.fecha_qc ? fechaPE(e.fecha_qc) : "-")}
           {e.qc_aprobado && fila("Supervisor QC", e.supervisor_qc ?? "-")}
@@ -325,11 +381,45 @@ function DetalleEquipo({ e, puedeEditar, onClose, onEditar }: { e: EquipoTermina
           </Button>
         </div>
       </div>
-      {puedeEditar && (
-        <div className="mt-4 flex justify-end border-t border-plomo-100 pt-4">
-          <Button variant="secondary" onClick={onEditar}>
-            <Pencil size={16} /> Editar / registrar QC
-          </Button>
+      <div className="mt-5 rounded-xl border border-plomo-200 p-4">
+        <p className="mb-3 text-[12px] font-semibold uppercase tracking-wider text-plomo-500">Trazabilidad</p>
+        <ol className="flex flex-wrap items-start gap-y-3" aria-label="Trazabilidad del equipo">
+          {pasos.map((p, i) => (
+            <li key={i} className="flex items-start">
+              <div className="flex max-w-[170px] flex-col items-center text-center">
+                <span className={cn("flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold", p.hecho ? (i === pasos.length - 1 ? "bg-corp text-white" : "bg-azul-900 text-white") : "border-2 border-plomo-200 bg-white text-plomo-500")}>
+                  {p.hecho ? "✓" : i + 1}
+                </span>
+                <span className={cn("mt-1 text-xs font-semibold", p.hecho ? "text-azul-900" : "text-plomo-500")}>{p.titulo}</span>
+                <span className="text-[11px] text-plomo-500">{p.detalle}</span>
+                {p.fecha && <span className="text-[10px] text-plomo-500">{fechaHora(p.fecha.length === 10 ? `${p.fecha}T12:00:00` : p.fecha)}</span>}
+              </div>
+              {i < pasos.length - 1 && <span className={cn("mx-1 mt-3.5 h-0.5 w-8", pasos[i + 1].hecho ? "bg-azul-900" : "bg-plomo-200")} />}
+            </li>
+          ))}
+        </ol>
+      </div>
+      {(puedeEditar || puedeTransferir) && (
+        <div className="mt-4 flex flex-wrap items-end justify-end gap-2 border-t border-plomo-100 pt-4">
+          {puedeTransferir && (
+            <>
+              <div className="w-48">
+                <Select value={destino} onChange={(ev) => setDestino(ev.target.value)} placeholder="Transferir a…" options={SEDES_EQUIPO.filter((x) => x !== sedeEquipo(e)).map((x) => ({ value: x, label: x }))} aria-label="Transferir a" />
+              </div>
+              <Button
+                variant="secondary"
+                disabled={!destino}
+                onClick={() => ejecutar(() => transferirEquipo(e.codigo_chasis, destino, getSesion()?.usuario ?? ""), `${e.id} transferido a ${destino}`) && setDestino("")}
+              >
+                <ArrowRightLeft size={16} /> Transferir
+              </Button>
+            </>
+          )}
+          {puedeEditar && (
+            <Button variant="secondary" onClick={onEditar}>
+              <Pencil size={16} /> Editar / registrar QC
+            </Button>
+          )}
         </div>
       )}
     </Modal>

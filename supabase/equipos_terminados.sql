@@ -23,9 +23,9 @@ begin
     raise exception 'Su usuario no puede codificar gastos' using errcode = '42501';
   elsif serie in ('BOL', 'RCT') and rol not in ('creador', 'planilla') then
     raise exception 'Su usuario no puede emitir boletas ni requerimientos de contratista' using errcode = '42501';
-  elsif serie = 'EQ' and rol not in ('creador', 'almacen') then
-    raise exception 'Su usuario no puede registrar equipos terminados' using errcode = '42501';
-  elsif serie not in ('REQ', 'OC', 'DJ', 'NP', 'F001', 'B001', 'OD', 'BOL', 'GST', 'RCT', 'EQ') or rol is null then
+  elsif serie in ('EQ', 'OP') and rol not in ('creador', 'almacen') then
+    raise exception 'Su usuario no puede registrar producción ni equipos terminados' using errcode = '42501';
+  elsif serie not in ('REQ', 'OC', 'DJ', 'NP', 'F001', 'B001', 'OD', 'BOL', 'GST', 'RCT', 'EQ', 'OP') or rol is null then
     raise exception 'Serie inválida: %', serie using errcode = '22023';
   end if;
 
@@ -46,13 +46,28 @@ create unique index if not exists almacen_eq_serie_motor_uidx
 create unique index if not exists almacen_eq_chasis_uidx
   on public.almacen (upper(replace(data->>'codigo_chasis', ' ', ''))) where tipo = 'EQUIPO_TERMINADO';
 
--- Vista de consulta
-create or replace view public.v_equipos_terminados with (security_invoker = true) as
-select id, data->>'tipo_equipo' as tipo_equipo, data->>'modelo' as modelo, data->>'marca_motor' as marca_motor,
-       data->>'serie_motor' as serie_motor, data->>'codigo_chasis' as codigo_chasis, data->>'color' as color,
-       data->>'sede' as sede, (data->>'qc_aprobado')::boolean as qc_aprobado, data->>'fecha_qc' as fecha_qc,
-       data->>'supervisor_qc' as supervisor_qc, data->>'estado' as estado, data->>'fecha_fabricacion' as fecha_fabricacion
-from public.almacen where tipo = 'EQUIPO_TERMINADO';
+-- Vista de consulta (se recrea: si ya existía con otras columnas, CREATE OR REPLACE no puede cambiarlas)
+drop view if exists public.v_equipos_terminados;
+create view public.v_equipos_terminados with (security_invoker = true) as
+select
+  id,
+  data->>'codigo_chasis' as chasis,
+  coalesce(data->>'ubicacion_sede', data->>'sede') as sede,
+  data->>'estado' as estado,
+  data,
+  data->>'tipo_equipo' as tipo_equipo,
+  data->>'modelo' as modelo,
+  data->>'marca_motor' as marca_motor,
+  data->>'serie_motor' as serie_motor,
+  data->>'origen' as origen,
+  data->>'op_id' as op_id,
+  data->>'qc_supervisor' as qc_supervisor,
+  data->>'fecha_ingreso' as fecha_ingreso,
+  data->>'cliente' as cliente,
+  data->>'vendido_od' as od,
+  data->>'fecha_salida' as fecha_salida
+from public.almacen
+where tipo = 'EQUIPO_TERMINADO';
 grant select on public.v_equipos_terminados to authenticated;
 
-select * from public.v_equipos_terminados order by id;
+select id, chasis, sede, estado from public.v_equipos_terminados order by id;
