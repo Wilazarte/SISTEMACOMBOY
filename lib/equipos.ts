@@ -15,7 +15,7 @@ export const MARCAS_MOTOR = ["RONCO", "ROMI", "TRANSVERSAL", "OTRO"] as const;
 export const SEDES_EQUIPO: readonly string[] = ALMACENES;
 export const SEDE_EQUIPO_DEFECTO = ALMACEN_DEFECTO;
 
-/** Las listas son sugerencias: Producción puede registrar otros (ej. REMOLCADOR ECO-MINE 3000, motor RONCO). */
+/** Listas únicas de tipos de equipo y marcas de motor: todos los formularios usan estas constantes. */
 export type TipoEquipo = string;
 export type MarcaMotor = string;
 export type EstadoEquipo = "DISPONIBLE" | "EN_QC" | "VENDIDO";
@@ -225,9 +225,9 @@ export type DatosEquipo = Pick<
 >;
 
 export const equipoVacio = (): DatosEquipo => ({
-  tipo_equipo: "REMOLCADOR ECO-MINE 3000",
+  tipo_equipo: "",
   modelo: "",
-  marca_motor: "RONCO",
+  marca_motor: "",
   serie_motor: "",
   codigo_chasis: "",
   color: "",

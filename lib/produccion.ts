@@ -51,9 +51,9 @@ const norm = (s?: string) => (s ?? "").replace(/\s+/g, "").toUpperCase();
 
 export async function crearOrdenProduccion(d: DatosOP, usuario: string): Promise<OrdenProduccion> {
   const codigo_chasis = d.codigo_chasis.trim().toUpperCase();
-  if (!d.tipo_equipo.trim()) throw new ErpError("Indique el tipo de equipo (ej. REMOLCADOR ECO-MINE 3000).");
+  if (!d.tipo_equipo.trim()) throw new ErpError("Seleccione el tipo de equipo.");
   if (!d.modelo.trim()) throw new ErpError("Indique el modelo (ej. CV-300).");
-  if (!d.marca_motor.trim()) throw new ErpError("Indique la marca del motor.");
+  if (!d.marca_motor.trim()) throw new ErpError("Seleccione la marca del motor.");
   if (!codigo_chasis) throw new ErpError("Indique el código de chasis.");
   const ops = getOrdenesProduccion();
   const opRep = ops.find((o) => o.estado !== "ANULADA" && norm(o.codigo_chasis) === norm(codigo_chasis));

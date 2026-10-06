@@ -191,13 +191,13 @@ function FormEquipo({ inicial, id, onClose }: { inicial: DatosEquipo; id?: strin
         <p className="text-sm text-plomo-600">Un registro por equipo fabricado. La serie de motor y el código de chasis / VIN no se pueden repetir.</p>
         <div className="grid gap-3 md:grid-cols-3">
           <Field label="Tipo de equipo *">
-            <Select value={d.tipo_equipo} onChange={(e) => set("tipo_equipo", e.target.value as TipoEquipo)} options={TIPOS_EQUIPO.map((x) => ({ value: x, label: x }))} />
+            <Select value={d.tipo_equipo} onChange={(e) => set("tipo_equipo", e.target.value as TipoEquipo)} placeholder="Selecciona tipo" options={TIPOS_EQUIPO.map((x) => ({ value: x, label: x }))} />
           </Field>
           <Field label="Modelo *">
             <Input value={d.modelo} onChange={(e) => set("modelo", e.target.value.toUpperCase())} placeholder="Ej: CV-D500, CV-MC300" />
           </Field>
           <Field label="Marca de motor *">
-            <Select value={d.marca_motor} onChange={(e) => set("marca_motor", e.target.value as MarcaMotor)} options={MARCAS_MOTOR.map((x) => ({ value: x, label: x }))} />
+            <Select value={d.marca_motor} onChange={(e) => set("marca_motor", e.target.value as MarcaMotor)} placeholder="Selecciona marca" options={MARCAS_MOTOR.map((x) => ({ value: x, label: x }))} />
           </Field>
           <Field label="Serie de motor * (única)">
             <Input value={d.serie_motor} onChange={(e) => set("serie_motor", e.target.value.toUpperCase())} placeholder="Ej: 8X123456" className="font-mono" />

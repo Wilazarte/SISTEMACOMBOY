@@ -142,23 +142,13 @@ function FormOP({ inicial, onClose }: { inicial: DatosOP; onClose: () => void })
     <Modal open onClose={onClose} title="Nueva orden de producción" wide>
       <div className="grid gap-3 md:grid-cols-3">
         <Field label="Tipo de equipo *" className="md:col-span-2">
-          <Input value={d.tipo_equipo} list="tipos-equipo" onChange={(e) => set("tipo_equipo", e.target.value.toUpperCase())} placeholder="Ej: REMOLCADOR ECO-MINE 3000" />
-          <datalist id="tipos-equipo">
-            {TIPOS_EQUIPO.map((t) => (
-              <option key={t} value={t} />
-            ))}
-          </datalist>
+          <Select value={d.tipo_equipo} onChange={(e) => set("tipo_equipo", e.target.value)} placeholder="Selecciona tipo" options={TIPOS_EQUIPO.map((t) => ({ value: t, label: t }))} />
         </Field>
         <Field label="Modelo *">
           <Input value={d.modelo} onChange={(e) => set("modelo", e.target.value.toUpperCase())} placeholder="Ej: CV-300" />
         </Field>
         <Field label="Marca de motor *">
-          <Input value={d.marca_motor} list="marcas-motor" onChange={(e) => set("marca_motor", e.target.value.toUpperCase())} placeholder="Ej: RONCO, KUBOTA" />
-          <datalist id="marcas-motor">
-            {MARCAS_MOTOR.map((t) => (
-              <option key={t} value={t} />
-            ))}
-          </datalist>
+          <Select value={d.marca_motor} onChange={(e) => set("marca_motor", e.target.value)} placeholder="Selecciona marca" options={MARCAS_MOTOR.map((t) => ({ value: t, label: t }))} />
         </Field>
         <Field label="Serie de motor">
           <Input value={d.serie_motor} onChange={(e) => set("serie_motor", e.target.value.toUpperCase())} className="font-mono" />
