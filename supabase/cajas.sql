@@ -6,21 +6,23 @@
 
 create table if not exists public.cajas (
   id uuid primary key default gen_random_uuid(),
-  nombre text not null,              -- Caja Principal Efectivo, Yape Empresa, BCP Empresa - Cta 123…
+  nombre text not null,              -- CAJA GENERAL, CAJA CHICA, FONDO DE RESERVA, YAPE EMPRESA…
   tipo text not null,                -- EFECTIVO | YAPE | BCP | BBVA | INTERBANK
   saldo_actual numeric(10,2) default 0,
   responsable text,
   estado text default 'ACTIVA',      -- ACTIVA | INACTIVA
+  orden integer default 100,         -- orden en el selector "¿De qué cuenta se realiza el pago?"
   created_at timestamptz default now()
 );
+alter table public.cajas add column if not exists orden integer default 100;
 create unique index if not exists cajas_nombre_key on public.cajas (upper(btrim(nombre)));
 
-insert into public.cajas (nombre, tipo) values
-  ('Caja Principal Efectivo', 'EFECTIVO'),
-  ('Yape Empresa', 'YAPE'),
-  ('BCP Empresa - Cta 123', 'BCP'),
-  ('Caja Chica Obra', 'EFECTIVO'),
-  ('Fondo de Reserva', 'EFECTIVO')
+insert into public.cajas (nombre, tipo, orden) values
+  ('CAJA GENERAL', 'EFECTIVO', 10),
+  ('CAJA CHICA', 'EFECTIVO', 20),
+  ('FONDO DE RESERVA', 'EFECTIVO', 30),
+  ('YAPE EMPRESA', 'YAPE', 40),
+  ('BCP EMPRESA - CTA 123', 'BCP', 50)
 on conflict do nothing;
 
 -- RLS: todos los usuarios ven las cajas; las administran creador, tesorería y admin
@@ -35,8 +37,8 @@ revoke all on public.cajas from anon;
 grant select, insert, update, delete on public.cajas to authenticated;
 
 -- Caja de salida en los pagos que viven en tablas propias (el resto se guarda en el JSON del documento)
-alter table public.adelantos add column if not exists caja text;
-alter table public.planilla_historial add column if not exists caja text;
+alter table public.adelantos add column if not exists caja_nombre text;
+alter table public.planilla_historial add column if not exists caja_nombre text;
 
 -- El historial de planilla no se edita (solo lectura para los usuarios): la caja se fija una sola vez,
 -- justo después de pagar, con esta función. No cambia montos.
@@ -49,7 +51,7 @@ begin
   if coalesce(btrim(p_caja), '') = '' then
     raise exception 'Indique la caja' using errcode = '22023';
   end if;
-  update public.planilla_historial set caja = btrim(p_caja) where id = p_id and caja is null;
+  update public.planilla_historial set caja_nombre = btrim(p_caja) where id = p_id and caja_nombre is null;
 end $$;
 revoke all on function public.fijar_caja_planilla(uuid, text) from public, anon;
 grant execute on function public.fijar_caja_planilla(uuid, text) to authenticated;
@@ -57,4 +59,4 @@ grant execute on function public.fijar_caja_planilla(uuid, text) to authenticate
 notify pgrst, 'reload schema';
 
 -- Verificación
-select nombre, tipo, estado from public.cajas order by nombre;
+select nombre, tipo, estado, orden from public.cajas order by orden, nombre;

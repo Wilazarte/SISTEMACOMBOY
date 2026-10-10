@@ -113,7 +113,7 @@ export function PagarSemanaFiltrada({
             <span className="font-semibold text-azul-900">Total a pagar (egreso)</span>
             <b className="text-right text-azul-900">{soles(total)}</b>
           </div>
-          <SelectorCaja value={caja} onChange={setCaja} label="¿De qué caja sale el pago? *" />
+          <SelectorCaja value={caja} onChange={setCaja} />
           <div className="flex justify-end gap-2 border-t border-plomo-100 pt-4">
             <Button variant="secondary" onClick={() => setAbierto(false)} disabled={guardando}>
               Cancelar

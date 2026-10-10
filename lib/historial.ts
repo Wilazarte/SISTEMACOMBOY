@@ -87,7 +87,7 @@ const aCabecera = (r: Record<string, unknown>): HistorialPlanilla => ({
   creado_por: (r.creado_por as string | null) ?? null,
   asistencia_desde: (r.asistencia_desde as string | null) ?? null,
   asistencia_hasta: (r.asistencia_hasta as string | null) ?? null,
-  caja: (r.caja as string | null) ?? null,
+  caja: (r.caja_nombre as string | null) ?? null,
 });
 
 const aDetalle = (r: Record<string, unknown>): HistorialDetalle => ({

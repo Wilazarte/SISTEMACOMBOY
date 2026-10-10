@@ -11,16 +11,19 @@ export interface Caja {
   saldo_actual: number;
   responsable: string | null;
   estado: string; // ACTIVA | INACTIVA
+  orden: number; // orden en el selector
 }
 
 /** Mientras no se ejecute supabase/cajas.sql: las mismas cajas iniciales, para no bloquear los pagos. */
-export const CAJAS_INICIALES: Caja[] = [
-  ["Caja Principal Efectivo", "EFECTIVO"],
-  ["Yape Empresa", "YAPE"],
-  ["BCP Empresa - Cta 123", "BCP"],
-  ["Caja Chica Obra", "EFECTIVO"],
-  ["Fondo de Reserva", "EFECTIVO"],
-].map(([nombre, tipo]) => ({ id: nombre, nombre, tipo, saldo_actual: 0, responsable: null, estado: "ACTIVA" }));
+export const CAJAS_INICIALES: Caja[] = (
+  [
+    ["CAJA GENERAL", "EFECTIVO"],
+    ["CAJA CHICA", "EFECTIVO"],
+    ["FONDO DE RESERVA", "EFECTIVO"],
+    ["YAPE EMPRESA", "YAPE"],
+    ["BCP EMPRESA - CTA 123", "BCP"],
+  ] as const
+).map(([nombre, tipo], i) => ({ id: nombre, nombre, tipo, saldo_actual: 0, responsable: null, estado: "ACTIVA", orden: (i + 1) * 10 }));
 
 export const CAJA_POR_DEFECTO = CAJAS_INICIALES[0].nombre;
 
@@ -29,7 +32,7 @@ let cache: Promise<Caja[]> | null = null;
 /** Cajas ACTIVAS por nombre (se lee una vez por sesión). */
 export function listarCajas(): Promise<Caja[]> {
   cache ??= (async () => {
-    const { data, error } = await createClient().from("cajas").select("*").order("nombre");
+    const { data, error } = await createClient().from("cajas").select("*");
     if (error || !data?.length) return CAJAS_INICIALES;
     return data
       .map((r) => ({
@@ -39,8 +42,11 @@ export function listarCajas(): Promise<Caja[]> {
         saldo_actual: Number(r.saldo_actual) || 0,
         responsable: (r.responsable as string | null) ?? null,
         estado: String(r.estado ?? "ACTIVA").toUpperCase(),
+        orden: Number(r.orden ?? 100),
       }))
-      .filter((c) => c.nombre && c.estado === "ACTIVA");
+      .filter((c) => c.nombre && c.estado === "ACTIVA")
+      // CAJA GENERAL, CAJA CHICA, FONDO DE RESERVA y luego Yape / bancos
+      .sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre));
   })();
   return cache;
 }

@@ -25,14 +25,14 @@ export interface Adelanto {
   semana?: string | null;
   sede?: string | null;
   medio_pago?: string | null; // supabase/adelantos_medio_pago.sql
-  caja?: string | null; // de qué caja salió el dinero (supabase/cajas.sql)
+  caja_nombre?: string | null; // de qué cuenta salió el dinero: "CAJA GENERAL"… (supabase/cajas.sql)
   created_at?: string;
   updated_at?: string;
 }
 
 export type DatosAdelanto = Pick<Adelanto, "trabajador_nombre" | "dni" | "fecha" | "monto" | "motivo" | "estado">;
 /** Datos extra que se guardan si la tabla ya tiene las columnas (supabase/adelantos_semana.sql). */
-export type ExtrasAdelanto = { trabajador_id?: string; semana?: string; sede?: string; medio_pago?: string; caja?: string };
+export type ExtrasAdelanto = { trabajador_id?: string; semana?: string; sede?: string; medio_pago?: string; caja_nombre?: string };
 
 /** Cómo se entregó el adelanto (se muestra en la boleta). */
 export const MEDIOS_PAGO = ["Efectivo", "Yape", "Plin", "Transferencia BCP", "Transferencia BBVA", "Transferencia Interbank", "Otro"];
@@ -42,7 +42,7 @@ const sinColumna = (e: { code?: string }) => e.code === "PGRST204" || e.code ===
 const extrasLimpios = (x?: ExtrasAdelanto) =>
   Object.fromEntries(Object.entries(x ?? {}).filter(([, v]) => typeof v === "string" && v.trim() !== "").map(([k, v]) => [k, String(v).trim()]));
 
-const sinNuevas = (x?: ExtrasAdelanto): ExtrasAdelanto => ({ ...x, medio_pago: undefined, caja: undefined });
+const sinNuevas = (x?: ExtrasAdelanto): ExtrasAdelanto => ({ ...x, medio_pago: undefined, caja_nombre: undefined });
 
 const COLUMNAS = "*";
 const MSG_FALTA_TABLA = "Falta la tabla adelantos en Supabase: ejecute supabase/adelantos.sql en el SQL Editor.";
@@ -75,7 +75,7 @@ const aAdelanto = (r: Record<string, unknown>): Adelanto => ({
   semana: (r.semana as string | null) ?? null,
   sede: (r.sede as string | null) ?? null,
   medio_pago: (r.medio_pago as string | null) ?? null,
-  caja: (r.caja as string | null) ?? null,
+  caja_nombre: (r.caja_nombre as string | null) ?? null,
   created_at: r.created_at as string | undefined,
   updated_at: r.updated_at as string | undefined,
 });
@@ -117,7 +117,7 @@ export async function crearAdelanto(datos: DatosAdelanto, extras?: ExtrasAdelant
   const insertar = (fila: object) => createClient().from("adelantos").insert(fila).select(COLUMNAS).single();
   let { data, error } = await insertar({ ...limpio, ...extrasLimpios(extras) });
   // Sin medio_pago / caja (faltan adelantos_medio_pago.sql o cajas.sql) se reintenta con las demás columnas extra, y luego sin ninguna
-  if (error && sinColumna(error) && (extras?.medio_pago || extras?.caja)) ({ data, error } = await insertar({ ...limpio, ...extrasLimpios(sinNuevas(extras)) }));
+  if (error && sinColumna(error) && (extras?.medio_pago || extras?.caja_nombre)) ({ data, error } = await insertar({ ...limpio, ...extrasLimpios(sinNuevas(extras)) }));
   if (error && sinColumna(error)) ({ data, error } = await insertar(limpio));
   if (error) throw errorAdelantos(error);
   return aAdelanto(data);
@@ -128,7 +128,7 @@ export async function editarAdelanto(id: string, datos: DatosAdelanto, extras?: 
   // Solo si no está descontado (la base también lo bloquea con un trigger)
   const actualizar = (fila: object) => createClient().from("adelantos").update(fila).eq("id", id).not("estado", "ilike", "descontado").select(COLUMNAS);
   let { data, error } = await actualizar({ ...limpio, ...extrasLimpios(extras) });
-  if (error && sinColumna(error) && (extras?.medio_pago || extras?.caja)) ({ data, error } = await actualizar({ ...limpio, ...extrasLimpios(sinNuevas(extras)) }));
+  if (error && sinColumna(error) && (extras?.medio_pago || extras?.caja_nombre)) ({ data, error } = await actualizar({ ...limpio, ...extrasLimpios(sinNuevas(extras)) }));
   if (error && sinColumna(error)) ({ data, error } = await actualizar(limpio));
   if (error) throw errorAdelantos(error);
   // Sin filas: no existe o la RLS no deja editarlo

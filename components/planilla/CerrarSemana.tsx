@@ -99,7 +99,7 @@ export function CerrarSemana({
               </>
             )}
           </div>
-          <SelectorCaja value={caja} onChange={setCaja} label="¿De qué caja sale el pago? *" />
+          <SelectorCaja value={caja} onChange={setCaja} />
           {nAdelantos > 0 && (
             <p className="rounded-lg bg-emerald-50 px-3 py-2 text-emerald-800">
               Los {nAdelantos} adelanto(s) descontado(s) pasan a <b>DESCONTADO</b> y quedan vinculados a esta planilla.

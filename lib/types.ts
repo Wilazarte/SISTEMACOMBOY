@@ -325,6 +325,7 @@ export interface Compra {
   tipoComprobante: TipoComprobanteCompra;
   numero: string; // F001-00001234 / B001-00000456
   sede: string; // almacén donde ingresa
+  caja?: string; // de qué cuenta se pagó ("CAJA GENERAL"…)
   items: ItemCompra[];
   subtotal: number;
   igv: number;

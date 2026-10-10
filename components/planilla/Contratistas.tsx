@@ -196,7 +196,7 @@ function FormConcesion({ form, onChange, onClose }: { form: ConcesionContratista
         <Field label="Adelanto (S/)">
           <Input type="number" min={0} step="0.01" value={form.adelanto || ""} onChange={(e) => set("adelanto", parseFloat(e.target.value) || 0)} />
         </Field>
-        {form.adelanto > 0 && <SelectorCaja value={form.cajaAdelanto ?? ""} onChange={(v) => set("cajaAdelanto", v)} label="Caja del adelanto" />}
+        {form.adelanto > 0 && <SelectorCaja value={form.cajaAdelanto ?? ""} onChange={(v) => set("cajaAdelanto", v)} />}
         <div className="flex flex-col justify-center rounded-lg bg-plomo-50 px-3 text-sm">
           Saldo: <b className="text-lg text-azul-900">{soles(calcularSaldo(form))}</b>
         </div>
@@ -277,7 +277,7 @@ function PagosConcesion({ c, soloLectura, onClose }: { c: ConcesionContratista; 
               <Field label="Medio">
                 <Select value={pago.medio} onChange={(e) => setPago({ ...pago, medio: e.target.value })} options={MEDIOS_PAGO_CONTRATISTA.map((m) => ({ value: m, label: m }))} />
               </Field>
-              <SelectorCaja value={pago.caja ?? ""} onChange={(caja) => setPago({ ...pago, caja })} label="Caja" />
+              <SelectorCaja value={pago.caja ?? ""} onChange={(caja) => setPago({ ...pago, caja })} />
               <Button variant="success" onClick={() => ejecutar(() => registrarPago(c.id, pago), "Pago registrado") && setPago({ ...pago, monto: 0 })}>
                 <Plus size={16} /> Registrar pago
               </Button>

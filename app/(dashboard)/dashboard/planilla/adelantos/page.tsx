@@ -78,7 +78,7 @@ export default function AdelantosPage() {
   const guardar = async () => {
     setGuardando(true);
     const ok = await ejecutarAsync(
-      () => (editandoId ? editarAdelanto(editandoId, form, { medio_pago: medio, caja }) : crearAdelanto(form, { medio_pago: medio, caja })),
+      () => (editandoId ? editarAdelanto(editandoId, form, { medio_pago: medio, caja_nombre: caja }) : crearAdelanto(form, { medio_pago: medio, caja_nombre: caja })),
       editandoId ? "Adelanto actualizado" : "Adelanto registrado"
     );
     setGuardando(false);
@@ -93,7 +93,7 @@ export default function AdelantosPage() {
     setEditandoId(a.id);
     setForm({ trabajador_nombre: a.trabajador_nombre, dni: a.dni ?? "", fecha: a.fecha, monto: a.monto, motivo: a.motivo ?? "", estado: a.estado });
     setMedio(a.medio_pago ?? "");
-    setCaja(a.caja ?? CAJA_POR_DEFECTO);
+    setCaja(a.caja_nombre ?? CAJA_POR_DEFECTO);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -226,7 +226,7 @@ export default function AdelantosPage() {
                   <span className="block truncate" title={a.motivo ?? ""}>
                     {a.motivo || "-"}
                   </span>
-                  {(a.medio_pago || a.caja) && <span className="block text-[11px] text-plomo-500">{[a.medio_pago, a.caja].filter(Boolean).join(" · ")}</span>}
+                  {(a.medio_pago || a.caja_nombre) && <span className="block text-[11px] text-plomo-500">{[a.medio_pago, a.caja_nombre].filter(Boolean).join(" · ")}</span>}
                 </Td>
                 <Td>
                   <Badge estado={a.estado} />

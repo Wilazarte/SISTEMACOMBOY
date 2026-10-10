@@ -43,7 +43,7 @@ export function AdelantosTrabajador({
   const guardar = async () => {
     setGuardando(true);
     const datos = { trabajador_nombre: trabajador.nombre, dni: trabajador.dni || null, fecha: f.fecha, monto: Number(f.monto), motivo: f.concepto, estado: "PENDIENTE" as const };
-    const extras = { trabajador_id: trabajador.id, semana: periodo, sede: f.sede, medio_pago: f.medio, caja: f.caja };
+    const extras = { trabajador_id: trabajador.id, semana: periodo, sede: f.sede, medio_pago: f.medio, caja_nombre: f.caja };
     const ok = await ejecutarAsync(
       () => (f.id ? editarAdelanto(f.id, datos, extras) : crearAdelanto(datos, extras)),
       f.id ? "Adelanto actualizado" : `Adelanto de ${soles(Number(f.monto) || 0)} registrado: se descuenta del total a pagar`
@@ -91,7 +91,7 @@ export function AdelantosTrabajador({
                       size="sm"
                       variant="ghost"
                       title="Editar"
-                      onClick={() => setF({ id: a.id, monto: String(a.monto), fecha: a.fecha, concepto: a.motivo ?? "", sede: a.sede || trabajador.sede || SEDES[0], medio: a.medio_pago ?? "", caja: a.caja ?? CAJA_POR_DEFECTO })}
+                      onClick={() => setF({ id: a.id, monto: String(a.monto), fecha: a.fecha, concepto: a.motivo ?? "", sede: a.sede || trabajador.sede || SEDES[0], medio: a.medio_pago ?? "", caja: a.caja_nombre ?? CAJA_POR_DEFECTO })}
                     >
                       <Pencil size={14} />
                     </Button>

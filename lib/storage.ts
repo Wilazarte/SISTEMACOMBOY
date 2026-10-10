@@ -1989,7 +1989,7 @@ const NUM_COMPROBANTE: Record<Compra["tipoComprobante"], RegExp> = {
 
 /** Registra la compra y suma las cantidades al stock de la sede. Valida todo antes de escribir. */
 export function registrarCompra(
-  data: Pick<Compra, "fecha" | "proveedorId" | "tipoComprobante" | "numero" | "sede"> & { items: Omit<ItemCompra, "subtotal">[] },
+  data: Pick<Compra, "fecha" | "proveedorId" | "tipoComprobante" | "numero" | "sede"> & Partial<Pick<Compra, "caja">> & { items: Omit<ItemCompra, "subtotal">[] },
   rol: Rol
 ): Compra {
   const prov = getProveedores().find((p) => p.id === data.proveedorId);
@@ -1997,6 +1997,7 @@ export function registrarCompra(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data.fecha)) throw new ErpError("Fecha de compra inválida. Use DD/MM/AAAA.");
   if (data.fecha > hoy()) throw new ErpError("La fecha de compra no puede ser futura.");
   if (!data.sede.trim()) throw new ErpError("Seleccione la sede / almacén de ingreso.");
+  if (!data.caja?.trim()) throw new ErpError("Seleccione de qué cuenta se realiza el pago.");
   const numero = data.numero.trim().toUpperCase();
   if (!NUM_COMPROBANTE[data.tipoComprobante].test(numero))
     throw new ErpError(`N° de ${data.tipoComprobante.toLowerCase()} inválido. Ej: ${data.tipoComprobante === "FACTURA" ? "F001-00001234" : "B001-00000456"}`);
@@ -2023,11 +2024,12 @@ export function registrarCompra(
     tipoComprobante: data.tipoComprobante,
     numero,
     sede: data.sede,
+    caja: data.caja.trim(),
     items,
     subtotal,
     igv,
     total,
-    historial: [evento(rol, "Compra registrada", `${numero} · ${prov.razonSocial} · ingreso a ${data.sede}`)],
+    historial: [evento(rol, "Compra registrada", `${numero} · ${prov.razonSocial} · ingreso a ${data.sede} · pagado desde ${data.caja.trim()}`)],
   };
 
   escribir(KEYS.COMPRAS, [compra, ...getCompras()]);

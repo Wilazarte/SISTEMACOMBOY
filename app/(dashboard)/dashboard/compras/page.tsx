@@ -281,6 +281,7 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
   const [tipo, setTipo] = useState<TipoComprobanteCompra>("FACTURA");
   const [numero, setNumero] = useState("");
   const [sede, setSede] = useState(SEDES[0]);
+  const [cajaCompra, setCajaCompra] = useState(CAJA_POR_DEFECTO);
   const [filas, setFilas] = useState<FilaCompra[]>([filaVacia()]);
   const habilitado = puede(rol, "compra.crear");
 
@@ -303,7 +304,7 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
 
   const guardar = () => {
     const ok = ejecutar(
-      () => registrarCompra({ proveedorId, fecha: fechaISO, tipoComprobante: tipo, numero, sede, items: filas }, rol),
+      () => registrarCompra({ proveedorId, fecha: fechaISO, tipoComprobante: tipo, numero, sede, caja: cajaCompra, items: filas }, rol),
       `Compra registrada · stock de ${sede} actualizado`
     );
     if (ok) {
@@ -374,6 +375,7 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
             <Field label="Ingresa a almacén">
               <Select value={sede} onChange={(e) => setSede(e.target.value)} options={SEDES.map((x) => ({ value: x, label: x }))} />
             </Field>
+            <SelectorCaja value={cajaCompra} onChange={setCajaCompra} className="md:col-span-2" />
           </div>
 
           <div className="overflow-x-auto">
@@ -912,7 +914,7 @@ function Ordenes({
           <div className="mx-5 mb-5 rounded-xl border border-plomo-200 p-4">
             <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-700">Comprobante de pago y origen</p>
             <div className="grid gap-4 md:grid-cols-3">
-              <SelectorCaja value={caja} onChange={setCaja} label="¿De qué caja se realiza el pago? *" />
+              <SelectorCaja value={caja} onChange={setCaja} encabezado={false} />
               <Field label="Monto del baucher (S/)">
                 <Input type="number" min={0} step="0.01" value={voucherMonto} onChange={(e) => setVoucherMonto(e.target.value)} />
               </Field>
@@ -1303,7 +1305,7 @@ function Facturas({
             <p className="text-plomo-600">
               {pagarFac.proveedor} · <b className="text-azul-900">{soles(pagarFac.netoPagar ?? pagarFac.total)}</b>
             </p>
-            <SelectorCaja value={cajaFac} onChange={setCajaFac} label="¿De qué caja sale el pago? *" />
+            <SelectorCaja value={cajaFac} onChange={setCajaFac} />
             <div className="flex justify-end gap-2 border-t border-plomo-100 pt-4">
               <Button variant="secondary" onClick={() => setPagarFac(null)}>
                 Cancelar
