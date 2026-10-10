@@ -12,6 +12,7 @@ import {
   History,
   MessageSquareWarning,
   PackagePlus,
+  Pencil,
   Plus,
   Receipt,
   ShoppingBag,
@@ -48,6 +49,9 @@ import {
   fechaPE,
   hoy,
   marcarPago,
+  motivoNoEditableOC,
+  editarOrdenCompra,
+  type EdicionOC,
   observarRequerimiento,
   parseFechaPE,
   puede,
@@ -66,7 +70,7 @@ import {
 } from "@/lib/storage";
 import { ALMACENES, ALMACEN_DEFECTO, SEDES, UNIDADES } from "@/lib/empresa";
 import { pdfCotizacion, pdfFactura, pdfOrdenCompra, pdfRequerimiento } from "@/lib/pdf";
-import { asientoOrdenCompra } from "@/lib/contable";
+import { asientoOrdenCompra, reasentarOrdenCompra } from "@/lib/contable";
 import { getSesion } from "@/lib/auth";
 import type { Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, Proveedor, Requerimiento, Rol, StockItem, TipoComprobanteCompra } from "@/lib/types";
 
@@ -811,6 +815,8 @@ function Ordenes({
   onFacturar: (id: string) => void;
 }) {
   const [bancarizar, setBancarizar] = useState<OrdenCompra | null>(null);
+  const [editar, setEditar] = useState<OrdenCompra | null>(null);
+  const facturasOC = useStore<Factura[]>(KEYS.FACTURAS, []);
   const [banc, setBanc] = useState<Bancarizacion>(bancarizacionVacia);
   const [cotiId, setCotiId] = useState(preCoti ?? "");
   const [fecha, setFecha] = useState(hoy());
@@ -1036,6 +1042,17 @@ function Ordenes({
                   <Button size="sm" variant="secondary" onClick={() => pdfOrdenCompra(o)}>
                     <FileText size={14} /> Ver PDF
                   </Button>
+                  {puede(rol, "oc.crear") &&
+                    (() => {
+                      const bloqueo = motivoNoEditableOC(o, facturasOC);
+                      return (
+                        <span title={bloqueo ?? "Editar OC"}>
+                          <Button size="sm" variant="ghost" disabled={!!bloqueo} onClick={() => setEditar(o)}>
+                            <Pencil size={14} />
+                          </Button>
+                        </span>
+                      );
+                    })()}
                   {o.estado === "EMITIDA" && puede(rol, "fac.pagar") && (
                     <Button
                       size="sm"
@@ -1059,6 +1076,10 @@ function Ordenes({
           ))}
         </Table>
       </Card>
+
+      <Modal open={!!editar} onClose={() => setEditar(null)} title={`Editar · ${editar?.numero ?? ""}`} wide>
+        {editar && <EditarOC key={editar.id} oc={editar} rol={rol} cotizaciones={todasCotis} onClose={() => setEditar(null)} />}
+      </Modal>
 
       <Modal open={!!bancarizar} onClose={() => setBancarizar(null)} title={`Bancarización · ${bancarizar?.numero ?? ""}`}>
         {bancarizar && (
@@ -1086,6 +1107,122 @@ function Ordenes({
           </div>
         )}
       </Modal>
+    </div>
+  );
+}
+
+// =====================================================================
+// EDITAR OC (solo sin factura ni pago)
+// =====================================================================
+function EditarOC({ oc, rol, cotizaciones, onClose }: { oc: OrdenCompra; rol: Rol; cotizaciones: Cotizacion[]; onClose: () => void }) {
+  const [d, setD] = useState<EdicionOC>(() => ({
+    fecha: oc.fecha.slice(0, 10),
+    proveedor: oc.proveedor,
+    ruc: oc.ruc,
+    formaPago: oc.formaPago,
+    tiempoEntrega: oc.tiempoEntrega,
+    lugarEntrega: oc.lugarEntrega,
+    cotizacionId: oc.cotizacionId,
+    items: oc.items.map((i) => ({ ...i })),
+  }));
+  const [guardando, setGuardando] = useState(false);
+  const opcionesCoti = cotizaciones.filter((c) => c.id === oc.cotizacionId || c.estado !== "CON_OC");
+  const coti = cotizaciones.find((c) => c.id === d.cotizacionId);
+  const subtotal = r2(d.items.reduce((a, i) => a + r2(i.cantidad * i.precioUnit), 0));
+  const igv = r2(subtotal * IGV);
+  const set = <K extends keyof EdicionOC>(k: K, v: EdicionOC[K]) => setD((x) => ({ ...x, [k]: v }));
+  const setItem = (n: number, cambio: Partial<ItemPrecio>) => set("items", d.items.map((i, j) => (j === n ? { ...i, ...cambio } : i)));
+
+  const elegirCoti = (id: string) => {
+    const c = cotizaciones.find((x) => x.id === id);
+    if (!c) return;
+    // Otra cotización: se cargan su proveedor y productos
+    setD((x) => ({ ...x, cotizacionId: id, proveedor: c.proveedor, ruc: c.ruc, items: c.items.map((i) => ({ ...i })) }));
+  };
+
+  const guardar = async () => {
+    setGuardando(true);
+    try {
+      const nueva = await editarOrdenCompra(oc.id, d, rol);
+      reasentarOrdenCompra(nueva, getSesion()?.usuario ?? String(rol));
+      toast(`${oc.numero} actualizada`, "ok");
+      onClose();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Error inesperado", "error");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4 text-sm">
+      <div className="grid gap-3 md:grid-cols-3">
+        <Field label="Cotización" className="md:col-span-2">
+          <Select value={d.cotizacionId} onChange={(e) => elegirCoti(e.target.value)} options={opcionesCoti.map((c) => ({ value: c.id, label: `${c.numero} · ${c.proveedor} · ${soles(c.total)}` }))} />
+        </Field>
+        <Field label="Requerimiento">
+          <Input value={coti?.reqNumero ?? oc.reqNumero} disabled />
+        </Field>
+        <Field label="Proveedor" className="md:col-span-2">
+          <Input value={d.proveedor} onChange={(e) => set("proveedor", e.target.value)} />
+        </Field>
+        <Field label="RUC">
+          <Input value={d.ruc} onChange={(e) => set("ruc", e.target.value.replace(/\D/g, "").slice(0, 11))} />
+        </Field>
+        <Field label="Fecha OC">
+          <Input type="date" value={d.fecha} onChange={(e) => set("fecha", e.target.value)} />
+        </Field>
+        <Field label="Forma de pago">
+          <Select value={d.formaPago} onChange={(e) => set("formaPago", e.target.value as FormaPago)} options={FORMAS_PAGO.map((f) => ({ value: f, label: f }))} />
+        </Field>
+        <Field label="Tiempo de entrega">
+          <Input value={d.tiempoEntrega} onChange={(e) => set("tiempoEntrega", e.target.value)} />
+        </Field>
+        <Field label="Lugar de entrega" className="md:col-span-3">
+          <Input value={d.lugarEntrega} onChange={(e) => set("lugarEntrega", e.target.value)} />
+        </Field>
+      </div>
+
+      <Table head={["Producto", "Cant.", "Und", "Marca", "P. unit (sin IGV)", "Subtotal", ""]}>
+        {d.items.map((i, n) => (
+          <tr key={n}>
+            <Td>
+              <Input value={i.nombre} onChange={(e) => setItem(n, { nombre: e.target.value })} />
+            </Td>
+            <Td className="w-24">
+              <Input type="number" min={0} step="any" value={i.cantidad} onChange={(e) => setItem(n, { cantidad: Number(e.target.value) })} />
+            </Td>
+            <Td className="w-24">
+              <Select value={i.unidad} onChange={(e) => setItem(n, { unidad: e.target.value })} options={UNIDADES.map((u) => ({ value: u, label: u }))} />
+            </Td>
+            <Td className="w-28">
+              <Input value={i.marca} onChange={(e) => setItem(n, { marca: e.target.value })} />
+            </Td>
+            <Td className="w-32">
+              <Input type="number" min={0} step="0.01" value={i.precioUnit} onChange={(e) => setItem(n, { precioUnit: Number(e.target.value) })} />
+            </Td>
+            <Td className="text-right">{soles(r2(i.cantidad * i.precioUnit))}</Td>
+            <Td>
+              <Button size="sm" variant="ghost" disabled={d.items.length === 1} onClick={() => set("items", d.items.filter((_, j) => j !== n))}>
+                <Trash2 size={14} />
+              </Button>
+            </Td>
+          </tr>
+        ))}
+      </Table>
+      <Button size="sm" variant="secondary" onClick={() => set("items", [...d.items, { itemReqId: uid(), nombre: "", cantidad: 1, unidad: "UND", marca: "", precioUnit: 0, subtotal: 0 }])}>
+        <Plus size={14} /> Agregar producto
+      </Button>
+      <Totales subtotal={subtotal} igv={igv} />
+
+      <div className="flex justify-end gap-2 border-t border-plomo-100 pt-4">
+        <Button variant="secondary" onClick={onClose}>
+          Cancelar
+        </Button>
+        <Button onClick={guardar} disabled={guardando}>
+          <Pencil size={14} /> {guardando ? "Guardando…" : "Guardar cambios"}
+        </Button>
+      </div>
     </div>
   );
 }

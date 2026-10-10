@@ -1022,6 +1022,91 @@ function validarOrdenCompra(data: Pick<OrdenCompra, "cotizacionId" | "tiempoEntr
   return coti;
 }
 
+/** Motivo por el que una OC ya no se puede editar (factura o pago registrado), o null si se puede. */
+export function motivoNoEditableOC(o: OrdenCompra, facturas: Factura[] = getFacturas()): string | null {
+  const conFactura = o.gastoId || facturas.some((f) => f.ocId === o.id);
+  const conPago = !!o.bancarizacion || !!o.voucherUrl || o.estado !== "EMITIDA";
+  return conFactura || conPago ? "No se puede editar: ya tiene factura/pago registrado" : null;
+}
+
+export type EdicionOC = Pick<OrdenCompra, "fecha" | "proveedor" | "ruc" | "formaPago" | "tiempoEntrega" | "lugarEntrega" | "cotizacionId" | "items">;
+
+/**
+ * Edita una OC sin factura ni pago. Si cambia la cotización, el REQ sale de la nueva cotización.
+ * Además de data, sincroniza la columna fecha de la fila (puede venir desfasada de registros antiguos).
+ */
+export async function editarOrdenCompra(id: string, d: EdicionOC, rol: Rol): Promise<OrdenCompra> {
+  if (!puede(rol, "oc.crear")) throw new ErpError("Solo Tesorería puede editar órdenes de compra.");
+  const actual = getOrdenes().find((o) => o.id === id);
+  if (!actual) throw new ErpError("Orden de compra no encontrada.");
+  const motivo = motivoNoEditableOC(actual);
+  if (motivo) throw new ErpError(motivo);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d.fecha)) throw new ErpError("Fecha inválida.");
+  if (!d.proveedor.trim()) throw new ErpError("Ingrese el proveedor.");
+  if (d.ruc.trim() && !rucValido(d.ruc.trim())) throw new ErpError("RUC inválido (11 dígitos con dígito verificador correcto).");
+  if (!d.tiempoEntrega.trim()) throw new ErpError("Indique el tiempo de entrega.");
+  const filas = d.items.filter((i) => i.nombre.trim());
+  if (!filas.length) throw new ErpError("La OC debe tener al menos un producto.");
+  if (filas.some((i) => !(i.cantidad > 0) || !(i.precioUnit > 0))) throw new ErpError("Cantidad y precio unitario deben ser mayores a 0.");
+
+  let coti: Cotizacion | undefined;
+  if (d.cotizacionId !== actual.cotizacionId) {
+    coti = getCotizaciones().find((c) => c.id === d.cotizacionId);
+    if (!coti) throw new ErpError("Seleccione una cotización.");
+    if (coti.estado === "CON_OC") throw new ErpError("Esa cotización ya tiene Orden de Compra.");
+    if (getOrdenes().some((o) => o.id !== id && o.reqId === coti!.reqId))
+      throw new ErpError(`El ${coti.reqNumero} ya tiene otra Orden de Compra.`);
+  }
+
+  const items = filas.map((i) => ({ ...i, nombre: i.nombre.trim(), subtotal: r2(i.cantidad * i.precioUnit) }));
+  const subtotal = r2(items.reduce((a, i) => a + i.subtotal, 0));
+  const igv = r2(subtotal * IGV);
+  const cambios = [
+    d.fecha !== actual.fecha && `fecha ${actual.fecha} → ${d.fecha}`,
+    r2(subtotal + igv) !== actual.total && `total ${actual.total.toFixed(2)} → ${r2(subtotal + igv).toFixed(2)}`,
+    coti && `cotización ${actual.cotizacionNumero} → ${coti.numero}`,
+  ].filter(Boolean);
+  const oc: OrdenCompra & { fecha_emision: string } = {
+    ...actual,
+    fecha: d.fecha,
+    // Se guarda también como fecha_emision: lo leen consultas / reportes hechos directo sobre data
+    fecha_emision: d.fecha,
+    proveedor: d.proveedor.trim().toUpperCase(),
+    ruc: d.ruc.trim(),
+    formaPago: d.formaPago,
+    tiempoEntrega: d.tiempoEntrega.trim(),
+    lugarEntrega: d.lugarEntrega,
+    ...(coti ? { cotizacionId: coti.id, cotizacionNumero: coti.numero, reqId: coti.reqId, reqNumero: coti.reqNumero } : {}),
+    items,
+    subtotal,
+    igv,
+    total: r2(subtotal + igv),
+    historial: [...actual.historial, evento(rol, "Orden de compra editada", cambios.join(" · ") || "Datos actualizados")],
+  };
+  escribir(KEYS.ORDENES, getOrdenes().map((o) => (o.id === id ? oc : o)));
+  if (coti)
+    escribir(
+      KEYS.COTIZACIONES,
+      getCotizaciones().map((c) =>
+        c.id === coti!.id
+          ? { ...c, estado: "CON_OC" as const, historial: [...c.historial, evento(rol, "Adjudicada", oc.numero)] }
+          : c.id === actual.cotizacionId
+            ? { ...c, estado: "REGISTRADA" as const, historial: [...c.historial, evento(rol, "Liberada", `${oc.numero} pasó a Cot. ${coti!.numero}`)] }
+            : c
+      )
+    );
+  const error = await esperarGuardado();
+  if (error) throw new ErpError(`No se guardó la OC: ${error}`);
+
+  // Columna fecha + updated_at de la fila (data ya quedó guardada arriba)
+  const sb = createClient();
+  const r = await sb.from("compras").update({ fecha: d.fecha, updated_at: new Date().toISOString() }).eq("tipo", "orden").eq("id", id);
+  // Tabla sin columna fecha (42703 / PGRST204): no hay nada que sincronizar
+  if (r.error && r.error.code !== "42703" && r.error.code !== "PGRST204") throw new ErpError(`OC guardada, pero no se pudo actualizar la columna fecha: ${r.error.message}`);
+  await recargarDatos(KEYS.ORDENES);
+  return oc;
+}
+
 export async function crearOrdenCompra(
   data: Pick<OrdenCompra, "fecha" | "cotizacionId" | "formaPago" | "tiempoEntrega" | "lugarEntrega"> &
     Partial<Pick<OrdenCompra, "cuentaOrigenPago" | "voucherUrl" | "voucherNombre" | "voucherTipo" | "voucherMonto" | "almacenIngreso" | "caja">>,
