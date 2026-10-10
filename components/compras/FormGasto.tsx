@@ -1,8 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { FileUp, Paperclip, Receipt, X } from "lucide-react";
-import { Button, Card, CardHeader, Field, Input, Select, Textarea, cn, ejecutar, toast } from "@/components/ui";
+import { useMemo, useRef, useState } from "react";
+import { FileUp, Paperclip, Plus, Receipt, ShoppingBag, Trash2, X } from "lucide-react";
+import { FormBancarizacion, bancarizacionVacia } from "@/components/compras/FormBancarizacion";
+import { UNIDADES } from "@/lib/empresa";
+import { Button, Card, CardHeader, Field, Input, Select, Textarea, cn, ejecutarAsync, toast } from "@/components/ui";
 import {
   COMPROBANTES_GASTO,
   DETRACCION_SUGERIDA,
@@ -14,12 +16,19 @@ import {
   fechaPE,
   hoy,
   parseFechaPE,
-  registrarGastoTesoreria,
+  IGV,
+  TOPE_BANCARIZACION,
+  r2,
+  registrarGastoCompleto,
+  requiereBancarizacion,
   rucValido,
   soles,
   type DatosGasto,
 } from "@/lib/storage";
-import type { ArchivoGasto, ComprobanteGasto, Proveedor, Rol, TipoGasto } from "@/lib/types";
+import type { ArchivoGasto, Bancarizacion, ComprobanteGasto, Proveedor, Rol, StockItem, TipoGasto } from "@/lib/types";
+
+type FilaOC = { id: string; nombre: string; unidad: string; cantidad: number; precioUnit: number };
+const filaOC = (): FilaOC => ({ id: Math.random().toString(36).slice(2), nombre: "", unidad: "UND", cantidad: 1, precioUnit: 0 });
 
 /** DD/MM/AAAA mientras se escribe. */
 const mascara = (v: string) => {
@@ -44,8 +53,20 @@ const vacio = (): Omit<DatosGasto, "fecha"> => ({
  * Gasto / servicio sin stock (Tesorería): almuerzos de representación, servicios básicos, transporte,
  * compras sin requerimiento… No ingresa a almacén: queda en Facturas como POR PAGAR.
  */
-export function FormGasto({ rol, proveedores, onGuardado }: { rol: Rol; proveedores: Proveedor[]; onGuardado?: () => void }) {
+export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: Rol; proveedores: Proveedor[]; stock?: StockItem[]; onGuardado?: () => void }) {
   const [d, setD] = useState(vacio);
+  // Orden de compra opcional por este gasto
+  const [conOC, setConOC] = useState(false);
+  const [filas, setFilas] = useState<FilaOC[]>([filaOC()]);
+  // Bancarización: con ella el gasto queda PAGADO ("Registrar y pagar")
+  const [pagar, setPagar] = useState(false);
+  const [banc, setBanc] = useState<Bancarizacion>(bancarizacionVacia);
+  const [guardando, setGuardando] = useState(false);
+  const productos = useMemo(() => {
+    const m = new Map<string, StockItem>();
+    stock.forEach((s) => m.has(s.nombre) || m.set(s.nombre, s));
+    return [...m.values()].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [stock]);
   const [fechaTxt, setFechaTxt] = useState(fechaPE(hoy()));
   const refFactura = useRef<HTMLInputElement>(null);
   const refGuia = useRef<HTMLInputElement>(null);
@@ -54,6 +75,14 @@ export function FormGasto({ rol, proveedores, onGuardado }: { rol: Rol; proveedo
   const fechaError = fechaTxt.length === 10 && !fechaISO ? "Fecha inexistente" : fechaISO > hoy() ? "La fecha no puede ser futura" : undefined;
   const { monto, neto } = calcularDetraccion(d.importe, d.detraccion, d.detraccionPorc);
   const rucMal = d.ruc.length === 11 && !rucValido(d.ruc);
+  const subOC = r2(filas.reduce((a, f) => a + (f.cantidad || 0) * (f.precioUnit || 0), 0));
+  const totalOC = d.comprobante === "FACTURA" ? r2(subOC * (1 + IGV)) : subOC;
+  const bancObligatoria = requiereBancarizacion(d.importe || 0, d.ruc);
+  const setFila = (id: string, cambios: Partial<FilaOC>) => setFilas((p) => p.map((f) => (f.id === id ? { ...f, ...cambios } : f)));
+  const elegirProducto = (id: string, nombre: string) => {
+    const p = productos.find((x) => x.nombre === nombre.toUpperCase());
+    setFila(id, p ? { nombre: p.nombre, unidad: p.unidad, precioUnit: p.costoUnit || 0 } : { nombre });
+  };
 
   const adjuntar = (tipo: ArchivoGasto["tipo"], file?: File) => {
     if (!file) return;
@@ -66,14 +95,23 @@ export function FormGasto({ rol, proveedores, onGuardado }: { rol: Rol; proveedo
   };
 
   const guardar = async () => {
+    setGuardando(true);
     let id = "";
-    if (
-      !ejecutar(() => {
-        id = registrarGastoTesoreria({ ...d, fecha: fechaISO }, rol).id;
-      }, `Gasto registrado · en Facturas como POR PAGAR${monto ? ` (neto ${soles(neto)})` : ""}`)
-    )
-      return;
+    const ok = await ejecutarAsync(
+      async () => {
+        const r = await registrarGastoCompleto({ ...d, fecha: fechaISO }, { items: conOC ? filas : undefined, bancarizacion: pagar ? banc : undefined }, rol);
+        id = r.gasto.id;
+        return r;
+      },
+      `Gasto registrado${conOC ? " con su orden de compra" : ""} · ${pagar ? `PAGADO desde ${banc.caja}` : `en Facturas como POR PAGAR${monto ? ` (neto ${soles(neto)})` : ""}`}`
+    );
+    setGuardando(false);
+    if (!ok) return;
     setD(vacio());
+    setConOC(false);
+    setFilas([filaOC()]);
+    setPagar(false);
+    setBanc(bancarizacionVacia());
     onGuardado?.();
     // Código global GST-xxx-AAAA (si falla, se vuelve a intentar al generar el PDF)
     try {
@@ -109,6 +147,80 @@ export function FormGasto({ rol, proveedores, onGuardado }: { rol: Rol; proveedo
         <Field label="Descripción del gasto *" className="md:col-span-3">
           <Textarea value={d.descripcion} onChange={(e) => set("descripcion", e.target.value)} placeholder="Ej: Servicio de transporte Arequipa - Lima" />
         </Field>
+
+        {/* Orden de compra opcional */}
+        <div className="rounded-xl border border-plomo-200 p-4 md:col-span-3">
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-azul-900">
+            <input type="checkbox" checked={conOC} onChange={(e) => setConOC(e.target.checked)} className="h-4 w-4 accent-corp" />
+            <ShoppingBag size={15} /> ¿Emitir Orden de Compra por este gasto? (opcional)
+          </label>
+          {conOC && (
+            <div className="mt-3 space-y-3">
+              <p className="text-xs text-plomo-500">
+                La OC se emite a nombre del proveedor de abajo. Busque los productos en el almacén o escríbalos; precios {d.comprobante === "FACTURA" ? "sin IGV" : "finales"}.
+              </p>
+              <datalist id="productos-oc-gasto">
+                {productos.map((p) => (
+                  <option key={p.id} value={p.nombre}>
+                    {p.unidad} · {p.sede}
+                  </option>
+                ))}
+              </datalist>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead className="bg-azul-900 text-[11px] font-semibold uppercase tracking-widest text-white">
+                    <tr>
+                      <th className="px-2 py-2 text-left">Producto</th>
+                      <th className="w-24 px-2 py-2 text-left">Cantidad</th>
+                      <th className="w-28 px-2 py-2 text-left">Unidad</th>
+                      <th className="w-32 px-2 py-2 text-left">Precio unit.</th>
+                      <th className="w-28 px-2 py-2 text-right">Subtotal</th>
+                      <th className="w-10" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-plomo-100">
+                    {filas.map((f) => (
+                      <tr key={f.id}>
+                        <td className="px-2 py-1.5">
+                          <Input value={f.nombre} list="productos-oc-gasto" onChange={(e) => elegirProducto(f.id, e.target.value)} placeholder="Buscar producto del almacén…" />
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <Input type="number" min={0} step="any" value={f.cantidad || ""} onChange={(e) => setFila(f.id, { cantidad: parseFloat(e.target.value) || 0 })} />
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <Select value={f.unidad} onChange={(e) => setFila(f.id, { unidad: e.target.value })} options={UNIDADES.map((u) => ({ value: u, label: u }))} />
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <Input type="number" min={0} step="0.01" value={f.precioUnit || ""} onChange={(e) => setFila(f.id, { precioUnit: parseFloat(e.target.value) || 0 })} />
+                        </td>
+                        <td className="px-2 py-1.5 text-right font-semibold">{soles(r2((f.cantidad || 0) * (f.precioUnit || 0)))}</td>
+                        <td className="px-2 py-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setFilas((p) => (p.length > 1 ? p.filter((x) => x.id !== f.id) : [filaOC()]))}
+                            className="rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                            aria-label="Quitar producto"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Button type="button" size="sm" variant="secondary" onClick={() => setFilas((p) => [...p, filaOC()])}>
+                  <Plus size={14} /> Agregar producto
+                </Button>
+                <p className={cn("text-sm", Math.abs(totalOC - (d.importe || 0)) > 0.05 ? "text-red-600" : "text-emerald-700")}>
+                  Total OC <b>{soles(totalOC)}</b>
+                  {d.comprobante === "FACTURA" ? ` (${soles(subOC)} + IGV)` : ""} · debe coincidir con el importe {soles(d.importe || 0)}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
         <Field label="Tipo de comprobante *">
           <Select
             value={d.comprobante}
@@ -179,6 +291,23 @@ export function FormGasto({ rol, proveedores, onGuardado }: { rol: Rol; proveedo
           )}
         </div>
 
+        {/* Bancarización */}
+        <div className="rounded-xl border border-plomo-200 p-4 md:col-span-3">
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-azul-900">
+            <input type="checkbox" checked={pagar} onChange={(e) => setPagar(e.target.checked)} className="h-4 w-4 accent-corp" /> Bancarización: registrar el pago ahora
+          </label>
+          <p className="mt-1 text-xs text-plomo-500">
+            {bancObligatoria
+              ? `Obligatoria al pagar: el total pasa S/ ${TOPE_BANCARIZACION.toLocaleString("es-PE")} o el proveedor tiene RUC.`
+              : "Opcional. Sin pago, el gasto queda POR PAGAR en Facturas."}
+          </p>
+          {pagar && (
+            <div className="mt-3">
+              <FormBancarizacion value={banc} onChange={setBanc} />
+            </div>
+          )}
+        </div>
+
         {/* Adjuntos */}
         <div className="flex flex-wrap gap-3 md:col-span-3">
           {(
@@ -219,8 +348,8 @@ export function FormGasto({ rol, proveedores, onGuardado }: { rol: Rol; proveedo
             </>
           )}
         </p>
-        <Button variant="warning" onClick={guardar} disabled={!fechaISO} className="px-5 py-2.5">
-          <Receipt size={16} /> Registrar gasto (por pagar)
+        <Button variant={pagar ? "success" : "warning"} onClick={guardar} disabled={!fechaISO || guardando} className="px-5 py-2.5">
+          <Receipt size={16} /> {guardando ? "Guardando…" : pagar ? "Registrar y pagar" : "Registrar gasto (por pagar)"}
         </Button>
       </div>
     </Card>

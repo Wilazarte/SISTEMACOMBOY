@@ -161,6 +161,26 @@ export function asientoOrdenCompra(
   });
 }
 
+/** OC editada: si su asiento ya no coincide, se anula y se registra uno nuevo con los importes actuales. */
+export function reasentarOrdenCompra(
+  oc: { id: string; numero: string; proveedor: string; fecha: string; subtotal: number; igv: number; total: number },
+  usuario: string
+): AsientoDiario | null {
+  const a = asientoDe("OC", oc.id);
+  if (!a) return null;
+  const monto = (c: string) => a.lineas.filter((l) => l.cuenta === c).reduce((s, l) => s + l.debe + l.haber, 0);
+  if (a.fecha === oc.fecha && Math.abs(monto("4212") - oc.total) < 0.01 && Math.abs(monto("40111") - oc.igv) < 0.01) return null;
+  revertirAsiento("OC", oc.id, "OC editada", usuario);
+  return registrar({
+    id: `OC-${oc.id}-E${Date.now()}`,
+    fecha: oc.fecha,
+    glosa: `Compra ${oc.numero} · ${oc.proveedor} (editada)`,
+    origen: { tipo: "OC", id: oc.id, numero: oc.numero },
+    lineas: [linea("6011", oc.subtotal, 0), linea("40111", oc.igv, 0), linea("4212", 0, oc.total)],
+    usuario,
+  });
+}
+
 /** Pagar planilla: DEBE 6211 Remuneraciones (bruto) / HABER 4032 AFP-ONP + 1412 adelantos + 1011 Caja (pagado). */
 export function asientoPlanilla(
   p: { id: string; periodo: string; bruto: number; descuento: number; adelantos: number; pagado: number },

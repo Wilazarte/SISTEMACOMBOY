@@ -108,6 +108,7 @@ const COLORES: Record<string, string> = {
   CON_OC: "bg-[#EEF2F7] text-azul-700 ring-[#C9D4E3]",
   EMITIDA: "bg-amber-50 text-amber-800 ring-amber-200",
   FACTURADA: "bg-[#EEF2F7] text-azul-700 ring-[#C9D4E3]",
+  BANCARIZADA: "bg-emerald-50 text-emerald-800 ring-emerald-200",
   EN_GUIA: "bg-amber-50 text-amber-800 ring-amber-200",
   POR_PAGAR: "bg-red-50 text-vino ring-red-200",
   PAGADA: "bg-emerald-50 text-emerald-800 ring-emerald-200",

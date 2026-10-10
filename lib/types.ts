@@ -69,7 +69,21 @@ export interface Cotizacion {
 
 export type FormaPago = "CONTADO" | "CREDITO 15 DIAS" | "CREDITO 30 DIAS" | "CREDITO 60 DIAS" | "ADELANTO 50%";
 
-export type EstadoOC = "EMITIDA" | "FACTURADA" | "EN_GUIA" | "FINALIZADA";
+/**
+ * Flujo de compras: EMITIDA -> BANCARIZADA -> FACTURADA (fin).
+ * EN_GUIA / FINALIZADA quedan solo para OC antiguas (guía y V°B° de almacén ya no son parte del flujo).
+ */
+export type EstadoOC = "EMITIDA" | "BANCARIZADA" | "FACTURADA" | "EN_GUIA" | "FINALIZADA";
+
+export type TipoBancarizacion = "EFECTIVO" | "TRANSFERENCIA BCP" | "YAPE" | "BBVA" | "INTERBANK" | "DETRACCIÓN";
+
+/** Pago de la OC o del gasto por el sistema financiero (bancarización). */
+export interface Bancarizacion {
+  tipo: TipoBancarizacion;
+  nroOperacion?: string;
+  fecha: string; // YYYY-MM-DD
+  caja: string; // CAJA GENERAL, CAJA CHICA…
+}
 
 export interface OrdenCompra {
   id: string;
@@ -96,6 +110,11 @@ export interface OrdenCompra {
   cuentaOrigenPago?: CuentaOrigenPago;
   /** Caja de la que sale el pago (tabla cajas). */
   caja?: string;
+  bancarizacion?: Bancarizacion;
+  /** OC emitida desde "Registrar gasto / compra" (sin cotización): id del gasto en Facturas. */
+  gastoId?: string;
+  /** Almacén ya registró el ingreso de esta OC (Almacén › Ingresos). */
+  ingresadaAlmacen?: boolean;
   voucherUrl?: string; // ruta en Supabase Storage: bucket "tesoreria", carpeta vouchers/
   voucherNombre?: string;
   voucherTipo?: string;
@@ -128,6 +147,7 @@ export interface Factura {
   estadoPago: "POR_PAGAR" | "PAGADA";
   /** Caja de la que salió el pago (al marcarla PAGADA). */
   caja?: string;
+  bancarizacion?: Bancarizacion;
   // Solo DJ
   motivoSinComprobante?: string;
   aprobadoPor?: string;
