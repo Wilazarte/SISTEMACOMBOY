@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { HandCoins, Pencil, Save, Trash2 } from "lucide-react";
 import { Button, Field, Input, Modal, Select, ejecutarAsync } from "@/components/ui";
-import { crearAdelanto, editarAdelanto, eliminarAdelanto, type Adelanto } from "@/lib/adelantos";
+import { MEDIOS_PAGO, crearAdelanto, editarAdelanto, eliminarAdelanto, type Adelanto } from "@/lib/adelantos";
 import { SEDES } from "@/lib/empresa";
 import { fechaPE, hoy, r2, soles } from "@/lib/storage";
 
 /** "SEMANA 14 - ABRIL 2026" -> "semana 14" (para el concepto sugerido). */
 const semanaCorta = (periodo: string) => periodo.match(/SEMANA\s+\d+/i)?.[0].toLowerCase() ?? periodo.toLowerCase();
 
-type Form = { id?: string; monto: string; fecha: string; concepto: string; sede: string };
+type Form = { id?: string; monto: string; fecha: string; concepto: string; sede: string; medio: string };
 
 /**
  * Columna ADELANTOS de la planilla: registrar, editar o eliminar los adelantos PENDIENTES de un trabajador.
@@ -20,6 +20,7 @@ export function AdelantosTrabajador({
   trabajador,
   periodo,
   pendientes,
+  descontados = [],
   editable,
   onClose,
   onCambio,
@@ -27,11 +28,12 @@ export function AdelantosTrabajador({
   trabajador: { id: string; nombre: string; dni?: string; sede?: string };
   periodo: string;
   pendientes: Adelanto[];
+  descontados?: string[]; // los que se descuentan en este pago (el resto queda pendiente)
   editable: boolean;
   onClose: () => void;
   onCambio: () => void;
 }) {
-  const nuevo = (): Form => ({ monto: "", fecha: hoy(), concepto: `Adelanto ${semanaCorta(periodo)}`, sede: trabajador.sede || SEDES[0] });
+  const nuevo = (): Form => ({ monto: "", fecha: hoy(), concepto: `Adelanto ${semanaCorta(periodo)}`, sede: trabajador.sede || SEDES[0], medio: "Efectivo" });
   const [f, setF] = useState<Form>(nuevo);
   const [guardando, setGuardando] = useState(false);
   const total = r2(pendientes.reduce((a, x) => a + x.monto, 0));
@@ -39,7 +41,7 @@ export function AdelantosTrabajador({
   const guardar = async () => {
     setGuardando(true);
     const datos = { trabajador_nombre: trabajador.nombre, dni: trabajador.dni || null, fecha: f.fecha, monto: Number(f.monto), motivo: f.concepto, estado: "PENDIENTE" as const };
-    const extras = { trabajador_id: trabajador.id, semana: periodo, sede: f.sede };
+    const extras = { trabajador_id: trabajador.id, semana: periodo, sede: f.sede, medio_pago: f.medio };
     const ok = await ejecutarAsync(
       () => (f.id ? editarAdelanto(f.id, datos, extras) : crearAdelanto(datos, extras)),
       f.id ? "Adelanto actualizado" : `Adelanto de ${soles(Number(f.monto) || 0)} registrado: se descuenta del total a pagar`
@@ -60,18 +62,24 @@ export function AdelantosTrabajador({
   };
 
   return (
-    <Modal open onClose={onClose} title={`Registrar adelanto - ${trabajador.nombre}`}>
+    <Modal open onClose={onClose} title={`${pendientes.length ? "Desglose de adelantos" : "Registrar adelanto"} - ${trabajador.nombre}`}>
       <div className="space-y-4 text-sm">
         {pendientes.length > 0 && (
           <div className="rounded-xl border border-red-200 bg-red-50/50">
             <p className="border-b border-red-100 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-red-700">
-              Adelantos pendientes · total <span className="text-red-600">- {soles(total)}</span>
+              Adelantos pendientes · {periodo}
             </p>
             {pendientes.map((a) => (
               <div key={a.id} className="flex items-center gap-2 border-b border-red-100 px-3 py-2 last:border-0">
                 <span className="w-24 text-xs text-plomo-500">{fechaPE(a.fecha)}</span>
                 <span className="flex-1 truncate">
-                  {a.motivo || "Adelanto"}
+                  {a.motivo || "Sin motivo"}
+                  {descontados.length > 0 && !descontados.includes(a.id) && (
+                    <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] font-semibold text-amber-800" title="No cabe en el neto: se descuenta en la siguiente planilla">
+                      queda pendiente
+                    </span>
+                  )}
+                  {a.medio_pago ? <span className="text-xs text-plomo-500"> · {a.medio_pago}</span> : null}
                   {a.sede ? <span className="text-xs text-plomo-500"> · {a.sede}</span> : null}
                 </span>
                 <b className="text-red-600">- {soles(a.monto)}</b>
@@ -81,7 +89,7 @@ export function AdelantosTrabajador({
                       size="sm"
                       variant="ghost"
                       title="Editar"
-                      onClick={() => setF({ id: a.id, monto: String(a.monto), fecha: a.fecha, concepto: a.motivo ?? "", sede: a.sede || trabajador.sede || SEDES[0] })}
+                      onClick={() => setF({ id: a.id, monto: String(a.monto), fecha: a.fecha, concepto: a.motivo ?? "", sede: a.sede || trabajador.sede || SEDES[0], medio: a.medio_pago ?? "" })}
                     >
                       <Pencil size={14} />
                     </Button>
@@ -92,6 +100,10 @@ export function AdelantosTrabajador({
                 )}
               </div>
             ))}
+            <div className="flex items-center justify-between border-t border-red-200 px-3 py-2 font-bold">
+              <span>Total adelantos</span>
+              <span className="text-red-600">- {soles(total)}</span>
+            </div>
           </div>
         )}
 
@@ -107,6 +119,9 @@ export function AdelantosTrabajador({
               </Field>
               <Field label="Concepto">
                 <Input value={f.concepto} onChange={(e) => setF({ ...f, concepto: e.target.value })} placeholder="Ej: Adelanto semana 14" />
+              </Field>
+              <Field label="Medio de pago">
+                <Select value={f.medio} onChange={(e) => setF({ ...f, medio: e.target.value })} placeholder="Sin indicar" options={MEDIOS_PAGO.map((m) => ({ value: m, label: m }))} />
               </Field>
               <Field label="Sede">
                 <Select value={f.sede} onChange={(e) => setF({ ...f, sede: e.target.value })} options={SEDES.map((s) => ({ value: s, label: s }))} />

@@ -13,6 +13,7 @@ import { codigoDesdeNumero, estadoDocumento } from "./utils/codigos";
 import { equipoDeLinea, sedeEquipo } from "./equipos";
 import { ESTADOS_OD, LUGARES_ENTREGA, estadoOD, origenOD, type EstadoAlmacen } from "./ventas";
 import { toast } from "@/components/ui";
+import type { Adelanto } from "./adelantos";
 import type { HistorialDetalle, HistorialPlanilla } from "./historial";
 import type { ConcesionContratista, LugarEntrega } from "./types";
 import type { ComprobanteVenta, Cotizacion, Factura, Guia, LineaVenta, NotaPedido, OrdenCompra, OrdenDespacho, Requerimiento } from "./types";
@@ -482,7 +483,33 @@ export interface DatosBoleta {
   bruto: number;
   descuentoAfp: number;
   adelantos: number;
+  /** Cada adelanto descontado en esta boleta (fecha, monto, motivo). Sin lista, la fila sale sin detalle. */
+  adelantosDetalle?: AdelantoBoleta[];
   totalPagar: number;
+}
+
+export type AdelantoBoleta = Pick<Adelanto, "fecha" | "monto" | "motivo" | "medio_pago">;
+
+/** "Transferencia BCP" -> "Transf. BCP" (para que el detalle quepa en una línea). */
+const medioCorto = (m?: string | null) => (m ?? "").trim().replace(/^Transferencia\b/i, "Transf.");
+
+/**
+ * Una fila por adelanto ("10/09/2026 - Efectivo - Pasaje") y, si hay varios, la fila del total descontado.
+ * El medio de pago sale solo si se registró.
+ */
+function filasAdelantos(d: DatosBoleta): string[][] {
+  const lista = d.adelantosDetalle ?? [];
+  if (!lista.length) {
+    if (!d.adelantos) return [["DESCUENTO", "Adelantos de sueldo", "Sin adelantos en este periodo", `- ${soles(0)}`]];
+    return [["DESCUENTO", "Adelantos de sueldo", "Detalle no disponible", `- ${soles(d.adelantos)}`]];
+  }
+  const filas = lista.map((a) => [
+    "DESCUENTO",
+    "Adelanto sueldo",
+    [fechaPE(a.fecha), medioCorto(a.medio_pago), a.motivo?.trim() || "Sin motivo"].filter(Boolean).join(" - "),
+    `- ${soles(a.monto)}`,
+  ]);
+  return lista.length > 1 ? [...filas, ["", "", "Total adelantos descontados", `- ${soles(d.adelantos)}`]] : filas;
 }
 
 /** Boleta individual de pago (Planilla del periodo): se descarga como BOL-xxx-AAAA.pdf. */
@@ -511,7 +538,7 @@ export function pdfBoletaPago(d: DatosBoleta, codigo: string): void {
       ["INGRESO", "Horas extra", d.horasExtra, soles(d.montoExtra)],
       ["", "Remuneración bruta", "", soles(d.bruto)],
       ["DESCUENTO", `Aporte ${d.pension}`, `${d.afpPorcentaje}% de la remuneración bruta`, `- ${soles(d.descuentoAfp)}`],
-      ["DESCUENTO", "Adelantos de sueldo", "Descontados en este periodo", `- ${soles(d.adelantos)}`],
+      ...filasAdelantos(d),
     ],
     alinearDerecha: [3],
     totales: [
