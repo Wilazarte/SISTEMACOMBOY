@@ -4,13 +4,15 @@ import { useState } from "react";
 import { HandCoins, Pencil, Save, Trash2 } from "lucide-react";
 import { Button, Field, Input, Modal, Select, ejecutarAsync } from "@/components/ui";
 import { MEDIOS_PAGO, crearAdelanto, editarAdelanto, eliminarAdelanto, type Adelanto } from "@/lib/adelantos";
+import { SelectorCaja } from "@/components/SelectorCaja";
+import { CAJA_POR_DEFECTO } from "@/lib/cajas";
 import { SEDES } from "@/lib/empresa";
 import { fechaPE, hoy, r2, soles } from "@/lib/storage";
 
 /** "SEMANA 14 - ABRIL 2026" -> "semana 14" (para el concepto sugerido). */
 const semanaCorta = (periodo: string) => periodo.match(/SEMANA\s+\d+/i)?.[0].toLowerCase() ?? periodo.toLowerCase();
 
-type Form = { id?: string; monto: string; fecha: string; concepto: string; sede: string; medio: string };
+type Form = { id?: string; monto: string; fecha: string; concepto: string; sede: string; medio: string; caja: string };
 
 /**
  * Columna ADELANTOS de la planilla: registrar, editar o eliminar los adelantos PENDIENTES de un trabajador.
@@ -33,7 +35,7 @@ export function AdelantosTrabajador({
   onClose: () => void;
   onCambio: () => void;
 }) {
-  const nuevo = (): Form => ({ monto: "", fecha: hoy(), concepto: `Adelanto ${semanaCorta(periodo)}`, sede: trabajador.sede || SEDES[0], medio: "Efectivo" });
+  const nuevo = (): Form => ({ monto: "", fecha: hoy(), concepto: `Adelanto ${semanaCorta(periodo)}`, sede: trabajador.sede || SEDES[0], medio: "Efectivo", caja: CAJA_POR_DEFECTO });
   const [f, setF] = useState<Form>(nuevo);
   const [guardando, setGuardando] = useState(false);
   const total = r2(pendientes.reduce((a, x) => a + x.monto, 0));
@@ -41,7 +43,7 @@ export function AdelantosTrabajador({
   const guardar = async () => {
     setGuardando(true);
     const datos = { trabajador_nombre: trabajador.nombre, dni: trabajador.dni || null, fecha: f.fecha, monto: Number(f.monto), motivo: f.concepto, estado: "PENDIENTE" as const };
-    const extras = { trabajador_id: trabajador.id, semana: periodo, sede: f.sede, medio_pago: f.medio };
+    const extras = { trabajador_id: trabajador.id, semana: periodo, sede: f.sede, medio_pago: f.medio, caja_nombre: f.caja };
     const ok = await ejecutarAsync(
       () => (f.id ? editarAdelanto(f.id, datos, extras) : crearAdelanto(datos, extras)),
       f.id ? "Adelanto actualizado" : `Adelanto de ${soles(Number(f.monto) || 0)} registrado: se descuenta del total a pagar`
@@ -89,7 +91,7 @@ export function AdelantosTrabajador({
                       size="sm"
                       variant="ghost"
                       title="Editar"
-                      onClick={() => setF({ id: a.id, monto: String(a.monto), fecha: a.fecha, concepto: a.motivo ?? "", sede: a.sede || trabajador.sede || SEDES[0], medio: a.medio_pago ?? "" })}
+                      onClick={() => setF({ id: a.id, monto: String(a.monto), fecha: a.fecha, concepto: a.motivo ?? "", sede: a.sede || trabajador.sede || SEDES[0], medio: a.medio_pago ?? "", caja: a.caja_nombre ?? CAJA_POR_DEFECTO })}
                     >
                       <Pencil size={14} />
                     </Button>
@@ -123,6 +125,7 @@ export function AdelantosTrabajador({
               <Field label="Medio de pago">
                 <Select value={f.medio} onChange={(e) => setF({ ...f, medio: e.target.value })} placeholder="Sin indicar" options={MEDIOS_PAGO.map((m) => ({ value: m, label: m }))} />
               </Field>
+              <SelectorCaja value={f.caja} onChange={(caja) => setF({ ...f, caja })} />
               <Field label="Sede">
                 <Select value={f.sede} onChange={(e) => setF({ ...f, sede: e.target.value })} options={SEDES.map((s) => ({ value: s, label: s }))} />
               </Field>

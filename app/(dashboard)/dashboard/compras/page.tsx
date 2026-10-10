@@ -23,10 +23,13 @@ import {
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
 import { FormGasto } from "@/components/compras/FormGasto";
+import { SelectorCaja } from "@/components/SelectorCaja";
+import { CAJA_POR_DEFECTO } from "@/lib/cajas";
 import {
   IGV,
   COMPROBANTES_GASTO,
   CUENTAS_ORIGEN_PAGO,
+  cuentaOrigenDeCaja,
   TIPOS_GASTO,
   KEYS,
   MAX_ARCHIVO,
@@ -61,7 +64,7 @@ import { ALMACENES, ALMACEN_DEFECTO, SEDES, UNIDADES } from "@/lib/empresa";
 import { pdfCotizacion, pdfFactura, pdfOrdenCompra, pdfRequerimiento } from "@/lib/pdf";
 import { asientoOrdenCompra } from "@/lib/contable";
 import { getSesion } from "@/lib/auth";
-import type { Compra, Cotizacion, CuentaOrigenPago, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, Proveedor, Requerimiento, Rol, StockItem, TipoComprobanteCompra } from "@/lib/types";
+import type { Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, Proveedor, Requerimiento, Rol, StockItem, TipoComprobanteCompra } from "@/lib/types";
 
 type Tab = "registrar" | "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias";
 
@@ -278,6 +281,7 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
   const [tipo, setTipo] = useState<TipoComprobanteCompra>("FACTURA");
   const [numero, setNumero] = useState("");
   const [sede, setSede] = useState(SEDES[0]);
+  const [cajaCompra, setCajaCompra] = useState(CAJA_POR_DEFECTO);
   const [filas, setFilas] = useState<FilaCompra[]>([filaVacia()]);
   const habilitado = puede(rol, "compra.crear");
 
@@ -300,7 +304,7 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
 
   const guardar = () => {
     const ok = ejecutar(
-      () => registrarCompra({ proveedorId, fecha: fechaISO, tipoComprobante: tipo, numero, sede, items: filas }, rol),
+      () => registrarCompra({ proveedorId, fecha: fechaISO, tipoComprobante: tipo, numero, sede, caja: cajaCompra, items: filas }, rol),
       `Compra registrada · stock de ${sede} actualizado`
     );
     if (ok) {
@@ -371,6 +375,7 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
             <Field label="Ingresa a almacén">
               <Select value={sede} onChange={(e) => setSede(e.target.value)} options={SEDES.map((x) => ({ value: x, label: x }))} />
             </Field>
+            <SelectorCaja value={cajaCompra} onChange={setCajaCompra} className="md:col-span-2" />
           </div>
 
           <div className="overflow-x-auto">
@@ -806,7 +811,7 @@ function Ordenes({
   const [tiempo, setTiempo] = useState("");
   const [lugar, setLugar] = useState("");
   const [almacenIngreso, setAlmacenIngreso] = useState(ALMACEN_DEFECTO);
-  const [cuentaOrigen, setCuentaOrigen] = useState<CuentaOrigenPago>("caja_general");
+  const [caja, setCaja] = useState(CAJA_POR_DEFECTO);
   const [voucher, setVoucher] = useState<{ file: File; url: string } | null>(null);
   const [voucherMonto, setVoucherMonto] = useState("");
   const voucherRef = useRef<HTMLInputElement>(null);
@@ -859,7 +864,7 @@ function Ordenes({
     const monto = voucherMonto === "" ? undefined : parseFloat(voucherMonto);
     const ok = await ejecutarAsync(async () => {
       const oc = await emitirOrdenCompra(
-        { cotizacionId: cotiId, fecha, formaPago, tiempoEntrega: tiempo, lugarEntrega: lugar, cuentaOrigenPago: cuentaOrigen, voucherMonto: monto, almacenIngreso },
+        { cotizacionId: cotiId, fecha, formaPago, tiempoEntrega: tiempo, lugarEntrega: lugar, cuentaOrigenPago: cuentaOrigenDeCaja(caja), caja, voucherMonto: monto, almacenIngreso },
         voucher?.file ?? null,
         rol
       );
@@ -871,7 +876,7 @@ function Ordenes({
     if (ok) {
       setCotiId("");
       setTiempo("");
-      setCuentaOrigen("caja_general");
+      setCaja(CAJA_POR_DEFECTO);
       setVoucher(null);
     }
   };
@@ -909,14 +914,7 @@ function Ordenes({
           <div className="mx-5 mb-5 rounded-xl border border-plomo-200 p-4">
             <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-700">Comprobante de pago y origen</p>
             <div className="grid gap-4 md:grid-cols-3">
-              <Field label="¿De qué cuenta se realiza el pago? *">
-                <Select
-                  required
-                  value={cuentaOrigen}
-                  onChange={(e) => setCuentaOrigen(e.target.value as CuentaOrigenPago)}
-                  options={Object.entries(CUENTAS_ORIGEN_PAGO).map(([value, label]) => ({ value, label }))}
-                />
-              </Field>
+              <SelectorCaja value={caja} onChange={setCaja} encabezado={false} />
               <Field label="Monto del baucher (S/)">
                 <Input type="number" min={0} step="0.01" value={voucherMonto} onChange={(e) => setVoucherMonto(e.target.value)} />
               </Field>
@@ -1003,7 +1001,7 @@ function Ordenes({
               <Td>{o.cotizacionNumero}</Td>
               <Td>{o.reqNumero}</Td>
               <Td>{o.formaPago}</Td>
-              <Td>{o.cuentaOrigenPago ? CUENTAS_ORIGEN_PAGO[o.cuentaOrigenPago] : "-"}</Td>
+              <Td>{o.caja || (o.cuentaOrigenPago ? CUENTAS_ORIGEN_PAGO[o.cuentaOrigenPago] : "-")}</Td>
               <Td>
                 {o.voucherUrl ? (
                   <Button size="sm" variant="ghost" title={o.voucherNombre} onClick={() => verVoucher(o.voucherUrl!)}>
@@ -1070,6 +1068,8 @@ function Facturas({
   const [motivoDJ, setMotivoDJ] = useState("");
   const [aprobador, setAprobador] = useState("");
   const [filtroPago, setFiltroPago] = useState("");
+  const [pagarFac, setPagarFac] = useState<Factura | null>(null);
+  const [cajaFac, setCajaFac] = useState(CAJA_POR_DEFECTO);
 
   const oc = ocs.find((o) => o.id === ocId);
   const igv = r2(subtotal * IGV);
@@ -1256,12 +1256,13 @@ function Facturas({
                 <Td>
                   <button
                     disabled={!puede(rol, "fac.pagar")}
-                    onClick={() => ejecutar(() => marcarPago(f.id, f.estadoPago === "POR_PAGAR", rol), f.estadoPago === "POR_PAGAR" ? `${f.numero} marcada como pagada` : `${f.numero} revertida a por pagar`)}
-                    title="Cambiar estado de pago"
+                    onClick={() => (f.estadoPago === "POR_PAGAR" ? setPagarFac(f) : ejecutar(() => marcarPago(f.id, false, rol), `${f.numero} revertida a por pagar`))}
+                    title={f.estadoPago === "POR_PAGAR" ? "Marcar como pagada (elegir caja)" : "Revertir a por pagar"}
                     className="disabled:cursor-not-allowed"
                   >
                     <Badge estado={f.estadoPago} />
                   </button>
+                  {f.estadoPago === "PAGADA" && f.caja && <p className="mt-0.5 text-[11px] text-plomo-500">{f.caja}</p>}
                 </Td>
                 <Td>
                   <div className="flex gap-1">
@@ -1297,6 +1298,29 @@ function Facturas({
           })}
         </Table>
       </Card>
+
+      <Modal open={!!pagarFac} onClose={() => setPagarFac(null)} title={`Pagar ${pagarFac?.numero ?? ""}`}>
+        {pagarFac && (
+          <div className="space-y-4 text-sm">
+            <p className="text-plomo-600">
+              {pagarFac.proveedor} · <b className="text-azul-900">{soles(pagarFac.netoPagar ?? pagarFac.total)}</b>
+            </p>
+            <SelectorCaja value={cajaFac} onChange={setCajaFac} />
+            <div className="flex justify-end gap-2 border-t border-plomo-100 pt-4">
+              <Button variant="secondary" onClick={() => setPagarFac(null)}>
+                Cancelar
+              </Button>
+              <Button
+                variant="success"
+                disabled={!cajaFac}
+                onClick={() => ejecutar(() => marcarPago(pagarFac.id, true, rol, cajaFac), `${pagarFac.numero} pagada desde ${cajaFac}`) && setPagarFac(null)}
+              >
+                Marcar como pagada
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

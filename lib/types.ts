@@ -94,6 +94,8 @@ export interface OrdenCompra {
   vistoBueno?: VistoBueno;
   // Comprobante de pago y origen (cuenta_origen_pago, voucher_url, voucher_monto)
   cuentaOrigenPago?: CuentaOrigenPago;
+  /** Caja de la que sale el pago (tabla cajas). */
+  caja?: string;
   voucherUrl?: string; // ruta en Supabase Storage: bucket "tesoreria", carpeta vouchers/
   voucherNombre?: string;
   voucherTipo?: string;
@@ -124,6 +126,8 @@ export interface Factura {
   igv: number;
   total: number;
   estadoPago: "POR_PAGAR" | "PAGADA";
+  /** Caja de la que salió el pago (al marcarla PAGADA). */
+  caja?: string;
   // Solo DJ
   motivoSinComprobante?: string;
   aprobadoPor?: string;
@@ -263,6 +267,7 @@ export interface PagoContratista {
   fecha: string;
   monto: number;
   medio: string; // EFECTIVO, TRANSFERENCIA...
+  caja?: string; // de qué caja salió el dinero
   nota?: string;
 }
 
@@ -281,6 +286,7 @@ export interface ConcesionContratista {
   fecha_fin: string;
   monto_total: number;
   adelanto: number;
+  cajaAdelanto?: string; // de qué caja salió el adelanto
   saldo: number; // monto_total - adelanto - pagos
   estado: "ACTIVO" | "FINALIZADO" | "ANULADO";
   comprobantes: ComprobanteContratista[];
@@ -319,6 +325,7 @@ export interface Compra {
   tipoComprobante: TipoComprobanteCompra;
   numero: string; // F001-00001234 / B001-00000456
   sede: string; // almacén donde ingresa
+  caja?: string; // de qué cuenta se pagó ("CAJA GENERAL"…)
   items: ItemCompra[];
   subtotal: number;
   igv: number;

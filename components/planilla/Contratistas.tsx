@@ -1,5 +1,7 @@
 "use client";
 
+import { SelectorCaja } from "@/components/SelectorCaja";
+import { CAJA_POR_DEFECTO } from "@/lib/cajas";
 import { useMemo, useState } from "react";
 import { Ban, Building2, CheckCircle2, FileDown, FilePlus2, HandCoins, Pencil, Plus, Receipt, Trash2, Wallet } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, Textarea, cn, ejecutar } from "@/components/ui";
@@ -194,6 +196,7 @@ function FormConcesion({ form, onChange, onClose }: { form: ConcesionContratista
         <Field label="Adelanto (S/)">
           <Input type="number" min={0} step="0.01" value={form.adelanto || ""} onChange={(e) => set("adelanto", parseFloat(e.target.value) || 0)} />
         </Field>
+        {form.adelanto > 0 && <SelectorCaja value={form.cajaAdelanto ?? ""} onChange={(v) => set("cajaAdelanto", v)} />}
         <div className="flex flex-col justify-center rounded-lg bg-plomo-50 px-3 text-sm">
           Saldo: <b className="text-lg text-azul-900">{soles(calcularSaldo(form))}</b>
         </div>
@@ -215,7 +218,7 @@ function FormConcesion({ form, onChange, onClose }: { form: ConcesionContratista
 
 function PagosConcesion({ c, soloLectura, onClose }: { c: ConcesionContratista; soloLectura: boolean; onClose: () => void }) {
   const [comp, setComp] = useState<ComprobanteContratista>({ tipo: "RH", numero: "", monto: 0, fecha: hoy() });
-  const [pago, setPago] = useState<PagoContratista>({ fecha: hoy(), monto: 0, medio: "TRANSFERENCIA" });
+  const [pago, setPago] = useState<PagoContratista>({ fecha: hoy(), monto: 0, medio: "TRANSFERENCIA", caja: CAJA_POR_DEFECTO });
   const [motivo, setMotivo] = useState("");
   const saldo = calcularSaldo(c);
   const activa = c.estado === "ACTIVO" && !soloLectura;
@@ -247,7 +250,7 @@ function PagosConcesion({ c, soloLectura, onClose }: { c: ConcesionContratista; 
             <tbody>
               <tr className="border-b">
                 <td className="px-4 py-2">{fechaPE(c.fecha_inicio)}</td>
-                <td className="px-4 py-2">Adelanto</td>
+                <td className="px-4 py-2">Adelanto{c.cajaAdelanto ? ` · ${c.cajaAdelanto}` : ""}</td>
                 <td className="px-4 py-2 text-right font-semibold">{soles(c.adelanto || 0)}</td>
               </tr>
               {(c.pagos ?? []).map((p, i) => (
@@ -255,6 +258,7 @@ function PagosConcesion({ c, soloLectura, onClose }: { c: ConcesionContratista; 
                   <td className="px-4 py-2">{fechaPE(p.fecha)}</td>
                   <td className="px-4 py-2">
                     {p.medio}
+                    {p.caja ? ` · ${p.caja}` : ""}
                     {p.nota ? ` · ${p.nota}` : ""}
                   </td>
                   <td className="px-4 py-2 text-right font-semibold">{soles(p.monto)}</td>
@@ -273,12 +277,13 @@ function PagosConcesion({ c, soloLectura, onClose }: { c: ConcesionContratista; 
               <Field label="Medio">
                 <Select value={pago.medio} onChange={(e) => setPago({ ...pago, medio: e.target.value })} options={MEDIOS_PAGO_CONTRATISTA.map((m) => ({ value: m, label: m }))} />
               </Field>
+              <SelectorCaja value={pago.caja ?? ""} onChange={(caja) => setPago({ ...pago, caja })} />
               <Button variant="success" onClick={() => ejecutar(() => registrarPago(c.id, pago), "Pago registrado") && setPago({ ...pago, monto: 0 })}>
                 <Plus size={16} /> Registrar pago
               </Button>
               <Button
                 variant="warning"
-                onClick={() => confirm(`¿Pagar el saldo de ${soles(saldo)} y finalizar la concesión?`) && ejecutar(() => liquidarConcesion(c.id, pago.medio, pago.fecha), "Concesión liquidada")}
+                onClick={() => confirm(`¿Pagar el saldo de ${soles(saldo)} y finalizar la concesión?`) && ejecutar(() => liquidarConcesion(c.id, pago.medio, pago.fecha, pago.caja), "Concesión liquidada")}
               >
                 <CheckCircle2 size={16} /> Liquidar / pagar saldo
               </Button>

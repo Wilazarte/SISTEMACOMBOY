@@ -21,6 +21,7 @@ export interface HistorialPlanilla {
   creado_por: string | null;
   asistencia_desde: string | null;
   asistencia_hasta: string | null;
+  caja?: string | null; // de qué caja salió el pago (supabase/cajas.sql)
 }
 
 export interface HistorialDetalle {
@@ -86,6 +87,7 @@ const aCabecera = (r: Record<string, unknown>): HistorialPlanilla => ({
   creado_por: (r.creado_por as string | null) ?? null,
   asistencia_desde: (r.asistencia_desde as string | null) ?? null,
   asistencia_hasta: (r.asistencia_hasta as string | null) ?? null,
+  caja: (r.caja_nombre as string | null) ?? null,
 });
 
 const aDetalle = (r: Record<string, unknown>): HistorialDetalle => ({
@@ -158,6 +160,16 @@ export async function cerrarPlanilla(periodo: string, filas: FilaCierre[], rango
   if (!error) return String(data);
   if (!sinFuncion(error)) throw errorHistorial(error);
   return insertarDirecto(periodo, filas, rango);
+}
+
+/**
+ * Guarda de qué caja salió el pago de la planilla. La planilla ya quedó pagada: si no se puede guardar
+ * (falta supabase/cajas.sql o la política no deja actualizar) devuelve false sin fallar.
+ */
+export async function guardarCajaPlanilla(id: string, caja: string): Promise<boolean> {
+  const { error } = await createClient().rpc("fijar_caja_planilla", { p_id: id, p_caja: caja });
+  if (error) console.warn("[planilla] caja no guardada", error.message);
+  return !error;
 }
 
 const suma = (filas: FilaCierre[], k: "bruto" | "neto" | "descuento_afp" | "horas" | "adelantos" | "total_pagar") => r2(filas.reduce((a, f) => a + (Number(f[k]) || 0), 0));

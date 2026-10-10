@@ -5,6 +5,8 @@ import Link from "next/link";
 import { ArrowLeft, HandCoins, Lock, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Select, Table, Td, Textarea, cn, ejecutarAsync } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
+import { SelectorCaja } from "@/components/SelectorCaja";
+import { CAJA_POR_DEFECTO } from "@/lib/cajas";
 import { ESTADOS_ADELANTO, ESTADOS_EDITABLES, MEDIOS_PAGO, crearAdelanto, editarAdelanto, eliminarAdelanto, listarAdelantos, type Adelanto, type DatosAdelanto, type EstadoAdelanto } from "@/lib/adelantos";
 import { fechaPE, hoy, r2, soles, useTrabajadores } from "@/lib/storage";
 import { createClient } from "@/lib/supabase/client";
@@ -21,6 +23,7 @@ export default function AdelantosPage() {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<DatosAdelanto>(vacio);
   const [medio, setMedio] = useState("");
+  const [caja, setCaja] = useState(CAJA_POR_DEFECTO);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [filtro, setFiltro] = useState<"" | EstadoAdelanto>("");
@@ -68,13 +71,14 @@ export default function AdelantosPage() {
   const limpiar = () => {
     setForm(vacio());
     setMedio("");
+    setCaja(CAJA_POR_DEFECTO);
     setEditandoId(null);
   };
 
   const guardar = async () => {
     setGuardando(true);
     const ok = await ejecutarAsync(
-      () => (editandoId ? editarAdelanto(editandoId, form, { medio_pago: medio }) : crearAdelanto(form, { medio_pago: medio })),
+      () => (editandoId ? editarAdelanto(editandoId, form, { medio_pago: medio, caja_nombre: caja }) : crearAdelanto(form, { medio_pago: medio, caja_nombre: caja })),
       editandoId ? "Adelanto actualizado" : "Adelanto registrado"
     );
     setGuardando(false);
@@ -89,6 +93,7 @@ export default function AdelantosPage() {
     setEditandoId(a.id);
     setForm({ trabajador_nombre: a.trabajador_nombre, dni: a.dni ?? "", fecha: a.fecha, monto: a.monto, motivo: a.motivo ?? "", estado: a.estado });
     setMedio(a.medio_pago ?? "");
+    setCaja(a.caja_nombre ?? CAJA_POR_DEFECTO);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -162,6 +167,7 @@ export default function AdelantosPage() {
             <Field label="Medio de pago" hint="Sale en la boleta">
               <Select value={medio} onChange={(e) => setMedio(e.target.value)} placeholder="Sin indicar" options={MEDIOS_PAGO.map((m) => ({ value: m, label: m }))} />
             </Field>
+            <SelectorCaja value={caja} onChange={setCaja} />
             <Field label="Motivo" className="md:col-span-2">
               <Textarea value={form.motivo ?? ""} onChange={(e) => setForm({ ...form, motivo: e.target.value })} placeholder="Ej: pasajes, emergencia familiar…" className="min-h-[42px]" />
             </Field>
@@ -220,7 +226,7 @@ export default function AdelantosPage() {
                   <span className="block truncate" title={a.motivo ?? ""}>
                     {a.motivo || "-"}
                   </span>
-                  {a.medio_pago && <span className="block text-[11px] text-plomo-500">{a.medio_pago}</span>}
+                  {(a.medio_pago || a.caja_nombre) && <span className="block text-[11px] text-plomo-500">{[a.medio_pago, a.caja_nombre].filter(Boolean).join(" · ")}</span>}
                 </Td>
                 <Td>
                   <Badge estado={a.estado} />
