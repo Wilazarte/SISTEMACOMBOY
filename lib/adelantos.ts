@@ -198,3 +198,27 @@ export function adelantosADescontar(pendientes: Adelanto[], neto: number): { des
   }
   return { descontar, total };
 }
+
+// ---------------------------------------------------------------------
+// Detalle en la boleta de pago
+// ---------------------------------------------------------------------
+
+/** Adelantos descontados en una planilla cerrada (planilla_historial.id), del más antiguo al más reciente. */
+export async function adelantosDescontadosEn(planillaId: string): Promise<Adelanto[]> {
+  const { data, error } = await createClient()
+    .from("adelantos")
+    .select(COLUMNAS)
+    .eq("planilla_id", planillaId)
+    .order("fecha", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (error) throw errorAdelantos(error);
+  return (data ?? []).map(aAdelanto);
+}
+
+/** Los adelantos de un trabajador dentro de una lista: por N° si ambos lo tienen, si no por DNI, si no por nombre. */
+export function adelantosDelTrabajador(t: { id: string; nombre: string; dni?: string | null }, lista: Adelanto[]): Adelanto[] {
+  const nombre = normalizarNombre(t.nombre);
+  return lista
+    .filter((a) => (a.trabajador_id && t.id ? a.trabajador_id === t.id : a.dni && t.dni ? a.dni === t.dni : normalizarNombre(a.trabajador_nombre) === nombre))
+    .sort((a, b) => a.fecha.localeCompare(b.fecha));
+}

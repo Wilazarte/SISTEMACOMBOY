@@ -51,7 +51,7 @@ import { HistorialPlanilla } from "@/components/planilla/HistorialPlanilla";
 import { LiquidacionCelda } from "@/components/planilla/LiquidacionCelda";
 import { useHistorialPlanilla } from "@/components/planilla/useHistorialPlanilla";
 import { useAdelantosPendientes } from "@/components/planilla/useAdelantosPendientes";
-import { adelantosADescontar, pendientesDe, type PendientesTrabajador } from "@/lib/adelantos";
+import { adelantosADescontar, pendientesDe, type Adelanto, type PendientesTrabajador } from "@/lib/adelantos";
 import type { FilaCierre } from "@/lib/historial";
 import type { AsistenciaPeriodo, LiquidacionPeriodo, ModoLiquidacion, TipoAfp, TipoSueldo, Trabajador } from "@/lib/types";
 
@@ -73,6 +73,7 @@ type TrabajadorCalc = Trabajador & {
   adelantosPendientes: number; // todos los adelantos PENDIENTES del trabajador
   adelantosDescuento: number; // los que se descuentan en este pago (caben en el neto)
   adelantoIds: string[];
+  adelantosDetalle: Adelanto[]; // los descontados, uno por fila en la boleta
   totalPagar: number; // neto - adelantosDescuento
 };
 
@@ -184,6 +185,7 @@ function calcular(t: Trabajador, liq: LiquidacionPeriodo, asistenciaExterna?: As
     adelantosPendientes: 0,
     adelantosDescuento: 0,
     adelantoIds: [],
+    adelantosDetalle: [],
     totalPagar: neto,
   };
 }
@@ -201,6 +203,7 @@ function conAdelantos(c: TrabajadorCalc, grupos: Map<string, PendientesTrabajado
     adelantosPendientes: r2(pendientes.reduce((s, a) => s + a.monto, 0)),
     adelantosDescuento: total,
     adelantoIds: descontar.map((a) => a.id),
+    adelantosDetalle: descontar,
     totalPagar: Math.max(0, r2(c.neto - total)), // nunca negativo
   };
 }
@@ -432,6 +435,7 @@ export default function PlanillaPage() {
       bruto: t.bruto,
       descuentoAfp: t.descuentoAfp,
       adelantos: t.adelantosDescuento,
+      adelantosDetalle: t.adelantosDetalle,
         totalPagar: t.totalPagar,
       }, codigo);
     }, "Boleta descargada");
@@ -1080,12 +1084,15 @@ export default function PlanillaPage() {
                     </td>
                     <td className="p-2 text-right">- {soles(boletaSel.descuentoAfp)}</td>
                   </tr>
-                  {boletaSel.adelantosDescuento > 0 && (
-                    <tr className="border-t text-red-600">
-                      <td className="p-2">Adelantos descontados ({boletaSel.adelantoIds.length})</td>
-                      <td className="p-2 text-right">- {soles(boletaSel.adelantosDescuento)}</td>
+                  {boletaSel.adelantosDetalle.map((a, i) => (
+                    <tr key={a.id} className="border-t text-red-600">
+                      <td className="p-2">
+                        Adelanto de sueldo{boletaSel.adelantosDetalle.length > 1 ? ` ${i + 1}` : ""} · {fechaPE(a.fecha)} · {a.motivo || "Sin motivo"}
+                        {a.semana ? ` · ${a.semana}` : ""}
+                      </td>
+                      <td className="p-2 text-right">- {soles(a.monto)}</td>
                     </tr>
-                  )}
+                  ))}
                   <tr className="border-t bg-amber-100 font-bold">
                     <td className="p-2">NETO A PAGAR</td>
                     <td className="p-2 text-right">{soles(boletaSel.totalPagar)}</td>
