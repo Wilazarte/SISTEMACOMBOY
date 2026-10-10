@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { Archive, CheckCircle2, Lock } from "lucide-react";
 import { Button, Modal, ejecutarAsync } from "@/components/ui";
-import { cerrarPlanilla, type FilaCierre } from "@/lib/historial";
+import { SelectorCaja } from "@/components/SelectorCaja";
+import { CAJA_POR_DEFECTO } from "@/lib/cajas";
+import { cerrarPlanilla, guardarCajaPlanilla, type FilaCierre } from "@/lib/historial";
 import { asientoPlanilla } from "@/lib/contable";
 import { getSesion } from "@/lib/auth";
 import { fechaPE, r2, soles } from "@/lib/storage";
@@ -28,6 +30,7 @@ export function CerrarSemana({
 }) {
   const [abierto, setAbierto] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [caja, setCaja] = useState(CAJA_POR_DEFECTO);
   const bruto = r2(filas.reduce((a, f) => a + f.bruto, 0));
   const descuento = r2(filas.reduce((a, f) => a + f.descuento_afp, 0));
   const neto = r2(filas.reduce((a, f) => a + f.neto, 0));
@@ -49,9 +52,10 @@ export function CerrarSemana({
     let id = "";
     const ok = await ejecutarAsync(async () => {
       id = await cerrarPlanilla(periodo, filas, rango);
+      await guardarCajaPlanilla(id, caja);
       // Contable: DEBE 62 Remuneraciones / HABER 10 Caja (+ AFP/ONP y adelantos descontados)
       asientoPlanilla({ id, periodo, bruto, descuento, adelantos, pagado: totalPagar }, getSesion()?.usuario ?? "planilla");
-    }, `Planilla ${periodo} pagada y guardada en el historial${nAdelantos ? ` · ${nAdelantos} adelanto(s) descontado(s)` : ""}`);
+    }, `Planilla ${periodo} pagada desde ${caja} y guardada en el historial${nAdelantos ? ` · ${nAdelantos} adelanto(s) descontado(s)` : ""}`);
     setGuardando(false);
     if (ok) {
       setAbierto(false);
@@ -95,6 +99,7 @@ export function CerrarSemana({
               </>
             )}
           </div>
+          <SelectorCaja value={caja} onChange={setCaja} label="¿De qué caja sale el pago? *" />
           {nAdelantos > 0 && (
             <p className="rounded-lg bg-emerald-50 px-3 py-2 text-emerald-800">
               Los {nAdelantos} adelanto(s) descontado(s) pasan a <b>DESCONTADO</b> y quedan vinculados a esta planilla.
@@ -109,7 +114,7 @@ export function CerrarSemana({
             <Button variant="secondary" onClick={() => setAbierto(false)} disabled={guardando}>
               Cancelar
             </Button>
-            <Button variant="warning" onClick={guardar} disabled={guardando}>
+            <Button variant="warning" onClick={guardar} disabled={guardando || !caja}>
               <Lock size={16} /> {guardando ? "Guardando…" : "Pagar y cerrar semana"}
             </Button>
           </div>

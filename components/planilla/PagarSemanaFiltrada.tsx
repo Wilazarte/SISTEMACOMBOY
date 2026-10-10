@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { CheckCircle2, Lock } from "lucide-react";
 import { Button, Modal, toast } from "@/components/ui";
-import { cerrarPlanilla, type FilaCierre } from "@/lib/historial";
+import { SelectorCaja } from "@/components/SelectorCaja";
+import { CAJA_POR_DEFECTO } from "@/lib/cajas";
+import { cerrarPlanilla, guardarCajaPlanilla, type FilaCierre } from "@/lib/historial";
 import { asientoPlanilla } from "@/lib/contable";
 import { getSesion, rolNegocio } from "@/lib/auth";
 import { esperarGuardado, fechaPE, r2, registrarEgresoPlanilla, soles } from "@/lib/storage";
@@ -35,6 +37,7 @@ export function PagarSemanaFiltrada({
 }) {
   const [abierto, setAbierto] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [caja, setCaja] = useState(CAJA_POR_DEFECTO);
   const total = r2(filas.reduce((a, f) => a + f.total_pagar, 0));
   const bruto = r2(filas.reduce((a, f) => a + f.bruto, 0));
   const afp = r2(filas.reduce((a, f) => a + f.descuento_afp, 0));
@@ -53,6 +56,7 @@ export function PagarSemanaFiltrada({
     let id = "";
     try {
       id = await cerrarPlanilla(periodoPago, filas, rango);
+      await guardarCajaPlanilla(id, caja);
       asientoPlanilla({ id, periodo: periodoPago, bruto, descuento: afp, adelantos, pagado: total }, getSesion()?.usuario ?? "planilla");
     } catch (e) {
       toast(e instanceof Error ? e.message : "No se pudo pagar la semana.", "error");
@@ -61,10 +65,10 @@ export function PagarSemanaFiltrada({
     }
     // La planilla ya quedó pagada: si el egreso no se guarda, se avisa sin deshacer el pago
     try {
-      registrarEgresoPlanilla({ periodo, grupo, desde: rango.desde, hasta: rango.hasta, total, trabajadores: filas.length, historialId: id }, rolNegocio(getSesion()));
+      registrarEgresoPlanilla({ periodo, grupo, desde: rango.desde, hasta: rango.hasta, total, trabajadores: filas.length, historialId: id, caja }, rolNegocio(getSesion()));
       const err = await esperarGuardado();
       if (err) throw new Error(err);
-      toast(`Semana pagada: ${filas.length} trabajador(es) · ${soles(total)} · egreso registrado en Tesorería`, "ok");
+      toast(`Semana pagada desde ${caja}: ${filas.length} trabajador(es) · ${soles(total)} · egreso registrado en Tesorería`, "ok");
     } catch (e) {
       toast(`Semana pagada (${soles(total)}), pero el egreso no se registró en Tesorería: ${(e as Error).message}. Ejecute supabase/egreso_planilla.sql en Supabase.`, "error");
     }
@@ -109,11 +113,12 @@ export function PagarSemanaFiltrada({
             <span className="font-semibold text-azul-900">Total a pagar (egreso)</span>
             <b className="text-right text-azul-900">{soles(total)}</b>
           </div>
+          <SelectorCaja value={caja} onChange={setCaja} label="¿De qué caja sale el pago? *" />
           <div className="flex justify-end gap-2 border-t border-plomo-100 pt-4">
             <Button variant="secondary" onClick={() => setAbierto(false)} disabled={guardando}>
               Cancelar
             </Button>
-            <button type="button" onClick={pagar} disabled={guardando} className={VERDE}>
+            <button type="button" onClick={pagar} disabled={guardando || !caja} className={VERDE}>
               <Lock size={16} /> {guardando ? "Pagando…" : `Pagar ${soles(total)}`}
             </button>
           </div>

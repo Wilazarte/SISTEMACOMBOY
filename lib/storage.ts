@@ -993,7 +993,7 @@ export async function urlVoucher(ruta: string): Promise<string> {
  */
 export async function emitirOrdenCompra(
   data: Pick<OrdenCompra, "fecha" | "cotizacionId" | "formaPago" | "tiempoEntrega" | "lugarEntrega" | "cuentaOrigenPago" | "voucherMonto"> &
-    Partial<Pick<OrdenCompra, "almacenIngreso">>,
+    Partial<Pick<OrdenCompra, "almacenIngreso" | "caja">>,
   voucher: File | null,
   rol: Rol
 ): Promise<OrdenCompra> {
@@ -1021,7 +1021,7 @@ function validarOrdenCompra(data: Pick<OrdenCompra, "cotizacionId" | "tiempoEntr
 
 export async function crearOrdenCompra(
   data: Pick<OrdenCompra, "fecha" | "cotizacionId" | "formaPago" | "tiempoEntrega" | "lugarEntrega"> &
-    Partial<Pick<OrdenCompra, "cuentaOrigenPago" | "voucherUrl" | "voucherNombre" | "voucherTipo" | "voucherMonto" | "almacenIngreso">>,
+    Partial<Pick<OrdenCompra, "cuentaOrigenPago" | "voucherUrl" | "voucherNombre" | "voucherTipo" | "voucherMonto" | "almacenIngreso" | "caja">>,
   rol: Rol
 ): Promise<OrdenCompra> {
   validarOrdenCompra(data);
@@ -1049,7 +1049,7 @@ export async function crearOrdenCompra(
       evento(
         rol,
         "Orden de compra emitida",
-        `Desde Cot. ${coti.numero} · Pago desde ${CUENTAS_ORIGEN_PAGO[data.cuentaOrigenPago ?? "caja_general"]}${data.voucherUrl ? " · con baucher" : ""}`
+        `Desde Cot. ${coti.numero} · Pago desde ${data.caja || CUENTAS_ORIGEN_PAGO[data.cuentaOrigenPago ?? "caja_general"]}${data.voucherUrl ? " · con baucher" : ""}`
       ),
     ],
   };
@@ -1156,7 +1156,12 @@ export async function crearDeclaracionJurada(
   return dj;
 }
 
-export function marcarPago(id: string, pagada: boolean, rol: Rol): void {
+/** Origen de la OC según la caja elegida: "Caja Chica…" -> caja chica, "Fondo de Reserva" -> fondo de reserva, el resto -> caja general. */
+export const cuentaOrigenDeCaja = (caja: string): CuentaOrigenPago => (/chica/i.test(caja) ? "caja_chica" : /reserva/i.test(caja) ? "fondo_reserva" : "caja_general");
+
+/** Marcar PAGADA pide la caja de la que salió el dinero; revertir a POR PAGAR la quita. */
+export function marcarPago(id: string, pagada: boolean, rol: Rol, caja?: string): void {
+  if (pagada && !caja?.trim()) throw new ErpError("Seleccione de qué caja sale el pago.");
   escribir(
     KEYS.FACTURAS,
     getFacturas().map((f) =>
@@ -1164,7 +1169,8 @@ export function marcarPago(id: string, pagada: boolean, rol: Rol): void {
         ? {
             ...f,
             estadoPago: pagada ? ("PAGADA" as const) : ("POR_PAGAR" as const),
-            historial: [...f.historial, evento(rol, pagada ? "Marcada como PAGADA" : "Revertida a POR PAGAR")],
+            caja: pagada ? caja?.trim() : undefined,
+            historial: [...f.historial, evento(rol, pagada ? "Marcada como PAGADA" : "Revertida a POR PAGAR", pagada ? `Desde ${caja?.trim()}` : undefined)],
           }
         : f
     )
@@ -1929,7 +1935,7 @@ export function registrarGastoTesoreria(d: DatosGasto, rol: Rol): Factura {
  * Queda en Facturas como gasto de Tesorería tipo PLANILLA, ya PAGADA (no lleva comprobante de proveedor).
  */
 export function registrarEgresoPlanilla(
-  d: { periodo: string; grupo: string; desde: string; hasta: string; total: number; trabajadores: number; historialId: string },
+  d: { periodo: string; grupo: string; desde: string; hasta: string; total: number; trabajadores: number; historialId: string; caja?: string },
   rol: Rol
 ): Factura {
   const total = r2(d.total);
@@ -1960,6 +1966,7 @@ export function registrarEgresoPlanilla(
     descripcion: `Pago planilla ${d.periodo} - ${d.grupo} (${d.trabajadores} trabajadores)${rango}`,
     comprobanteGasto: "RECIBO",
     netoPagar: total,
+    ...(d.caja ? { caja: d.caja } : {}),
   };
   escribir(KEYS.FACTURAS, [f, ...getFacturas()]);
   return f;

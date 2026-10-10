@@ -85,6 +85,7 @@ export function DetalleHistorial({ id }: { id: string }) {
           <p className="mt-1 text-[13px] text-plomo-600">
             Cerrada el {new Date(h.fecha_cierre).toLocaleString("es-PE")}
             {h.creado_por ? ` por ${h.creado_por}` : ""}
+            {h.caja ? ` · pagada desde ${h.caja}` : ""}
             {h.asistencia_desde ? ` · asistencia del ${fechaPE(h.asistencia_desde)} al ${fechaPE(h.asistencia_hasta ?? h.asistencia_desde)}` : ""}
           </p>
         </div>

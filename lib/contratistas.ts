@@ -131,20 +131,21 @@ export function registrarPago(id: string, pago: PagoContratista): ConcesionContr
   const monto = r2(Number(pago.monto));
   if (!(monto > 0)) throw new ErpError("El monto del pago debe ser mayor a 0.");
   if (!FECHA.test(pago.fecha)) throw new ErpError("Indique la fecha del pago.");
+  if (!pago.caja?.trim()) throw new ErpError("Seleccione de qué caja sale el pago.");
   return actualizar(id, (c) => {
     if (c.estado !== "ACTIVO") throw new ErpError(`La concesión está ${c.estado}: no admite pagos.`);
     if (monto > calcularSaldo(c) + 0.005) throw new ErpError(`El pago supera el saldo (S/ ${calcularSaldo(c).toFixed(2)}).`);
-    return { ...c, pagos: [...(c.pagos ?? []), { fecha: pago.fecha, monto, medio: pago.medio || "TRANSFERENCIA", nota: pago.nota?.trim() || undefined }] };
+    return { ...c, pagos: [...(c.pagos ?? []), { fecha: pago.fecha, monto, medio: pago.medio || "TRANSFERENCIA", caja: (pago.caja ?? "").trim(), nota: pago.nota?.trim() || undefined }] };
   });
 }
 
 /** Paga todo el saldo y deja la concesión FINALIZADA. */
-export function liquidarConcesion(id: string, medio: string, fecha = hoy()): ConcesionContratista {
+export function liquidarConcesion(id: string, medio: string, fecha = hoy(), caja?: string): ConcesionContratista {
   const c = getConcesiones().find((x) => x.id === id);
   if (!c) throw new ErpError("Concesión no encontrada.");
   if (c.estado !== "ACTIVO") throw new ErpError(`La concesión está ${c.estado}.`);
   const saldo = calcularSaldo(c);
-  if (saldo > 0) registrarPago(id, { fecha, monto: saldo, medio, nota: "Liquidación del saldo" });
+  if (saldo > 0) registrarPago(id, { fecha, monto: saldo, medio, caja, nota: "Liquidación del saldo" });
   return actualizar(id, (x) => ({ ...x, estado: "FINALIZADO", fecha_fin: x.fecha_fin || fecha }));
 }
 
