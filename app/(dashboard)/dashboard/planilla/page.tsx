@@ -1084,11 +1084,10 @@ export default function PlanillaPage() {
                     </td>
                     <td className="p-2 text-right">- {soles(boletaSel.descuentoAfp)}</td>
                   </tr>
-                  {boletaSel.adelantosDetalle.map((a, i) => (
+                  {boletaSel.adelantosDetalle.map((a) => (
                     <tr key={a.id} className="border-t text-red-600">
                       <td className="p-2">
-                        Adelanto de sueldo{boletaSel.adelantosDetalle.length > 1 ? ` ${i + 1}` : ""} · {fechaPE(a.fecha)} · {a.motivo || "Sin motivo"}
-                        {a.semana ? ` · ${a.semana}` : ""}
+                        Adelanto sueldo · {[fechaPE(a.fecha), a.medio_pago, a.motivo || "Sin motivo"].filter(Boolean).join(" - ")}
                       </td>
                       <td className="p-2 text-right">- {soles(a.monto)}</td>
                     </tr>

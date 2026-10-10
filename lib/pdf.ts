@@ -488,21 +488,28 @@ export interface DatosBoleta {
   totalPagar: number;
 }
 
-export type AdelantoBoleta = Pick<Adelanto, "fecha" | "monto" | "motivo" | "semana">;
+export type AdelantoBoleta = Pick<Adelanto, "fecha" | "monto" | "motivo" | "medio_pago">;
 
-/** Una fila por adelanto: "Adelanto de sueldo 1 · 03/10/2026 · Pasajes · S/ -50.00". */
+/** "Transferencia BCP" -> "Transf. BCP" (para que el detalle quepa en una línea). */
+const medioCorto = (m?: string | null) => (m ?? "").trim().replace(/^Transferencia\b/i, "Transf.");
+
+/**
+ * Una fila por adelanto ("10/09/2026 - Efectivo - Pasaje") y, si hay varios, la fila del total descontado.
+ * El medio de pago sale solo si se registró.
+ */
 function filasAdelantos(d: DatosBoleta): string[][] {
   const lista = d.adelantosDetalle ?? [];
   if (!lista.length) {
     if (!d.adelantos) return [["DESCUENTO", "Adelantos de sueldo", "Sin adelantos en este periodo", `- ${soles(0)}`]];
     return [["DESCUENTO", "Adelantos de sueldo", "Detalle no disponible", `- ${soles(d.adelantos)}`]];
   }
-  return lista.map((a, i) => [
+  const filas = lista.map((a) => [
     "DESCUENTO",
-    lista.length > 1 ? `Adelanto de sueldo ${i + 1}` : "Adelanto de sueldo",
-    [fechaPE(a.fecha), a.motivo?.trim() || "Sin motivo", a.semana?.trim()].filter(Boolean).join(" · "),
+    "Adelanto sueldo",
+    [fechaPE(a.fecha), medioCorto(a.medio_pago), a.motivo?.trim() || "Sin motivo"].filter(Boolean).join(" - "),
     `- ${soles(a.monto)}`,
   ]);
+  return lista.length > 1 ? [...filas, ["", "", "Total adelantos descontados", `- ${soles(d.adelantos)}`]] : filas;
 }
 
 /** Boleta individual de pago (Planilla del periodo): se descarga como BOL-xxx-AAAA.pdf. */

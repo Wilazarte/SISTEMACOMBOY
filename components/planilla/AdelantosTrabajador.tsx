@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { HandCoins, Pencil, Save, Trash2 } from "lucide-react";
 import { Button, Field, Input, Modal, Select, ejecutarAsync } from "@/components/ui";
-import { crearAdelanto, editarAdelanto, eliminarAdelanto, type Adelanto } from "@/lib/adelantos";
+import { MEDIOS_PAGO, crearAdelanto, editarAdelanto, eliminarAdelanto, type Adelanto } from "@/lib/adelantos";
 import { SEDES } from "@/lib/empresa";
 import { fechaPE, hoy, r2, soles } from "@/lib/storage";
 
 /** "SEMANA 14 - ABRIL 2026" -> "semana 14" (para el concepto sugerido). */
 const semanaCorta = (periodo: string) => periodo.match(/SEMANA\s+\d+/i)?.[0].toLowerCase() ?? periodo.toLowerCase();
 
-type Form = { id?: string; monto: string; fecha: string; concepto: string; sede: string };
+type Form = { id?: string; monto: string; fecha: string; concepto: string; sede: string; medio: string };
 
 /**
  * Columna ADELANTOS de la planilla: registrar, editar o eliminar los adelantos PENDIENTES de un trabajador.
@@ -31,7 +31,7 @@ export function AdelantosTrabajador({
   onClose: () => void;
   onCambio: () => void;
 }) {
-  const nuevo = (): Form => ({ monto: "", fecha: hoy(), concepto: `Adelanto ${semanaCorta(periodo)}`, sede: trabajador.sede || SEDES[0] });
+  const nuevo = (): Form => ({ monto: "", fecha: hoy(), concepto: `Adelanto ${semanaCorta(periodo)}`, sede: trabajador.sede || SEDES[0], medio: "Efectivo" });
   const [f, setF] = useState<Form>(nuevo);
   const [guardando, setGuardando] = useState(false);
   const total = r2(pendientes.reduce((a, x) => a + x.monto, 0));
@@ -39,7 +39,7 @@ export function AdelantosTrabajador({
   const guardar = async () => {
     setGuardando(true);
     const datos = { trabajador_nombre: trabajador.nombre, dni: trabajador.dni || null, fecha: f.fecha, monto: Number(f.monto), motivo: f.concepto, estado: "PENDIENTE" as const };
-    const extras = { trabajador_id: trabajador.id, semana: periodo, sede: f.sede };
+    const extras = { trabajador_id: trabajador.id, semana: periodo, sede: f.sede, medio_pago: f.medio };
     const ok = await ejecutarAsync(
       () => (f.id ? editarAdelanto(f.id, datos, extras) : crearAdelanto(datos, extras)),
       f.id ? "Adelanto actualizado" : `Adelanto de ${soles(Number(f.monto) || 0)} registrado: se descuenta del total a pagar`
@@ -72,6 +72,7 @@ export function AdelantosTrabajador({
                 <span className="w-24 text-xs text-plomo-500">{fechaPE(a.fecha)}</span>
                 <span className="flex-1 truncate">
                   {a.motivo || "Adelanto"}
+                  {a.medio_pago ? <span className="text-xs text-plomo-500"> · {a.medio_pago}</span> : null}
                   {a.sede ? <span className="text-xs text-plomo-500"> · {a.sede}</span> : null}
                 </span>
                 <b className="text-red-600">- {soles(a.monto)}</b>
@@ -81,7 +82,7 @@ export function AdelantosTrabajador({
                       size="sm"
                       variant="ghost"
                       title="Editar"
-                      onClick={() => setF({ id: a.id, monto: String(a.monto), fecha: a.fecha, concepto: a.motivo ?? "", sede: a.sede || trabajador.sede || SEDES[0] })}
+                      onClick={() => setF({ id: a.id, monto: String(a.monto), fecha: a.fecha, concepto: a.motivo ?? "", sede: a.sede || trabajador.sede || SEDES[0], medio: a.medio_pago ?? "" })}
                     >
                       <Pencil size={14} />
                     </Button>
@@ -107,6 +108,9 @@ export function AdelantosTrabajador({
               </Field>
               <Field label="Concepto">
                 <Input value={f.concepto} onChange={(e) => setF({ ...f, concepto: e.target.value })} placeholder="Ej: Adelanto semana 14" />
+              </Field>
+              <Field label="Medio de pago">
+                <Select value={f.medio} onChange={(e) => setF({ ...f, medio: e.target.value })} placeholder="Sin indicar" options={MEDIOS_PAGO.map((m) => ({ value: m, label: m }))} />
               </Field>
               <Field label="Sede">
                 <Select value={f.sede} onChange={(e) => setF({ ...f, sede: e.target.value })} options={SEDES.map((s) => ({ value: s, label: s }))} />
