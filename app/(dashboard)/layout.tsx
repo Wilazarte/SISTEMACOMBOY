@@ -48,8 +48,8 @@ function buscar(q: string): Resultado[] {
 /** Logotipo: COMBOY azul + VID rojo, serif. */
 /** Flujo de trabajo de cada módulo (subtítulo del header, para ubicarse rápido). */
 const FLUJOS: [string, string][] = [
-  ["/dashboard/compras", "Requerimiento → Cotización → Orden de Compra → Factura → Guía → V°B° Almacén"],
-  ["/dashboard/almacen", "Requerimiento → V°B° Ingreso → Stock → Orden de Despacho → Entrega"],
+  ["/dashboard/compras", "Requerimiento → Cotización → Orden de Compra → Bancarización → Factura"],
+  ["/dashboard/almacen", "Requerimiento → Ingreso a almacén → Stock → Orden de Despacho → Entrega"],
   ["/dashboard/produccion", "Orden de Producción → QC firmado → Ingreso a Almacén → Venta → Despacho"],
   ["/dashboard/ventas", "Nota de Pedido → Aprobación → Orden de Despacho → Factura / Boleta → Cobro"],
   ["/dashboard/planilla", "Trabajadores → Planilla del periodo → Historial → Contratistas"],

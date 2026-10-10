@@ -20,6 +20,9 @@ import type {
   EstadoCivil,
   AsistenciaPeriodo,
   CuentaOrigenPago,
+  Bancarizacion,
+  ItemPrecio,
+  TipoBancarizacion,
   Compra,
   Cotizacion,
   EventoHistorial,
@@ -1074,13 +1077,77 @@ export async function crearOrdenCompra(
 // 5. FACTURA (vinculada a OC)  |  8. DECLARACIÓN JURADA (excepción)
 // ---------------------------------------------------------------------
 
+// ---------------------------------------------------------------------
+// BANCARIZACIÓN: OC -> BANCARIZACIÓN -> FACTURA
+// ---------------------------------------------------------------------
+
+export const TIPOS_BANCARIZACION: TipoBancarizacion[] = ["EFECTIVO", "TRANSFERENCIA BCP", "YAPE", "BBVA", "INTERBANK", "DETRACCIÓN"];
+/** Monto desde el que el pago debe bancarizarse. */
+export const TOPE_BANCARIZACION = 2000;
+
+/** Obligatoria si el total pasa S/ 2,000 o el proveedor tiene RUC. */
+export const requiereBancarizacion = (total: number, ruc: string) => total > TOPE_BANCARIZACION || /^\d{11}$/.test((ruc ?? "").trim());
+
+function validarBancarizacion(b: Bancarizacion): Bancarizacion {
+  if (!TIPOS_BANCARIZACION.includes(b.tipo)) throw new ErpError("Seleccione el tipo de bancarización.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(b.fecha)) throw new ErpError("Indique la fecha de pago.");
+  if (b.fecha > hoy()) throw new ErpError("La fecha de pago no puede ser futura.");
+  if (!b.caja?.trim()) throw new ErpError("Seleccione de qué cuenta se realiza el pago.");
+  return { tipo: b.tipo, fecha: b.fecha, caja: b.caja.trim(), ...(b.nroOperacion?.trim() ? { nroOperacion: b.nroOperacion.trim().toUpperCase() } : {}) };
+}
+
+const textoBancarizacion = (b: Bancarizacion) => `${b.tipo}${b.nroOperacion ? ` N° ${b.nroOperacion}` : ""} · ${fechaPE(b.fecha)} · ${b.caja}`;
+
+/** Registra el pago (bancarización) de una OC EMITIDA: queda BANCARIZADA y lista para la factura. */
+export function bancarizarOC(ocId: string, b: Bancarizacion, rol: Rol): OrdenCompra {
+  const oc = getOrdenes().find((o) => o.id === ocId);
+  if (!oc) throw new ErpError("OC no encontrada.");
+  if (oc.estado !== "EMITIDA") throw new ErpError(`La ${oc.numero} ya está ${oc.estado === "BANCARIZADA" ? "bancarizada" : "facturada"}.`);
+  const limpio = validarBancarizacion(b);
+  actualizarOC(ocId, (o) => ({
+    ...o,
+    estado: "BANCARIZADA",
+    bancarizacion: limpio,
+    caja: limpio.caja,
+    cuentaOrigenPago: cuentaOrigenDeCaja(limpio.caja),
+    historial: [...o.historial, evento(rol, "Bancarizada", textoBancarizacion(limpio))],
+  }));
+  return getOrdenes().find((o) => o.id === ocId)!;
+}
+
+/** La factura (o DJ) cierra el proceso: OC FACTURADA y requerimiento FINALIZADO. Ya no hay guía ni V°B° de almacén. */
+function cerrarProcesoOC(oc: OrdenCompra, comprobante: string, rol: Rol): void {
+  actualizarOC(oc.id, (o) => ({
+    ...o,
+    estado: "FACTURADA",
+    historial: [...o.historial, evento(rol, "Facturada · proceso de compra finalizado", comprobante)],
+  }));
+  if (oc.reqId)
+    actualizarProcesado(oc.reqId, (r) => ({
+      ...r,
+      estado: "FINALIZADO",
+      historial: [...r.historial, evento(rol, "FINALIZADO · Factura registrada", `${oc.numero} · ${comprobante}`)],
+    }));
+}
+
+/** La OC puede recibir factura: bancarizada, o EMITIDA si no requiere bancarización. */
+function validarOCParaComprobante(oc: OrdenCompra): void {
+  if (oc.estado !== "EMITIDA" && oc.estado !== "BANCARIZADA") throw new ErpError(`La ${oc.numero} ya tiene comprobante.`);
+  if (oc.estado === "EMITIDA" && requiereBancarizacion(oc.total, oc.ruc))
+    throw new ErpError(`Registre primero la bancarización de la ${oc.numero} (total mayor a S/ ${TOPE_BANCARIZACION} o proveedor con RUC).`);
+}
+
+/** Datos de pago que la factura hereda de la OC bancarizada. */
+const pagoDesdeOC = (oc: OrdenCompra): Partial<Factura> =>
+  oc.bancarizacion ? { estadoPago: "PAGADA", caja: oc.bancarizacion.caja, bancarizacion: oc.bancarizacion } : {};
+
 export function crearFactura(
   data: Pick<Factura, "numero" | "fecha" | "fechaVencimiento" | "ocId" | "subtotal">,
   rol: Rol
 ): Factura {
   const oc = getOrdenes().find((o) => o.id === data.ocId);
   if (!oc) throw new ErpError("Seleccione una Orden de Compra.");
-  if (oc.estado !== "EMITIDA") throw new ErpError(`La ${oc.numero} ya tiene comprobante.`);
+  validarOCParaComprobante(oc);
   const num = data.numero.trim().toUpperCase();
   if (!/^[EF][A-Z0-9]{3}-\d{1,8}$/.test(num)) throw new ErpError("Formato de factura inválido. Ej: F001-00001234 / E001-123");
   if (getFacturas().some((f) => f.numero === num && f.ruc === oc.ruc)) throw new ErpError("Factura duplicada para este proveedor.");
@@ -1100,15 +1167,12 @@ export function crearFactura(
     proveedor: oc.proveedor,
     ruc: oc.ruc,
     estadoPago: "POR_PAGAR",
+    ...pagoDesdeOC(oc),
     id: uid(),
-    historial: [evento(rol, "Factura registrada", `${num} · ${oc.numero}`)],
+    historial: [evento(rol, "Factura registrada", `${num} · ${oc.numero}${oc.bancarizacion ? ` · pagada (${textoBancarizacion(oc.bancarizacion)})` : ""}`)],
   };
   escribir(KEYS.FACTURAS, [fac, ...getFacturas()]);
-  actualizarOC(oc.id, (o) => ({
-    ...o,
-    estado: "FACTURADA",
-    historial: [...o.historial, evento(rol, "Facturada", num)],
-  }));
+  cerrarProcesoOC(oc, num, rol);
   return fac;
 }
 
@@ -1119,7 +1183,7 @@ export async function crearDeclaracionJurada(
   if (rol !== "GERENCIA") throw new ErpError("Solo GERENCIA puede aprobar una Declaración Jurada.");
   const oc = getOrdenes().find((o) => o.id === data.ocId);
   if (!oc) throw new ErpError("Seleccione una Orden de Compra.");
-  if (oc.estado !== "EMITIDA") throw new ErpError(`La ${oc.numero} ya tiene comprobante.`);
+  if (oc.estado !== "EMITIDA" && oc.estado !== "BANCARIZADA") throw new ErpError(`La ${oc.numero} ya tiene comprobante.`);
   if (oc.subtotal > TOPE_DJ) throw new ErpError(`El monto (${soles(oc.subtotal)}) supera el tope de DJ (${soles(TOPE_DJ)}).`);
   if (!/^\d{8}$/.test(data.dniVendedor)) throw new ErpError("DNI del vendedor inválido (8 dígitos).");
   if (!data.nombreVendedor.trim()) throw new ErpError("Ingrese el nombre del vendedor.");
@@ -1142,26 +1206,29 @@ export async function crearDeclaracionJurada(
     igv: 0,
     total: oc.subtotal,
     estadoPago: "POR_PAGAR",
+    ...pagoDesdeOC(oc),
     motivoSinComprobante: data.motivoSinComprobante.trim(),
     aprobadoPor: data.aprobadoPor.trim(),
     historial: [evento(rol, "Declaración jurada aprobada", data.aprobadoPor)],
   };
   escribir(KEYS.FACTURAS, [dj, ...getFacturas()]);
-  // La DJ no requiere guía: pasa directo a visto bueno de Almacén
-  actualizarOC(oc.id, (o) => ({
-    ...o,
-    estado: "EN_GUIA",
-    historial: [...o.historial, evento(rol, "Sustentada con Declaración Jurada", dj.numero)],
-  }));
+  cerrarProcesoOC(oc, `DJ ${dj.numero}`, rol);
   return dj;
 }
 
 /** Origen de la OC según la caja elegida: "Caja Chica…" -> caja chica, "Fondo de Reserva" -> fondo de reserva, el resto -> caja general. */
 export const cuentaOrigenDeCaja = (caja: string): CuentaOrigenPago => (/chica/i.test(caja) ? "caja_chica" : /reserva/i.test(caja) ? "fondo_reserva" : "caja_general");
 
-/** Marcar PAGADA pide la caja de la que salió el dinero; revertir a POR PAGAR la quita. */
-export function marcarPago(id: string, pagada: boolean, rol: Rol, caja?: string): void {
+/**
+ * Marcar PAGADA pide la caja de la que salió el dinero y, si el total pasa S/ 2,000 o el proveedor tiene RUC,
+ * la bancarización. Revertir a POR PAGAR la quita.
+ */
+export function marcarPago(id: string, pagada: boolean, rol: Rol, caja?: string, bancarizacion?: Bancarizacion): void {
   if (pagada && !caja?.trim()) throw new ErpError("Seleccione de qué caja sale el pago.");
+  const fac = getFacturas().find((f) => f.id === id);
+  const b = pagada && bancarizacion ? validarBancarizacion({ ...bancarizacion, caja: caja ?? "" }) : undefined;
+  if (pagada && fac && !b && requiereBancarizacion(fac.netoPagar ?? fac.total, fac.ruc))
+    throw new ErpError(`Registre la bancarización: el pago supera S/ ${TOPE_BANCARIZACION} o el proveedor tiene RUC.`);
   escribir(
     KEYS.FACTURAS,
     getFacturas().map((f) =>
@@ -1170,7 +1237,8 @@ export function marcarPago(id: string, pagada: boolean, rol: Rol, caja?: string)
             ...f,
             estadoPago: pagada ? ("PAGADA" as const) : ("POR_PAGAR" as const),
             caja: pagada ? caja?.trim() : undefined,
-            historial: [...f.historial, evento(rol, pagada ? "Marcada como PAGADA" : "Revertida a POR PAGAR", pagada ? `Desde ${caja?.trim()}` : undefined)],
+            bancarizacion: b,
+            historial: [...f.historial, evento(rol, pagada ? "Marcada como PAGADA" : "Revertida a POR PAGAR", pagada ? (b ? textoBancarizacion(b) : `Desde ${caja?.trim()}`) : undefined)],
           }
         : f
     )
@@ -1801,6 +1869,41 @@ export function descontarStock(sede: string, items: { nombre: string; unidad: st
 }
 
 /** Sede donde ingresa la mercadería de una OC: la del REQ; si no existe, el lugar de entrega. */
+/** Producto que entra al almacén: del stock (base de datos) o de la OC. */
+export type ItemIngreso = { nombre: string; unidad: string; cantidad: number; costoUnit?: number };
+
+/**
+ * Almacén › Ingresos: suma productos al stock de la sede y deja el movimiento INGRESO en el kardex
+ * (documento = OC y lote; motivo = observaciones; usuario = quien registra). Reemplaza al V°B° de la compra.
+ */
+export function registrarIngresoAlmacen(d: { sede: string; ocId?: string; lote?: string; observaciones?: string; items: ItemIngreso[] }, rol: Rol): number {
+  if (!puede(rol, "vb.dar")) throw new ErpError("Solo ALMACÉN puede registrar ingresos.");
+  if (!d.sede.trim()) throw new ErpError("Seleccione el almacén.");
+  const filas = d.items.filter((i) => i.nombre.trim());
+  if (!filas.length) throw new ErpError("Agregue al menos un producto.");
+  if (filas.some((i) => !(i.cantidad > 0))) throw new ErpError("Todas las cantidades deben ser mayores a 0.");
+  const oc = d.ocId ? getOrdenes().find((o) => o.id === d.ocId) : undefined;
+  if (d.ocId && !oc) throw new ErpError("OC no encontrada.");
+  const stock = getStock();
+  const items = filas.map((i) => {
+    const nombre = i.nombre.trim().replace(/\s+/g, " ").toUpperCase();
+    const enStock = stock.find((s) => claveStock(s.sede, s.nombre, s.unidad) === claveStock(d.sede, nombre, i.unidad));
+    const deOC = oc?.items.find((x) => x.nombre.trim().toUpperCase() === nombre);
+    // Costo: el de la OC; si no, el último del stock
+    return { nombre, unidad: i.unidad, cantidad: i.cantidad, precioUnit: i.costoUnit ?? deOC?.precioUnit ?? enStock?.costoUnit ?? 0 };
+  });
+  const lote = d.lote?.trim().toUpperCase();
+  const documento = [oc?.numero, lote ? `Lote ${lote}` : ""].filter(Boolean).join(" · ") || "Ingreso a almacén";
+  ingresarStock(d.sede, items, { tipo: "INGRESO", documento, motivo: d.observaciones?.trim() || undefined });
+  if (oc)
+    actualizarOC(oc.id, (o) => ({
+      ...o,
+      ingresadaAlmacen: true,
+      historial: [...o.historial, evento(rol, "Ingreso a almacén registrado", `${items.length} producto(s) · ${d.sede}${lote ? ` · lote ${lote}` : ""}`)],
+    }));
+  return items.length;
+}
+
 export const sedeIngresoOC = (oc: OrdenCompra): string => oc.almacenIngreso || buscarReq(oc.reqId)?.sede || oc.lugarEntrega;
 
 /** Traslado de un repuesto entre sedes (botón "Transferir desde…" del despacho). */
@@ -1876,6 +1979,87 @@ const NUM_GASTO: Partial<Record<ComprobanteGasto, RegExp>> = {
 
 /** Registra un gasto / servicio: NO ingresa a stock; queda en Facturas como POR PAGAR. */
 export function registrarGastoTesoreria(d: DatosGasto, rol: Rol): Factura {
+  const f = prepararGasto(d, rol);
+  escribir(KEYS.FACTURAS, [f, ...getFacturas()]);
+  return f;
+}
+
+/** Ítems de la OC opcional del gasto (productos del almacén o escritos a mano). */
+export type ItemOCGasto = { nombre: string; unidad: string; cantidad: number; precioUnit: number };
+
+/**
+ * "Registrar gasto / compra" con OC opcional y bancarización:
+ * - con `items`: emite además una OC (sin cotización) vinculada al gasto; su total debe coincidir con el importe.
+ * - con `bancarizacion`: el gasto queda PAGADO desde esa cuenta ("Registrar y pagar"); sin ella queda POR PAGAR.
+ *   Pagar requiere bancarización si el total pasa S/ 2,000 o el proveedor tiene RUC (se valida en el formulario).
+ */
+export async function registrarGastoCompleto(
+  d: DatosGasto,
+  opc: { items?: ItemOCGasto[]; bancarizacion?: Bancarizacion },
+  rol: Rol
+): Promise<{ gasto: Factura; oc?: OrdenCompra }> {
+  const f = prepararGasto(d, rol);
+  const b = opc.bancarizacion ? validarBancarizacion(opc.bancarizacion) : undefined;
+  let oc: OrdenCompra | undefined;
+  if (opc.items) {
+    const filas = opc.items.filter((i) => i.nombre.trim());
+    if (!filas.length) throw new ErpError("Agregue al menos un producto a la orden de compra.");
+    if (filas.some((i) => !(i.cantidad > 0) || !(i.precioUnit > 0))) throw new ErpError("Cada producto de la OC necesita cantidad y precio mayores a 0.");
+    const items: ItemPrecio[] = filas.map((i) => ({
+      itemReqId: uid(),
+      nombre: i.nombre.trim().replace(/\s+/g, " ").toUpperCase(),
+      cantidad: i.cantidad,
+      unidad: i.unidad || "UND",
+      marca: "",
+      precioUnit: r2(i.precioUnit),
+      subtotal: r2(i.cantidad * i.precioUnit),
+    }));
+    // Mismo criterio que el gasto: la factura lleva IGV aparte; boleta / recibo / DJ no
+    const subtotal = r2(items.reduce((a, i) => a + i.subtotal, 0));
+    const igv = d.comprobante === "FACTURA" ? r2(subtotal * IGV) : 0;
+    const total = r2(subtotal + igv);
+    if (Math.abs(total - f.total) > 0.05)
+      throw new ErpError(`El total de la OC (${soles(total)}) no coincide con el importe del gasto (${soles(f.total)}). Revise cantidades y precios${igv ? " (sin IGV)" : ""}.`);
+    const numero = formatear("OC", await siguiente("OC"));
+    oc = {
+      id: uid(),
+      numero,
+      fecha: d.fecha,
+      cotizacionId: "",
+      cotizacionNumero: "-",
+      reqId: "",
+      reqNumero: "-",
+      proveedor: f.proveedor,
+      ruc: f.ruc,
+      formaPago: "CONTADO",
+      tiempoEntrega: "Inmediato",
+      lugarEntrega: "-",
+      items,
+      subtotal,
+      igv,
+      total,
+      // El gasto ya trae su comprobante: la OC nace con factura (fin del flujo)
+      estado: "FACTURADA",
+      gastoId: f.id,
+      ...(b ? { bancarizacion: b, caja: b.caja, cuentaOrigenPago: cuentaOrigenDeCaja(b.caja) } : {}),
+      historial: [evento(rol, "Orden de compra emitida desde Registrar gasto", `${COMPROBANTES_GASTO[d.comprobante]} ${f.numero}`)],
+    };
+    f.ocId = oc.id;
+    f.ocNumero = numero;
+  }
+  if (b) {
+    f.estadoPago = "PAGADA";
+    f.caja = b.caja;
+    f.bancarizacion = b;
+    f.historial = [...f.historial, evento(rol, "Marcada como PAGADA", textoBancarizacion(b))];
+  }
+  if (oc) escribir(KEYS.ORDENES, [oc, ...getOrdenes()]);
+  escribir(KEYS.FACTURAS, [f, ...getFacturas()]);
+  return { gasto: f, oc };
+}
+
+/** Valida el gasto y arma la fila de Facturas (sin guardar). */
+function prepararGasto(d: DatosGasto, rol: Rol): Factura {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d.fecha)) throw new ErpError("Fecha del gasto inválida. Use DD/MM/AAAA.");
   if (d.fecha > hoy()) throw new ErpError("La fecha del gasto no puede ser futura.");
   if (!(d.tipoGasto in TIPOS_GASTO)) throw new ErpError("Seleccione el tipo de gasto.");
@@ -1926,7 +2110,6 @@ export function registrarGastoTesoreria(d: DatosGasto, rol: Rol): Factura {
     netoPagar: neto,
     ...(d.archivos.length ? { archivos: d.archivos } : {}),
   };
-  escribir(KEYS.FACTURAS, [f, ...getFacturas()]);
   return f;
 }
 

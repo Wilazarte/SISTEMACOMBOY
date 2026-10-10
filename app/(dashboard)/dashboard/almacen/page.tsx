@@ -5,7 +5,7 @@ import { Boxes, CheckCircle2, Factory, Truck, ClipboardList, Eye, FilePlus2, Fil
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar, ejecutarAsync } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
 import { getSesion } from "@/lib/auth";
-import { SEDES, UNIDADES } from "@/lib/empresa";
+import { SEDES, SEDES_STOCK, UNIDADES } from "@/lib/empresa";
 import {
   KEYS,
   crearRequerimiento,
@@ -15,6 +15,7 @@ import {
   observarIngreso,
   puede,
   reenviarRequerimiento,
+  registrarIngresoAlmacen,
   sedeIngresoOC,
   soles,
   uid,
@@ -22,7 +23,7 @@ import {
   useStore,
 } from "@/lib/storage";
 import { pdfActaIngreso, pdfRequerimiento } from "@/lib/pdf";
-import type { EstadoReq, Factura, Guia, ItemReq, OrdenCompra, OrdenDespacho, Requerimiento, Rol, StockItem } from "@/lib/types";
+import type { EstadoReq, Factura, Guia, ItemReq, MovimientoKardex, OrdenCompra, OrdenDespacho, Requerimiento, Rol, StockItem } from "@/lib/types";
 import { OrdenesDespacho } from "./despacho";
 import { EquiposTerminados } from "@/components/almacen/EquiposTerminados";
 import { StockAlmacen } from "@/components/almacen/StockAlmacen";
@@ -59,7 +60,7 @@ export default function AlmacenPage() {
     <div className="w-full space-y-6">
       <div>
         <h1 className="font-serif text-2xl font-light leading-tight text-azul-900 lg:text-3xl">Almacén</h1>
-        <p className="mt-1 text-[13px] text-plomo-600">Emisión de requerimientos y visto bueno de ingreso de mercadería</p>
+        <p className="mt-1 text-[13px] text-plomo-600">Emisión de requerimientos, ingresos de mercadería y stock</p>
       </div>
 
       {observados > 0 && (
@@ -74,7 +75,7 @@ export default function AlmacenPage() {
         tabs={[
           { id: "nuevo", label: "Nuevo requerimiento", icon: <FilePlus2 size={16} /> },
           { id: "lista", label: "Requerimientos emitidos", icon: <ClipboardList size={16} />, count: observados },
-          { id: "ingresos", label: "Ingresos por V°B°", icon: <PackageCheck size={16} />, count: porVB.length },
+          { id: "ingresos", label: "Ingresos", icon: <PackageCheck size={16} />, count: porVB.length },
           { id: "stock", label: "Stock", icon: <Boxes size={16} /> },
           {
             id: "despacho",
@@ -87,7 +88,12 @@ export default function AlmacenPage() {
 
       {tab === "nuevo" && <NuevoReq rol={rol} onCreado={() => setTab("lista")} />}
       {tab === "lista" && <ListaReq reqs={todos} rol={rol} />}
-      {tab === "ingresos" && <Ingresos rol={rol} porVB={porVB} ordenes={ordenes} facturas={facturas} guias={guias} />}
+      {tab === "ingresos" && (
+        <div className="space-y-6">
+          <RegistrarIngreso rol={rol} stock={stock} ordenes={ordenes} />
+          <Ingresos rol={rol} porVB={porVB} ordenes={ordenes} facturas={facturas} guias={guias} />
+        </div>
+      )}
       {tab === "stock" && <Stock stock={stock} rol={rol} onIrDespacho={() => setTab("despacho")} />}
       {tab === "despacho" && <OrdenesDespacho />}
     </div>
@@ -344,10 +350,9 @@ function Ingresos({ rol, porVB, ordenes, facturas, guias }: { rol: Rol; porVB: O
 
   return (
     <div className="space-y-6">
-      {porVB.length === 0 ? (
-        <Empty icon={<PackageCheck size={28} />} text="No hay ingresos pendientes de visto bueno" />
-      ) : (
+      {porVB.length > 0 && (
         <div className="grid gap-4 lg:grid-cols-2">
+          <p className="text-[13px] font-semibold text-plomo-600 lg:col-span-2">OCs anteriores pendientes de visto bueno (flujo antiguo con guía)</p>
           {porVB.map((o) => {
             const f = facturas.find((x) => x.ocId === o.id);
             const g = guias.find((x) => x.ocId === o.id);
@@ -403,6 +408,7 @@ function Ingresos({ rol, porVB, ordenes, facturas, guias }: { rol: Rol; porVB: O
         </div>
       )}
 
+      {finalizadas.length > 0 && (
       <Card>
         <CardHeader title="Ingresos finalizados" subtitle="Procesos de compra cerrados con visto bueno de almacén" />
         <Table head={["OC", "REQ", "Proveedor", "Recibido por", "Fecha V°B°", "Total", ""]} empty={finalizadas.length === 0}>
@@ -427,6 +433,7 @@ function Ingresos({ rol, porVB, ordenes, facturas, guias }: { rol: Rol; porVB: O
           ))}
         </Table>
       </Card>
+      )}
 
       <Modal open={!!vb} onClose={() => setVb(null)} title={`Visto bueno de ingreso · ${vb?.numero ?? ""}`}>
         <p className="mb-2 text-sm text-plomo-600">Verifique físicamente cada producto:</p>
@@ -484,6 +491,143 @@ function Ingresos({ rol, porVB, ordenes, facturas, guias }: { rol: Rol; porVB: O
           </Button>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+// =====================================================================
+// REGISTRAR INGRESO (productos de la base de stock, con o sin OC)
+// =====================================================================
+type FilaIngreso = { id: string; nombre: string; unidad: string; cantidad: string };
+const filaIngreso = (): FilaIngreso => ({ id: uid(), nombre: "", unidad: "UND", cantidad: "" });
+
+function RegistrarIngreso({ rol, stock, ordenes }: { rol: Rol; stock: StockItem[]; ordenes: OrdenCompra[] }) {
+  const kardex = useStore<MovimientoKardex[]>(KEYS.KARDEX, []);
+  const [sede, setSede] = useState("");
+  const [ocId, setOcId] = useState("");
+  const [lote, setLote] = useState("");
+  const [obs, setObs] = useState("");
+  const [filas, setFilas] = useState<FilaIngreso[]>([filaIngreso()]);
+  const habilitado = puede(rol, "vb.dar");
+  const sedes = Array.from(new Set([...SEDES_STOCK, ...stock.map((s) => s.sede)]));
+  const ocs = ordenes.filter((o) => !o.ingresadaAlmacen && o.estado !== "FINALIZADA");
+  const productos = Array.from(new Set(stock.filter((s) => !sede || s.sede === sede).map((s) => s.nombre))).sort();
+  const recientes = kardex.filter((m) => m.tipo_movimiento === "INGRESO").slice(0, 30);
+
+  const set = (id: string, k: keyof FilaIngreso, v: string) =>
+    setFilas((fs) =>
+      fs.map((f) => {
+        if (f.id !== id) return f;
+        const n = { ...f, [k]: v };
+        if (k === "nombre") {
+          const s = stock.find((x) => x.nombre === v.trim().toUpperCase() && (!sede || x.sede === sede)) ?? stock.find((x) => x.nombre === v.trim().toUpperCase());
+          if (s) n.unidad = s.unidad;
+        }
+        return n;
+      }),
+    );
+
+  const elegirOC = (id: string) => {
+    setOcId(id);
+    const oc = ordenes.find((o) => o.id === id);
+    if (!oc) return;
+    if (!sede) setSede(sedeIngresoOC(oc));
+    setFilas(oc.items.map((i) => ({ id: uid(), nombre: i.nombre.toUpperCase(), unidad: i.unidad, cantidad: String(i.cantidad) })));
+  };
+
+  const guardar = () => {
+    const n = ejecutar(
+      () =>
+        registrarIngresoAlmacen(
+          { sede, ocId: ocId || undefined, lote, observaciones: obs, items: filas.map((f) => ({ nombre: f.nombre, unidad: f.unidad, cantidad: Number(f.cantidad) })) },
+          rol,
+        ),
+      "Ingreso registrado en el stock",
+    );
+    if (n) {
+      setOcId("");
+      setLote("");
+      setObs("");
+      setFilas([filaIngreso()]);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader title="Registrar ingreso" subtitle="Ingrese productos de la base de stock del almacén; las cantidades se suman al stock y quedan en el kardex" />
+        <div className="space-y-4 p-5 pt-0">
+          <div className="grid gap-3 md:grid-cols-3">
+            <Field label="Almacén *">
+              <Select value={sede} onChange={(e) => setSede(e.target.value)} placeholder="Seleccione…" options={sedes.map((s) => ({ value: s, label: s }))} />
+            </Field>
+            <Field label="Orden de compra" hint="Opcional: carga sus productos">
+              <Select value={ocId} onChange={(e) => elegirOC(e.target.value)} placeholder="Sin OC" options={ocs.map((o) => ({ value: o.id, label: `${o.numero} · ${o.proveedor}` }))} />
+            </Field>
+            <Field label="Lote / guía del proveedor">
+              <Input value={lote} onChange={(e) => setLote(e.target.value)} placeholder="Opcional" />
+            </Field>
+          </div>
+
+          <datalist id="productos-ingreso">
+            {productos.map((p) => (
+              <option key={p} value={p} />
+            ))}
+          </datalist>
+          <div className="space-y-2">
+            {filas.map((f) => (
+              <div key={f.id} className="grid grid-cols-[1fr_110px_110px_auto] items-end gap-2">
+                <Field label="Producto">
+                  <Input list="productos-ingreso" value={f.nombre} onChange={(e) => set(f.id, "nombre", e.target.value)} placeholder="Buscar en el stock…" />
+                </Field>
+                <Field label="Unidad">
+                  <Select value={f.unidad} onChange={(e) => set(f.id, "unidad", e.target.value)} options={UNIDADES.map((u) => ({ value: u, label: u }))} />
+                </Field>
+                <Field label="Cantidad">
+                  <Input type="number" min="0" step="any" value={f.cantidad} onChange={(e) => set(f.id, "cantidad", e.target.value)} />
+                </Field>
+                <Button variant="ghost" size="sm" disabled={filas.length === 1} onClick={() => setFilas((fs) => fs.filter((x) => x.id !== f.id))}>
+                  <Trash2 size={14} />
+                </Button>
+              </div>
+            ))}
+            <Button variant="secondary" size="sm" onClick={() => setFilas((fs) => [...fs, filaIngreso()])}>
+              <Plus size={14} /> Agregar producto
+            </Button>
+          </div>
+
+          <Field label="Observaciones">
+            <Textarea value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Opcional" />
+          </Field>
+          <div className="flex justify-end">
+            <Button variant="success" disabled={!habilitado} title={habilitado ? "" : "Solo Almacén registra ingresos"} onClick={guardar}>
+              <PackageCheck size={15} /> Registrar ingreso
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader title="Últimos ingresos" subtitle="Movimientos de ingreso del kardex" />
+        <Table head={["Fecha", "Almacén", "Producto", "Cantidad", "Saldo", "Documento", "Usuario"]} empty={recientes.length === 0}>
+          {recientes.map((m) => (
+            <tr key={m.id} className="hover:bg-plomo-50">
+              <Td>{new Date(m.fecha).toLocaleString("es-PE")}</Td>
+              <Td>{m.sede}</Td>
+              <Td className="font-semibold text-azul-900">{m.producto}</Td>
+              <Td>
+                {m.cantidad} {m.unidad}
+              </Td>
+              <Td>{m.saldo}</Td>
+              <Td>
+                {m.documento}
+                {m.motivo ? <span className="block text-xs text-plomo-500">{m.motivo}</span> : null}
+              </Td>
+              <Td>{m.usuario}</Td>
+            </tr>
+          ))}
+        </Table>
+      </Card>
     </div>
   );
 }

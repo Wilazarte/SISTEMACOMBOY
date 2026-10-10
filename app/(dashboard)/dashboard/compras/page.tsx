@@ -24,12 +24,16 @@ import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Ta
 import { abrirDoc } from "@/components/doc-viewer";
 import { FormGasto } from "@/components/compras/FormGasto";
 import { SelectorCaja } from "@/components/SelectorCaja";
+import { FormBancarizacion, bancarizacionVacia } from "@/components/compras/FormBancarizacion";
 import { CAJA_POR_DEFECTO } from "@/lib/cajas";
 import {
   IGV,
   COMPROBANTES_GASTO,
   CUENTAS_ORIGEN_PAGO,
   cuentaOrigenDeCaja,
+  bancarizarOC,
+  requiereBancarizacion,
+  TOPE_BANCARIZACION,
   TIPOS_GASTO,
   KEYS,
   MAX_ARCHIVO,
@@ -64,7 +68,7 @@ import { ALMACENES, ALMACEN_DEFECTO, SEDES, UNIDADES } from "@/lib/empresa";
 import { pdfCotizacion, pdfFactura, pdfOrdenCompra, pdfRequerimiento } from "@/lib/pdf";
 import { asientoOrdenCompra } from "@/lib/contable";
 import { getSesion } from "@/lib/auth";
-import type { Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, Proveedor, Requerimiento, Rol, StockItem, TipoComprobanteCompra } from "@/lib/types";
+import type { Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, Proveedor, Requerimiento, Rol, StockItem, TipoComprobanteCompra } from "@/lib/types";
 
 type Tab = "registrar" | "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias";
 
@@ -108,7 +112,8 @@ export default function ComprasPage() {
 
   const cotizables = procesados.filter((r) => r.estado === "ACEPTADO" || r.estado === "COTIZADO");
   const cotisSinOC = cotizaciones.filter((c) => c.estado === "REGISTRADA" && !ordenes.some((o) => o.reqId === c.reqId));
-  const ocsSinFactura = ordenes.filter((o) => o.estado === "EMITIDA");
+  // Flujo: OC EMITIDA -> BANCARIZADA -> FACTURA (la OC que no requiere bancarización puede facturarse EMITIDA)
+  const ocsSinFactura = ordenes.filter((o) => o.estado === "EMITIDA" || o.estado === "BANCARIZADA");
   // Los gastos de Tesorería no llevan guía ni V°B° (no ingresan a almacén)
   const facturasSinGuia = facturas.filter((f) => f.tipo === "FACTURA" && !f.esGastoTesoreria && (!guias.some((g) => g.facturaId === f.id) || guias.some((g) => g.facturaId === f.id && g.estado === "OBSERVADA")));
 
@@ -117,7 +122,7 @@ export default function ComprasPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-serif text-2xl font-light leading-tight text-azul-900 lg:text-3xl">Tesorería / Compras</h1>
-          <p className="mt-1 text-[13px] text-plomo-600">Requerimiento → Cotización → Orden de Compra → Factura → Guía → V°B° Almacén</p>
+          <p className="mt-1 text-[13px] text-plomo-600">Requerimiento → Cotización → Orden de Compra → Bancarización → Factura</p>
         </div>
         {!puede(rol, "req.revisar") && (
           <span className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-plomo-600">Modo lectura para su rol</span>
@@ -135,7 +140,7 @@ export default function ComprasPage() {
           { id: "cotizaciones", label: "Cotizaciones", icon: <FileSpreadsheet size={16} />, count: cotizables.filter((r) => r.estado === "ACEPTADO").length },
           { id: "ordenes", label: "Órdenes de compra", icon: <ShoppingBag size={16} />, count: cotisSinOC.length },
           { id: "facturas", label: "Facturas", icon: <Receipt size={16} />, count: ocsSinFactura.length },
-          { id: "guias", label: "Guías de remisión", icon: <Truck size={16} />, count: facturasSinGuia.length },
+          // Guías de remisión: ya no son parte del flujo (pestaña oculta; las guías cargadas siguen guardadas)
         ]}
       />
 
@@ -147,7 +152,7 @@ export default function ComprasPage() {
       {tab === "ordenes" && (
         <Ordenes key={pre.coti ?? "o"} rol={rol} cotis={cotisSinOC} todasCotis={cotizaciones} ordenes={ordenes} reqs={procesados} preCoti={pre.coti} onFacturar={(id) => ir("facturas", { oc: id })} />
       )}
-      {tab === "facturas" && <Facturas key={pre.oc ?? "f"} rol={rol} ocs={ocsSinFactura} ordenes={ordenes} facturas={facturas} preOc={pre.oc} onGuia={(id) => ir("guias", { fac: id })} />}
+      {tab === "facturas" && <Facturas key={pre.oc ?? "f"} rol={rol} ocs={ocsSinFactura} ordenes={ordenes} facturas={facturas} preOc={pre.oc} />}
       {tab === "guias" && <Guias key={pre.fac ?? "g"} rol={rol} facturas={facturasSinGuia} guias={guias} preFac={pre.fac} />}
     </div>
   );
@@ -337,7 +342,7 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
         </Card>
       )}
 
-      {habilitado && modo === "GASTO" && <FormGasto rol={rol} proveedores={proveedores} />}
+      {habilitado && modo === "GASTO" && <FormGasto rol={rol} proveedores={proveedores} stock={stock} />}
 
       {habilitado && modo === "COMPRA" && (
         <Card>
@@ -805,6 +810,8 @@ function Ordenes({
   preCoti?: string;
   onFacturar: (id: string) => void;
 }) {
+  const [bancarizar, setBancarizar] = useState<OrdenCompra | null>(null);
+  const [banc, setBanc] = useState<Bancarizacion>(bancarizacionVacia);
   const [cotiId, setCotiId] = useState(preCoti ?? "");
   const [fecha, setFecha] = useState(hoy());
   const [formaPago, setFormaPago] = useState<FormaPago>("CREDITO 30 DIAS");
@@ -907,7 +914,7 @@ function Ordenes({
             <Field label="Lugar de entrega" className="md:col-span-2">
               <Input value={lugar} onChange={(e) => setLugar(e.target.value)} />
             </Field>
-            <Field label="Almacén de ingreso *" hint="Al dar el V°B° los repuestos se suman al stock de este almacén">
+            <Field label="Almacén de ingreso *" hint="Almacén registra el ingreso de los repuestos en este almacén">
               <Select value={almacenIngreso} onChange={(e) => setAlmacenIngreso(e.target.value)} options={ALMACENES.map((a) => ({ value: a, label: a }))} />
             </Field>
           </div>
@@ -1014,6 +1021,12 @@ function Ordenes({
               <Td className="text-right font-semibold">{soles(o.total)}</Td>
               <Td>
                 <Badge estado={o.estado} />
+                {o.bancarizacion && (
+                  <p className="mt-0.5 text-[11px] text-plomo-500">
+                    {o.bancarizacion.tipo}
+                    {o.bancarizacion.nroOperacion ? ` · ${o.bancarizacion.nroOperacion}` : ""}
+                  </p>
+                )}
               </Td>
               <Td>
                 <div className="flex gap-1">
@@ -1023,7 +1036,19 @@ function Ordenes({
                   <Button size="sm" variant="secondary" onClick={() => pdfOrdenCompra(o)}>
                     <FileText size={14} /> Ver PDF
                   </Button>
-                  {o.estado === "EMITIDA" && puede(rol, "fac.crear") && (
+                  {o.estado === "EMITIDA" && puede(rol, "fac.pagar") && (
+                    <Button
+                      size="sm"
+                      variant="success"
+                      onClick={() => {
+                        setBanc({ ...bancarizacionVacia(), caja: o.caja || CAJA_POR_DEFECTO });
+                        setBancarizar(o);
+                      }}
+                    >
+                      Bancarizar
+                    </Button>
+                  )}
+                  {(o.estado === "BANCARIZADA" || (o.estado === "EMITIDA" && !requiereBancarizacion(o.total, o.ruc))) && puede(rol, "fac.crear") && (
                     <Button size="sm" onClick={() => onFacturar(o.id)}>
                       Registrar factura
                     </Button>
@@ -1034,6 +1059,33 @@ function Ordenes({
           ))}
         </Table>
       </Card>
+
+      <Modal open={!!bancarizar} onClose={() => setBancarizar(null)} title={`Bancarización · ${bancarizar?.numero ?? ""}`}>
+        {bancarizar && (
+          <div className="space-y-4 text-sm">
+            <p className="text-plomo-600">
+              {bancarizar.proveedor} · <b className="text-azul-900">{soles(bancarizar.total)}</b>. Después de bancarizar se registra la factura y termina el proceso.
+            </p>
+            <FormBancarizacion value={banc} onChange={setBanc} />
+            <div className="flex justify-end gap-2 border-t border-plomo-100 pt-4">
+              <Button variant="secondary" onClick={() => setBancarizar(null)}>
+                Cancelar
+              </Button>
+              <Button
+                variant="success"
+                onClick={() => {
+                  if (ejecutar(() => bancarizarOC(bancarizar.id, banc, rol), `${bancarizar.numero} bancarizada: ya puede registrar la factura`)) {
+                    setBancarizar(null);
+                    onFacturar(bancarizar.id);
+                  }
+                }}
+              >
+                Registrar bancarización
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
@@ -1047,14 +1099,12 @@ function Facturas({
   ordenes,
   facturas,
   preOc,
-  onGuia,
 }: {
   rol: Rol;
   ocs: OrdenCompra[];
   ordenes: OrdenCompra[];
   facturas: Factura[];
   preOc?: string;
-  onGuia: (id: string) => void;
 }) {
   const [modo, setModo] = useState<"FACTURA" | "DJ">("FACTURA");
   const [ocId, setOcId] = useState(preOc ?? "");
@@ -1070,6 +1120,12 @@ function Facturas({
   const [filtroPago, setFiltroPago] = useState("");
   const [pagarFac, setPagarFac] = useState<Factura | null>(null);
   const [cajaFac, setCajaFac] = useState(CAJA_POR_DEFECTO);
+  const [bancFac, setBancFac] = useState<Bancarizacion>(bancarizacionVacia);
+  const abrirPago = (f: Factura) => {
+    setBancFac(bancarizacionVacia());
+    setCajaFac(CAJA_POR_DEFECTO);
+    setPagarFac(f);
+  };
 
   const oc = ocs.find((o) => o.id === ocId);
   const igv = r2(subtotal * IGV);
@@ -1256,7 +1312,7 @@ function Facturas({
                 <Td>
                   <button
                     disabled={!puede(rol, "fac.pagar")}
-                    onClick={() => (f.estadoPago === "POR_PAGAR" ? setPagarFac(f) : ejecutar(() => marcarPago(f.id, false, rol), `${f.numero} revertida a por pagar`))}
+                    onClick={() => (f.estadoPago === "POR_PAGAR" ? abrirPago(f) : ejecutar(() => marcarPago(f.id, false, rol), `${f.numero} revertida a por pagar`))}
                     title={f.estadoPago === "POR_PAGAR" ? "Marcar como pagada (elegir caja)" : "Revertir a por pagar"}
                     className="disabled:cursor-not-allowed"
                   >
@@ -1286,11 +1342,6 @@ function Facturas({
                         <Upload size={14} /> {a.tipo === "GUIA" ? "Guía" : "Adjunto"}
                       </Button>
                     ))}
-                    {f.tipo === "FACTURA" && ordenes.find((o) => o.id === f.ocId)?.estado === "FACTURADA" && puede(rol, "guia.crear") && (
-                      <Button size="sm" onClick={() => onGuia(f.id)}>
-                        Subir guía
-                      </Button>
-                    )}
                   </div>
                 </Td>
               </tr>
@@ -1305,15 +1356,27 @@ function Facturas({
             <p className="text-plomo-600">
               {pagarFac.proveedor} · <b className="text-azul-900">{soles(pagarFac.netoPagar ?? pagarFac.total)}</b>
             </p>
-            <SelectorCaja value={cajaFac} onChange={setCajaFac} />
+            {requiereBancarizacion(pagarFac.netoPagar ?? pagarFac.total, pagarFac.ruc) ? (
+              <>
+                <p className="rounded-lg bg-amber-50 px-3 py-2 text-amber-800">
+                  <b>Bancarización obligatoria:</b> el pago supera S/ {TOPE_BANCARIZACION.toLocaleString("es-PE")} o el proveedor tiene RUC.
+                </p>
+                <FormBancarizacion value={bancFac} onChange={setBancFac} />
+              </>
+            ) : (
+              <SelectorCaja value={cajaFac} onChange={setCajaFac} />
+            )}
             <div className="flex justify-end gap-2 border-t border-plomo-100 pt-4">
               <Button variant="secondary" onClick={() => setPagarFac(null)}>
                 Cancelar
               </Button>
               <Button
                 variant="success"
-                disabled={!cajaFac}
-                onClick={() => ejecutar(() => marcarPago(pagarFac.id, true, rol, cajaFac), `${pagarFac.numero} pagada desde ${cajaFac}`) && setPagarFac(null)}
+                onClick={() => {
+                  const banc = requiereBancarizacion(pagarFac.netoPagar ?? pagarFac.total, pagarFac.ruc);
+                  const caja = banc ? bancFac.caja : cajaFac;
+                  if (ejecutar(() => marcarPago(pagarFac.id, true, rol, caja, banc ? bancFac : undefined), `${pagarFac.numero} pagada desde ${caja}`)) setPagarFac(null);
+                }}
               >
                 Marcar como pagada
               </Button>
