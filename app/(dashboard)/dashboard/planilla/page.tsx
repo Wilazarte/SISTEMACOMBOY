@@ -208,6 +208,12 @@ function conAdelantos(c: TrabajadorCalc, grupos: Map<string, PendientesTrabajado
   };
 }
 
+/** Tooltip de la columna ADELANTOS: "10/09/2026 - Efectivo - Pasaje: S/ 500.00" por línea y el total. */
+function detalleAdelantosTxt(lista: Adelanto[]): string {
+  const lineas = lista.map((a) => `${[fechaPE(a.fecha), a.medio_pago, a.motivo || "Sin motivo"].filter(Boolean).join(" - ")}: ${soles(a.monto)}`);
+  return [...lineas, `Total: ${soles(r2(lista.reduce((s, a) => s + a.monto, 0)))}`, "Clic para ver el desglose"].join("\n");
+}
+
 /** Lo del reloj: solo lectura (se cambia con Importar asistencia o el Módulo Creador). */
 function CampoBloqueado({ valor, alerta }: { valor: number | string; alerta?: boolean }) {
   return (
@@ -957,12 +963,15 @@ export default function PlanillaPage() {
                         type="button"
                         data-adelanto={t.id}
                         onClick={() => setAdelantoDe(t)}
-                        title={t.adelantosPendientes > 0 ? "Ver / editar adelantos" : "Registrar adelanto"}
+                        title={t.adelantosPendientes > 0 ? detalleAdelantosTxt(pendientesDe(t, adelantos.grupos)) : "Registrar adelanto"}
                         className="rounded-md px-1.5 py-0.5 text-right transition hover:bg-red-50 hover:ring-1 hover:ring-red-200"
                       >
                       {t.adelantosPendientes > 0 ? (
                         <>
-                          <span className="font-semibold text-red-600">- {soles(t.adelantosDescuento)}</span>
+                          <span className="font-semibold text-red-600 underline decoration-dotted underline-offset-4">- {soles(t.adelantosDescuento)}</span>
+                          <p className="flex items-center justify-end gap-1 text-[10px] text-plomo-500">
+                            <Eye size={11} /> Ver {t.adelantosDetalle.length} adelanto{t.adelantosDetalle.length === 1 ? "" : "s"}
+                          </p>
                           {t.adelantosDescuento < t.adelantosPendientes && (
                             <p className="text-[10px] text-amber-700" title="El adelanto que no cabe en el neto queda pendiente para la siguiente planilla">
                               {soles(r2(t.adelantosPendientes - t.adelantosDescuento))} queda pendiente
@@ -1033,6 +1042,7 @@ export default function PlanillaPage() {
           trabajador={adelantoDe}
           periodo={normalizarPeriodo(periodo)}
           pendientes={pendientesDe(adelantoDe, adelantos.grupos)}
+          descontados={adelantoDe.adelantoIds}
           editable={puedeEditar && !pagado(adelantoDe)}
           onClose={() => setAdelantoDe(null)}
           onCambio={() => void adelantos.recargar()}

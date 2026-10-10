@@ -20,6 +20,7 @@ export function AdelantosTrabajador({
   trabajador,
   periodo,
   pendientes,
+  descontados = [],
   editable,
   onClose,
   onCambio,
@@ -27,6 +28,7 @@ export function AdelantosTrabajador({
   trabajador: { id: string; nombre: string; dni?: string; sede?: string };
   periodo: string;
   pendientes: Adelanto[];
+  descontados?: string[]; // los que se descuentan en este pago (el resto queda pendiente)
   editable: boolean;
   onClose: () => void;
   onCambio: () => void;
@@ -60,18 +62,23 @@ export function AdelantosTrabajador({
   };
 
   return (
-    <Modal open onClose={onClose} title={`Registrar adelanto - ${trabajador.nombre}`}>
+    <Modal open onClose={onClose} title={`${pendientes.length ? "Desglose de adelantos" : "Registrar adelanto"} - ${trabajador.nombre}`}>
       <div className="space-y-4 text-sm">
         {pendientes.length > 0 && (
           <div className="rounded-xl border border-red-200 bg-red-50/50">
             <p className="border-b border-red-100 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-red-700">
-              Adelantos pendientes · total <span className="text-red-600">- {soles(total)}</span>
+              Adelantos pendientes · {periodo}
             </p>
             {pendientes.map((a) => (
               <div key={a.id} className="flex items-center gap-2 border-b border-red-100 px-3 py-2 last:border-0">
                 <span className="w-24 text-xs text-plomo-500">{fechaPE(a.fecha)}</span>
                 <span className="flex-1 truncate">
-                  {a.motivo || "Adelanto"}
+                  {a.motivo || "Sin motivo"}
+                  {descontados.length > 0 && !descontados.includes(a.id) && (
+                    <span className="ml-1 rounded bg-amber-100 px-1 text-[10px] font-semibold text-amber-800" title="No cabe en el neto: se descuenta en la siguiente planilla">
+                      queda pendiente
+                    </span>
+                  )}
                   {a.medio_pago ? <span className="text-xs text-plomo-500"> · {a.medio_pago}</span> : null}
                   {a.sede ? <span className="text-xs text-plomo-500"> · {a.sede}</span> : null}
                 </span>
@@ -93,6 +100,10 @@ export function AdelantosTrabajador({
                 )}
               </div>
             ))}
+            <div className="flex items-center justify-between border-t border-red-200 px-3 py-2 font-bold">
+              <span>Total adelantos</span>
+              <span className="text-red-600">- {soles(total)}</span>
+            </div>
           </div>
         )}
 
