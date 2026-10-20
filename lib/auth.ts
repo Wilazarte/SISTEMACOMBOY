@@ -94,6 +94,7 @@ export async function logout(): Promise<void> {
   try {
     window.localStorage.removeItem("erp_modulo");
     window.localStorage.removeItem("erp_usuario");
+    window.sessionStorage.removeItem("notif_login_shown"); // recordatorio de Tesorería: vuelve a salir en el próximo login
   } catch {
     /* almacenamiento bloqueado */
   }

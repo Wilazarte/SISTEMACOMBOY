@@ -8,6 +8,7 @@ import { Badge, ID_BARRA_PESTANAS, Toaster, cn, toast } from "@/components/ui";
 import { DocViewerHost, abrirDoc, type DocRef } from "@/components/doc-viewer";
 import { ObservacionesGerencia } from "@/components/ObservacionesGerencia";
 import { Header } from "@/components/Header";
+import { NotificationBell } from "@/components/NotificationBell";
 import { inicioDe, logout, puedeVer, useSesion, veDashboard } from "@/lib/auth";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
 import { KEYS, detenerDatos, getCotizaciones, getFacturas, getGuias, getOrdenes, getPendientes, getProcesados, useDatos, useStore } from "@/lib/storage";
@@ -309,14 +310,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               )}
             </Link>
           )}
-          {veCompras && (
-            <Link href="/dashboard/compras" className="relative rounded-full p-2 text-azul-900 hover:bg-plomo-100" title="Requerimientos por revisar">
-              <Bell size={20} />
-              {pendientes.length > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-corp px-1 text-[11px] font-bold text-white">{pendientes.length}</span>
-              )}
-            </Link>
-          )}
+          {veCompras && <NotificationBell />}
           <span className="hidden items-center gap-2 whitespace-nowrap rounded-full border border-plomo-200 px-3 py-1.5 text-xs font-semibold text-azul-900 md:inline-flex">
             <UserCircle2 size={16} className="text-plomo-500" /> {sesion.nombre}
           </span>
