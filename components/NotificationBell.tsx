@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Bell, Check, Eye, X } from "lucide-react";
+import { ArrowRight, Bell, Check, Eye, MessageSquareWarning, X } from "lucide-react";
 import { Badge, Button, cn, ejecutar } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
+import { useComprasActions } from "@/components/compras/useComprasActions";
 import { KEYS, aceptarRequerimiento, fechaPE, puede, recargarDatos, useRol, useStore } from "@/lib/storage";
 import type { Requerimiento } from "@/lib/types";
 
@@ -53,6 +54,7 @@ export function NotificationBell() {
   const total = pendientes.length;
   const lista = pendientes.slice(0, MAX_ITEMS);
   const habilitado = puede(rol, "req.revisar");
+  const { observar, rechazar, modales } = useComprasActions(rol);
 
   // Cerrar al hacer clic fuera o con Escape
   useEffect(() => {
@@ -151,12 +153,19 @@ export function NotificationBell() {
                     <p className="mt-1.5 truncate text-xs text-slate-700" title={detalleDe(r)}>
                       {detalleDe(r)}
                     </p>
-                    <div className="mt-2 flex gap-1.5" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                    <div className="mt-2 flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                       <Button size="sm" variant="secondary" onClick={() => abrirDoc({ tipo: "REQ", id: r.id })}>
                         <Eye size={14} /> Ver
                       </Button>
                       <Button size="sm" variant="success" disabled={!habilitado} onClick={() => ejecutar(() => aceptarRequerimiento(r.id, rol), `${r.numero} ACEPTADO`)}>
                         <Check size={14} /> Aceptar
+                      </Button>
+                      {/* Observar / Rechazar abren su modal: se cierra el desplegable (el clic en el modal contaría como "fuera") */}
+                      <Button size="sm" variant="warning" disabled={!habilitado} onClick={() => { setAbierto(false); observar(r); }}>
+                        <MessageSquareWarning size={14} /> Observar
+                      </Button>
+                      <Button size="sm" variant="danger" disabled={!habilitado} onClick={() => { setAbierto(false); rechazar(r); }}>
+                        <X size={14} /> Rechazar
                       </Button>
                     </div>
                   </div>
@@ -175,6 +184,8 @@ export function NotificationBell() {
           </div>
         )}
       </div>
+
+      {modales}
 
       {recordatorio && (
         <div role="alert" className="fixed bottom-4 right-4 z-[70] w-[min(92vw,380px)] overflow-hidden rounded-xl bg-white shadow-[0_16px_40px_rgba(15,36,64,0.25)]">

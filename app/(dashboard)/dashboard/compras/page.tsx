@@ -24,6 +24,7 @@ import {
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
 import { FormGasto } from "@/components/compras/FormGasto";
+import { useComprasActions } from "@/components/compras/useComprasActions";
 import { SelectorCaja } from "@/components/SelectorCaja";
 import { FormBancarizacion, bancarizacionVacia } from "@/components/compras/FormBancarizacion";
 import { CAJA_POR_DEFECTO } from "@/lib/cajas";
@@ -52,11 +53,9 @@ import {
   motivoNoEditableOC,
   editarOrdenCompra,
   type EdicionOC,
-  observarRequerimiento,
   parseFechaPE,
   puede,
   r2,
-  rechazarRequerimiento,
   registrarCompra,
   rucValido,
   soles,
@@ -195,9 +194,7 @@ function AvisoCampana({ total }: { total: number }) {
 // NOTIFICACIONES (cards amarillas) — oculta con SHOW_PENDING_GRID = false
 // =====================================================================
 function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol: Rol }) {
-  const [rechazo, setRechazo] = useState<Requerimiento | null>(null);
-  const [obs, setObs] = useState<Requerimiento | null>(null);
-  const [motivo, setMotivo] = useState("");
+  const { observar, rechazar, modales } = useComprasActions(rol);
   const habilitado = puede(rol, "req.revisar");
 
   if (pendientes.length === 0)
@@ -244,10 +241,10 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
               <Button size="sm" variant="success" disabled={!habilitado} onClick={() => ejecutar(() => aceptarRequerimiento(r.id, rol), `${r.numero} ACEPTADO`)}>
                 <Check size={14} /> Aceptar
               </Button>
-              <Button size="sm" variant="warning" disabled={!habilitado} onClick={() => { setMotivo(""); setObs(r); }}>
+              <Button size="sm" variant="warning" disabled={!habilitado} onClick={() => observar(r)}>
                 <MessageSquareWarning size={14} /> Observar
               </Button>
-              <Button size="sm" variant="danger" disabled={!habilitado} onClick={() => setRechazo(r)}>
+              <Button size="sm" variant="danger" disabled={!habilitado} onClick={() => rechazar(r)}>
                 <X size={14} /> Rechazar
               </Button>
             </div>
@@ -255,40 +252,7 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
         ))}
       </div>
 
-      <Modal open={!!rechazo} onClose={() => setRechazo(null)} title={`Rechazar ${rechazo?.numero ?? ""}`}>
-        <div className="flex gap-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">
-          <AlertTriangle size={20} className="shrink-0" />
-          El requerimiento se <b>eliminará de todo el sistema</b> (notificaciones y lista). Esta acción no se puede deshacer.
-        </div>
-        <div className="mt-4 flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setRechazo(null)}>Cancelar</Button>
-          <Button
-            variant="danger"
-            onClick={() => {
-              if (rechazo && ejecutar(() => rechazarRequerimiento(rechazo.id), `${rechazo.numero} rechazado y eliminado`)) setRechazo(null);
-            }}
-          >
-            Rechazar y eliminar
-          </Button>
-        </div>
-      </Modal>
-
-      <Modal open={!!obs} onClose={() => setObs(null)} title={`Observar ${obs?.numero ?? ""}`}>
-        <Field label="Motivo de la observación" hint="Almacén verá esta observación y podrá corregir y reenviar.">
-          <Textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej: Especificar medida del rodamiento y marca aceptada" autoFocus />
-        </Field>
-        <div className="mt-4 flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setObs(null)}>Cancelar</Button>
-          <Button
-            variant="warning"
-            onClick={() => {
-              if (obs && ejecutar(() => observarRequerimiento(obs.id, motivo, rol), `${obs.numero} OBSERVADO`)) setObs(null);
-            }}
-          >
-            Enviar observación
-          </Button>
-        </div>
-      </Modal>
+      {modales}
     </section>
   );
 }
