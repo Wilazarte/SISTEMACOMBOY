@@ -74,6 +74,9 @@ import { asientoOrdenCompra, reasentarOrdenCompra } from "@/lib/contable";
 import { getSesion } from "@/lib/auth";
 import type { Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, Proveedor, Requerimiento, Rol, StockItem, TipoComprobanteCompra } from "@/lib/types";
 
+/** Grilla de cards amarillas de pendientes: oculta, se revisan en la campanita del header (true para volver a mostrarla). */
+const SHOW_PENDING_GRID = false;
+
 type Tab = "registrar" | "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias";
 
 const FORMAS_PAGO: FormaPago[] = ["CONTADO", "CREDITO 15 DIAS", "CREDITO 30 DIAS", "CREDITO 60 DIAS", "ADELANTO 50%"];
@@ -133,7 +136,7 @@ export default function ComprasPage() {
         )}
       </div>
 
-      <Notificaciones pendientes={pendientes} rol={rol} />
+      {SHOW_PENDING_GRID ? <Notificaciones pendientes={pendientes} rol={rol} /> : <AvisoCampana total={pendientes.length} />}
 
       <Tabs<Tab>
         value={tab}
@@ -163,7 +166,33 @@ export default function ComprasPage() {
 }
 
 // =====================================================================
-// NOTIFICACIONES (cards amarillas)
+// AVISO: los pendientes se revisan en la campanita del header
+// =====================================================================
+function AvisoCampana({ total }: { total: number }) {
+  if (total === 0)
+    return (
+      <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
+        <Check size={18} /> No hay requerimientos pendientes de revisión.
+      </div>
+    );
+  return (
+    <div className="flex items-center gap-4 rounded-xl border-2 border-dashed border-amber-300 bg-amber-50 px-5 py-4">
+      <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white text-[#A00000] shadow-sm ring-4 ring-amber-100">
+        <Bell size={22} />
+        <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#A00000] px-1 text-[11px] font-bold text-white">{total}</span>
+      </span>
+      <div className="min-w-0">
+        <p className="font-semibold text-azul-900">
+          Tienes {total} requerimiento{total === 1 ? "" : "s"} pendiente{total === 1 ? "" : "s"}
+        </p>
+        <p className="text-sm text-plomo-600">Revísalos en la campanita 🔔 arriba a la derecha.</p>
+      </div>
+    </div>
+  );
+}
+
+// =====================================================================
+// NOTIFICACIONES (cards amarillas) — oculta con SHOW_PENDING_GRID = false
 // =====================================================================
 function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol: Rol }) {
   const [rechazo, setRechazo] = useState<Requerimiento | null>(null);
