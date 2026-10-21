@@ -7,7 +7,7 @@
 // =====================================================================
 
 import { ALMACENES, ALMACEN_DEFECTO } from "./empresa";
-import { ErpError, KEYS, escribir, hoy, leer, siguienteNumero, uid, type Serie } from "./storage";
+import { ErpError, KEYS, escribir, hoy, leer, siguienteNumero, subirBaucher, uid, type Serie } from "./storage";
 
 export const TIPOS_EQUIPO = ["REMOLCADOR ECO-MINE 3000", "REMOLCADOR ECO-MINE 3500 PRO", "REMOLCADOR ELECTRIC 4000", "COCHE MINERO", "OTRO"] as const;
 export const MARCAS_MOTOR = ["RONCO", "ROMI", "TRANSVERSAL", "OTRO"] as const;
@@ -346,7 +346,17 @@ export function reducirFoto(file: File, lado = 1280): Promise<FotoEquipo> {
         c.width = Math.round(img.width * k);
         c.height = Math.round(img.height * k);
         c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
-        ok({ nombre: file.name, url: c.toDataURL("image/jpeg", 0.75) });
+        // Se sube a Storage; si su rol no puede subir, queda en base64 como antes
+        c.toBlob(
+          (blob) =>
+            blob
+              ? subirBaucher(blob, "equipo")
+                  .then(({ ref }) => ok({ nombre: file.name, url: ref }))
+                  .catch(mal)
+              : ok({ nombre: file.name, url: c.toDataURL("image/jpeg", 0.75) }),
+          "image/jpeg",
+          0.75
+        );
       };
       img.src = String(r.result);
     };

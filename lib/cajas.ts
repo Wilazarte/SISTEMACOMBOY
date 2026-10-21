@@ -32,7 +32,7 @@ let cache: Promise<Caja[]> | null = null;
 /** Cajas ACTIVAS por nombre (se lee una vez por sesión). */
 export function listarCajas(): Promise<Caja[]> {
   cache ??= (async () => {
-    const { data, error } = await createClient().from("cajas").select("*");
+    const { data, error } = await createClient().from("cajas").select("id,nombre,tipo,saldo_actual,responsable,estado,orden");
     if (error || !data?.length) return CAJAS_INICIALES;
     return data
       .map((r) => ({

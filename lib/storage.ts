@@ -43,6 +43,7 @@ import type {
   VistoBueno,
 } from "./types";
 import { generarCodigo } from "./utils/codigos";
+import { clavesDeModulos } from "./storage.por-modulo";
 
 export const KEYS = {
   REQS_PENDIENTES: "reqs_almacen_pendientes",
@@ -235,6 +236,11 @@ const sucias = new Set<StoreKey>(); // recibieron Realtime mientras se escribía
 let cola: Promise<void> = Promise.resolve();
 let canal: RealtimeChannel | null = null;
 let carga: Promise<void> | null = null;
+/** Claves ya descargadas del servidor (las del módulo al entrar; el resto, cuando una pantalla las pide). */
+const cargadas = new Set<StoreKey>();
+const cargando = new Map<StoreKey, Promise<void>>();
+/** Claves que está bajando iniciarDatos: no se piden dos veces. */
+const enCargaInicial = new Set<StoreKey>();
 
 const clonar = <T,>(v: T): T => (typeof structuredClone === "function" ? structuredClone(v) : JSON.parse(JSON.stringify(v)));
 const avisar = (key: StoreKey) => window.dispatchEvent(new CustomEvent(EVENTO, { detail: key }));
@@ -366,6 +372,7 @@ function fijarDesdeServidor(key: StoreKey, filas: Fila[]): void {
   });
   cache.set(key, deFilas(key, limpias));
   servidor.set(key, new Map(aFilas(key, cache.get(key)).map((f) => [f.id, firma(f)])));
+  cargadas.add(key);
   avisar(key);
 }
 
@@ -374,8 +381,10 @@ async function descargar(key: StoreKey): Promise<Fila[]> {
   const d = DESTINOS[key];
   const sb = createClient();
   const filas: Fila[] = [];
+  // Tablas de documentos: solo id, tipo y data (lo único que lee deFilas); observaciones y condiciones usan sus columnas
+  const columnas: string = d.forma === "lista" || d.forma === "objeto" ? "id,tipo,data" : "*";
   for (let desde = 0; ; desde += 1000) {
-    let q = sb.from(d.tabla).select("*");
+    let q = sb.from(d.tabla).select(columnas);
     q =
       d.forma === "observaciones"
         ? q.order("fecha", { ascending: false })
@@ -384,7 +393,7 @@ async function descargar(key: StoreKey): Promise<Fila[]> {
           : q.eq("tipo", d.tipo).order("created_at", { ascending: false });
     const { data, error } = await q.range(desde, desde + 999);
     if (error) throw error;
-    filas.push(...((data ?? []) as Fila[]));
+    filas.push(...((data ?? []) as unknown as Fila[]));
     if (!data || data.length < 1000) return filas;
   }
 }
@@ -404,15 +413,67 @@ async function recargar(key: StoreKey): Promise<void> {
 async function aplicarCambio(tabla: string, p: RealtimePostgresChangesPayload<Fila>): Promise<void> {
   const nuevo = p.new as Partial<Fila>;
   const viejo = p.old as Partial<Fila>;
-  const key = claveDeFila(tabla, nuevo?.tipo ?? viejo?.tipo);
-  if (!key) return;
+  const id = String(nuevo?.id ?? viejo?.id ?? "");
+  let key = claveDeFila(tabla, nuevo?.tipo ?? viejo?.tipo);
+  // DELETE solo trae la llave primaria: se busca la clave que tenía ese id
+  if (!key && p.eventType === "DELETE" && id)
+    key = (Object.keys(DESTINOS) as StoreKey[]).find((k) => DESTINOS[k].tabla === tabla && servidor.get(k)?.has(id));
+  if (!key || !cargadas.has(key)) return; // clave que esta PC no usa: se leerá fresca si la pide
   if ((pendientes.get(key) ?? 0) > 0) {
     sucias.add(key); // hay escrituras propias en curso: se recarga al terminar
     return;
   }
-  // Se relee la clave completa: evita depender del tamaño del mensaje (guías con archivo)
-  // y mantiene el orden correcto de la lista.
-  await recargar(key);
+  // Se aplica solo la fila que cambió; si no se puede (forma no lista, mensaje recortado), se relee la clave
+  if (!aplicarFila(key, p, id)) await recargar(key);
+}
+
+/** INSERT / UPDATE / DELETE de una fila en una clave tipo lista. Devuelve false si hay que recargar la clave. */
+function aplicarFila(key: StoreKey, p: RealtimePostgresChangesPayload<Fila>, id: string): boolean {
+  if (DESTINOS[key].forma !== "lista" || !id) return false;
+  if ((p as { errors?: unknown }).errors) return false; // Realtime recortó el mensaje (fila muy grande)
+  const lista = (cache.get(key) ?? []) as { id: string }[];
+  const srv = new Map(servidor.get(key) ?? []);
+  if (p.eventType === "DELETE") {
+    cache.set(key, lista.filter((x) => String(x.id) !== id));
+    srv.delete(id);
+  } else {
+    const nuevo = p.new as Partial<Fila>;
+    if (!nuevo || nuevo.data === undefined) return false;
+    const fila = Object.fromEntries(Object.entries(nuevo).filter(([k]) => !COLUMNAS_SERVIDOR.includes(k))) as Fila;
+    const [item] = deFilas(key, [fila]) as { id: string }[];
+    const i = lista.findIndex((x) => String(x.id) === String(item.id));
+    // Nuevo: arriba (las listas van de más nuevo a más antiguo); modificado: en su lugar
+    cache.set(key, i >= 0 ? lista.map((x, j) => (j === i ? item : x)) : [item, ...lista]);
+    srv.set(String(item.id), firma(aFilas(key, [item])[0]));
+  }
+  servidor.set(key, srv);
+  avisar(key);
+  return true;
+}
+
+/** Descarga una clave que no se bajó al entrar (la pide una pantalla de otro módulo). */
+export function cargarClave(key: StoreKey): Promise<void> {
+  if (cargadas.has(key) || !carga) return Promise.resolve();
+  if (enCargaInicial.has(key)) return carga.catch(() => undefined);
+  let p = cargando.get(key);
+  if (!p) {
+    p = descargar(key)
+      .catch((e) => {
+        if (TABLAS_OPCIONALES.includes(DESTINOS[key].tabla) && esTablaFaltante(e)) return [] as Fila[];
+        throw e;
+      })
+      .then((filas) => {
+        if (!cargadas.has(key) && !(pendientes.get(key) ?? 0)) fijarDesdeServidor(key, filas);
+      })
+      .catch((e) => {
+        avisarError(`No se pudieron cargar los datos: ${(e as Error).message}`);
+      })
+      .finally(() => {
+        cargando.delete(key);
+      });
+    cargando.set(key, p);
+  }
+  return p;
 }
 
 /** Tablas de módulos nuevos: si aún no existen en Supabase, su módulo queda vacío en vez de bloquear todo. */
@@ -427,10 +488,15 @@ const esTablaFaltante = (e: unknown): boolean => {
   return err?.code === "42P01" || err?.code === "PGRST205" || /does not exist|schema cache/i.test(err?.message ?? "");
 };
 
-/** Carga todos los datos permitidos para el usuario y se suscribe a Realtime. */
-export function iniciarDatos(): Promise<void> {
+/**
+ * Carga los datos de los módulos del usuario (perfiles.modulos, ver lib/storage.por-modulo.ts) y se suscribe
+ * a Realtime. Las demás claves se descargan cuando una pantalla las pide (cargarClave).
+ */
+export function iniciarDatos(modulos: string[] = getSesion()?.modulos ?? ["*"]): Promise<void> {
   carga ??= (async () => {
-    const claves = Object.keys(DESTINOS) as StoreKey[];
+    const claves = clavesDeModulos(modulos, Object.keys(DESTINOS) as StoreKey[]);
+    console.time("iniciarDatos");
+    claves.forEach((k) => enCargaInicial.add(k));
     // Una tabla opcional que aún no existe (ej. ventas antes de correr fix_ventas.sql) no bloquea el resto del ERP
     const faltantes = new Set<string>();
     const resultados = await Promise.all(
@@ -448,6 +514,9 @@ export function iniciarDatos(): Promise<void> {
       )
     );
     resultados.forEach(([k, f]) => fijarDesdeServidor(k, f));
+    enCargaInicial.clear();
+    console.timeEnd("iniciarDatos");
+    console.info(`iniciarDatos: ${claves.length} de ${Object.keys(DESTINOS).length} claves, ${resultados.reduce((n, [, f]) => n + f.length, 0)} filas`);
     tablasFaltantes.clear();
     faltantes.forEach((t) => tablasFaltantes.add(t));
     if (faltantes.has("contable") && getSesion()?.modulos.some((m) => m === "*" || m === "/dashboard/contable"))
@@ -463,8 +532,8 @@ export function iniciarDatos(): Promise<void> {
       sb.channel("erp-cambios")
     ).subscribe((estado) => {
       if (estado !== "SUBSCRIBED") return;
-      // Al reconectar se recarga todo por si se perdieron cambios sin conexión
-      if (!primera) claves.forEach((k) => void recargar(k));
+      // Al reconectar se recargan las claves en uso por si se perdieron cambios sin conexión
+      if (!primera) cargadas.forEach((k) => void recargar(k));
       primera = false;
     });
   })().catch((e) => {
@@ -484,6 +553,9 @@ export async function detenerDatos(): Promise<void> {
   cache.clear();
   servidor.clear();
   sucias.clear();
+  cargadas.clear();
+  cargando.clear();
+  enCargaInicial.clear();
 }
 
 /** Hook del layout: carga los datos cuando hay sesión. */
@@ -510,7 +582,9 @@ export function useDatos(activo: boolean): { listo: boolean; error: string } {
 }
 
 export function leer<T>(key: StoreKey, fallback: T): T {
-  if (typeof window === "undefined" || !cache.has(key)) return fallback;
+  if (typeof window === "undefined") return fallback;
+  if (!cargadas.has(key)) void cargarClave(key); // de otro módulo: se baja ahora y la pantalla se refresca
+  if (!cache.has(key)) return fallback;
   return clonar(cache.get(key) as T);
 }
 
@@ -523,6 +597,13 @@ export function escribir<T>(key: StoreKey, value: T): void {
   // DÍAS / TARD.: nunca se escriben directo (la base también lo rechaza con RLS)
   if (key === KEYS.ASISTENCIA) throw new ErpError(MSG_ASISTENCIA_BLOQUEADA);
   const d = DESTINOS[key];
+  // Clave aún no descargada: un objeto (contadores, alias) se pisaría entero; una lista solo agrega/actualiza
+  // (no borra nada del servidor) y se relee al terminar de guardar.
+  const sinCargar = !cargadas.has(key);
+  if (sinCargar && d.forma !== "lista") {
+    void cargarClave(key);
+    throw new ErpError("Cargando datos del servidor. Intente de nuevo en unos segundos.");
+  }
   const filas = aFilas(key, value);
   const antes = servidor.get(key) ?? new Map<string, string>();
   const cambios = filas.filter((f) => antes.get(f.id) !== firma(f));
@@ -535,6 +616,7 @@ export function escribir<T>(key: StoreKey, value: T): void {
   if (cambios.length === 0 && borrados.length === 0) return;
 
   pendientes.set(key, (pendientes.get(key) ?? 0) + 1);
+  if (sinCargar) sucias.add(key);
   cola = cola.then(async () => {
     const sb = createClient();
     try {
@@ -593,10 +675,14 @@ export async function esperarGuardado(): Promise<string | undefined> {
   return e;
 }
 
-/** Hook reactivo: se actualiza cuando se escribe la clave en esta PC o llega un cambio de otra. */
-export function useStore<T>(key: StoreKey, fallback: T): T {
-  const [value, setValue] = useState<T>(() => leer<T>(key, fallback));
+/**
+ * Hook reactivo: se actualiza cuando se escribe la clave en esta PC o llega un cambio de otra.
+ * `activa = false`: el usuario no usa esa clave (otro módulo); no se descarga y devuelve el fallback.
+ */
+export function useStore<T>(key: StoreKey, fallback: T, activa = true): T {
+  const [value, setValue] = useState<T>(() => (activa ? leer<T>(key, fallback) : fallback));
   useEffect(() => {
+    if (!activa) return;
     const cargar = () => setValue(leer<T>(key, fallback));
     cargar();
     const onCambio = (e: Event) => {
@@ -605,8 +691,8 @@ export function useStore<T>(key: StoreKey, fallback: T): T {
     window.addEventListener(EVENTO, onCambio);
     return () => window.removeEventListener(EVENTO, onCambio);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
-  return value;
+  }, [key, activa]);
+  return activa ? value : fallback;
 }
 
 function evento(usuario: Rol, accion: string, detalle?: string): EventoHistorial {
@@ -868,6 +954,33 @@ export function aceptarRequerimiento(id: string, rol: Rol): void {
   escribir(KEYS.REQS_PROCESADOS, [aceptado, ...getProcesados().filter((r) => r.id !== id)]);
 }
 
+/** Acepta varios REQ pendientes a la vez: un solo guardado por lista (pendientes y procesados). Devuelve cuántos. */
+export function aceptarMultiple(ids: string[], rol: Rol): number {
+  const pend = getPendientes();
+  const elegidos = pend.filter((r) => ids.includes(r.id));
+  if (elegidos.length === 0) throw new ErpError("Seleccione al menos un requerimiento pendiente.");
+  const aceptados: Requerimiento[] = elegidos.map((req) => ({
+    ...req,
+    estado: "ACEPTADO",
+    observacion: undefined,
+    historial: [...req.historial, evento(rol, "Aceptado por Tesorería")],
+  }));
+  const set = new Set(elegidos.map((r) => r.id));
+  escribir(KEYS.REQS_PENDIENTES, pend.filter((r) => !set.has(r.id)));
+  escribir(KEYS.REQS_PROCESADOS, [...aceptados, ...getProcesados().filter((r) => !set.has(r.id))]);
+  return aceptados.length;
+}
+
+/** Rechaza (elimina) varios REQ a la vez. */
+export function rechazarMultiple(ids: string[]): number {
+  const set = new Set(ids);
+  const n = getPendientes().filter((r) => set.has(r.id)).length;
+  if (n === 0) throw new ErpError("Seleccione al menos un requerimiento pendiente.");
+  escribir(KEYS.REQS_PENDIENTES, getPendientes().filter((r) => !set.has(r.id)));
+  escribir(KEYS.REQS_PROCESADOS, getProcesados().filter((r) => !set.has(r.id)));
+  return n;
+}
+
 export function rechazarRequerimiento(id: string): void {
   // Borrado total: notificaciones + lista de procesados
   escribir(KEYS.REQS_PENDIENTES, getPendientes().filter((r) => r.id !== id));
@@ -981,6 +1094,88 @@ async function subirVoucher(file: File): Promise<string> {
     throw new ErpError(`No se pudo subir el baucher: ${error.message}`);
   }
   return ruta;
+}
+
+// ---------------------------------------------------------------------
+// Adjuntos en Storage (en vez de base64 dentro de data jsonb)
+// El campo del documento guarda "sb:tesoreria/<ruta>"; los antiguos siguen siendo "data:..." y se muestran igual.
+// ---------------------------------------------------------------------
+const PREFIJO_SB = `sb:${BUCKET_TESORERIA}/`;
+const EXT_ARCHIVO: Record<string, string> = { ...TIPOS_VOUCHER, "image/webp": "webp" };
+export const esArchivoStorage = (ref?: string): boolean => !!ref && ref.startsWith(PREFIJO_SB);
+
+const leerComoDataUrl = (archivo: Blob): Promise<string> =>
+  new Promise((ok, mal) => {
+    const r = new FileReader();
+    r.onload = () => ok(String(r.result));
+    r.onerror = () => mal(new ErpError("No se pudo leer el archivo."));
+    r.readAsDataURL(archivo);
+  });
+
+/**
+ * Sube un adjunto (baucher, guía, foto) al bucket privado como {tipo}/{id}/{timestamp}.{ext} y devuelve
+ * la referencia a guardar en el documento y una URL firmada para mostrarlo ya.
+ * Si Storage lo rechaza (su rol no puede subir, formato no permitido en el bucket, sin conexión a Storage),
+ * vuelve al base64 de siempre para no perder el adjunto.
+ */
+export async function subirBaucher(archivo: Blob, tipo: string): Promise<{ ref: string; url: string; enStorage: boolean }> {
+  const ext = EXT_ARCHIVO[archivo.type];
+  if (ext && archivo.size <= MAX_VOUCHER) {
+    const ruta = `${tipo}/${uid()}/${Date.now()}.${ext}`;
+    const sb = createClient().storage.from(BUCKET_TESORERIA);
+    const { error } = await sb.upload(ruta, archivo, { contentType: archivo.type, upsert: false });
+    if (!error) {
+      const ref = PREFIJO_SB + ruta;
+      return { ref, url: await urlArchivo(ref).catch(() => ""), enStorage: true };
+    }
+    console.warn(`subirBaucher: Storage rechazó ${ruta} (${error.message}); se guarda en base64`);
+  }
+  const dataUrl = await leerComoDataUrl(archivo);
+  return { ref: dataUrl, url: dataUrl, enStorage: false };
+}
+
+const urlsFirmadas = new Map<string, { url: string; vence: number }>();
+
+/** URL para mostrar un adjunto: firmada (5 min, en caché 4 min) si está en Storage; el base64 antiguo tal cual. */
+export async function urlArchivo(ref: string): Promise<string> {
+  if (!esArchivoStorage(ref)) return ref;
+  const guardada = urlsFirmadas.get(ref);
+  if (guardada && guardada.vence > Date.now()) return guardada.url;
+  const url = await urlVoucher(ref.slice(PREFIJO_SB.length));
+  urlsFirmadas.set(ref, { url, vence: Date.now() + 240_000 });
+  return url;
+}
+
+/** Hook: URL lista para <img>/<iframe> de un adjunto ("" mientras se firma). */
+export function useUrlArchivo(ref?: string): string {
+  const [url, setUrl] = useState(() => (ref && !esArchivoStorage(ref) ? ref : ""));
+  useEffect(() => {
+    let vivo = true;
+    if (!ref) setUrl("");
+    else if (!esArchivoStorage(ref)) setUrl(ref);
+    else urlArchivo(ref).then((u) => vivo && setUrl(u)).catch(() => vivo && setUrl(""));
+    return () => {
+      vivo = false;
+    };
+  }, [ref]);
+  return url;
+}
+
+/** Abre un adjunto en otra pestaña (Storage o base64 antiguo). */
+export function abrirArchivo(ref: string): void {
+  const w = window.open("", "_blank");
+  if (!w) return;
+  if (!esArchivoStorage(ref)) {
+    // Chrome no navega a data: en una pestaña nueva: se muestra dentro de un iframe
+    w.document.write(`<iframe src="${ref}" style="border:0;width:100%;height:100vh"></iframe>`);
+    return;
+  }
+  urlArchivo(ref)
+    .then((u) => (w.location.href = u))
+    .catch((e) => {
+      w.close();
+      avisarError((e as Error).message);
+    });
 }
 
 /** URL temporal (5 min) para ver un baucher privado. */

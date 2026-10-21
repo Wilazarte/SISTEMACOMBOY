@@ -22,7 +22,8 @@ import {
   type MarcaMotor,
   type TipoEquipo,
 } from "@/lib/equipos";
-import { KEYS, fechaPE, hoy, useStore } from "@/lib/storage";
+import { KEYS, abrirArchivo, fechaPE, hoy, useStore } from "@/lib/storage";
+import { ArchivoImg } from "@/components/ArchivoRef";
 import { trazabilidadEquipo } from "@/lib/trazabilidad";
 
 const fechaHora = (iso?: string) => {
@@ -254,8 +255,7 @@ function FormEquipo({ inicial, id, onClose }: { inicial: DatosEquipo; id?: strin
           <div className="flex flex-wrap items-center gap-3">
             {d.fotos.map((f, i) => (
               <div key={i} className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={f.url} alt={f.nombre} className="h-20 w-28 rounded-lg border border-plomo-200 object-cover" />
+                <ArchivoImg refArchivo={f.url} alt={f.nombre} className="h-20 w-28 rounded-lg border border-plomo-200 object-cover" />
                 <button
                   type="button"
                   onClick={() => setD((x) => ({ ...x, fotos: x.fotos.filter((_, j) => j !== i) }))}
@@ -359,10 +359,9 @@ function DetalleEquipo({
           {e.fotos.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-2">
               {e.fotos.map((f, i) => (
-                <a key={i} href={f.url} target="_blank" rel="noreferrer">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={f.url} alt={f.nombre} className="h-24 w-32 rounded-lg border border-plomo-200 object-cover" />
-                </a>
+                <button key={i} type="button" onClick={() => abrirArchivo(f.url)}>
+                  <ArchivoImg refArchivo={f.url} alt={f.nombre} className="h-24 w-32 rounded-lg border border-plomo-200 object-cover" />
+                </button>
               ))}
             </div>
           )}

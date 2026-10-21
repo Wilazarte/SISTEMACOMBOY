@@ -5,9 +5,10 @@ import { AlertTriangle, ArrowRightLeft, Building2, Camera, CheckCircle2, Clipboa
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, Textarea, Timeline, cn, ejecutar, toast } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { FirmaPad } from "@/components/FirmaPad";
+import { ArchivoImg } from "@/components/ArchivoRef";
 import { SEDES_STOCK as SEDES } from "@/lib/empresa";
 import { pdfOrdenDespacho } from "@/lib/pdf";
-import { KEYS, MAX_ARCHIVO, fechaPE, puede, r2, soles, stockDisponible, transferirStock, useRol, useStore } from "@/lib/storage";
+import { KEYS, MAX_ARCHIVO, abrirArchivo, subirBaucher, fechaPE, puede, r2, soles, stockDisponible, transferirStock, useRol, useStore } from "@/lib/storage";
 import { disponibleEquipo, equipoDeLinea, registrarMovimiento, sedeEquipo, transferirEquipo, type EquipoTerminado } from "@/lib/equipos";
 import { codigoDesdeNumero } from "@/lib/utils/codigos";
 import {
@@ -260,9 +261,10 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
     if (!file) return;
     if (!file.type.startsWith("image/")) return toast("La foto debe ser una imagen (JPG, PNG o WEBP).", "error");
     if (file.size > MAX_ARCHIVO) return toast(`La foto pesa ${(file.size / 1048576).toFixed(1)} MB. Máximo 1.5 MB.`, "error");
-    const r = new FileReader();
-    r.onload = () => setFoto({ nombre: file.name, tipo: file.type, url: String(r.result) });
-    r.readAsDataURL(file);
+    // url guarda la referencia: Storage ("sb:...") o base64 si Storage lo rechaza
+    subirBaucher(file, "despacho")
+      .then(({ ref }) => setFoto({ nombre: file.name, tipo: file.type, url: ref }))
+      .catch((e) => toast((e as Error).message, "error"));
   };
 
   const cerrar = () => {
@@ -398,9 +400,9 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
               <img src={od.firmaCliente.url} alt="Firma del cliente" className="mt-2 h-16 rounded border border-plomo-200 bg-surface" />
             )}
             {od.fotoGuia && (
-              <a href={od.fotoGuia.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-azul-700 underline">
+              <button type="button" onClick={() => abrirArchivo(od.fotoGuia!.url)} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-azul-700 underline">
                 <Camera size={12} /> Foto de la guía
-              </a>
+              </button>
             )}
           </div>
           <Field label="Observación de Almacén">
@@ -431,10 +433,7 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
                       <Button type="button" variant="secondary" size="sm" onClick={() => fotoRef.current?.click()}>
                         <Camera size={14} /> {foto ? "Cambiar" : "Adjuntar"}
                       </Button>
-                      {foto && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={foto.url} alt="Foto de la guía" className="h-10 w-10 rounded object-cover" />
-                      )}
+                      {foto && <ArchivoImg refArchivo={foto.url} alt="Foto de la guía" className="h-10 w-10 rounded object-cover" />}
                       <input ref={fotoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(ev) => cargarFoto(ev.target.files?.[0])} />
                     </div>
                   </Field>

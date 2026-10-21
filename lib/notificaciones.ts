@@ -36,11 +36,14 @@ const DIA = 86_400_000;
 const diasHasta = (fecha: string, desde: string) => Math.round((new Date(`${fecha}T12:00:00`).getTime() - new Date(`${desde}T12:00:00`).getTime()) / DIA);
 
 export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
-  const ods = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, []);
-  const reqs = useStore<Requerimiento[]>(KEYS.REQS_PENDIENTES, []);
-  const facturas = useStore<Factura[]>(KEYS.FACTURAS, []);
-  const stock = useStore<StockItem[]>(KEYS.STOCK, []);
-  const equiposRaw = useStore<unknown[]>(KEYS.EQUIPOS, []);
+  // Solo las claves de los avisos que este usuario ve (no se descargan las de otros módulos)
+  const ve = (ruta: string) => !!sesion && puedeVer(sesion, ruta);
+  const veAlmacen = ve("/dashboard/almacen");
+  const ods = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, [], veAlmacen && ["creador", "almacen"].includes(sesion?.rol ?? ""));
+  const reqs = useStore<Requerimiento[]>(KEYS.REQS_PENDIENTES, [], ve("/dashboard/compras"));
+  const facturas = useStore<Factura[]>(KEYS.FACTURAS, [], ve("/dashboard/compras"));
+  const stock = useStore<StockItem[]>(KEYS.STOCK, [], veAlmacen);
+  const equiposRaw = useStore<unknown[]>(KEYS.EQUIPOS, [], veAlmacen || ve("/dashboard/ventas"));
 
   return useMemo(() => {
     if (!sesion) return [];

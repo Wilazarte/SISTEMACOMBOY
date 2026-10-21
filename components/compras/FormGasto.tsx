@@ -24,6 +24,7 @@ import {
   rucValido,
   soles,
   type DatosGasto,
+  subirBaucher,
 } from "@/lib/storage";
 import type { ArchivoGasto, Bancarizacion, ComprobanteGasto, Proveedor, Rol, StockItem, TipoGasto } from "@/lib/types";
 
@@ -88,10 +89,10 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
     if (!file) return;
     if (!/^(application\/pdf|image\/(png|jpe?g|webp))$/.test(file.type)) return toast("Adjunte un PDF o una imagen (JPG / PNG).", "error");
     if (file.size > MAX_ARCHIVO) return toast(`El archivo pesa ${(file.size / 1048576).toFixed(1)} MB. Máximo 1.5 MB.`, "error");
-    const reader = new FileReader();
-    reader.onload = () =>
-      setD((x) => ({ ...x, archivos: [...x.archivos.filter((a) => a.tipo !== tipo), { tipo, nombre: file.name, mime: file.type, dataUrl: String(reader.result) }] }));
-    reader.readAsDataURL(file);
+    // dataUrl guarda la referencia: "sb:tesoreria/..." (Storage) o el base64 si Storage lo rechaza
+    subirBaucher(file, tipo === "GUIA" ? "gasto-guia" : "gasto-factura")
+      .then(({ ref }) => setD((x) => ({ ...x, archivos: [...x.archivos.filter((a) => a.tipo !== tipo), { tipo, nombre: file.name, mime: file.type, dataUrl: ref }] })))
+      .catch((e) => toast((e as Error).message, "error"));
   };
 
   const guardar = async () => {

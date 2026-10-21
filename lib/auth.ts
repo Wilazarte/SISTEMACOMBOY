@@ -61,7 +61,7 @@ async function cargarSesion(): Promise<Sesion | null> {
     data: { user },
   } = await sb.auth.getUser();
   if (!user) return null;
-  const { data, error } = await sb.from("perfiles").select("*").eq("id", user.id).maybeSingle();
+  const { data, error } = await sb.from("perfiles").select("usuario,rol,nombre,modulos,solo_lectura,cargo,nombre_completo").eq("id", user.id).maybeSingle();
   if (error) throw error;
   if (!data) return null;
   return { usuario: data.usuario, rol: data.rol as RolAuth, nombre: data.nombre, modulos: data.modulos ?? [], soloLectura: !!data.solo_lectura, cargo: data.cargo ?? undefined, nombreCompleto: data.nombre_completo ?? undefined };

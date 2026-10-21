@@ -40,6 +40,8 @@ import {
   KEYS,
   MAX_ARCHIVO,
   TOPE_DJ,
+  abrirArchivo,
+  aceptarMultiple,
   aceptarRequerimiento,
   crearCotizacion,
   crearDeclaracionJurada,
@@ -57,6 +59,8 @@ import {
   parseFechaPE,
   puede,
   r2,
+  subirBaucher,
+  rechazarMultiple,
   rechazarRequerimiento,
   registrarCompra,
   rucValido,
@@ -185,7 +189,23 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
   const [rechazo, setRechazo] = useState<Requerimiento | null>(null);
   const [obs, setObs] = useState<Requerimiento | null>(null);
   const [motivo, setMotivo] = useState("");
+  // Aprobación en lote: ids marcados (se limpian los que ya no están pendientes)
+  const [marcados, setMarcados] = useState<Set<string>>(new Set());
+  const [rechazoLote, setRechazoLote] = useState(false);
   const habilitado = puede(rol, "req.revisar");
+  const elegidos = pendientes.filter((r) => marcados.has(r.id)).map((r) => r.id);
+  const todos = pendientes.length > 0 && elegidos.length === pendientes.length;
+  const marcar = (id: string) =>
+    setMarcados((m) => {
+      const n = new Set(m);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const plural = (n: number, txt: string) => `${n} requerimiento${n === 1 ? "" : "s"} ${txt}${n === 1 ? "" : "s"}`;
+  const aceptarLote = () => {
+    if (ejecutar(() => void aceptarMultiple(elegidos, rol), plural(elegidos.length, "aceptado"))) setMarcados(new Set());
+  };
 
   if (pendientes.length === 0)
     return (
@@ -196,20 +216,50 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
 
   return (
     <section>
-      <div className="mb-3 flex items-center gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <Bell size={18} className="text-amber-600" />
         <h2 className="font-semibold text-fg">Requerimientos por revisar</h2>
         <span className="rounded-full bg-corp px-2 text-xs font-bold text-white">{pendientes.length}</span>
+        {habilitado && (
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <label className="flex cursor-pointer items-center gap-2 rounded-md border border-[#1e2a45] bg-[#0e1424]/80 px-3 py-1.5 text-xs font-medium text-fg">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-[#2a7bff]"
+                checked={todos}
+                onChange={() => setMarcados(todos ? new Set() : new Set(pendientes.map((r) => r.id)))}
+              />
+              Seleccionar todos ({pendientes.length})
+            </label>
+            <button className={`${BTN_REQ} border-[#2a7bff] bg-[#2a7bff] shadow-[0_0_14px_rgba(42,123,255,0.6)]`} disabled={elegidos.length === 0} onClick={aceptarLote}>
+              <Check size={14} /> Aceptar seleccionados{elegidos.length ? ` (${elegidos.length})` : ""}
+            </button>
+            <button className={`${BTN_REQ} border-[#ff1a1a] bg-[#ff1a1a] font-bold shadow-[0_0_14px_rgba(255,26,26,0.6)]`} disabled={elegidos.length === 0} onClick={() => setRechazoLote(true)}>
+              <X size={14} /> Rechazar seleccionados{elegidos.length ? ` (${elegidos.length})` : ""}
+            </button>
+          </div>
+        )}
       </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {pendientes.map((r) => (
-          <div key={r.id} className="flex flex-col rounded-xl border-2 border-[#fbbf24]/50 bg-[#1a1500]/60 p-4 shadow-sm backdrop-blur-xl">
+          <div key={r.id} className={cn("flex flex-col rounded-xl border-2 bg-[#1a1500]/60 p-4 shadow-sm backdrop-blur-xl", marcados.has(r.id) ? "border-[#2a7bff]" : "border-[#fbbf24]/50")}>
             <div className="flex items-start justify-between">
-              <div>
+              <div className="flex items-start gap-2.5">
+                {habilitado && (
+                  <input
+                    type="checkbox"
+                    className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-[#2a7bff]"
+                    checked={marcados.has(r.id)}
+                    onChange={() => marcar(r.id)}
+                    aria-label={`Seleccionar ${r.numero}`}
+                  />
+                )}
+                <div>
                 <p className="font-bold text-fg">{r.numero}</p>
                 <p className="text-xs text-plomo-600">
                   {fechaPE(r.fecha)} · {r.sede}
                 </p>
+                </div>
               </div>
               <span className="rounded-full bg-[#fbbf24] px-2 py-0.5 text-[11px] font-bold text-black">PENDIENTE</span>
             </div>
@@ -241,6 +291,27 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
           </div>
         ))}
       </div>
+
+      <Modal open={rechazoLote} onClose={() => setRechazoLote(false)} title={`Rechazar ${elegidos.length} requerimiento(s)`}>
+        <div className="flex gap-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">
+          <AlertTriangle size={20} className="shrink-0" />
+          {pendientes.filter((r) => marcados.has(r.id)).map((r) => r.numero).join(", ")} se <b>eliminarán de todo el sistema</b>. Esta acción no se puede deshacer.
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setRechazoLote(false)}>Cancelar</Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              if (ejecutar(() => void rechazarMultiple(elegidos), `${plural(elegidos.length, "rechazado")} y eliminado${elegidos.length === 1 ? "" : "s"}`)) {
+                setMarcados(new Set());
+                setRechazoLote(false);
+              }
+            }}
+          >
+            Rechazar y eliminar
+          </Button>
+        </div>
+      </Modal>
 
       <Modal open={!!rechazo} onClose={() => setRechazo(null)} title={`Rechazar ${rechazo?.numero ?? ""}`}>
         <div className="flex gap-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">
@@ -1487,10 +1558,7 @@ function Facturas({
                         size="sm"
                         variant="ghost"
                         title={a.nombre}
-                        onClick={() => {
-                          const w = window.open();
-                          if (w) w.document.write(`<iframe src="${a.dataUrl}" style="border:0;width:100%;height:100vh"></iframe>`);
-                        }}
+                        onClick={() => abrirArchivo(a.dataUrl)}
                       >
                         <Upload size={14} /> {a.tipo === "GUIA" ? "Guía" : "Adjunto"}
                       </Button>
@@ -1548,7 +1616,9 @@ function Guias({ rol, facturas, guias, preFac }: { rol: Rol; facturas: Factura[]
   const [facId, setFacId] = useState(preFac ?? "");
   const [numero, setNumero] = useState("");
   const [fecha, setFecha] = useState(hoy());
-  const [archivo, setArchivo] = useState<{ nombre: string; tipo: string; url: string } | null>(null);
+  // url: vista previa local; ref: lo que se guarda (Storage "sb:..." o base64 si Storage lo rechaza)
+  const [archivo, setArchivo] = useState<{ nombre: string; tipo: string; url: string; ref: string } | null>(null);
+  const [subiendo, setSubiendo] = useState(false);
   const [drag, setDrag] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const fac = facturas.find((f) => f.id === facId);
@@ -1564,9 +1634,11 @@ function Guias({ rol, facturas, guias, preFac }: { rol: Rol; facturas: Factura[]
       toast(`El archivo pesa ${(file.size / 1048576).toFixed(1)} MB. Máximo 1.5 MB (comprima o escanee en menor resolución).`, "error");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => setArchivo({ nombre: file.name, tipo: file.type, url: String(reader.result) });
-    reader.readAsDataURL(file);
+    setSubiendo(true);
+    subirBaucher(file, "guia")
+      .then(({ ref }) => setArchivo({ nombre: file.name, tipo: file.type, url: URL.createObjectURL(file), ref }))
+      .catch((e) => toast((e as Error).message, "error"))
+      .finally(() => setSubiendo(false));
   };
 
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
@@ -1579,7 +1651,7 @@ function Guias({ rol, facturas, guias, preFac }: { rol: Rol; facturas: Factura[]
     const ok = ejecutar(
       () =>
         crearGuia(
-          { facturaId: facId, numero, fecha, archivoNombre: archivo?.nombre ?? "", archivoTipo: archivo?.tipo ?? "", archivoDataUrl: archivo?.url ?? "" },
+          { facturaId: facId, numero, fecha, archivoNombre: archivo?.nombre ?? "", archivoTipo: archivo?.tipo ?? "", archivoDataUrl: archivo?.ref ?? "" },
           rol
         ),
       "Guía cargada. Almacén ya puede dar el visto bueno."
@@ -1660,7 +1732,7 @@ function Guias({ rol, facturas, guias, preFac }: { rol: Rol; facturas: Factura[]
                 Quitar archivo
               </Button>
             )}
-            <Button onClick={guardar} disabled={!facId || !archivo}>
+            <Button onClick={guardar} disabled={!facId || !archivo || subiendo}>
               <Truck size={16} /> Guardar guía
             </Button>
           </div>

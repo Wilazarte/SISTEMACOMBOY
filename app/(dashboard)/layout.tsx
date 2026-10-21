@@ -63,7 +63,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const datos = useDatos(!!sesion);
   const prefs = usePrefs();
   const notifs = useNotificaciones(sesion);
-  const ods = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, []);
+  // Solo Almacén / creador reciben el aviso de órdenes de despacho: los demás no descargan esa clave
+  const ods = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, [], ["creador", "almacen"].includes(sesion?.rol ?? ""));
   const [paleta, setPaleta] = useState(false);
   const [pestana, setPestana] = useState<PestanaActiva | null>(null);
   const [locales, setLocales] = useState(0);

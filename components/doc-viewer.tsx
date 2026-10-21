@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { FileText } from "lucide-react";
 import { Badge, Button, Modal, Timeline } from "./ui";
+import { ArchivoFrame, ArchivoImg } from "./ArchivoRef";
 import { buscarReq, fechaPE, getCotizaciones, getFacturas, getGuias, getOrdenes, soles } from "@/lib/storage";
 import { pdfActaIngreso, pdfCotizacion, pdfFactura, pdfOrdenCompra, pdfRequerimiento } from "@/lib/pdf";
 import type { EventoHistorial, TipoDoc } from "@/lib/types";
@@ -125,10 +126,9 @@ export function DocViewer({ doc, onClose }: { doc: DocRef | null; onClose: () =>
             </dl>
             {r.archivo &&
               (r.archivo.tipo.startsWith("image/") ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={r.archivo.url} alt={r.archivo.nombre} className="max-h-[420px] w-full rounded-lg border object-contain" />
+                <ArchivoImg refArchivo={r.archivo.url} alt={r.archivo.nombre} className="max-h-[420px] w-full rounded-lg border object-contain" />
               ) : (
-                <iframe src={r.archivo.url} title={r.archivo.nombre} className="h-[420px] w-full rounded-lg border" />
+                <ArchivoFrame refArchivo={r.archivo.url} title={r.archivo.nombre} className="h-[420px] w-full rounded-lg border" />
               ))}
           </div>
           <div>
