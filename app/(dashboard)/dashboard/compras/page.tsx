@@ -405,6 +405,7 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
   const [editando, setEditando] = useState<Compra | null>(null);
   const [borrar, setBorrar] = useState<Compra | null>(null);
   const [editGasto, setEditGasto] = useState<Factura | null>(null);
+  const [verCompra, setVerCompra] = useState<Compra | null>(null);
   const editarEnFormulario = (c: Compra) => {
     setEditando(c);
     setModo("COMPRA");
@@ -591,100 +592,103 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
 
       <Card>
         <CardHeader title="Compras registradas" subtitle={`${compras.length} compra(s) · ${gastos.length} gasto(s) de Tesorería · Total ${soles(totalRegistros)}`} />
-        <Table head={["Tipo", "Fecha", "Comprobante", "Proveedor", "RUC", "Almacén / gasto", "Items / detalle", "Subtotal", "IGV", "Total", "Acciones"]} empty={registros.length === 0}>
+        {/* Vista previa: una línea por registro. Comprobante, almacén / gasto, ítems, subtotal e IGV se ven en "Ver". */}
+        <Table head={["Fecha", "Proveedor", "RUC", "Total", "Acciones"]} empty={registros.length === 0}>
           {registros.map((r) => {
             if (r.tipo === "GASTO_TESORERIA") {
               const g = r.gasto;
+              const p = permisoEditarGasto(g, sesion);
               return (
                 <tr key={g.id} className="hover:bg-plomo-50">
-                  <Td>
-                    <Badge estado="GASTO_TESORERIA" />
+                  <Td className="whitespace-nowrap">
+                    {fechaPE(g.fecha)}
+                    {g.tipoGasto === "PLANILLA" && <span className="ml-2 text-xs text-plomo-500">{g.numero.replace(/^PLLA\s+/, "")}</span>}
                   </Td>
-                  <Td>{fechaPE(g.fecha)}</Td>
-                  <Td>
-                    <span className="font-semibold text-fg">{g.numero}</span>
-                    <p className="text-xs text-plomo-500">{g.comprobanteGasto ? COMPROBANTES_GASTO[g.comprobanteGasto] : "-"}</p>
-                  </Td>
-                  <Td>{g.proveedor}</Td>
+                  <Td className="max-w-[320px] truncate"><span title={g.proveedor}>{g.proveedor}</span></Td>
                   <Td>{g.ruc || "-"}</Td>
-                  <Td>{g.tipoGasto ? TIPOS_GASTO[g.tipoGasto] : "-"}</Td>
-                  <Td className="max-w-[220px]">
-                    <span className="block truncate" title={g.descripcion}>
-                      {g.descripcion}
-                    </span>
-                    {g.detraccionMonto ? <p className="text-xs text-red-600">Detracción {g.detraccionPorc}% − {soles(g.detraccionMonto)}</p> : null}
-                  </Td>
-                  <Td className="text-right">{soles(g.subtotal)}</Td>
-                  <Td className="text-right">{soles(g.igv)}</Td>
                   <Td className="text-right font-semibold">{soles(g.total)}</Td>
                   <Td>
-                    {(() => {
-                      const p = permisoEditarGasto(g, sesion);
-                      return (
-                        <div className="flex gap-1">
-                          <span className="tip" data-tip={p.ok ? "Editar" : p.motivo}>
-                            <Button size="sm" variant="ghost" disabled={!p.ok} onClick={() => setEditGasto(g)} aria-label="Editar">
-                              <Pencil size={15} />
-                            </Button>
-                          </span>
-                          <span className="tip" data-tip="Un gasto se corrige con Editar (no se elimina)">
-                            <Button size="sm" variant="ghost" disabled aria-label="Eliminar">
-                              <Trash2 size={15} />
-                            </Button>
-                          </span>
-                        </div>
-                      );
-                    })()}
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "FACTURA", id: g.id })} title="Ver detalle" aria-label="Ver">
+                        <Eye size={15} />
+                      </Button>
+                      <span className="tip" data-tip={p.ok ? "Editar" : p.motivo}>
+                        <Button size="sm" variant="ghost" disabled={!p.ok} onClick={() => setEditGasto(g)} aria-label="Editar">
+                          <Pencil size={15} />
+                        </Button>
+                      </span>
+                    </div>
                   </Td>
                 </tr>
               );
             }
             const c = r.compra;
+            const p = permisoEditarCompra(c, sesion);
             return (
-            <tr key={c.id} className="hover:bg-plomo-50">
-              <Td>
-                <Badge estado="COMPRA" />
-              </Td>
-              <Td>{fechaPE(c.fecha)}</Td>
-              <Td>
-                <span className="font-semibold text-fg">{c.numero}</span>
-                <p className="text-xs text-plomo-500">{c.tipoComprobante === "FACTURA" ? "Factura" : "Boleta"}</p>
-              </Td>
-              <Td>{c.proveedor}</Td>
-              <Td>{c.ruc}</Td>
-              <Td>{c.sede}</Td>
-              <Td>
-                <span title={c.items.map((i) => `${i.cantidad} ${i.unidad} ${i.nombre}`).join("\n")}>{c.items.length}</span>
-              </Td>
-              <Td className="text-right">{soles(c.subtotal)}</Td>
-              <Td className="text-right">{soles(c.igv)}</Td>
-              <Td className="text-right font-semibold">{soles(c.total)}</Td>
-              <Td>
-                {(() => {
-                  const p = permisoEditarCompra(c, sesion);
-                  return (
-                    <div className="flex gap-1">
-                      <span className="tip" data-tip={p.ok ? "Editar" : p.motivo}>
-                        <Button size="sm" variant="ghost" disabled={!p.ok} onClick={() => editarEnFormulario(c)} aria-label="Editar">
-                          <Pencil size={15} />
-                        </Button>
-                      </span>
-                      <span className="tip" data-tip={p.ok ? "Eliminar" : p.motivo}>
-                        <Button size="sm" variant="ghost" disabled={!p.ok} onClick={() => setBorrar(c)} aria-label="Eliminar">
-                          <Trash2 size={15} className="text-red-600" />
-                        </Button>
-                      </span>
-                    </div>
-                  );
-                })()}
-              </Td>
-            </tr>
+              <tr key={c.id} className="hover:bg-plomo-50">
+                <Td className="whitespace-nowrap">{fechaPE(c.fecha)}</Td>
+                <Td className="max-w-[320px] truncate"><span title={c.proveedor}>{c.proveedor}</span></Td>
+                <Td>{c.ruc}</Td>
+                <Td className="text-right font-semibold">{soles(c.total)}</Td>
+                <Td>
+                  <div className="flex gap-1">
+                    <Button size="sm" variant="ghost" onClick={() => setVerCompra(c)} title="Ver detalle" aria-label="Ver">
+                      <Eye size={15} />
+                    </Button>
+                    <span className="tip" data-tip={p.ok ? "Editar" : p.motivo}>
+                      <Button size="sm" variant="ghost" disabled={!p.ok} onClick={() => editarEnFormulario(c)} aria-label="Editar">
+                        <Pencil size={15} />
+                      </Button>
+                    </span>
+                    <span className="tip" data-tip={p.ok ? "Eliminar" : p.motivo}>
+                      <Button size="sm" variant="ghost" disabled={!p.ok} onClick={() => setBorrar(c)} aria-label="Eliminar">
+                        <Trash2 size={15} className="text-red-600" />
+                      </Button>
+                    </span>
+                  </div>
+                </Td>
+              </tr>
             );
           })}
         </Table>
       </Card>
 
       {editGasto && <EditarGasto gasto={editGasto} rol={rol} onClose={() => setEditGasto(null)} />}
+
+      <Modal open={!!verCompra} onClose={() => setVerCompra(null)} title={`Compra ${verCompra?.numero ?? ""}`} wide>
+        {verCompra && (
+          <div className="space-y-4 text-sm">
+            <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+              {(
+                [
+                  ["Comprobante", `${verCompra.tipoComprobante === "FACTURA" ? "Factura" : "Boleta"} ${verCompra.numero}`],
+                  ["Fecha", fechaPE(verCompra.fecha)],
+                  ["Proveedor", `${verCompra.proveedor} · RUC ${verCompra.ruc}`],
+                  ["Ingresó a almacén", verCompra.sede],
+                  ["Pagado desde", verCompra.caja ?? "-"],
+                ] as [string, string][]
+              ).map(([k, v]) => (
+                <div key={k}>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-plomo-500">{k}</dt>
+                  <dd className="text-fg">{v}</dd>
+                </div>
+              ))}
+            </dl>
+            <Table head={["Producto", "Unidad", "Cantidad", "P. unit.", "Subtotal"]}>
+              {verCompra.items.map((i) => (
+                <tr key={i.id}>
+                  <Td>{i.nombre}</Td>
+                  <Td>{i.unidad}</Td>
+                  <Td className="text-right">{i.cantidad}</Td>
+                  <Td className="text-right">{soles(i.precioUnit)}</Td>
+                  <Td className="text-right">{soles(i.subtotal)}</Td>
+                </tr>
+              ))}
+            </Table>
+            <Totales subtotal={verCompra.subtotal} igv={verCompra.igv} total={verCompra.total} />
+          </div>
+        )}
+      </Modal>
 
       <Modal open={!!borrar} onClose={() => setBorrar(null)} title={`Eliminar compra ${borrar?.numero ?? ""}`}>
         <div className="flex gap-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">

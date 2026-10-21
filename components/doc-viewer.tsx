@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { FileText } from "lucide-react";
 import { Badge, Button, Modal, Timeline } from "./ui";
 import { ArchivoFrame, ArchivoImg } from "./ArchivoRef";
-import { buscarReq, fechaPE, getCotizaciones, getFacturas, getGuias, getOrdenes, soles } from "@/lib/storage";
+import { COMPROBANTES_GASTO, TIPOS_GASTO, buscarReq, fechaPE, getCotizaciones, getFacturas, getGuias, getOrdenes, soles } from "@/lib/storage";
 import { pdfActaIngreso, pdfCotizacion, pdfFactura, pdfOrdenCompra, pdfRequerimiento } from "@/lib/pdf";
 import type { EventoHistorial, TipoDoc } from "@/lib/types";
 
@@ -70,7 +70,11 @@ function resolver(ref: DocRef): Resuelto | null {
         filas: [
           ["Proveedor", `${f.proveedor}${f.ruc ? ` (${f.ruc})` : ""}`],
           ["Fecha", fechaPE(f.fecha)],
+          ["Comprobante", `${f.comprobanteGasto ? COMPROBANTES_GASTO[f.comprobanteGasto] : "-"} ${f.numero}`],
+          ["Tipo de gasto", f.tipoGasto ? TIPOS_GASTO[f.tipoGasto] : "-"],
           ["Descripción", f.descripcion ?? "-"],
+          ["Subtotal", soles(f.subtotal)],
+          ["IGV", soles(f.igv)],
           ["Total", soles(f.total)],
           ...(f.detraccionMonto ? ([["Detracción", `${f.detraccionPorc}% · ${soles(f.detraccionMonto)}`]] as [string, string][]) : []),
           ["Neto a pagar", soles(f.netoPagar ?? f.total)],
