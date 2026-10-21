@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Ban, CalendarClock, Check, Copy, FileText, Plus, Receipt, Truck } from "lucide-react";
+import { Ban, CalendarClock, Check, Copy, FileText, Pencil, Plus, Receipt, Truck } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, Textarea, ejecutar, ejecutarAsync } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { pdfNotaPedido } from "@/lib/pdf";
 import { codigoDesdeNumero } from "@/lib/utils/codigos";
 import { KEYS, fechaPE, hoy, puede, soles, useRol, useStore } from "@/lib/storage";
-import { anularNP, aprobarNP, despachoVacio, faltaDespacho, estadoOD, generarDespachoNP, odDeNP, clienteVacio, clonarNP, crearNotaPedido, getCondicionesPago, guardarCliente, guardarCondicion, lineaVacia, pideDias, sumarDias, type DatosNP } from "@/lib/ventas";
+import { anularNP, aprobarNP, despachoVacio, faltaDespacho, estadoOD, generarDespachoNP, odDeNP, clienteVacio, clonarNP, crearNotaPedido, editarNotaPedido, permisoEditarNP, getCondicionesPago, guardarCliente, guardarCondicion, lineaVacia, pideDias, sumarDias, type DatosNP } from "@/lib/ventas";
 import type { Cliente, CondicionPago, DatosDespacho, NotaPedido, OrdenDespacho } from "@/lib/types";
 import { AvisoCondiciones, DatosDespachoForm, FormCliente, LineasEditor, SelectorCliente, TotalesVenta, useCargaCondiciones, useVentas } from "./comun";
 import { FormCondicion, condVacia } from "./maestros";
@@ -31,6 +31,8 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
   const ods = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, []);
   const { clientes, condiciones, stock } = useVentas();
   const [form, setForm] = useState<DatosNP | null>(null);
+  // NP que se está editando (el mismo modal de "Nueva nota de pedido" con sus datos precargados)
+  const [editando, setEditando] = useState<NotaPedido | null>(null);
   const [clienteRapido, setClienteRapido] = useState<Cliente | null>(null);
   const [condRapida, setCondRapida] = useState<CondicionPago | null>(null);
   const carga = useCargaCondiciones(!!form); // se vuelve a leer de Supabase al abrir la nota de pedido
@@ -41,7 +43,29 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
   const [filtro, setFiltro] = useState("");
   const [aprobar, setAprobar] = useState<{ np: NotaPedido; despacho: DatosDespacho } | null>(null);
   const habilitado = puede(rol, "venta.gestionar");
-  const vendedor = getSesion()?.usuario ?? "";
+  const sesion = getSesion();
+  const vendedor = sesion?.usuario ?? "";
+  const abrirEdicion = (n: NotaPedido) => {
+    setEditando(n);
+    setForm({
+      fecha: n.fecha,
+      clienteId: n.clienteId,
+      condPagoId: n.condPagoId,
+      validezDias: n.validezDias,
+      fechaEntrega: n.fechaEntrega,
+      lugarObra: n.lugarObra,
+      items: n.items.map((l) => ({ ...l })),
+      conIgv: n.conIgv,
+      descuento: n.descuento,
+      observaciones: n.observaciones,
+      diasCredito: n.diasCredito,
+      condPagoDetalle: n.condPagoDetalle,
+    });
+  };
+  const cerrarForm = () => {
+    setForm(null);
+    setEditando(null);
+  };
   const lista = notas.filter((n) => !filtro || n.estado === filtro);
 
   /** Al cambiar la condición se proponen sus días (crédito) y se limpia el detalle (personalizado). */
@@ -71,9 +95,11 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
   const guardar = async () => {
     if (!form) return;
     setEnviando(true);
-    const ok = await ejecutarAsync(() => crearNotaPedido(form, vendedor, rol), "Nota de pedido registrada");
+    const ok = editando
+      ? ejecutar(() => void editarNotaPedido(editando.id, form, rol), `${editando.numero} actualizada`)
+      : await ejecutarAsync(() => crearNotaPedido(form, vendedor, rol), "Nota de pedido registrada");
     setEnviando(false);
-    if (ok) setForm(null);
+    if (ok) cerrarForm();
   };
 
   const guardarClienteRapido = () => {
@@ -151,7 +177,17 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
             <Td>{n.vendedor}</Td>
             <Td>
               <div className="flex flex-wrap gap-1">
-                <Button size="sm" variant="secondary" onClick={() => pdfNotaPedido(n)} title="PDF cotización">
+                {(() => {
+                  const p = permisoEditarNP(n, sesion);
+                  return (
+                    <span className="tip" data-tip={p.ok ? "Editar" : p.motivo}>
+                      <Button size="sm" variant="ghost" disabled={!p.ok} onClick={() => abrirEdicion(n)} aria-label="Editar">
+                        <Pencil size={14} />
+                      </Button>
+                    </span>
+                  );
+                })()}
+                <Button size="sm" variant="secondary" onClick={() => pdfNotaPedido(n)} title="Ver / PDF cotización">
                   <FileText size={14} /> PDF
                 </Button>
                 {habilitado && n.estado === "PENDIENTE" && (
@@ -170,7 +206,7 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
                   </Button>
                 )}
                 {habilitado && (
-                  <Button size="sm" variant="ghost" title="Clonar" onClick={() => ejecutarAsync(() => clonarNP(n.id, vendedor, rol), "Nota de pedido clonada")}>
+                  <Button size="sm" variant="ghost" title="Duplicar" onClick={() => ejecutarAsync(() => clonarNP(n.id, vendedor, rol), "Nota de pedido duplicada")}>
                     <Copy size={14} />
                   </Button>
                 )}
@@ -185,7 +221,7 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
         ))}
       </Table>
 
-      <Modal open={!!form} onClose={() => setForm(null)} title="Nueva nota de pedido" wide>
+      <Modal open={!!form} onClose={cerrarForm} title={editando ? `Editar ${editando.numero}` : "Nueva nota de pedido"} wide>
         {form && (
           <div className="space-y-4">
             <div className="grid gap-3 md:grid-cols-3">
@@ -271,11 +307,11 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
               <TotalesVenta items={form.items} conIgv={form.conIgv} descuento={form.descuento} />
             </div>
             <div className="flex justify-end gap-2 border-t border-plomo-100 pt-4">
-              <Button variant="secondary" onClick={() => setForm(null)}>
+              <Button variant="secondary" onClick={cerrarForm}>
                 Cancelar
               </Button>
               <Button variant="warning" onClick={guardar} disabled={enviando}>
-                {enviando ? "Guardando…" : "Guardar nota de pedido"}
+                {enviando ? "Guardando…" : editando ? "Guardar cambios" : "Guardar nota de pedido"}
               </Button>
             </div>
           </div>

@@ -17,6 +17,7 @@ import {
   puede,
   hoy,
   leer,
+  marcarEditado,
   nuevoEvento,
   r2,
   rucValido,
@@ -288,6 +289,51 @@ function prepararLineas(items: LineaVenta[]): LineaVenta[] {
 }
 
 export async function crearNotaPedido(data: DatosNP, vendedor: string, rol: Rol): Promise<NotaPedido> {
+  const base = armarNP(data);
+  const numero = await siguienteNumero("NP");
+  const np: NotaPedido = {
+    ...base,
+    id: uid(),
+    numero,
+    vendedor,
+    estado: "PENDIENTE",
+    historial: [nuevoEvento(rol, "Nota de pedido registrada", `${base.cliente} · ${vendedor}`)],
+  };
+  escribir(KEYS.NOTAS_PEDIDO, [np, ...getNotasPedido()]);
+  return np;
+}
+
+/**
+ * Quién edita una NP: solo PENDIENTE (aún sin orden de despacho ni asiento), y solo su vendedor o el creador.
+ * Una APROBADA ya generó OD y asiento contable: se anula y se duplica.
+ */
+export function permisoEditarNP(n: NotaPedido, sesion: { usuario: string; rol: string; soloLectura: boolean } | null): { ok: boolean; motivo: string } {
+  if (n.estado === "ANULADA") return { ok: false, motivo: "Documento anulado: solo ver" };
+  if (n.estado !== "PENDIENTE") return { ok: false, motivo: "Documento ya procesado (tiene orden de despacho y asiento): anule y duplique" };
+  if (!sesion || sesion.soloLectura) return { ok: false, motivo: "Su usuario es de solo lectura" };
+  if (sesion.rol === "creador" || n.vendedor === sesion.usuario) return { ok: true, motivo: "" };
+  return { ok: false, motivo: "Solo su vendedor puede editarla" };
+}
+
+/** Edita una NP PENDIENTE con los mismos datos y validaciones de la creación; conserva número, vendedor y estado. */
+export function editarNotaPedido(id: string, data: DatosNP, rol: Rol): NotaPedido {
+  const lista = getNotasPedido();
+  const vieja = lista.find((n) => n.id === id);
+  if (!vieja) throw new ErpError("Nota de pedido no encontrada.");
+  if (vieja.estado !== "PENDIENTE") throw new ErpError(`Documento ya procesado: la ${vieja.numero} está ${vieja.estado}.`);
+  const base = armarNP(data);
+  const editada = marcarEditado(
+    { ...vieja, ...base, diasCredito: base.diasCredito, fechaVencimiento: base.fechaVencimiento, condPagoDetalle: base.condPagoDetalle },
+    rol,
+    "Nota de pedido editada",
+    vieja.total !== base.total ? `Total ${vieja.total.toFixed(2)} → ${base.total.toFixed(2)}` : undefined
+  );
+  escribir(KEYS.NOTAS_PEDIDO, lista.map((n) => (n.id === id ? editada : n)));
+  return editada;
+}
+
+/** Valida los datos de la NP y calcula cliente, plazo y totales (común a crear y editar). */
+function armarNP(data: DatosNP): Omit<NotaPedido, "id" | "numero" | "vendedor" | "estado" | "historial"> {
   const cliente = getClientes().find((c) => c.id === data.clienteId);
   if (!cliente) throw new ErpError("Seleccione el cliente.");
   const cond = getCondicionesPago().find((c) => c.id === data.condPagoId);
@@ -298,26 +344,18 @@ export async function crearNotaPedido(data: DatosNP, vendedor: string, rol: Rol)
   const items = prepararLineas(data.items);
   const t = totalesVenta(items, data.conIgv, data.descuento);
   if (!(t.total > 0)) throw new ErpError("El total debe ser mayor a 0.");
-  const numero = await siguienteNumero("NP");
-  const np: NotaPedido = {
+  return {
     ...data,
-    id: uid(),
-    numero,
     cliente: cliente.razonSocial,
     clienteDoc: `${cliente.tipoDoc} ${cliente.numDoc}`,
     condPagoNombre: cond.nombre,
     ...plazo,
-    vendedor,
     items,
     descuento: t.descuento,
     subtotal: t.base,
     igv: t.igv,
     total: t.total,
-    estado: "PENDIENTE",
-    historial: [nuevoEvento(rol, "Nota de pedido registrada", `${cliente.razonSocial} · ${vendedor}`)],
   };
-  escribir(KEYS.NOTAS_PEDIDO, [np, ...getNotasPedido()]);
-  return np;
 }
 
 function actualizarNP(id: string, fn: (n: NotaPedido) => NotaPedido): void {

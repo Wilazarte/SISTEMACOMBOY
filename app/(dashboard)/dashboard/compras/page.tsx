@@ -64,6 +64,9 @@ import {
   rechazarMultiple,
   rechazarRequerimiento,
   registrarCompra,
+  editarCompra,
+  eliminarCompra,
+  permisoEditarCompra,
   rucValido,
   soles,
   totalesCompra,
@@ -397,6 +400,28 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
   const [cajaCompra, setCajaCompra] = useState(CAJA_POR_DEFECTO);
   const [filas, setFilas] = useState<FilaCompra[]>([filaVacia()]);
   const habilitado = puede(rol, "compra.crear");
+  const sesion = getSesion();
+  // Edición: el mismo formulario de "Registrar compra" con los datos de la compra
+  const [editando, setEditando] = useState<Compra | null>(null);
+  const [borrar, setBorrar] = useState<Compra | null>(null);
+  const [editGasto, setEditGasto] = useState<Factura | null>(null);
+  const editarEnFormulario = (c: Compra) => {
+    setEditando(c);
+    setModo("COMPRA");
+    setProveedorId(c.proveedorId);
+    setFechaTxt(fechaPE(c.fecha));
+    setTipo(c.tipoComprobante);
+    setNumero(c.numero);
+    setSede(c.sede);
+    setCajaCompra(c.caja ?? CAJA_POR_DEFECTO);
+    setFilas(c.items.map((i) => ({ id: uid(), nombre: i.nombre, unidad: i.unidad, cantidad: i.cantidad, precioUnit: i.precioUnit })));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const cancelarEdicion = () => {
+    setEditando(null);
+    setNumero("");
+    setFilas([filaVacia()]);
+  };
 
   const fechaISO = parseFechaPE(fechaTxt);
   const fechaError = fechaTxt.length === 10 && !fechaISO ? "Fecha inexistente" : fechaISO > hoy() ? "La fecha no puede ser futura" : undefined;
@@ -416,14 +441,11 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
   };
 
   const guardar = () => {
-    const ok = ejecutar(
-      () => registrarCompra({ proveedorId, fecha: fechaISO, tipoComprobante: tipo, numero, sede, caja: cajaCompra, items: filas }, rol),
-      `Compra registrada · stock de ${sede} actualizado`
-    );
-    if (ok) {
-      setNumero("");
-      setFilas([filaVacia()]);
-    }
+    const datos = { proveedorId, fecha: fechaISO, tipoComprobante: tipo, numero, sede, caja: cajaCompra, items: filas };
+    const ok = editando
+      ? ejecutar(() => void editarCompra(editando.id, datos, rol), `${editando.numero} corregida · stock de ${sede} ajustado`)
+      : ejecutar(() => registrarCompra(datos, rol), `Compra registrada · stock de ${sede} actualizado`);
+    if (ok) cancelarEdicion();
   };
 
   // Compras (con stock) y gastos de Tesorería en una sola lista, de la más reciente a la más antigua
@@ -454,7 +476,14 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
 
       {habilitado && modo === "COMPRA" && (
         <Card>
-          <CardHeader title="Registrar compra" subtitle="Factura: precios sin IGV (se suma 18 %). Boleta: precios con IGV incluido. Al guardar, los productos ingresan al stock del almacén seleccionado." />
+          <CardHeader
+            title={editando ? `Editar compra ${editando.numero}` : "Registrar compra"}
+            subtitle={
+              editando
+                ? "Al guardar se devuelve al almacén lo que ingresó esta compra y entra lo corregido (queda como AJUSTE en el kardex)."
+                : "Factura: precios sin IGV (se suma 18 %). Boleta: precios con IGV incluido. Al guardar, los productos ingresan al stock del almacén seleccionado."
+            }
+          />
           <div className="grid gap-4 p-5 md:grid-cols-3">
             <Field label="Proveedor" className="md:col-span-2" hint={prov ? `RUC ${prov.ruc}` : undefined}>
               <div className="flex gap-2">
@@ -548,8 +577,13 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
           {conIgv && <p className="px-5 pt-3 text-right text-xs text-plomo-500">Boleta: los precios incluyen IGV; la base imponible se obtiene dividiendo el total entre 1.18.</p>}
           <Totales subtotal={subtotal} igv={igv} total={total} />
           <div className="flex justify-end border-t border-plomo-100 px-5 py-4">
+            {editando && (
+              <Button variant="secondary" onClick={cancelarEdicion} className="mr-2">
+                Cancelar edición
+              </Button>
+            )}
             <Button onClick={guardar} disabled={!proveedorId || !fechaISO}>
-              <PackagePlus size={16} /> Guardar compra e ingresar a stock
+              {editando ? <Pencil size={16} /> : <PackagePlus size={16} />} {editando ? "Guardar cambios" : "Guardar compra e ingresar a stock"}
             </Button>
           </div>
         </Card>
@@ -557,7 +591,7 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
 
       <Card>
         <CardHeader title="Compras registradas" subtitle={`${compras.length} compra(s) · ${gastos.length} gasto(s) de Tesorería · Total ${soles(totalRegistros)}`} />
-        <Table head={["Tipo", "Fecha", "Comprobante", "Proveedor", "RUC", "Almacén / gasto", "Items / detalle", "Subtotal", "IGV", "Total"]} empty={registros.length === 0}>
+        <Table head={["Tipo", "Fecha", "Comprobante", "Proveedor", "RUC", "Almacén / gasto", "Items / detalle", "Subtotal", "IGV", "Total", "Acciones"]} empty={registros.length === 0}>
           {registros.map((r) => {
             if (r.tipo === "GASTO_TESORERIA") {
               const g = r.gasto;
@@ -583,6 +617,25 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
                   <Td className="text-right">{soles(g.subtotal)}</Td>
                   <Td className="text-right">{soles(g.igv)}</Td>
                   <Td className="text-right font-semibold">{soles(g.total)}</Td>
+                  <Td>
+                    {(() => {
+                      const p = permisoEditarGasto(g, sesion);
+                      return (
+                        <div className="flex gap-1">
+                          <span className="tip" data-tip={p.ok ? "Editar" : p.motivo}>
+                            <Button size="sm" variant="ghost" disabled={!p.ok} onClick={() => setEditGasto(g)} aria-label="Editar">
+                              <Pencil size={15} />
+                            </Button>
+                          </span>
+                          <span className="tip" data-tip="Un gasto se corrige con Editar (no se elimina)">
+                            <Button size="sm" variant="ghost" disabled aria-label="Eliminar">
+                              <Trash2 size={15} />
+                            </Button>
+                          </span>
+                        </div>
+                      );
+                    })()}
+                  </Td>
                 </tr>
               );
             }
@@ -606,11 +659,57 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
               <Td className="text-right">{soles(c.subtotal)}</Td>
               <Td className="text-right">{soles(c.igv)}</Td>
               <Td className="text-right font-semibold">{soles(c.total)}</Td>
+              <Td>
+                {(() => {
+                  const p = permisoEditarCompra(c, sesion);
+                  return (
+                    <div className="flex gap-1">
+                      <span className="tip" data-tip={p.ok ? "Editar" : p.motivo}>
+                        <Button size="sm" variant="ghost" disabled={!p.ok} onClick={() => editarEnFormulario(c)} aria-label="Editar">
+                          <Pencil size={15} />
+                        </Button>
+                      </span>
+                      <span className="tip" data-tip={p.ok ? "Eliminar" : p.motivo}>
+                        <Button size="sm" variant="ghost" disabled={!p.ok} onClick={() => setBorrar(c)} aria-label="Eliminar">
+                          <Trash2 size={15} className="text-red-600" />
+                        </Button>
+                      </span>
+                    </div>
+                  );
+                })()}
+              </Td>
             </tr>
             );
           })}
         </Table>
       </Card>
+
+      {editGasto && <EditarGasto gasto={editGasto} rol={rol} onClose={() => setEditGasto(null)} />}
+
+      <Modal open={!!borrar} onClose={() => setBorrar(null)} title={`Eliminar compra ${borrar?.numero ?? ""}`}>
+        <div className="flex gap-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">
+          <AlertTriangle size={20} className="shrink-0" />
+          <span>
+            Se elimina la compra y se <b>saca del almacén {borrar?.sede}</b> lo que ingresó ({borrar?.items.length} producto(s)), como AJUSTE en el kardex. Si esos productos ya se usaron, no se podrá eliminar.
+          </span>
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setBorrar(null)}>
+            Cancelar
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              if (borrar && ejecutar(() => eliminarCompra(borrar.id, rol), `${borrar.numero} eliminada · stock ajustado`)) {
+                if (editando?.id === borrar.id) cancelarEdicion();
+                setBorrar(null);
+              }
+            }}
+          >
+            Eliminar compra
+          </Button>
+        </div>
+      </Modal>
 
       <Modal open={!!nuevoProv} onClose={() => setNuevoProv(null)} title="Nuevo proveedor">
         {nuevoProv && (

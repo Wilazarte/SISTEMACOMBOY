@@ -359,6 +359,10 @@ export interface Compra {
   igv: number;
   total: number;
   historial: EventoHistorial[];
+  /** Usuario que la registró (perfiles.usuario). Las antiguas no lo tienen. */
+  creadoPor?: string;
+  editadoPor?: string;
+  editadoEn?: string;
 }
 
 export interface StockItem {
@@ -515,6 +519,8 @@ export interface NotaPedido {
   odNumero?: string;
   despacho?: DatosDespacho;
   historial: EventoHistorial[];
+  editadoPor?: string;
+  editadoEn?: string;
 }
 
 export type TipoComprobanteVenta = "FACTURA" | "BOLETA" | "NOTA_CREDITO" | "NOTA_DEBITO";

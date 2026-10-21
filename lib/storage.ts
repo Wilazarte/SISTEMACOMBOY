@@ -2546,10 +2546,56 @@ const NUM_COMPROBANTE: Record<Compra["tipoComprobante"], RegExp> = {
 };
 
 /** Registra la compra y suma las cantidades al stock de la sede. Valida todo antes de escribir. */
-export function registrarCompra(
-  data: Pick<Compra, "fecha" | "proveedorId" | "tipoComprobante" | "numero" | "sede"> & Partial<Pick<Compra, "caja">> & { items: Omit<ItemCompra, "subtotal">[] },
-  rol: Rol
-): Compra {
+export type DatosCompra = Pick<Compra, "fecha" | "proveedorId" | "tipoComprobante" | "numero" | "sede"> & Partial<Pick<Compra, "caja">> & { items: Omit<ItemCompra, "subtotal">[] };
+
+export function registrarCompra(data: DatosCompra, rol: Rol): Compra {
+  const compra: Compra = { ...prepararCompra(data), id: uid(), creadoPor: usuarioActual(), historial: [] };
+  compra.historial = [evento(rol, "Compra registrada", `${compra.numero} · ${compra.proveedor} · ingreso a ${compra.sede} · pagado desde ${compra.caja}`)];
+  escribir(KEYS.COMPRAS, [compra, ...getCompras()]);
+  ingresarStock(compra.sede, compra.items, { tipo: "INGRESO", documento: `${compra.tipoComprobante === "BOLETA" ? "Boleta" : "Factura"} ${compra.numero}` });
+  return compra;
+}
+
+/**
+ * Corrige una compra registrada: devuelve al almacén (AJUSTE en el kardex) lo que ingresó y vuelve a ingresar
+ * lo corregido. Si esos productos ya se usaron (no alcanza el stock), no se puede editar: se avisa antes de tocar nada.
+ */
+export function editarCompra(id: string, data: DatosCompra, rol: Rol): Compra {
+  const lista = getCompras();
+  const vieja = lista.find((c) => c.id === id);
+  if (!vieja) throw new ErpError("Compra no encontrada.");
+  const nueva = prepararCompra(data, id);
+  const doc = `Edición ${vieja.tipoComprobante === "BOLETA" ? "boleta" : "factura"} ${vieja.numero}`;
+  descontarStock(vieja.sede, vieja.items, { tipo: "AJUSTE", documento: doc, motivo: "Se revierte el ingreso para corregir la compra" });
+  ingresarStock(nueva.sede, nueva.items, { tipo: "INGRESO", documento: `${nueva.tipoComprobante === "BOLETA" ? "Boleta" : "Factura"} ${nueva.numero} (corregida)` });
+  const editada = marcarEditado({ ...vieja, ...nueva }, rol, "Compra editada", `${vieja.numero} · ${soles(vieja.total)} → ${nueva.numero} · ${soles(nueva.total)}`);
+  escribir(KEYS.COMPRAS, lista.map((c) => (c.id === id ? editada : c)));
+  return editada;
+}
+
+/** Elimina una compra registrada y saca del almacén lo que ingresó (AJUSTE en el kardex). */
+export function eliminarCompra(id: string, rol: Rol): void {
+  const c = getCompras().find((x) => x.id === id);
+  if (!c) throw new ErpError("Compra no encontrada.");
+  descontarStock(c.sede, c.items, { tipo: "AJUSTE", documento: `Anulación ${c.numero}`, motivo: `Compra eliminada por ${usuarioActual()} (${rol})` });
+  escribir(KEYS.COMPRAS, getCompras().filter((x) => x.id !== id));
+}
+
+/** Quién puede editar o eliminar una compra registrada: quien la registró o el creador (las antiguas, el rol Tesorería). */
+export function permisoEditarCompra(c: Compra, sesion: { usuario: string; rol: string; soloLectura: boolean } | null): { ok: boolean; motivo: string } {
+  if (!sesion || sesion.soloLectura) return { ok: false, motivo: "Su usuario es de solo lectura" };
+  if (sesion.rol === "creador") return { ok: true, motivo: "" };
+  const esAutor = c.creadoPor ? c.creadoPor === sesion.usuario : sesion.rol === "tesoreria";
+  return esAutor ? { ok: true, motivo: "" } : { ok: false, motivo: "Solo quien la registró puede editarla" };
+}
+
+/** Deja rastro de una edición en el documento: quién, cuándo y una línea en el historial. */
+export function marcarEditado<T extends { historial: EventoHistorial[] }>(doc: T, rol: Rol, accion: string, detalle?: string): T & { editadoPor: string; editadoEn: string } {
+  return { ...doc, editadoPor: usuarioActual(), editadoEn: new Date().toISOString(), historial: [...doc.historial, evento(rol, accion, detalle)] };
+}
+
+/** Valida y arma la compra (sin id ni historial). `excluirId`: la propia compra al editar (no cuenta como duplicada). */
+function prepararCompra(data: DatosCompra, excluirId?: string): Omit<Compra, "id" | "historial"> {
   const prov = getProveedores().find((p) => p.id === data.proveedorId);
   if (!prov) throw new ErpError("Seleccione el proveedor.");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data.fecha)) throw new ErpError("Fecha de compra inválida. Use DD/MM/AAAA.");
@@ -2559,7 +2605,7 @@ export function registrarCompra(
   const numero = data.numero.trim().toUpperCase();
   if (!NUM_COMPROBANTE[data.tipoComprobante].test(numero))
     throw new ErpError(`N° de ${data.tipoComprobante.toLowerCase()} inválido. Ej: ${data.tipoComprobante === "FACTURA" ? "F001-00001234" : "B001-00000456"}`);
-  if (getCompras().some((c) => c.numero === numero && c.ruc === prov.ruc) || getFacturas().some((f) => f.numero === numero && f.ruc === prov.ruc))
+  if (getCompras().some((c) => c.id !== excluirId && c.numero === numero && c.ruc === prov.ruc) || getFacturas().some((f) => f.numero === numero && f.ruc === prov.ruc))
     throw new ErpError(`El comprobante ${numero} de ${prov.razonSocial} ya fue registrado.`);
 
   const filas = data.items.filter((i) => i.nombre.trim());
@@ -2573,8 +2619,7 @@ export function registrarCompra(
     subtotal: r2(i.cantidad * i.precioUnit),
   }));
   const { subtotal, igv, total } = totalesCompra(data.tipoComprobante, items);
-  const compra: Compra = {
-    id: uid(),
+  return {
     fecha: data.fecha,
     proveedorId: prov.id,
     proveedor: prov.razonSocial,
@@ -2587,12 +2632,7 @@ export function registrarCompra(
     subtotal,
     igv,
     total,
-    historial: [evento(rol, "Compra registrada", `${numero} · ${prov.razonSocial} · ingreso a ${data.sede} · pagado desde ${data.caja.trim()}`)],
   };
-
-  escribir(KEYS.COMPRAS, [compra, ...getCompras()]);
-  ingresarStock(data.sede, items, { tipo: "INGRESO", documento: `${data.tipoComprobante === "BOLETA" ? "Boleta" : "Factura"} ${numero}` });
-  return compra;
 }
 
 // ---------------------------------------------------------------------

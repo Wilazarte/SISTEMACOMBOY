@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, ArrowRightLeft, Building2, Camera, CheckCircle2, ClipboardCheck, FileText, MapPin, PackageCheck, Save, Truck } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, Pencil, Building2, Camera, CheckCircle2, ClipboardCheck, FileText, MapPin, PackageCheck, Save, Truck } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, Textarea, Timeline, cn, ejecutar, toast } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { FirmaPad } from "@/components/FirmaPad";
 import { ArchivoImg } from "@/components/ArchivoRef";
+import { useEditar } from "@/lib/hooks/useEditar";
 import { SEDES_STOCK as SEDES } from "@/lib/empresa";
 import { pdfOrdenDespacho } from "@/lib/pdf";
 import { KEYS, MAX_ARCHIVO, abrirArchivo, subirBaucher, fechaPE, puede, r2, soles, stockDisponible, transferirStock, useRol, useStore } from "@/lib/storage";
@@ -197,6 +198,17 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
   const e = estadoOD(od);
   const abierta = e === "PENDIENTE" || e === "PEDIDO_ALISTADO";
   const [obs, setObs] = useState(od.observacion ?? "");
+  // Corregir la foto de la guía de una OD ya cerrada (queda en el historial de la OD)
+  const { editar } = useEditar<OrdenDespacho>(KEYS.DESPACHOS);
+  const fotoNuevaRef = useRef<HTMLInputElement>(null);
+  const cambiarFoto = (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return toast("La foto debe ser una imagen (JPG, PNG o WEBP).", "error");
+    if (file.size > MAX_ARCHIVO) return toast(`La foto pesa ${(file.size / 1048576).toFixed(1)} MB. Máximo 1.5 MB.`, "error");
+    subirBaucher(file, "despacho")
+      .then(({ ref }) => ejecutar(() => void editar(od.id, { fotoGuia: { nombre: file.name, tipo: file.type, url: ref } }, "Foto de la guía corregida"), "Foto de la guía actualizada"))
+      .catch((err) => toast((err as Error).message, "error"));
+  };
   const [modo, setModo] = useState<Modo>(null);
   useStore<EquipoTerminado[]>(KEYS.EQUIPOS, []); // en vivo: equipos terminados
   /** Disponible en la sede: equipos terminados por chasis + sede + DISPONIBLE; repuestos por stock. */
@@ -403,6 +415,14 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
               <button type="button" onClick={() => abrirArchivo(od.fotoGuia!.url)} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-azul-700 underline">
                 <Camera size={12} /> Foto de la guía
               </button>
+            )}
+            {!abierta && od.lugar === "ENVIO_AGENCIA" && (
+              <span className="tip ml-3" data-tip={habilitado ? "Reemplazar la foto de la guía" : "Su usuario no puede editar despachos"}>
+                <Button type="button" size="sm" variant="ghost" disabled={!habilitado} onClick={() => fotoNuevaRef.current?.click()}>
+                  <Pencil size={13} /> {od.fotoGuia ? "Cambiar foto" : "Agregar foto"}
+                </Button>
+                <input ref={fotoNuevaRef} type="file" accept="image/*" className="hidden" onChange={(ev) => cambiarFoto(ev.target.files?.[0])} />
+              </span>
             )}
           </div>
           <Field label="Observación de Almacén">
