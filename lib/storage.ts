@@ -900,10 +900,40 @@ export async function crearRequerimiento(
     id: uid(),
     numero: formatear("REQ", await siguiente("REQ")),
     estado: "PENDIENTE",
+    creadoPor: usuarioActual(),
     historial: [evento(rol, "Requerimiento emitido", `${items.length} producto(s) · Sede ${data.sede}`)],
   };
   escribir(KEYS.REQS_PENDIENTES, [req, ...getPendientes()]);
   return req;
+}
+
+/**
+ * Edita un REQ que Tesorería aún no revisó (PENDIENTE). Se cambia solo esa fila (escribir envía el cambio
+ * y la caché se ve al instante). Un REQ OBSERVADO se corrige con reenviarRequerimiento.
+ */
+export function editarRequerimiento(
+  id: string,
+  cambios: Pick<Requerimiento, "items" | "motivo" | "sede" | "solicitante" | "fecha">,
+  rol: Rol
+): void {
+  const lista = getPendientes();
+  const req = lista.find((r) => r.id === id);
+  if (!req) throw new ErpError("Documento ya procesado: el requerimiento ya no está pendiente.");
+  if (!cambios.sede.trim()) throw new ErpError("Seleccione la sede.");
+  if (!cambios.solicitante.trim()) throw new ErpError("Ingrese el solicitante.");
+  if (!cambios.motivo.trim()) throw new ErpError("Ingrese el motivo del requerimiento.");
+  const items = cambios.items.filter((i) => i.nombre.trim());
+  if (items.length === 0) throw new ErpError("Agregue al menos un producto.");
+  if (items.some((i) => !(i.cantidad > 0))) throw new ErpError("Todas las cantidades deben ser mayores a 0.");
+  const editado: Requerimiento = {
+    ...req,
+    ...cambios,
+    items,
+    editadoPor: usuarioActual(),
+    editadoEn: new Date().toISOString(),
+    historial: [...req.historial, evento(rol, "Editado antes de la revisión", `${items.length} producto(s) · Sede ${cambios.sede}`)],
+  };
+  escribir(KEYS.REQS_PENDIENTES, lista.map((r) => (r.id === id ? editado : r)));
 }
 
 /** Almacén corrige un REQ observado y lo reenvía a Tesorería. */
@@ -2389,8 +2419,73 @@ function prepararGasto(d: DatosGasto, rol: Rol): Factura {
     ...(d.detraccion ? { detraccionPorc: d.detraccionPorc, detraccionMonto: monto } : {}),
     netoPagar: neto,
     ...(d.archivos.length ? { archivos: d.archivos } : {}),
+    creadoPor: usuarioActual(),
   };
   return f;
+}
+
+/** Campos que se pueden corregir en un gasto POR PAGAR (el tipo de comprobante y la OC no cambian). */
+export type EdicionGasto = Pick<Factura, "numero" | "fecha" | "proveedor" | "ruc" | "descripcion"> & { tipoGasto: TipoGasto; importe: number };
+
+/**
+ * Quién puede editar un gasto: solo gastos de Tesorería POR PAGAR (no los egresos de planilla),
+ * y solo quien lo registró o el creador. Los antiguos sin autor los edita el rol Tesorería.
+ */
+export function permisoEditarGasto(f: Factura, sesion: { usuario: string; rol: string; soloLectura: boolean } | null): { ok: boolean; motivo: string } {
+  if (!f.esGastoTesoreria || f.tipoGasto === "PLANILLA") return { ok: false, motivo: "Solo se editan gastos registrados en Tesorería" };
+  if (f.estadoPago !== "POR_PAGAR") return { ok: false, motivo: "Documento ya procesado" };
+  if (!sesion || sesion.soloLectura) return { ok: false, motivo: "Su usuario es de solo lectura" };
+  if (sesion.rol === "creador") return { ok: true, motivo: "" };
+  const esAutor = f.creadoPor ? f.creadoPor === sesion.usuario : sesion.rol === "tesoreria";
+  return esAutor ? { ok: true, motivo: "" } : { ok: false, motivo: "Solo quien lo registró puede editarlo" };
+}
+
+/** Corrige un gasto POR PAGAR. Con OC vinculada el importe no cambia (debe coincidir con la OC). */
+export function editarGasto(id: string, c: EdicionGasto, rol: Rol): Factura {
+  const lista = getFacturas();
+  const f = lista.find((x) => x.id === id);
+  if (!f || !f.esGastoTesoreria) throw new ErpError("Gasto no encontrado.");
+  if (f.estadoPago !== "POR_PAGAR") throw new ErpError("Documento ya procesado: el gasto ya fue pagado.");
+  if (!/^d{4}-d{2}-d{2}$/.test(c.fecha) || c.fecha > hoy()) throw new ErpError("Fecha del gasto inválida (no puede ser futura).");
+  if (!(c.tipoGasto in TIPOS_GASTO)) throw new ErpError("Seleccione el tipo de gasto.");
+  if (!c.descripcion?.trim()) throw new ErpError("Describa el gasto.");
+  const numero = c.numero.trim().toUpperCase();
+  const comp = f.comprobanteGasto ?? "FACTURA";
+  const re = NUM_GASTO[comp];
+  if (!numero || (re && !re.test(numero))) throw new ErpError(`N° de ${COMPROBANTES_GASTO[comp].toLowerCase()} inválido.`);
+  const proveedor = c.proveedor.trim().toUpperCase();
+  if (!proveedor) throw new ErpError("Indique el proveedor o agencia.");
+  const ruc = c.ruc.trim();
+  if (ruc && !/^d{8}$/.test(ruc) && !/^d{11}$/.test(ruc)) throw new ErpError("RUC (11 dígitos) o DNI (8 dígitos) inválido.");
+  if (comp === "FACTURA" && ruc.length !== 11) throw new ErpError("La factura requiere el RUC del proveedor.");
+  if (ruc.length === 11 && !rucValido(ruc)) throw new ErpError("RUC inválido (dígito verificador).");
+  if (lista.some((x) => x.id !== id && x.numero === numero && (ruc ? x.ruc === ruc : x.proveedor === proveedor)))
+    throw new ErpError(`El comprobante ${numero} de ${proveedor} ya fue registrado.`);
+  const total = f.ocId ? f.total : r2(Number(c.importe));
+  if (!(total > 0)) throw new ErpError("El importe total debe ser mayor a 0.");
+  const subtotal = comp === "FACTURA" ? r2(total / (1 + IGV)) : total;
+  const { monto, neto } = calcularDetraccion(total, !!f.detraccionPorc, f.detraccionPorc ?? 0);
+  const cambios = [numero !== f.numero && `N° ${f.numero} → ${numero}`, total !== f.total && `importe ${soles(f.total)} → ${soles(total)}`].filter(Boolean).join(" · ");
+  const editado: Factura = {
+    ...f,
+    numero,
+    fecha: c.fecha,
+    fechaVencimiento: f.fechaVencimiento === f.fecha ? c.fecha : f.fechaVencimiento,
+    proveedor,
+    ruc,
+    descripcion: c.descripcion.trim(),
+    tipoGasto: c.tipoGasto,
+    subtotal,
+    igv: r2(total - subtotal),
+    total,
+    ...(f.detraccionPorc ? { detraccionMonto: monto } : {}),
+    netoPagar: neto,
+    editadoPor: usuarioActual(),
+    editadoEn: new Date().toISOString(),
+    historial: [...f.historial, evento(rol, "Gasto editado", cambios || undefined)],
+  };
+  escribir(KEYS.FACTURAS, lista.map((x) => (x.id === id ? editado : x)));
+  return editado;
 }
 
 /**

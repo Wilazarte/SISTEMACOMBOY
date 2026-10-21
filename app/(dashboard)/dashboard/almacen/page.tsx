@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Boxes, CheckCircle2, Factory, Truck, ClipboardList, Eye, FilePlus2, FileText, MessageSquareWarning, PackageCheck, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar, ejecutarAsync } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
+import { EditarReq, ItemsEditor, itemVacio, permisoEditarReq } from "@/components/compras/EditarReq";
 import { getSesion } from "@/lib/auth";
 import { SEDES, SEDES_STOCK, UNIDADES } from "@/lib/empresa";
 import {
@@ -14,7 +15,6 @@ import {
   hoy,
   observarIngreso,
   puede,
-  reenviarRequerimiento,
   registrarIngresoAlmacen,
   sedeIngresoOC,
   soles,
@@ -31,7 +31,6 @@ import { estadoOD } from "@/lib/ventas";
 
 type Tab = "nuevo" | "lista" | "ingresos" | "stock" | "despacho";
 
-const itemVacio = (): ItemReq => ({ id: uid(), nombre: "", cantidad: 1, unidad: "UND", marca: "", caracteristica: "" });
 
 export default function AlmacenPage() {
   const [rol] = useRol();
@@ -101,66 +100,6 @@ export default function AlmacenPage() {
 }
 
 // =====================================================================
-// Editor de productos (reutilizado en nuevo y corrección)
-// =====================================================================
-function ItemsEditor({ items, onChange }: { items: ItemReq[]; onChange: (i: ItemReq[]) => void }) {
-  const set = (id: string, campo: keyof ItemReq, v: string | number) => onChange(items.map((i) => (i.id === id ? { ...i, [campo]: v } : i)));
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[860px] text-sm">
-        <thead className="bg-azul-900 text-[11px] font-semibold uppercase tracking-widest text-white">
-          <tr>
-            <th className="w-8 px-3 py-2 text-left">#</th>
-            <th className="px-2 py-2 text-left">Producto *</th>
-            <th className="w-24 px-2 py-2 text-left">Cantidad *</th>
-            <th className="w-28 px-2 py-2 text-left">Unidad</th>
-            <th className="w-40 px-2 py-2 text-left">Marca</th>
-            <th className="px-2 py-2 text-left">Característica</th>
-            <th className="w-10" />
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-plomo-100">
-          {items.map((i, k) => (
-            <tr key={i.id}>
-              <td className="px-3 py-1.5 text-slate-400">{k + 1}</td>
-              <td className="px-2 py-1.5">
-                <Input value={i.nombre} onChange={(e) => set(i.id, "nombre", e.target.value)} placeholder="Ej: Rodamiento 6205" />
-              </td>
-              <td className="px-2 py-1.5">
-                <Input type="number" min={0} step="any" value={i.cantidad || ""} onChange={(e) => set(i.id, "cantidad", parseFloat(e.target.value) || 0)} />
-              </td>
-              <td className="px-2 py-1.5">
-                <Select value={i.unidad} onChange={(e) => set(i.id, "unidad", e.target.value)} options={UNIDADES.map((u) => ({ value: u, label: u }))} />
-              </td>
-              <td className="px-2 py-1.5">
-                <Input value={i.marca} onChange={(e) => set(i.id, "marca", e.target.value)} placeholder="SKF, 3M…" />
-              </td>
-              <td className="px-2 py-1.5">
-                <Input value={i.caracteristica} onChange={(e) => set(i.id, "caracteristica", e.target.value)} placeholder="Medida, material, norma…" />
-              </td>
-              <td className="px-2 py-1.5">
-                <button
-                  onClick={() => onChange(items.length > 1 ? items.filter((x) => x.id !== i.id) : [itemVacio()])}
-                  className="rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                  aria-label="Eliminar fila"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <div className="px-3 py-3">
-        <Button variant="secondary" size="sm" onClick={() => onChange([...items, itemVacio()])}>
-          <Plus size={14} /> Agregar producto
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// =====================================================================
 // NUEVO REQUERIMIENTO
 // =====================================================================
 function NuevoReq({ rol, onCreado }: { rol: Rol; onCreado: () => void }) {
@@ -222,6 +161,19 @@ function NuevoReq({ rol, onCreado }: { rol: Rol; onCreado: () => void }) {
 // =====================================================================
 const ESTADOS: EstadoReq[] = ["PENDIENTE", "ACEPTADO", "OBSERVADO", "COTIZADO", "COMPRADO", "FINALIZADO"];
 
+/** Lápiz de la tabla: activo solo si el REQ se puede editar; si no, deshabilitado con el motivo. */
+function BotonEditarReq({ req, onEditar }: { req: Requerimiento; onEditar: () => void }) {
+  const p = permisoEditarReq(req, getSesion());
+  return (
+    <span className="tip" data-tip={p.ok ? (req.estado === "OBSERVADO" ? "Corregir y reenviar" : "Editar") : p.motivo}>
+      <Button size="sm" variant={req.estado === "OBSERVADO" && p.ok ? "warning" : "ghost"} disabled={!p.ok} onClick={onEditar} aria-label="Editar">
+        <Pencil size={14} />
+        {req.estado === "OBSERVADO" && p.ok && " Corregir"}
+      </Button>
+    </span>
+  );
+}
+
 function ListaReq({ reqs, rol }: { reqs: Requerimiento[]; rol: Rol }) {
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
@@ -276,55 +228,15 @@ function ListaReq({ reqs, rol }: { reqs: Requerimiento[]; rol: Rol }) {
                   <Button size="sm" variant="ghost" onClick={() => pdfRequerimiento(r)} title="PDF">
                     <FileText size={15} />
                   </Button>
-                  {r.estado === "OBSERVADO" && puede(rol, "req.reenviar") && (
-                    <Button size="sm" variant="warning" onClick={() => setEditando(r)}>
-                      <Pencil size={13} /> Corregir
-                    </Button>
-                  )}
+                  <BotonEditarReq req={r} onEditar={() => setEditando(r)} />
                 </div>
               </Td>
             </tr>
           ))}
         </Table>
       </Card>
-      {editando && <CorregirReq req={editando} rol={rol} onClose={() => setEditando(null)} />}
+      {editando && <EditarReq req={editando} rol={rol} onClose={() => setEditando(null)} />}
     </>
-  );
-}
-
-function CorregirReq({ req, rol, onClose }: { req: Requerimiento; rol: Rol; onClose: () => void }) {
-  const [sede, setSede] = useState(req.sede);
-  const [solicitante, setSolicitante] = useState(req.solicitante);
-  const [motivo, setMotivo] = useState(req.motivo);
-  const [items, setItems] = useState<ItemReq[]>(req.items);
-  return (
-    <Modal open onClose={onClose} title={`Corregir ${req.numero}`} wide>
-      <div className="mb-4 rounded-lg bg-orange-50 px-3 py-2 text-sm text-orange-800">
-        <b>Observación de Tesorería:</b> {req.observacion}
-      </div>
-      <div className="mb-4 grid gap-3 md:grid-cols-3">
-        <Field label="Sede">
-          <Select value={sede} onChange={(e) => setSede(e.target.value)} options={SEDES.map((s) => ({ value: s, label: s }))} />
-        </Field>
-        <Field label="Solicitante">
-          <Input value={solicitante} onChange={(e) => setSolicitante(e.target.value)} />
-        </Field>
-        <Field label="Motivo">
-          <Input value={motivo} onChange={(e) => setMotivo(e.target.value)} />
-        </Field>
-      </div>
-      <ItemsEditor items={items} onChange={setItems} />
-      <div className="mt-4 flex justify-end gap-2">
-        <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-        <Button
-          onClick={() => {
-            if (ejecutar(() => reenviarRequerimiento(req.id, { sede, solicitante, motivo, items }, rol), `${req.numero} reenviado a Tesorería`)) onClose();
-          }}
-        >
-          <Send size={15} /> Reenviar
-        </Button>
-      </div>
-    </Modal>
   );
 }
 

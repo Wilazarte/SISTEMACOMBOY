@@ -41,6 +41,7 @@ import {
   MAX_ARCHIVO,
   TOPE_DJ,
   abrirArchivo,
+  permisoEditarGasto,
   aceptarMultiple,
   aceptarRequerimiento,
   crearCotizacion,
@@ -78,6 +79,8 @@ import { pdfCotizacion, pdfFactura, pdfOrdenCompra, pdfRequerimiento } from "@/l
 import { asientoOrdenCompra, reasentarOrdenCompra } from "@/lib/contable";
 import { getSesion, puedeVer } from "@/lib/auth";
 import { PlanillaExistente } from "@/components/tesoreria/PlanillaExistente";
+import { EditarReq, permisoEditarReq } from "@/components/compras/EditarReq";
+import { EditarGasto } from "@/components/compras/EditarGasto";
 import type { Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, Proveedor, Requerimiento, Rol, StockItem, TipoComprobanteCompra } from "@/lib/types";
 
 type Tab = "registrar" | "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias" | "planilla";
@@ -192,6 +195,8 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
   // Aprobación en lote: ids marcados (se limpian los que ya no están pendientes)
   const [marcados, setMarcados] = useState<Set<string>>(new Set());
   const [rechazoLote, setRechazoLote] = useState(false);
+  const [editReq, setEditReq] = useState<Requerimiento | null>(null);
+  const sesion = getSesion();
   const habilitado = puede(rol, "req.revisar");
   const elegidos = pendientes.filter((r) => marcados.has(r.id)).map((r) => r.id);
   const todos = pendientes.length > 0 && elegidos.length === pendientes.length;
@@ -278,6 +283,16 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
               <button className={`${BTN_REQ} border-[#60a5fa] bg-[#1e3a8a] shadow-[0_0_12px_rgba(30,58,138,0.6)]`} onClick={() => abrirDoc({ tipo: "REQ", id: r.id })}>
                 <Eye size={14} /> Ver
               </button>
+              {(() => {
+                const p = permisoEditarReq(r, sesion);
+                return (
+                  <span className="tip" data-tip={p.ok ? "Editar antes de revisar" : p.motivo}>
+                    <button className={`${BTN_REQ} border-[#94a3b8]/60 bg-[#1e2a45] shadow-[0_0_10px_rgba(148,163,184,0.25)]`} disabled={!p.ok} onClick={() => setEditReq(r)}>
+                      <Pencil size={14} /> Editar
+                    </button>
+                  </span>
+                );
+              })()}
               <button className={`${BTN_REQ} border-[#2a7bff] bg-[#2a7bff] shadow-[0_0_14px_rgba(42,123,255,0.6)]`} disabled={!habilitado} onClick={() => ejecutar(() => aceptarRequerimiento(r.id, rol), `${r.numero} ACEPTADO`)}>
                 <Check size={14} /> Aceptar
               </button>
@@ -291,6 +306,8 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
           </div>
         ))}
       </div>
+
+      {editReq && <EditarReq req={editReq} rol={rol} onClose={() => setEditReq(null)} />}
 
       <Modal open={rechazoLote} onClose={() => setRechazoLote(false)} title={`Rechazar ${elegidos.length} requerimiento(s)`}>
         <div className="flex gap-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">
@@ -1330,6 +1347,8 @@ function Facturas({
   facturas: Factura[];
   preOc?: string;
 }) {
+  const [editGasto, setEditGasto] = useState<Factura | null>(null);
+  const sesion = getSesion();
   const [modo, setModo] = useState<"FACTURA" | "DJ">("FACTURA");
   const [ocId, setOcId] = useState(preOc ?? "");
   const [numero, setNumero] = useState("");
@@ -1546,9 +1565,19 @@ function Facturas({
                 </Td>
                 <Td>
                   <div className="flex gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "FACTURA", id: f.id })}>
+                    <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "FACTURA", id: f.id })} title="Ver">
                       <Eye size={15} />
                     </Button>
+                    {(() => {
+                      const p = permisoEditarGasto(f, sesion);
+                      return (
+                        <span className="tip" data-tip={p.ok ? "Editar" : p.motivo}>
+                          <Button size="sm" variant="ghost" disabled={!p.ok} onClick={() => setEditGasto(f)} aria-label="Editar">
+                            <Pencil size={15} />
+                          </Button>
+                        </span>
+                      );
+                    })()}
                     <Button size="sm" variant="secondary" onClick={() => pdfFactura(f, ordenes.find((o) => o.id === f.ocId))}>
                       <FileText size={14} /> PDF
                     </Button>
@@ -1570,6 +1599,8 @@ function Facturas({
           })}
         </Table>
       </Card>
+
+      {editGasto && <EditarGasto gasto={editGasto} rol={rol} onClose={() => setEditGasto(null)} />}
 
       <Modal open={!!pagarFac} onClose={() => setPagarFac(null)} title={`Pagar ${pagarFac?.numero ?? ""}`}>
         {pagarFac && (

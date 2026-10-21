@@ -39,6 +39,10 @@ export interface Requerimiento {
   estado: EstadoReq;
   observacion?: string;
   historial: EventoHistorial[];
+  /** Usuario que lo emitió (perfiles.usuario). Los REQ antiguos no lo tienen. */
+  creadoPor?: string;
+  editadoPor?: string;
+  editadoEn?: string;
 }
 
 export interface ItemPrecio {
@@ -161,6 +165,10 @@ export interface Factura {
   detraccionMonto?: number;
   netoPagar?: number; // total - detracción
   archivos?: ArchivoGasto[];
+  /** Usuario que registró el gasto (perfiles.usuario). Los antiguos no lo tienen. */
+  creadoPor?: string;
+  editadoPor?: string;
+  editadoEn?: string;
 }
 
 export type TipoGasto = "REPRESENTACION" | "SERVICIO_BASICO" | "TRANSPORTE" | "COMPRA_SIN_REQ" | "OTROS" | "PLANILLA";
