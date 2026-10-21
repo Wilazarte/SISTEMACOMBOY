@@ -1,5 +1,6 @@
 "use client";
 
+import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useEffect, useState } from "react";
 import { Ban, FilePlus2, FileText, Printer, Send, Trash2, Truck } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, Textarea, cn, ejecutar, ejecutarAsync } from "@/components/ui";
@@ -171,21 +172,28 @@ export function Comprobantes({ preNp, onListo }: { preNp?: string; onListo: () =
           </button>
         ))}
       </div>
-      <Table head={["Fecha", "Cliente", "Comprobante", "Total", "Acciones"]} empty={lista.length === 0}>
-        {lista.map((c) => (
-          <tr key={c.id} className="hover:bg-plomo-50">
-            <Td className="whitespace-nowrap">{fechaPE(c.fecha)}</Td>
-            <Td className="font-medium text-fg">{c.cliente}</Td>
-            <Td>
+      <ListaDocs
+          tipo="ventas"
+          filas={lista.map((c): FilaDoc => {
+          return {
+          id: c.id,
+          fecha: c.fecha,
+          contraparte: c.cliente,
+          ref: (
+            <>
               <span className="font-semibold text-fg">{c.numero || <span className="text-slate-400">{c.serie}-(borrador)</span>}</span>
               {c.npNumero && <span className="ml-1.5 text-xs text-plomo-500">{c.npNumero}</span>}
               <span className="ml-2 inline-block align-middle"><Badge estado={c.estado} /></span>
-            </Td>
-            <Td className="text-right font-semibold">
+            </>
+          ),
+          total: (
+            <>
               {soles(c.total)}
               {c.estado === "EMITIDO" && c.saldo > 0 && <p className="text-[11px] font-semibold text-red-600">saldo {soles(c.saldo)}</p>}
-            </Td>
-            <Td>
+            </>
+          ),
+          acciones: (
+            <>
               <div className="flex flex-wrap gap-1">
                 <Button size="sm" variant="secondary" onClick={() => pdfComprobanteVenta(c)} title="PDF A4">
                   <FileText size={14} /> A4
@@ -209,10 +217,14 @@ export function Comprobantes({ preNp, onListo }: { preNp?: string; onListo: () =
                   </Button>
                 )}
               </div>
-            </Td>
-          </tr>
-        ))}
-      </Table>
+            </>
+          ),
+          buscar: `${c.numero ?? ""} ${c.serie} ${c.npNumero ?? ""} ${c.clienteDoc}`,
+          tipoDoc: c.tipo,
+          estado: c.estado,
+          };
+        })}
+        />
 
       <Modal open={!!form} onClose={cerrar} title={borradorId ? "Emitir comprobante (borrador)" : "Nuevo comprobante"} wide>
         {form && t && (

@@ -1,5 +1,6 @@
 "use client";
 
+import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, ArrowRightLeft, Pencil, Building2, Camera, CheckCircle2, ClipboardCheck, FileText, MapPin, PackageCheck, Save, Truck } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, Textarea, Timeline, cn, ejecutar, toast } from "@/components/ui";
@@ -128,19 +129,25 @@ export function OrdenesDespacho({ vista = "almacen" }: { vista?: "almacen" | "ve
             <Empty icon={<Truck size={28} />} text="No hay órdenes de despacho" />
           </div>
         ) : (
-          <Table head={["Fecha", "Cliente", "Doc. referencia", "Acciones"]}>
-            {lista.map((o) => (
-              <tr key={o.id} className="cursor-pointer hover:bg-plomo-50" onClick={() => setSelId(o.id)}>
-                <Td className="whitespace-nowrap">{fechaPE(o.fecha)}</Td>
-                <Td className="font-medium text-fg">{o.cliente}</Td>
-                <Td>
-                  <span className="font-mono font-semibold text-fg">{codigoOD(o)}</span>
+          <ListaDocs
+          tipo="ventas"
+          filas={lista.map((o): FilaDoc => {
+          return {
+          id: o.id,
+          fecha: o.fecha,
+          contraparte: o.cliente,
+          ref: (
+            <>
+              <span className="font-mono font-semibold text-fg">{codigoOD(o)}</span>
                   {o.vistoAlmacen === false && <span className="ml-2 rounded-full bg-corp px-1.5 py-0.5 text-[10px] font-bold text-white">NUEVA</span>}
                   <span className="ml-1.5 text-xs text-plomo-500">{origenOD(o)}</span>
                   <span className="ml-2 inline-block align-middle"><Badge estado={estadoOD(o)} /></span>
-                </Td>
-                <Td>
-                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+            </>
+          ),
+          total: `${o.items.length} ítem(s)`,
+          acciones: (
+            <>
+              <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                     <Button size="sm" variant="secondary" onClick={() => setSelId(o.id)}>
                       <ClipboardCheck size={14} /> Ver
                     </Button>
@@ -148,10 +155,14 @@ export function OrdenesDespacho({ vista = "almacen" }: { vista?: "almacen" | "ve
                       <FileText size={14} />
                     </Button>
                   </div>
-                </Td>
-              </tr>
-            ))}
-          </Table>
+            </>
+          ),
+          buscar: `${codigoOD(o)} ${o.numero} ${origenOD(o)} ${o.clienteDoc ?? ""} ${o.guiaNro ?? ""}`,
+          tipoDoc: "OD",
+          estado: estadoOD(o),
+          };
+        })}
+        />
         )}
       </Card>
 

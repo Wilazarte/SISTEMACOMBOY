@@ -1,5 +1,6 @@
 "use client";
 
+import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useCallback, useEffect, useState } from "react";
 import { Boxes, CheckCircle2, Factory, Truck, ClipboardList, Eye, FilePlus2, FileText, MessageSquareWarning, PackageCheck, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar, ejecutarAsync } from "@/components/ui";
@@ -207,18 +208,24 @@ function ListaReq({ reqs, rol }: { reqs: Requerimiento[]; rol: Rol }) {
             </div>
           }
         />
-        <Table head={["Fecha", "Solicitante", "Doc. referencia", "Acciones"]} empty={lista.length === 0}>
-          {lista.map((r) => (
-            <tr key={r.id} className={cn("hover:bg-plomo-50", r.estado === "OBSERVADO" && "bg-orange-50/60")}>
-              <Td className="whitespace-nowrap">{fechaPE(r.fecha)}</Td>
-              <Td>{r.solicitante}</Td>
-              <Td>
-                <span className="font-semibold text-fg">{r.numero}</span>
+        <ListaDocs
+          tipo="requerimientos"
+          filas={lista.map((r): FilaDoc => {
+          return {
+          id: r.id,
+          fecha: r.fecha,
+          contraparte: r.solicitante,
+          ref: (
+            <>
+              <span className="font-semibold text-fg">{r.numero}</span>
                 <span className="ml-2 inline-block align-middle"><Badge estado={r.estado} /></span>
                 {r.observacion && r.estado === "OBSERVADO" && <p className="mt-1 max-w-[320px] whitespace-normal text-xs text-orange-700">{r.observacion}</p>}
-              </Td>
-              <Td>
-                <div className="flex gap-1">
+            </>
+          ),
+          total: `${(r.items || []).length} ítem(s)`,
+          acciones: (
+            <>
+              <div className="flex gap-1">
                   <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "REQ", id: r.id })} title="Ver e historial">
                     <Eye size={15} />
                   </Button>
@@ -227,10 +234,15 @@ function ListaReq({ reqs, rol }: { reqs: Requerimiento[]; rol: Rol }) {
                   </Button>
                   <BotonEditarReq req={r} onEditar={() => setEditando(r)} />
                 </div>
-              </Td>
-            </tr>
-          ))}
-        </Table>
+            </>
+          ),
+          buscar: `${r.numero} ${r.sede} ${r.motivo}`,
+          tipoDoc: "REQ",
+          estado: r.estado,
+          claseFila: r.estado === "OBSERVADO" ? "bg-orange-50/60" : undefined,
+          };
+        })}
+        />
       </Card>
       {editando && <EditarReq req={editando} rol={rol} onClose={() => setEditando(null)} />}
     </>
@@ -320,18 +332,27 @@ function Ingresos({ rol, porVB, ordenes, facturas, guias }: { rol: Rol; porVB: O
       {finalizadas.length > 0 && (
       <Card>
         <CardHeader title="Ingresos finalizados" subtitle="Procesos de compra cerrados con visto bueno de almacén" />
-        <Table head={["Fecha", "Proveedor", "Doc. referencia", "Total", "Acciones"]} empty={finalizadas.length === 0}>
-          {finalizadas.map((o) => (
-            <tr key={o.id} className="hover:bg-plomo-50">
-              <Td className="whitespace-nowrap">{o.vistoBueno ? fechaPE(o.vistoBueno.fecha.slice(0, 10)) : fechaPE(o.fecha)}</Td>
-              <Td>{o.proveedor}</Td>
-              <Td>
-                <span className="font-semibold text-fg">{o.numero}</span>
+        <ListaDocs
+          tipo="compras"
+          filas={finalizadas.map((o): FilaDoc => {
+          return {
+          id: o.id,
+          fecha: o.vistoBueno?.fecha ?? o.fecha,
+          contraparte: o.proveedor,
+          ref: (
+            <>
+              <span className="font-semibold text-fg">{o.numero}</span>
                 <span className="ml-1.5 text-xs text-plomo-500">{o.reqNumero}</span>
-              </Td>
-              <Td className="text-right font-semibold">{soles(o.total)}</Td>
-              <Td>
-                <div className="flex gap-1">
+            </>
+          ),
+          total: (
+            <>
+              {soles(o.total)}
+            </>
+          ),
+          acciones: (
+            <>
+              <div className="flex gap-1">
                   <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "OC", id: o.id })} title="Ver (recibido por, V°B°, historial)">
                     <Eye size={15} />
                   </Button>
@@ -343,10 +364,13 @@ function Ingresos({ rol, porVB, ordenes, facturas, guias }: { rol: Rol; porVB: O
                     <FileText size={14} /> Acta PDF
                   </Button>
                 </div>
-              </Td>
-            </tr>
-          ))}
-        </Table>
+            </>
+          ),
+          buscar: `${o.numero} ${o.reqNumero} ${o.vistoBueno?.recibidoPor ?? ""}`,
+          tipoDoc: "OC",
+          };
+        })}
+        />
       </Card>
       )}
 

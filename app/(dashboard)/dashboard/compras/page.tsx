@@ -1,5 +1,6 @@
 "use client";
 
+import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   AlertTriangle,
@@ -593,64 +594,66 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
       <Card>
         <CardHeader title="Compras registradas" subtitle={`${compras.length} compra(s) · ${gastos.length} gasto(s) de Tesorería · Total ${soles(totalRegistros)}`} />
         {/* Vista previa: una línea por registro. Comprobante, almacén / gasto, ítems, subtotal e IGV se ven en "Ver". */}
-        <Table head={["Fecha", "Proveedor", "Doc. referencia", "Total", "Acciones"]} empty={registros.length === 0}>
-          {registros.map((r) => {
+        <ListaDocs
+          tipo="compras"
+          filas={registros.map((r): FilaDoc => {
             if (r.tipo === "GASTO_TESORERIA") {
               const g = r.gasto;
               const p = permisoEditarGasto(g, sesion);
-              return (
-                <tr key={g.id} className="hover:bg-plomo-50">
-                  <Td className="whitespace-nowrap">
-                    {fechaPE(g.fecha)}
-                    {g.tipoGasto === "PLANILLA" && <span className="ml-2 text-xs text-plomo-500">{g.numero.replace(/^PLLA\s+/, "")}</span>}
-                  </Td>
-                  <Td className="max-w-[320px] truncate"><span title={g.proveedor}>{g.proveedor}</span></Td>
-                  <Td className="whitespace-nowrap font-semibold text-fg">{g.codigo ?? g.numero}</Td>
-                  <Td className="text-right font-semibold">{soles(g.total)}</Td>
-                  <Td>
-                    <div className="flex gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "FACTURA", id: g.id })} title="Ver detalle" aria-label="Ver">
-                        <Eye size={15} />
-                      </Button>
-                      <span className="tip" data-tip={p.ok ? "Editar" : p.motivo}>
-                        <Button size="sm" variant="ghost" disabled={!p.ok} onClick={() => setEditGasto(g)} aria-label="Editar">
-                          <Pencil size={15} />
-                        </Button>
-                      </span>
-                    </div>
-                  </Td>
-                </tr>
-              );
-            }
-            const c = r.compra;
-            const p = permisoEditarCompra(c, sesion);
-            return (
-              <tr key={c.id} className="hover:bg-plomo-50">
-                <Td className="whitespace-nowrap">{fechaPE(c.fecha)}</Td>
-                <Td className="max-w-[320px] truncate"><span title={c.proveedor}>{c.proveedor}</span></Td>
-                <Td className="whitespace-nowrap font-semibold text-fg">{c.numero}</Td>
-                <Td className="text-right font-semibold">{soles(c.total)}</Td>
-                <Td>
+              return {
+                id: g.id,
+                fecha: g.fecha,
+                contraparte: g.proveedor,
+                subFecha: g.tipoGasto === "PLANILLA" ? <span className="text-plomo-500">{g.numero.replace(/^PLLA\s+/, "")}</span> : undefined,
+                ref: <span className="whitespace-nowrap font-semibold text-fg">{g.codigo ?? g.numero}</span>,
+                total: soles(g.total),
+                buscar: `${g.codigo ?? ""} ${g.numero} ${g.ruc} ${g.descripcion ?? ""}`,
+                tipoDoc: g.tipoGasto === "PLANILLA" ? "PLANILLA" : "GASTO",
+                estado: g.estadoPago,
+                acciones: (
                   <div className="flex gap-1">
-                    <Button size="sm" variant="ghost" onClick={() => setVerCompra(c)} title="Ver detalle" aria-label="Ver">
+                    <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "FACTURA", id: g.id })} title="Ver detalle" aria-label="Ver">
                       <Eye size={15} />
                     </Button>
                     <span className="tip" data-tip={p.ok ? "Editar" : p.motivo}>
-                      <Button size="sm" variant="ghost" disabled={!p.ok} onClick={() => editarEnFormulario(c)} aria-label="Editar">
+                      <Button size="sm" variant="ghost" disabled={!p.ok} onClick={() => setEditGasto(g)} aria-label="Editar">
                         <Pencil size={15} />
                       </Button>
                     </span>
-                    <span className="tip" data-tip={p.ok ? "Eliminar" : p.motivo}>
-                      <Button size="sm" variant="ghost" disabled={!p.ok} onClick={() => setBorrar(c)} aria-label="Eliminar">
-                        <Trash2 size={15} className="text-red-600" />
-                      </Button>
-                    </span>
                   </div>
-                </Td>
-              </tr>
-            );
+                ),
+              };
+            }
+            const c = r.compra;
+            const p = permisoEditarCompra(c, sesion);
+            return {
+              id: c.id,
+              fecha: c.fecha,
+              contraparte: c.proveedor,
+              ref: <span className="whitespace-nowrap font-semibold text-fg">{c.numero}</span>,
+              total: soles(c.total),
+              buscar: `${c.numero} ${c.ruc} ${c.sede} ${c.items.map((i) => i.nombre).join(" ")}`,
+              tipoDoc: "COMPRA",
+              acciones: (
+                <div className="flex gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => setVerCompra(c)} title="Ver detalle" aria-label="Ver">
+                    <Eye size={15} />
+                  </Button>
+                  <span className="tip" data-tip={p.ok ? "Editar" : p.motivo}>
+                    <Button size="sm" variant="ghost" disabled={!p.ok} onClick={() => editarEnFormulario(c)} aria-label="Editar">
+                      <Pencil size={15} />
+                    </Button>
+                  </span>
+                  <span className="tip" data-tip={p.ok ? "Eliminar" : p.motivo}>
+                    <Button size="sm" variant="ghost" disabled={!p.ok} onClick={() => setBorrar(c)} aria-label="Eliminar">
+                      <Trash2 size={15} className="text-red-600" />
+                    </Button>
+                  </span>
+                </div>
+              ),
+            };
           })}
-        </Table>
+        />
       </Card>
 
       {editGasto && <EditarGasto gasto={editGasto} rol={rol} onClose={() => setEditGasto(null)} />}
@@ -777,20 +780,25 @@ function Antecedentes({ reqs, ordenes, rol, onCotizar }: { reqs: Requerimiento[]
           </div>
         }
       />
-      <Table head={["Fecha", "Solicitante", "Doc. referencia", "Acciones"]} empty={lista.length === 0}>
-        {lista.map((r) => {
+      <ListaDocs
+          tipo="requerimientos"
+          filas={lista.map((r): FilaDoc => {
           const oc = ordenes.find((o) => o.reqId === r.id);
-          return (
-            <tr key={r.id} className="hover:bg-plomo-50">
-              <Td className="whitespace-nowrap">{fechaPE(r.fecha)}</Td>
-              <Td>{r.solicitante}</Td>
-              <Td>
-                <span className="font-semibold text-fg">{r.numero}</span>
+          return {
+          id: r.id,
+          fecha: r.fecha,
+          contraparte: r.solicitante,
+          ref: (
+            <>
+              <span className="font-semibold text-fg">{r.numero}</span>
                 {oc && <span className="ml-1.5 text-xs text-plomo-500">→ {oc.numero}</span>}
                 <span className="ml-2 inline-block align-middle"><Badge estado={r.estado} /></span>
-              </Td>
-              <Td>
-                <div className="flex gap-1">
+            </>
+          ),
+          total: `${(r.items || []).length} ítem(s)`,
+          acciones: (
+            <>
+              <div className="flex gap-1">
                   <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "REQ", id: r.id })} title="Ver e historial">
                     <Eye size={15} />
                   </Button>
@@ -803,11 +811,14 @@ function Antecedentes({ reqs, ordenes, rol, onCotizar }: { reqs: Requerimiento[]
                     </Button>
                   )}
                 </div>
-              </Td>
-            </tr>
-          );
+            </>
+          ),
+          buscar: `${r.numero} ${r.sede} ${r.motivo} ${oc?.numero ?? ""}`,
+          tipoDoc: "REQ",
+          estado: r.estado,
+          };
         })}
-      </Table>
+        />
     </Card>
   );
 }
@@ -939,22 +950,29 @@ function Cotizaciones({
 
       <Card>
         <CardHeader title="Cotizaciones registradas" subtitle="★ = menor precio del requerimiento" />
-        <Table head={["Fecha", "Proveedor", "N° cotización", "Total", "Acciones"]} empty={cotizaciones.length === 0}>
-          {cotizaciones.map((c) => (
-            <tr key={c.id} className="hover:bg-plomo-50">
-              <Td className="whitespace-nowrap">{fechaPE(c.fechaEmision)}</Td>
-              <Td>{c.proveedor}</Td>
-              <Td>
-                <span className="font-semibold text-fg">{c.numero}</span>
+        <ListaDocs
+          tipo="cotizaciones"
+          filas={cotizaciones.map((c): FilaDoc => {
+          return {
+          id: c.id,
+          fecha: c.fechaEmision,
+          contraparte: c.proveedor,
+          ref: (
+            <>
+              <span className="font-semibold text-fg">{c.numero}</span>
                 <span className="ml-1.5 text-xs text-plomo-500">{c.reqNumero}</span>
                 <span className="ml-2 inline-block align-middle"><Badge estado={c.estado} /></span>
-              </Td>
-              <Td className="text-right font-semibold">
-                {minPorReq[c.reqId] === c.total && <span className="mr-1 text-rojo">★</span>}
+            </>
+          ),
+          total: (
+            <>
+              {minPorReq[c.reqId] === c.total && <span className="mr-1 text-rojo">★</span>}
                 {soles(c.total)}
-              </Td>
-              <Td>
-                <div className="flex gap-1">
+            </>
+          ),
+          acciones: (
+            <>
+              <div className="flex gap-1">
                   <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "COTI", id: c.id })}>
                     <Eye size={15} />
                   </Button>
@@ -967,10 +985,14 @@ function Cotizaciones({
                     </Button>
                   )}
                 </div>
-              </Td>
-            </tr>
-          ))}
-        </Table>
+            </>
+          ),
+          buscar: `${c.numero} ${c.reqNumero} ${c.ruc}`,
+          tipoDoc: "COTI",
+          estado: c.estado,
+          };
+        })}
+        />
       </Card>
     </div>
   );
@@ -1208,19 +1230,28 @@ function Ordenes({
 
       <Card>
         <CardHeader title="Órdenes de compra" />
-        <Table head={["Fecha", "Proveedor", "N° OC / cotización", "Total", "Acciones"]} empty={ordenes.length === 0}>
-          {ordenes.map((o) => (
-            <tr key={o.id} className="hover:bg-plomo-50">
-              <Td className="whitespace-nowrap">{fechaPE(o.fecha)}</Td>
-              <Td>{o.proveedor}</Td>
-              <Td>
-                <span className="font-semibold text-fg">{o.numero}</span>
+        <ListaDocs
+          tipo="ordenes"
+          filas={ordenes.map((o): FilaDoc => {
+          return {
+          id: o.id,
+          fecha: o.fecha,
+          contraparte: o.proveedor,
+          ref: (
+            <>
+              <span className="font-semibold text-fg">{o.numero}</span>
                 <span className="ml-1.5 text-xs text-plomo-500">{o.cotizacionNumero}</span>
                 <span className="ml-2 inline-block align-middle"><Badge estado={o.estado} /></span>
-              </Td>
-              <Td className="text-right font-semibold">{soles(o.total)}</Td>
-              <Td>
-                <div className="flex gap-1">
+            </>
+          ),
+          total: (
+            <>
+              {soles(o.total)}
+            </>
+          ),
+          acciones: (
+            <>
+              <div className="flex gap-1">
                   <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "OC", id: o.id })}>
                     <Eye size={15} />
                   </Button>
@@ -1256,10 +1287,14 @@ function Ordenes({
                     </Button>
                   )}
                 </div>
-              </Td>
-            </tr>
-          ))}
-        </Table>
+            </>
+          ),
+          buscar: `${o.numero} ${o.cotizacionNumero} ${o.reqNumero} ${o.ruc} ${o.formaPago}`,
+          tipoDoc: "OC",
+          estado: o.estado,
+          };
+        })}
+        />
       </Card>
 
       <Modal open={!!editar} onClose={() => setEditar(null)} title={`Editar · ${editar?.numero ?? ""}`} wide>
@@ -1594,18 +1629,17 @@ function Facturas({
             />
           }
         />
-        <Table head={["Fecha", "Proveedor", "N° factura", "Total", "Acciones"]} empty={lista.length === 0}>
-          {lista.map((f) => {
-            const vencida = f.estadoPago === "POR_PAGAR" && f.fechaVencimiento < hoy();
-            return (
-              <tr key={f.id} className="hover:bg-plomo-50">
-                <Td className="whitespace-nowrap">
-                  {fechaPE(f.fecha)}
-                  {vencida && <p className="text-[11px] font-semibold text-red-600">venció {fechaPE(f.fechaVencimiento)}</p>}
-                </Td>
-                <Td>{f.proveedor}</Td>
-                <Td>
-                  <span className="font-semibold text-fg">{f.numero}</span>
+        <ListaDocs
+          tipo="facturas"
+          filas={lista.map((f): FilaDoc => {
+          const vencida = f.estadoPago === "POR_PAGAR" && f.fechaVencimiento < hoy();
+          return {
+          id: f.id,
+          fecha: f.fecha,
+          contraparte: f.proveedor,
+          ref: (
+            <>
+              <span className="font-semibold text-fg">{f.numero}</span>
                   <span className="ml-1.5 text-xs text-plomo-500">{f.esGastoTesoreria ? f.codigo ?? "Gasto" : f.ocNumero}</span>
                   {/* El estado de pago sigue siendo el botón para pagar / revertir */}
                   <button
@@ -1616,10 +1650,16 @@ function Facturas({
                   >
                     <Badge estado={f.estadoPago} />
                   </button>
-                </Td>
-                <Td className="text-right font-semibold">{soles(f.total)}</Td>
-                <Td>
-                  <div className="flex gap-1">
+            </>
+          ),
+          total: (
+            <>
+              {soles(f.total)}
+            </>
+          ),
+          acciones: (
+            <>
+              <div className="flex gap-1">
                     <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "FACTURA", id: f.id })} title="Ver">
                       <Eye size={15} />
                     </Button>
@@ -1648,11 +1688,15 @@ function Facturas({
                       </Button>
                     ))}
                   </div>
-                </Td>
-              </tr>
-            );
-          })}
-        </Table>
+            </>
+          ),
+          buscar: `${f.numero} ${f.ocNumero} ${f.codigo ?? ""} ${f.ruc}`,
+          tipoDoc: f.esGastoTesoreria ? "GASTO" : f.tipo === "DECLARACION_JURADA" ? "DJ" : "FACTURA",
+          estado: f.estadoPago,
+          subFecha: vencida ? <span className="font-semibold text-red-600">venció {fechaPE(f.fechaVencimiento)}</span> : undefined,
+          };
+        })}
+        />
       </Card>
 
       {editGasto && <EditarGasto gasto={editGasto} rol={rol} onClose={() => setEditGasto(null)} />}

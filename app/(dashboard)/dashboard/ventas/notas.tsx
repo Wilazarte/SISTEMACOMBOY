@@ -1,5 +1,6 @@
 "use client";
 
+import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useState } from "react";
 import { Ban, CalendarClock, Check, Copy, FileText, Pencil, Plus, Receipt, Truck } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, Textarea, ejecutar, ejecutarAsync } from "@/components/ui";
@@ -137,21 +138,30 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
           </div>
         }
       />
-      <Table head={["Fecha", "Cliente", "N° NP", "Total", "Acciones"]} empty={lista.length === 0}>
-        {lista.map((n) => (
-          <tr key={n.id} className="hover:bg-plomo-50">
-            <Td className="whitespace-nowrap">{fechaPE(n.fecha)}</Td>
-            <Td className="font-medium text-fg">{n.cliente}</Td>
-            <Td>
+      <ListaDocs
+          tipo="ventas"
+          filas={lista.map((n): FilaDoc => {
+          return {
+          id: n.id,
+          fecha: n.fecha,
+          contraparte: n.cliente,
+          ref: (
+            <>
               <span className="font-semibold text-fg">{n.numero}</span>
               {(() => {
                 const od = odDeNP(n, ods) ?? (n.odId ? ods.find((o) => o.id === n.odId) : undefined);
                 return od ? <span className="ml-1.5 font-mono text-xs text-plomo-500">{codigoDesdeNumero("OD", od.numero, od.fecha)}</span> : null;
               })()}
               <span className="ml-2 inline-block align-middle"><Badge estado={n.estado} /></span>
-            </Td>
-            <Td className="text-right font-semibold">{soles(n.total)}</Td>
-            <Td>
+            </>
+          ),
+          total: (
+            <>
+              {soles(n.total)}
+            </>
+          ),
+          acciones: (
+            <>
               <div className="flex flex-wrap gap-1">
                 {(() => {
                   const p = permisoEditarNP(n, sesion);
@@ -192,10 +202,14 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
                   </Button>
                 )}
               </div>
-            </Td>
-          </tr>
-        ))}
-      </Table>
+            </>
+          ),
+          buscar: `${n.numero} ${n.clienteDoc} ${n.vendedor} ${n.condPagoNombre}`,
+          tipoDoc: "NP",
+          estado: n.estado,
+          };
+        })}
+        />
 
       <Modal open={!!form} onClose={cerrarForm} title={editando ? `Editar ${editando.numero}` : "Nueva nota de pedido"} wide>
         {form && (

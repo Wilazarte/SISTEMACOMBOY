@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { productoNormalizado, sedeNormalizada } from "@/lib/constantes";
 import { FileDown, FileSpreadsheet, History, PackageMinus, Truck, Upload } from "lucide-react";
 import { Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, cn, ejecutar, toast } from "@/components/ui";
@@ -103,62 +104,66 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
           <input type="checkbox" checked={soloSinValor} onChange={(e) => setSoloSinValor(e.target.checked)} className="h-4 w-4 accent-amber-500" /> Solo sin valorizar
         </label>
       </div>
-      <Table head={["Sede", "Producto", "Unidad", "Cantidad", "Último costo", "Valorizado", "Actualizado", "Acciones"]} empty={filas.length === 0}>
-        {filas.map(({ s, partes, valor, base }) => (
-          <tr key={s.id} className="hover:bg-plomo-50" data-stock={s.id}>
-            <Td>
-              {s.sede}
-              {partes.length > 1 && (
-                <span
-                  className="tip ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800"
-                  data-tip={partes.map((p) => `${p.sede}: ${num(p.cantidad)}`).join(" + ")}
-                >
-                  {partes.length} registros
-                </span>
-              )}
-            </Td>
-            <Td className="font-medium text-fg">{s.nombre}</Td>
-            <Td>{s.unidad}</Td>
-            <Td className={cn("text-right font-semibold", s.cantidad <= 0 && "text-red-600")}>{num(s.cantidad)}</Td>
-            <Td className="text-right">
-              {s.costoUnit > 0 ? (
-                soles(s.costoUnit)
-              ) : (
-                <span className="inline-flex whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800 ring-1 ring-inset ring-amber-300" data-sin-valorizar>
-                  Sin valorizar
-                </span>
-              )}
-            </Td>
-            <Td className="text-right">{soles(valor)}</Td>
-            <Td>{fechaCorta(s.actualizado)}</Td>
-            <Td>
-              <div className="flex flex-nowrap gap-1">
-                <Button size="sm" variant="secondary" onClick={() => setKardexDe(base)} title={partes.length > 1 ? `Kardex de ${base.sede} (registro con más stock)` : "Ver Kardex"}>
-                  <History size={14} /> Kardex
-                </Button>
-                {puedeOperar && (
-                  <>
-                    <Button size="sm" onClick={() => setRetiroDe(base)} disabled={base.cantidad <= 0} title={partes.length > 1 ? `Retiro desde ${base.sede} (${num(base.cantidad)} disponibles)` : "Retiro para producción (Vale de Producción Interno)"}>
-                      <PackageMinus size={14} /> Retiro Producción
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        toast(`Retiro por venta de ${s.nombre}: se descuenta al despachar la Orden de Despacho (SALIDA-VENTA).`);
-                        onIrDespacho();
-                      }}
-                      title="Retiro para despacho (venta): se hace desde la Orden de Despacho"
-                    >
-                      <Truck size={14} /> Retiro Despacho
-                    </Button>
-                  </>
+      {/* Actualizado | Producto | Sede y unidad | Cantidad | Acciones. Costo y valorizado: al pasar el mouse sobre la cantidad y en el Kardex. */}
+      <ListaDocs
+        tipo="inventario"
+        filas={filas.map(
+          ({ s, partes, valor, base }): FilaDoc => ({
+            id: s.id,
+            fecha: s.actualizado,
+            contraparte: s.nombre,
+            ref: (
+              <>
+                <span className="font-medium text-fg">{s.sede}</span>
+                <span className="ml-1.5 text-xs text-plomo-500">{s.unidad}</span>
+                {partes.length > 1 && (
+                  <span className="tip ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800" data-tip={partes.map((p) => `${p.sede}: ${num(p.cantidad)}`).join(" + ")}>
+                    {partes.length} registros
+                  </span>
                 )}
-              </div>
-            </Td>
-          </tr>
-        ))}
-      </Table>
+                {!(s.costoUnit > 0) && (
+                  <span className="ml-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800" data-sin-valorizar>
+                    Sin valorizar
+                  </span>
+                )}
+              </>
+            ),
+            total: (
+              <span className={cn(s.cantidad <= 0 && "text-red-600")} title={s.costoUnit > 0 ? `Último costo ${soles(s.costoUnit)} · valorizado ${soles(valor)}` : "Sin valorizar"}>
+                {num(s.cantidad)}
+              </span>
+            ),
+            buscar: `${s.sede} ${s.unidad} ${partes.map((p) => p.sede).join(" ")}`,
+            tipoDoc: s.unidad,
+            estado: s.costoUnit > 0 ? "VALORIZADO" : "SIN_VALORIZAR",
+            acciones: (
+                  <div className="flex flex-nowrap gap-1">
+                    <Button size="sm" variant="secondary" onClick={() => setKardexDe(base)} title={partes.length > 1 ? `Kardex de ${base.sede} (registro con más stock)` : "Ver Kardex"}>
+                      <History size={14} /> Kardex
+                    </Button>
+                    {puedeOperar && (
+                      <>
+                        <Button size="sm" onClick={() => setRetiroDe(base)} disabled={base.cantidad <= 0} title={partes.length > 1 ? `Retiro desde ${base.sede} (${num(base.cantidad)} disponibles)` : "Retiro para producción (Vale de Producción Interno)"}>
+                          <PackageMinus size={14} /> Retiro Producción
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            toast(`Retiro por venta de ${s.nombre}: se descuenta al despachar la Orden de Despacho (SALIDA-VENTA).`);
+                            onIrDespacho();
+                          }}
+                          title="Retiro para despacho (venta): se hace desde la Orden de Despacho"
+                        >
+                          <Truck size={14} /> Retiro Despacho
+                        </Button>
+                      </>
+                    )}
+                  </div>
+            ),
+          })
+        )}
+      />
 
       {kardexDe_ && <KardexModal item={stock.find((x) => x.id === kardexDe_.id) ?? kardexDe_} onClose={() => setKardexDe(null)} />}
       {retiroDe && <RetiroProduccionModal item={stock.find((x) => x.id === retiroDe.id) ?? retiroDe} onClose={() => setRetiroDe(null)} />}

@@ -331,7 +331,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </span>
         <span className="font-mono">v3.2.1</span>
       </footer>
-      <BottomNav sesion={sesion} />
+      <BottomNav sesion={sesion} tab={tabActiva?.id ?? null} />
       <AccionRapida acciones={acciones} />
       <CommandPalette abierto={paleta} onCerrar={() => setPaleta(false)} comandos={comandos} documentos={documentos} />
       <DocViewerHost />

@@ -1,6 +1,7 @@
 "use client";
 
 import { pdfBoletaPago } from "@/lib/pdf";
+import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, Archive, Building2, Calculator, Copy, Eye, FileDown, HandCoins, Lock, Pencil, Plus, Trash2, Upload, Users } from "lucide-react";
@@ -555,52 +556,39 @@ export function PlanillaExistente() {
               <Empty icon={<Users size={28} />} text={trabajadores.length ? "Ningún trabajador coincide." : "Aún no hay trabajadores. Regístrelos o importe la asistencia del reloj."} />
             </div>
           ) : (
-            <Table head={["N°", "Trabajador", "Cargo / sede", "F. ingreso", "Sueldo", "Pensión", "Estado", ""]}>
-              {listaMaestro.map((t) => (
-                <tr key={t.id} className={cn("transition hover:bg-plomo-50", !t.activo && "bg-plomo-100 text-slate-400")}>
-                  <Td className="font-mono text-base">{t.id}</Td>
-                  <Td>
-                    <p className={cn("font-semibold", t.activo ? "text-fg" : "text-plomo-500 line-through decoration-slate-300")}>{t.nombre}</p>
-                    <p className="text-xs text-plomo-500">
-                      DNI {t.dni || "-"}
-                      {edad(t.fechaNacimiento) !== null ? ` · ${edad(t.fechaNacimiento)} años` : ""}
-                      {t.celular ? ` · ${t.celular}` : ""}
-                    </p>
-                  </Td>
-                  <Td>
-                    {t.cargo}
-                    {t.sede && <p className="text-xs text-plomo-500">{t.sede}</p>}
-                  </Td>
-                  <Td>
-                    {t.fechaIngreso ? (
-                      <>
-                        <p>{fechaPE(t.fechaIngreso)}</p>
-                        <p className="text-xs text-plomo-500">{antiguedad(t.fechaIngreso)}</p>
-                      </>
-                    ) : (
-                      <span className="text-xs font-semibold text-orange-600">Sin registrar</span>
-                    )}
-                  </Td>
-                  <Td className="text-right">
-                    {soles(t.sueldo)}
-                    <p className="text-xs text-plomo-500">{sueldoDe(t).label}</p>
-                  </Td>
-                  <Td>
-                    <p>{afpLabel(t)}</p>
-                    <p className="text-xs text-plomo-500">{t.afpPorcentaje}%</p>
-                  </Td>
-                  <Td>
-                    <Badge estado={t.activo ? "ACTIVO" : "INACTIVO"} />
-                    {!t.activo && t.fechaBaja && <p className="mt-1 text-[11px] text-red-600">Baja {fechaPE(t.fechaBaja)}</p>}
-                  </Td>
-                  <Td>
+            <ListaDocs
+              tipo="planilla"
+              filas={listaMaestro.map(
+                (t): FilaDoc => ({
+                  id: t.id,
+                  fecha: t.fechaIngreso || "",
+                  subFecha: t.fechaIngreso ? <span className="text-plomo-500">{antiguedad(t.fechaIngreso)}</span> : <span className="font-semibold text-orange-600">Sin fecha de ingreso</span>,
+                  contraparte: t.nombre,
+                  ref: (
+                    <>
+                      <span className="font-mono font-semibold text-fg">N° {t.id}</span>
+                      <span className="ml-1.5 text-xs text-plomo-500">{t.cargo}</span>
+                      <span className="ml-2 inline-block align-middle"><Badge estado={t.activo ? "ACTIVO" : "INACTIVO"} /></span>
+                    </>
+                  ),
+                  total: (
+                    <>
+                      {soles(t.sueldo)}
+                      <span className="ml-1 text-xs font-normal text-plomo-500">{sueldoDe(t).label}</span>
+                    </>
+                  ),
+                  buscar: `${t.id} ${t.dni ?? ""} ${t.cargo} ${t.sede ?? ""} ${afpLabel(t)}`,
+                  tipoDoc: t.cargo,
+                  estado: t.activo ? "ACTIVO" : "INACTIVO",
+                  claseFila: t.activo ? undefined : "bg-plomo-100 text-slate-400",
+                  acciones: (
                     <div className="flex gap-1">
-                      <Button size="md" variant={t.activo ? "secondary" : "ghost"} onClick={() => setFicha({ form: { ...t }, idOriginal: t.id })} title="Ficha del trabajador">
+                      <Button size="sm" variant={t.activo ? "secondary" : "ghost"} onClick={() => setFicha({ form: { ...t }, idOriginal: t.id })} title="Ver y editar la ficha del trabajador">
                         <Pencil size={15} /> Ficha
                       </Button>
                       {puedeEditar && !t.fechaIngreso && (
                         <Button
-                          size="md"
+                          size="sm"
                           variant="ghost"
                           title="Eliminar (registro incompleto)"
                           onClick={() => confirm(`¿Eliminar a ${t.nombre} (N° ${t.id})? No tiene ficha completa.`) && ejecutar(() => eliminarTrabajador(t.id), "Trabajador eliminado")}
@@ -609,10 +597,10 @@ export function PlanillaExistente() {
                         </Button>
                       )}
                     </div>
-                  </Td>
-                </tr>
-              ))}
-            </Table>
+                  ),
+                })
+              )}
+            />
           )}
         </Card>
       )}

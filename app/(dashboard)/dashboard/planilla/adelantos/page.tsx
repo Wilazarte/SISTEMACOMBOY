@@ -1,5 +1,6 @@
 "use client";
 
+import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, HandCoins, Lock, Pencil, Plus, Save, Trash2, X } from "lucide-react";
@@ -206,31 +207,28 @@ export default function AdelantosPage() {
             <Empty icon={<HandCoins size={28} />} text={lista.length ? "Ningún adelanto coincide con el filtro." : "Aún no hay adelantos registrados."} />
           </div>
         ) : (
-          <Table head={["Fecha", "Trabajador", "Estado", "Monto", ...(puedeEditar ? ["Acciones"] : [])]}>
-            {visibles.map((a) => (
-              <tr
-                key={a.id}
-                className={cn(
-                  "hover:bg-plomo-50",
-                  a.estado === "PENDIENTE" && "bg-amber-50/40",
-                  a.estado === "DESCONTADO" && "bg-emerald-50/40",
-                  editandoId === a.id && "bg-amber-100",
-                  a.estado === "ANULADO" && "opacity-60"
-                )}
-              >
-                <Td className="whitespace-nowrap">{fechaPE(a.fecha)}</Td>
-                <Td className="font-semibold text-fg">
-                  {/* DNI, motivo, medio y caja: al pasar el mouse y en el formulario de edición */}
-                  <span title={[a.dni && `DNI ${a.dni}`, a.motivo, a.medio_pago, a.caja_nombre].filter(Boolean).join(" · ")}>{a.trabajador_nombre}</span>
-                </Td>
-                <Td>
-                  <Badge estado={a.estado} />
+          <ListaDocs
+          tipo="planilla"
+          conAcciones={puedeEditar}
+          filas={visibles.map((a): FilaDoc => {
+          return {
+          id: a.id,
+          fecha: a.fecha,
+          contraparte: a.trabajador_nombre,
+          ref: (
+            <>
+              <Badge estado={a.estado} />
                   {a.estado === "DESCONTADO" && <span className="ml-1.5 text-[11px] text-emerald-700">{a.planilla_periodo ? `En ${a.planilla_periodo}` : "En planilla"}</span>}
-                </Td>
-                <Td className="text-right font-semibold">{soles(a.monto)}</Td>
-                {puedeEditar && (
-                  <Td>
-                    {a.estado === "DESCONTADO" ? (
+            </>
+          ),
+          total: (
+            <>
+              {soles(a.monto)}
+            </>
+          ),
+          acciones: (
+            <>
+              {a.estado === "DESCONTADO" ? (
                       <span className="inline-flex items-center gap-1 text-xs font-medium text-plomo-500" title="Ya se descontó en una planilla: no se puede editar ni eliminar">
                         <Lock size={13} /> Descontado
                       </span>
@@ -244,11 +242,15 @@ export default function AdelantosPage() {
                       </Button>
                     </div>
                     )}
-                  </Td>
-                )}
-              </tr>
-            ))}
-          </Table>
+            </>
+          ),
+          buscar: `${a.dni ?? ""} ${a.motivo ?? ""} ${a.planilla_periodo ?? ""} ${a.caja_nombre ?? ""}`,
+          tipoDoc: "ADELANTO",
+          estado: a.estado,
+          claseFila: cn(a.estado === "PENDIENTE" && "bg-amber-50/40", a.estado === "DESCONTADO" && "bg-emerald-50/40", editandoId === a.id && "bg-amber-100", a.estado === "ANULADO" && "opacity-60"),
+          };
+        })}
+        />
         )}
       </Card>
     </div>
