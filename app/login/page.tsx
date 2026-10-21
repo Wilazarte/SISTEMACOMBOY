@@ -111,14 +111,14 @@ function Login() {
   return (
     <Fondo>
       {/* Logo (tal cual, sin fondo) */}
-      <header className="mt-10 flex justify-center px-4">
+      <header className="mt-8 flex justify-center px-4">
         <Logo />
       </header>
 
       {/* Título + formulario del módulo elegido */}
       <section className="flex flex-col items-center px-4 text-center">
-        <h1 className="mt-16 text-[26px] font-bold uppercase leading-tight text-white md:text-[36px]">BIENVENIDO AL SISTEMA ERP COMBOY VID</h1>
-        <p className="mt-3 text-[18px] text-[#8fb0ff]">{encargado ? `${encargado.nombre} · ${encargado.cargo}` : "Selecciona tu módulo"}</p>
+        <h1 className="mt-12 text-[28px] font-bold uppercase leading-tight text-white md:text-[40px]">BIENVENIDO AL SISTEMA ERP COMBOY VID</h1>
+        <p className="mt-4 text-[20px] text-[#8fb0ff]">{encargado ? `${encargado.nombre} · ${encargado.cargo}` : "Selecciona tu módulo"}</p>
         {proximamente && (
           <p className="mt-6 animate-aparecer rounded-full border border-white/20 bg-black/40 px-5 py-2 text-sm text-white/80 backdrop-blur-xl">
             {tarjetaDe(pedido as ModuloLogin).titulo.split(" (")[0]} estará disponible próximamente.
@@ -203,7 +203,7 @@ function Login() {
 
       {/* Dock de módulos (scroll horizontal en mobile) */}
       <nav className="mt-10 w-full px-4 pb-10">
-        <div className="mx-auto flex w-full max-w-[980px] justify-between gap-3 overflow-x-auto rounded-full border border-white/30 bg-black/20 px-6 py-4 backdrop-blur-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="mx-auto flex w-full max-w-[1050px] justify-between gap-3 overflow-x-auto rounded-full border border-white/20 bg-black/30 px-6 py-4 backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {DOCK.map(({ id, slug, titulo, icon: Icon }) => {
             const sel = activo === id;
             return (
@@ -213,7 +213,7 @@ function Login() {
                 data-modulo={id}
                 aria-pressed={sel}
                 onClick={() => elegir(id, slug)}
-                className={`flex h-[72px] min-w-[112px] flex-1 flex-col items-center justify-center gap-1.5 rounded-full border text-[15px] font-bold text-white transition-all duration-200 ${
+                className={`flex h-20 min-w-[112px] flex-1 flex-col items-center justify-center gap-1.5 rounded-full border text-[15px] font-bold text-white transition-all duration-200 ${
                   sel
                     ? "border-[#ff5a5a] bg-gradient-to-b from-[#e42323] to-[#7a0000] shadow-[0_0_22px_rgba(255,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.35)]"
                     : "border-white/20 bg-white/10 text-white/85 hover:border-white/40 hover:bg-white/15 hover:text-white"
@@ -230,18 +230,18 @@ function Login() {
   );
 }
 
-/** Logo tal cual (sin fondo): /logo-comboy.png es el único logo en public/. */
+/** Logo COMBOY VID transparente (/logo.png). */
 function Logo() {
-  return <Image src="/logo-comboy.png" alt="COMBOY" width={380} height={110} priority className="h-auto max-w-full object-contain" />;
+  return <Image src="/logo.png" alt="COMBOY VID" width={500} height={160} priority className="h-[160px] w-[500px] max-w-full object-contain drop-shadow-[0_0_18px_rgba(0,0,0,0.6)]" />;
 }
 
-/** Fondo: imagen de referencia /login-bg.jpg a pantalla completa con overlay negro 45%. */
+/** Fondo: imagen de referencia /login-bg.jpg a pantalla completa con overlay negro 40%. */
 function Fondo({ children }: { children?: React.ReactNode }) {
   return (
     <div className="relative isolate min-h-screen overflow-hidden bg-black">
       <div aria-hidden className="pointer-events-none fixed inset-0 z-[-1]">
         <Image src="/login-bg.jpg" alt="" fill priority quality={90} sizes="100vw" className="object-cover object-center" />
-        <div className="absolute inset-0 bg-black/45" />
+        <div className="absolute inset-0 bg-black/40" />
       </div>
       <main className="relative z-10 flex min-h-screen flex-col">{children}</main>
     </div>
