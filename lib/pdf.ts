@@ -720,31 +720,48 @@ function pdfGasto(f: Factura, codigo: string): void {
 }
 
 /** Declaración jurada de gasto (gasto sin comprobante) con su N° correlativo DJ-0001. */
+export function docDeclaracionJurada(f: Factura): jsPDF {
+  const doc = construir({
+    titulo: `DECLARACIÓN JURADA DE GASTO N° ${f.numero}`,
+    numero: f.numero,
+    estado: f.djEstado === "APROBADA" ? "APROBADA" : f.djEstado === "ENVIADA" ? "EN APROBACIÓN" : estadoDocumento(f.estadoPago),
+    datos: [
+      ["Fecha", fechaPE(f.fecha)],
+      ["Concepto", f.descripcion ?? "-"],
+      ["Importe", soles(f.total)],
+      ["Proveedor", f.proveedor],
+      ["DNI / RUC", f.ruc || "-"],
+      ["Código de gasto", f.codigo ?? "-"],
+      ["Motivo", "Gasto sin comprobante de pago autorizado"],
+    ],
+    head: ["#", "Concepto", "Importe"],
+    body: [[1, f.descripcion ?? "-", soles(f.total)]],
+    alinearDerecha: [2],
+    totales: [["TOTAL", soles(f.total)]],
+    notas: [
+      `Yo, ${f.proveedor}${f.ruc ? `, identificado con ${f.ruc.length === 11 ? "RUC" : "DNI"} ${f.ruc}` : ""}, declaro bajo juramento haber recibido de ${EMPRESA.razonSocial} (RUC ${EMPRESA.ruc}) el importe de ${soles(f.total)} por el concepto indicado, el ${fechaPE(f.fecha)}, sin haber emitido comprobante de pago.`,
+      "Motivo: gasto sin comprobante de pago autorizado. Documento sustentatorio interno; no otorga derecho a crédito fiscal.",
+    ],
+    firmas: ["Firma Solicitante", "Firma Gerencia"],
+  });
+  doc.setProperties({ title: f.numero });
+  return doc;
+}
+
+/** Descarga DJ-0005.pdf */
 export function pdfDeclaracionJurada(f: Factura): void {
-  guardar(
-    construir({
-      titulo: `DECLARACIÓN JURADA DE GASTO N° ${f.numero}`,
-      numero: f.numero,
-      estado: estadoDocumento(f.estadoPago),
-      datos: [
-        ["Fecha", fechaPE(f.fecha)],
-        ["Importe", soles(f.total)],
-        ["Descripción", f.descripcion ?? "-"],
-        ["Proveedor", f.proveedor],
-        ["DNI / RUC", f.ruc || "-"],
-        ["Concepto", "Gasto sin comprobante"],
-      ],
-      head: ["#", "Descripción", "Importe"],
-      body: [[1, f.descripcion ?? "-", soles(f.total)]],
-      alinearDerecha: [2],
-      totales: [["TOTAL", soles(f.total)]],
-      notas: [
-        `Declaro bajo juramento que el gasto detallado por ${soles(f.total)} se realizó a favor de ${EMPRESA.razonSocial} y que el proveedor ${f.proveedor} no emitió comprobante de pago. Documento sustentatorio interno; no otorga derecho a crédito fiscal.`,
-      ],
-      firmas: ["Declarante", "Tesorería", "Gerencia"],
-    }),
-    f.numero
-  );
+  guardar(docDeclaracionJurada(f), f.numero);
+}
+
+/** URL blob para ver la DJ dentro de un iframe (vista previa del modal). */
+export const urlDeclaracionJurada = (f: Factura): string => String(docDeclaracionJurada(f).output("bloburl"));
+
+/** Abre la DJ e imprime. */
+export function imprimirDeclaracionJurada(f: Factura): void {
+  const doc = docDeclaracionJurada(f);
+  doc.autoPrint();
+  const w = window.open(String(doc.output("bloburl")), "_blank");
+  if (!w) guardar(doc, f.numero);
 }
 
 export function pdfFactura(f: Factura, oc?: OrdenCompra): void {

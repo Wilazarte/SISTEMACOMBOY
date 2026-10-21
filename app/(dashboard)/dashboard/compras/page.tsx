@@ -40,6 +40,7 @@ import {
   TIPOS_GASTO,
   KEYS,
   esContratista,
+  esDeclaracionJurada,
   MAX_ARCHIVO,
   TOPE_DJ,
   abrirArchivo,
@@ -84,12 +85,14 @@ import { pdfCotizacion, pdfFactura, pdfOrdenCompra, pdfRequerimiento } from "@/l
 import { asientoOrdenCompra, reasentarOrdenCompra } from "@/lib/contable";
 import { getSesion, puedeVer } from "@/lib/auth";
 import PlanillaInterna from "@/components/tesoreria/PlanillaTab";
+import { DeclaracionesJuradas } from "@/components/tesoreria/DeclaracionesJuradas";
+import { pdfDeclaracionJurada } from "@/lib/pdf";
 import { EditarReq, permisoEditarReq } from "@/components/compras/EditarReq";
 import { EditarGasto } from "@/components/compras/EditarGasto";
 import type { Trabajador } from "@/lib/types";
 import type { Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, Proveedor, Requerimiento, Rol, StockItem, TipoComprobanteCompra } from "@/lib/types";
 
-type Tab = "registrar" | "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias" | "planilla";
+type Tab = "registrar" | "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias" | "planilla" | "declaraciones";
 
 const FORMAS_PAGO: FormaPago[] = ["CONTADO", "CREDITO 15 DIAS", "CREDITO 30 DIAS", "CREDITO 60 DIAS", "ADELANTO 50%"];
 const DIAS_CREDITO: Record<FormaPago, number> = {
@@ -135,7 +138,7 @@ export default function ComprasPage() {
   // Contador de la pestaña Planilla (solo se descarga si el usuario ve planilla)
   const trabajadores = useStore<Trabajador[]>(KEYS.TRABAJADORES, [], vePlanilla);
   const activos = trabajadores.filter((t) => t.activo && !esContratista(t)).length;
-  const tabsPermitidas: Tab[] = [...(veCompras ? (["registrar", "antecedentes", "cotizaciones", "ordenes", "facturas"] as Tab[]) : []), ...(vePlanilla ? (["planilla"] as Tab[]) : [])];
+  const tabsPermitidas: Tab[] = [...(veCompras ? (["registrar", "antecedentes", "cotizaciones", "ordenes", "facturas", "declaraciones"] as Tab[]) : []), ...(vePlanilla ? (["planilla"] as Tab[]) : [])];
   // Al volver a Tesorería abre la última pestaña usada (salvo que la URL pida otra con ?tab=)
   useEffect(() => {
     try {
@@ -197,6 +200,7 @@ export default function ComprasPage() {
               ]
             : []),
           ...(vePlanilla ? [{ id: "planilla" as const, label: "Planilla", icon: <Users size={16} />, count: activos }] : []),
+          ...(veCompras ? [{ id: "declaraciones" as const, label: "Declaraciones juradas", icon: <FileText size={16} />, count: facturas.filter(esDeclaracionJurada).length }] : []),
         ]}
       />
 
@@ -209,6 +213,7 @@ export default function ComprasPage() {
         <Ordenes key={pre.coti ?? "o"} rol={rol} cotis={cotisSinOC} todasCotis={cotizaciones} ordenes={ordenes} reqs={procesados} preCoti={pre.coti} onFacturar={(id) => ir("facturas", { oc: id })} />
       )}
       {tab === "facturas" && <Facturas key={pre.oc ?? "f"} rol={rol} ocs={ocsSinFactura} ordenes={ordenes} facturas={facturas} preOc={pre.oc} />}
+      {tab === "declaraciones" && veCompras && <DeclaracionesJuradas facturas={facturas} rol={rol} />}
       {tab === "planilla" && vePlanilla && (
         <div>
           <PlanillaInterna />
@@ -635,7 +640,16 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
                 fecha: g.fecha,
                 contraparte: g.proveedor,
                 subFecha: g.tipoGasto === "PLANILLA" ? <span className="text-plomo-500">{g.numero.replace(/^PLLA\s+/, "")}</span> : undefined,
-                ref: <span className="whitespace-nowrap font-semibold text-fg">{g.codigo ?? g.numero}</span>,
+                ref: esDeclaracionJurada(g) ? (
+                  <span className="whitespace-nowrap">
+                    <span className="font-semibold text-fg">{g.codigo ?? "-"}</span>
+                    <button type="button" onClick={() => pdfDeclaracionJurada(g)} className="ml-1.5 text-xs font-semibold text-[#2a7bff] underline" title="Ver PDF de la declaración jurada">
+                      {g.numero}
+                    </button>
+                  </span>
+                ) : (
+                  <span className="whitespace-nowrap font-semibold text-fg">{g.codigo ?? g.numero}</span>
+                ),
                 total: soles(g.total),
                 buscar: `${g.codigo ?? ""} ${g.numero} ${g.ruc} ${g.descripcion ?? ""}`,
                 tipoDoc: g.tipoGasto === "PLANILLA" ? "PLANILLA" : "GASTO",

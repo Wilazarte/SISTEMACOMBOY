@@ -24,9 +24,11 @@ export interface FilaDoc {
   /** Línea pequeña bajo la fecha (vencimiento, periodo…). */
   subFecha?: ReactNode;
   claseFila?: string;
+  /** Celda de la columna extra (si la lista la pide con `extra`). */
+  extra?: ReactNode;
 }
 
-export type TipoLista = "compras" | "cotizaciones" | "ordenes" | "facturas" | "planilla" | "ventas" | "inventario" | "requerimientos";
+export type TipoLista = "compras" | "cotizaciones" | "ordenes" | "facturas" | "planilla" | "ventas" | "inventario" | "requerimientos" | "declaraciones";
 
 const ETIQUETAS: Record<TipoLista, { contraparte: string; ref: string; total: string; buscar: string }> = {
   compras: { contraparte: "Proveedor", ref: "Doc. referencia", total: "Total", buscar: "Buscar comprobante, proveedor, RUC…" },
@@ -37,6 +39,7 @@ const ETIQUETAS: Record<TipoLista, { contraparte: string; ref: string; total: st
   ventas: { contraparte: "Cliente", ref: "Doc. referencia", total: "Total", buscar: "Buscar NP, OD, cliente…" },
   inventario: { contraparte: "Producto", ref: "Sede / unidad", total: "Cantidad", buscar: "Buscar producto…" },
   requerimientos: { contraparte: "Solicitante", ref: "Doc. referencia", total: "Ítems", buscar: "Buscar REQ, OC, solicitante…" },
+  declaraciones: { contraparte: "Proveedor", ref: "Doc. referencia", total: "Total", buscar: "Buscar DJ, GST, proveedor, concepto…" },
 };
 
 /** Página 1: los últimos 15; desde la 2: de 30 en 30. */
@@ -49,7 +52,20 @@ const rango = (pagina: number): [number, number] => (pagina === 1 ? [0, PAGE1] :
  * con buscador, filtros (fecha, contraparte, tipo, estado) y paginación 15 / 30.
  * El detalle completo (RUC, ítems, IGV, pago, baucher…) queda en el modal Ver y en el PDF de cada documento.
  */
-export function ListaDocs({ filas, tipo, conAcciones = true, conRef = true }: { filas: FilaDoc[]; tipo: TipoLista; conAcciones?: boolean; conRef?: boolean }) {
+export function ListaDocs({
+  filas,
+  tipo,
+  conAcciones = true,
+  conRef = true,
+  extra,
+}: {
+  filas: FilaDoc[];
+  tipo: TipoLista;
+  conAcciones?: boolean;
+  conRef?: boolean;
+  /** Título de una columna extra entre Doc. referencia y Total. */
+  extra?: string;
+}) {
   const et = ETIQUETAS[tipo];
   const [q, setQ] = useState("");
   const [desde, setDesde] = useState("");
@@ -119,7 +135,7 @@ export function ListaDocs({ filas, tipo, conAcciones = true, conRef = true }: { 
         )}
       </div>
 
-      <Table head={["Fecha", et.contraparte, ...(conRef ? [et.ref] : []), et.total, ...(conAcciones ? ["Acciones"] : [])]} empty={visibles.length === 0}>
+      <Table head={["Fecha", et.contraparte, ...(conRef ? [et.ref] : []), ...(extra ? [extra] : []), et.total, ...(conAcciones ? ["Acciones"] : [])]} empty={visibles.length === 0}>
         {visibles.map((f) => (
           <tr key={f.id} className={cn("hover:bg-plomo-50", f.claseFila)}>
             <Td className="whitespace-nowrap">
@@ -132,6 +148,7 @@ export function ListaDocs({ filas, tipo, conAcciones = true, conRef = true }: { 
               </span>
             </Td>
             {conRef && <Td>{f.ref}</Td>}
+            {extra && <Td className="max-w-[280px]">{f.extra}</Td>}
             <Td className="whitespace-nowrap text-right font-semibold">{f.total}</Td>
             {conAcciones && <Td>{f.acciones}</Td>}
           </tr>

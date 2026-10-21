@@ -2317,6 +2317,27 @@ async function siguienteDJ(): Promise<string> {
   return `DJ-${data}`;
 }
 
+/** Declaraciones juradas de gasto: gastos de Tesorería con comprobante DJ (las de la OC también son DJ). */
+export const esDeclaracionJurada = (f: Factura): boolean => (f.esGastoTesoreria && f.comprobanteGasto === "DJ") || f.tipo === "DECLARACION_JURADA";
+
+/** PENDIENTE -> ENVIADA (a Gerencia) -> APROBADA (creador / Gerencia). Deja rastro en el historial. */
+export function cambiarEstadoDJ(id: string, estado: "ENVIADA" | "APROBADA", rol: Rol): Factura {
+  const lista = getFacturas();
+  const f = lista.find((x) => x.id === id);
+  if (!f || !esDeclaracionJurada(f)) throw new ErpError("Declaración jurada no encontrada.");
+  const actual = f.djEstado ?? "PENDIENTE";
+  if (estado === "ENVIADA" && actual !== "PENDIENTE") throw new ErpError(`La ${f.numero} ya fue ${actual === "APROBADA" ? "aprobada" : "enviada"}.`);
+  if (estado === "APROBADA" && actual === "APROBADA") throw new ErpError(`La ${f.numero} ya está aprobada.`);
+  const nueva: Factura = {
+    ...f,
+    djEstado: estado,
+    ...(estado === "APROBADA" ? { aprobadoPor: usuarioActual() } : {}),
+    historial: [...f.historial, evento(rol, estado === "ENVIADA" ? "Declaración jurada enviada a aprobar" : "Declaración jurada aprobada")],
+  };
+  escribir(KEYS.FACTURAS, lista.map((x) => (x.id === id ? nueva : x)));
+  return nueva;
+}
+
 /** Registra un gasto / servicio: NO ingresa a stock; queda en Facturas como POR PAGAR. */
 export function registrarGastoTesoreria(d: DatosGasto, rol: Rol): Factura {
   const f = prepararGasto(d, rol);
@@ -2393,6 +2414,7 @@ export async function registrarGastoCompleto(
     const numero = await siguienteDJ();
     const poner = (h: EventoHistorial[]) => h.map((e) => (e.detalle ? { ...e, detalle: e.detalle.replace(DJ_AUTO, numero) } : e));
     f.numero = numero;
+    f.djEstado = "PENDIENTE";
     f.historial = poner(f.historial);
     if (oc) oc.historial = poner(oc.historial);
   }

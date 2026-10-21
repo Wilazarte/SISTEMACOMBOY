@@ -165,6 +165,8 @@ export interface Factura {
   detraccionMonto?: number;
   netoPagar?: number; // total - detracción
   archivos?: ArchivoGasto[];
+  /** Declaración jurada de gasto: PENDIENTE (recién emitida), ENVIADA (a Gerencia), APROBADA. */
+  djEstado?: "PENDIENTE" | "ENVIADA" | "APROBADA";
   /** Usuario que registró el gasto (perfiles.usuario). Los antiguos no lo tienen. */
   creadoPor?: string;
   editadoPor?: string;
