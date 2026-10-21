@@ -226,7 +226,7 @@ function CampoBloqueado({ valor, alerta }: { valor: number | string; alerta?: bo
 }
 
 /** Planilla (antes /dashboard/planilla): ahora es la pestaña Planilla de Tesorería / Compras. Usa las mismas tablas. */
-export function PlanillaExistente() {
+export function PlanillaTab() {
   const maestro = useTrabajadores();
   // Contratistas: mismo maestro, pero fuera de la lista de operarios y de la planilla del periodo
   const trabajadores = useMemo(() => maestro.filter((t) => !esContratista(t)), [maestro]);

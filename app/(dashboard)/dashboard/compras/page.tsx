@@ -39,6 +39,7 @@ import {
   TOPE_BANCARIZACION,
   TIPOS_GASTO,
   KEYS,
+  esContratista,
   MAX_ARCHIVO,
   TOPE_DJ,
   abrirArchivo,
@@ -82,9 +83,10 @@ import { ALMACENES, ALMACEN_DEFECTO, SEDES, UNIDADES } from "@/lib/empresa";
 import { pdfCotizacion, pdfFactura, pdfOrdenCompra, pdfRequerimiento } from "@/lib/pdf";
 import { asientoOrdenCompra, reasentarOrdenCompra } from "@/lib/contable";
 import { getSesion, puedeVer } from "@/lib/auth";
-import { PlanillaExistente } from "@/components/tesoreria/PlanillaExistente";
+import { PlanillaTab } from "@/components/tesoreria/PlanillaTab";
 import { EditarReq, permisoEditarReq } from "@/components/compras/EditarReq";
 import { EditarGasto } from "@/components/compras/EditarGasto";
+import type { Trabajador } from "@/lib/types";
 import type { Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, Proveedor, Requerimiento, Rol, StockItem, TipoComprobanteCompra } from "@/lib/types";
 
 type Tab = "registrar" | "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias" | "planilla";
@@ -110,6 +112,9 @@ const diasCredito = (forma?: string): number => {
 const BTN_REQ =
   "inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-medium text-white transition duration-150 hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100";
 
+/** Última pestaña abierta de Tesorería / Compras (por navegador). */
+const CLAVE_TAB = "tesoreria-tab-activa";
+
 export default function ComprasPage() {
   const [rol] = useRol();
   const pendientes = useStore<Requerimiento[]>(KEYS.REQS_PENDIENTES, []);
@@ -127,6 +132,27 @@ export default function ComprasPage() {
   const veCompras = puedeVer(sesion, "/dashboard/compras");
   const vePlanilla = puedeVer(sesion, "/dashboard/planilla");
   const [tab, setTab] = useState<Tab>(!veCompras ? "planilla" : puede(rol, "compra.crear") ? "registrar" : "antecedentes");
+  // Contador de la pestaña Planilla (solo se descarga si el usuario ve planilla)
+  const trabajadores = useStore<Trabajador[]>(KEYS.TRABAJADORES, [], vePlanilla);
+  const activos = trabajadores.filter((t) => t.activo && !esContratista(t)).length;
+  const tabsPermitidas: Tab[] = [...(veCompras ? (["registrar", "antecedentes", "cotizaciones", "ordenes", "facturas"] as Tab[]) : []), ...(vePlanilla ? (["planilla"] as Tab[]) : [])];
+  // Al volver a Tesorería abre la última pestaña usada (salvo que la URL pida otra con ?tab=)
+  useEffect(() => {
+    try {
+      const guardada = window.localStorage.getItem(CLAVE_TAB) as Tab | null;
+      if (!new URLSearchParams(window.location.search).get("tab") && guardada && tabsPermitidas.includes(guardada)) setTab(guardada);
+    } catch {
+      /* almacenamiento bloqueado */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(CLAVE_TAB, tab);
+    } catch {
+      /* almacenamiento bloqueado */
+    }
+  }, [tab]);
   const [pre, setPre] = useState<{ req?: string; coti?: string; oc?: string; fac?: string }>({});
 
   const ir = (t: Tab, p: typeof pre = {}) => {
@@ -170,7 +196,7 @@ export default function ComprasPage() {
                 // Guías de remisión: ya no son parte del flujo (pestaña oculta; las guías cargadas siguen guardadas)
               ]
             : []),
-          ...(vePlanilla ? [{ id: "planilla" as const, label: "Planilla", icon: <Users size={16} /> }] : []),
+          ...(vePlanilla ? [{ id: "planilla" as const, label: "Planilla", icon: <Users size={16} />, count: activos }] : []),
         ]}
       />
 
@@ -183,7 +209,7 @@ export default function ComprasPage() {
         <Ordenes key={pre.coti ?? "o"} rol={rol} cotis={cotisSinOC} todasCotis={cotizaciones} ordenes={ordenes} reqs={procesados} preCoti={pre.coti} onFacturar={(id) => ir("facturas", { oc: id })} />
       )}
       {tab === "facturas" && <Facturas key={pre.oc ?? "f"} rol={rol} ocs={ocsSinFactura} ordenes={ordenes} facturas={facturas} preOc={pre.oc} />}
-      {tab === "planilla" && vePlanilla && <PlanillaExistente />}
+      {tab === "planilla" && vePlanilla && <PlanillaTab />}
       {tab === "guias" && <Guias key={pre.fac ?? "g"} rol={rol} facturas={facturasSinGuia} guias={guias} preFac={pre.fac} />}
     </div>
   );
