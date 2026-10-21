@@ -233,7 +233,7 @@ export default function PlanillaTab() {
   const nContratistas = maestro.length - trabajadores.length;
   const sesion = getSesion();
   const soloLectura = !!sesion?.soloLectura; // Gerencia: ver sin editar
-  const puedeEditar = !soloLectura && ["creador", "planilla", "admin"].includes(sesion?.rol ?? "");
+  const puedeEditar = !soloLectura && ["creador", "planilla", "tesoreria", "admin"].includes(sesion?.rol ?? "");
   const [tab, setTab] = useState<Tab>("trabajadores");
   const historial = useHistorialPlanilla();
   const adelantos = useAdelantosPendientes();

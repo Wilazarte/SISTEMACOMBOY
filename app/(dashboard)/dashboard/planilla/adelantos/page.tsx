@@ -17,7 +17,7 @@ const vacio = (): DatosAdelanto => ({ trabajador_nombre: "", dni: "", fecha: hoy
 /** Planilla › Adelantos: formulario arriba (registrar / editar) y tabla abajo. */
 export default function AdelantosPage() {
   const sesion = getSesion();
-  const puedeEditar = !sesion?.soloLectura && ["creador", "planilla", "admin"].includes(sesion?.rol ?? "");
+  const puedeEditar = !sesion?.soloLectura && ["creador", "planilla", "tesoreria", "admin"].includes(sesion?.rol ?? "");
   const trabajadores = useTrabajadores();
   const [lista, setLista] = useState<Adelanto[]>([]);
   const [cargando, setCargando] = useState(true);
