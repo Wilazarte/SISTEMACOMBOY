@@ -28,6 +28,24 @@ export interface ItemReq {
   caracteristica: string;
 }
 
+/**
+ * Movimiento de caja registrado a mano en Reportes › Estados de cuenta (saldo inicial, reposición, transferencia).
+ * Los egresos de gastos, compras y adelantos NO se guardan aquí: se leen de esos documentos (lib/estadoCuenta.ts).
+ * Tabla contable, tipo MOVIMIENTO_CAJA.
+ */
+export interface MovimientoCajaManual {
+  id: string;
+  cuenta: string; // "CAJA CHICA" | "CAJA GENERAL" | "FONDO DE RESERVA"
+  fecha: string; // YYYY-MM-DD
+  tipo: "INGRESO" | "EGRESO";
+  concepto: string;
+  documento?: string;
+  proveedor?: string;
+  monto: number;
+  usuario: string;
+  creado: string; // ISO
+}
+
 export interface Requerimiento {
   id: string;
   numero: string; // REQ-ALM-001

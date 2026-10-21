@@ -71,7 +71,7 @@ export const CLAVES_POR_MODULO: Record<string, StoreKey[]> = {
     "almacen_equipos_terminados",
   ],
   "/dashboard/planilla": PLANILLA,
-  "/dashboard/contable": ["contable_asientos", "contable_plan_cuentas", "contable_cierres", "ventas_asientos"],
+  "/dashboard/contable": ["contable_asientos", "contable_plan_cuentas", "contable_cierres", "ventas_asientos", "contable_mov_caja"],
   "/dashboard/creador": ["CV_TRABAJADORES_V2", "planilla_asistencia", "planilla_huellas_alias"],
 };
 

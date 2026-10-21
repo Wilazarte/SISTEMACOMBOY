@@ -1,7 +1,8 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
-import { BookOpen, ChevronDown, ChevronRight, FileBarChart2, Landmark, Lock, LockOpen, Scale, Sparkles } from "lucide-react";
+import { EstadosCuenta } from "@/components/contable/EstadosCuenta";
+import { BookOpen, ChevronDown, ChevronRight, FileBarChart2, Landmark, Lock, LockOpen, Scale, Sparkles, Wallet } from "lucide-react";
 import { Button, Card, CardHeader, Empty, Field, Select, Table, Tabs, Td, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import {
@@ -22,7 +23,7 @@ import {
 import { generarAsientosAutomaticos } from "@/lib/contable-auto";
 import { KEYS, fechaPE, soles, tablaDisponible, useRol, useStore } from "@/lib/storage";
 
-type Tab = "diario" | "mayor" | "balance" | "eeff";
+type Tab = "diario" | "mayor" | "balance" | "eeff" | "estados";
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"];
 
@@ -126,9 +127,11 @@ export default function ContablePage() {
           { id: "mayor", label: "Mayor", icon: <Landmark size={16} /> },
           { id: "balance", label: "Balance", icon: <Scale size={16} /> },
           { id: "eeff", label: "EEFF", icon: <FileBarChart2 size={16} /> },
+          { id: "estados", label: "Estados de cuenta", icon: <Wallet size={16} /> },
         ]}
       />
 
+      {tab === "estados" && <EstadosCuenta anio={filtro.anio} mes={filtro.mes} onVerDiario={() => setTab("diario")} />}
       {tab === "diario" && <LibroDiario asientos={delPeriodo} titulo={nombrePeriodo} />}
       {tab === "mayor" && <Mayor asientos={delPeriodo} titulo={nombrePeriodo} />}
       {tab === "balance" && (

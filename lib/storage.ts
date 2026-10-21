@@ -27,6 +27,7 @@ import type {
   Cotizacion,
   EventoHistorial,
   Factura,
+  MovimientoCajaManual,
   Guia,
   ItemCompra,
   OrdenCompra,
@@ -81,6 +82,7 @@ export const KEYS = {
   CONTABLE_ASIENTOS: "contable_asientos",
   CONTABLE_PLAN: "contable_plan_cuentas",
   CONTABLE_CIERRES: "contable_cierres",
+  MOV_CAJA: "contable_mov_caja", // movimientos manuales de caja (Estados de cuenta)
 } as const;
 
 export type StoreKey = (typeof KEYS)[keyof typeof KEYS];
@@ -210,6 +212,7 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.CONTABLE_ASIENTOS]: { tabla: "contable", tipo: "ASIENTO_DIARIO", forma: "lista" },
   [KEYS.CONTABLE_PLAN]: { tabla: "contable", tipo: "PLAN_CUENTAS", forma: "lista" },
   [KEYS.CONTABLE_CIERRES]: { tabla: "contable", tipo: "CIERRE_MENSUAL", forma: "lista" },
+  [KEYS.MOV_CAJA]: { tabla: "contable", tipo: "MOVIMIENTO_CAJA", forma: "lista" },
   [KEYS.OBSERVACIONES]: { tabla: "observaciones", forma: "observaciones" },
 };
 const TABLAS = ["compras", "almacen", "planilla", "ventas", "observaciones", "condiciones_pago", "contable"] as const;
@@ -2336,6 +2339,33 @@ export function cambiarEstadoDJ(id: string, estado: "ENVIADA" | "APROBADA", rol:
   };
   escribir(KEYS.FACTURAS, lista.map((x) => (x.id === id ? nueva : x)));
   return nueva;
+}
+
+/** Saldo inicial, reposición o transferencia de una caja (Reportes › Estados de cuenta). */
+export function registrarMovimientoCaja(d: Pick<MovimientoCajaManual, "cuenta" | "fecha" | "tipo" | "concepto" | "documento" | "proveedor" | "monto">): MovimientoCajaManual {
+  if (!d.cuenta) throw new ErpError("Seleccione la cuenta.");
+  if (!FECHA_RE.test(d.fecha)) throw new ErpError("Fecha inválida.");
+  if (!d.concepto.trim()) throw new ErpError("Ingrese el concepto.");
+  const monto = r2(Number(d.monto));
+  if (!(monto > 0)) throw new ErpError("El monto debe ser mayor a 0.");
+  const m: MovimientoCajaManual = {
+    id: uid(),
+    cuenta: d.cuenta,
+    fecha: d.fecha,
+    tipo: d.tipo,
+    concepto: d.concepto.trim(),
+    ...(d.documento?.trim() ? { documento: d.documento.trim().toUpperCase() } : {}),
+    ...(d.proveedor?.trim() ? { proveedor: d.proveedor.trim().toUpperCase() } : {}),
+    monto,
+    usuario: usuarioActual(),
+    creado: new Date().toISOString(),
+  };
+  escribir(KEYS.MOV_CAJA, [m, ...leer<MovimientoCajaManual[]>(KEYS.MOV_CAJA, [])]);
+  return m;
+}
+
+export function eliminarMovimientoCaja(id: string): void {
+  escribir(KEYS.MOV_CAJA, leer<MovimientoCajaManual[]>(KEYS.MOV_CAJA, []).filter((m) => m.id !== id));
 }
 
 /** Registra un gasto / servicio: NO ingresa a stock; queda en Facturas como POR PAGAR. */

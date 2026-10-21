@@ -719,6 +719,49 @@ function pdfGasto(f: Factura, codigo: string): void {
   );
 }
 
+/** Estado de cuenta de una caja: saldo inicial, movimientos del periodo y saldo final. */
+export function pdfEstadoCuenta(d: {
+  cuenta: string;
+  periodo: string;
+  saldoInicial: number;
+  ingresos: number;
+  egresos: number;
+  saldoFinal: number;
+  movimientos: { fecha: string; concepto: string; documento: string; proveedor: string; debe: number; haber: number; saldo?: number }[];
+}): void {
+  const nombre = `ESTADO-CUENTA-${d.cuenta.replace(/\s+/g, "-")}-${d.periodo.replace(/\s+/g, "-")}`;
+  guardar(
+    construir({
+      titulo: `ESTADO DE CUENTA · ${d.cuenta}`,
+      numero: d.periodo.toUpperCase(),
+      estado: "REPORTE",
+      datos: [
+        ["Cuenta", d.cuenta],
+        ["Periodo", d.periodo],
+        ["Sede", "Arequipa"],
+        ["Emitido", fechaPE(new Date().toISOString().slice(0, 10))],
+        ["Saldo inicial", soles(d.saldoInicial)],
+        ["Saldo final", soles(d.saldoFinal)],
+      ],
+      head: ["Fecha", "Concepto", "Doc. ref.", "Proveedor", "Debe (ingreso)", "Haber (egreso)", "Saldo"],
+      body: [
+        ["", "SALDO INICIAL", "", "", "", "", soles(d.saldoInicial)],
+        ...d.movimientos.map((m) => [fechaPE(m.fecha), m.concepto, m.documento, m.proveedor, m.debe ? soles(m.debe) : "", m.haber ? soles(m.haber) : "", soles(m.saldo ?? 0)]),
+      ],
+      alinearDerecha: [4, 5, 6],
+      totales: [
+        ["Saldo inicial", soles(d.saldoInicial)],
+        ["Ingresos", soles(d.ingresos)],
+        ["Egresos", `- ${soles(d.egresos)}`],
+        ["SALDO FINAL", soles(d.saldoFinal)],
+      ],
+      firmas: ["Tesorería", "Gerencia"],
+      horizontal: true,
+    }),
+    nombre
+  );
+}
+
 /** Declaración jurada de gasto (gasto sin comprobante) con su N° correlativo DJ-0001. */
 export function docDeclaracionJurada(f: Factura): jsPDF {
   const doc = construir({
