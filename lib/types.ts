@@ -238,6 +238,12 @@ export interface Trabajador {
   observacionesMedicas?: string; // alergias, condiciones
   fechaBaja?: string; // YYYY-MM-DD (al dar de baja)
   motivoBaja?: string;
+  // ---- Cuenta bancaria para el pago (en planilla.data; no hay tabla trabajadores) ----
+  bancoNombre?: string; // BCP, BBVA, Interbank…
+  bancoTipoCuenta?: "Ahorros" | "Corriente";
+  bancoNumeroCuenta?: string; // solo dígitos
+  bancoCci?: string; // 20 dígitos
+  bancoTitular?: string; // si la cuenta no es del trabajador
   // ---- Contratista (mismo maestro, pero fuera de la planilla diaria) ----
   esContratista?: boolean; // también cuenta cargo "Contratista" o tipoSueldo POR_CONTRATO
   ruc?: string; // RUC del contratista (11 dígitos); el DNI va en dni

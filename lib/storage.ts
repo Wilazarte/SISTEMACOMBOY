@@ -1718,6 +1718,10 @@ const CAMPOS_FICHA_TEXTO = [
   "motivoBaja",
   "empresa",
   "formaPagoContrato",
+  "bancoNombre",
+  "bancoNumeroCuenta",
+  "bancoCci",
+  "bancoTitular",
 ] as const;
 export const SERVICIOS_CONTRATISTA: Record<ServicioContratista, string> = {
   ASESORIA: "Asesoría",
@@ -1740,6 +1744,7 @@ function fichaOpcional(t: Partial<Trabajador>): Partial<Trabajador> {
   if (typeof t.fechaBaja === "string" && FECHA_RE.test(t.fechaBaja)) r.fechaBaja = t.fechaBaja;
   if (t.estadoCivil && ESTADOS_CIVILES.includes(t.estadoCivil)) r.estadoCivil = t.estadoCivil;
   if (t.esContratista === true) r.esContratista = true;
+  if (t.bancoNombre && (t.bancoTipoCuenta === "Ahorros" || t.bancoTipoCuenta === "Corriente")) r.bancoTipoCuenta = t.bancoTipoCuenta;
   if (typeof t.ruc === "string" && /^\d{11}$/.test(t.ruc.trim())) r.ruc = t.ruc.trim();
   if (t.tipoServicio && t.tipoServicio in SERVICIOS_CONTRATISTA) r.tipoServicio = t.tipoServicio;
   if (typeof t.fechaFinContrato === "string" && FECHA_RE.test(t.fechaFinContrato)) r.fechaFinContrato = t.fechaFinContrato;
@@ -1757,6 +1762,14 @@ export function edad(fechaNacimiento?: string): number | null {
   return e >= 0 ? e : null;
 }
 
+export const BANCOS = ["BCP", "BBVA", "Interbank", "Scotiabank", "Banco de la Nación", "Caja Arequipa", "Caja Cusco", "Mibanco", "BanBif", "Otro"];
+
+/** "BCP · Ahorros · N° 21512345678 · CCI 00221500… · Titular X" (boletas y planilla). */
+export const cuentaBancariaTxt = (t: Pick<Trabajador, "bancoNombre" | "bancoTipoCuenta" | "bancoNumeroCuenta" | "bancoCci" | "bancoTitular"> | undefined): string =>
+  t?.bancoNombre
+    ? [t.bancoNombre, t.bancoTipoCuenta ?? "Ahorros", t.bancoNumeroCuenta && `N° ${t.bancoNumeroCuenta}`, t.bancoCci && `CCI ${t.bancoCci}`, t.bancoTitular && `Titular: ${t.bancoTitular}`].filter(Boolean).join(" · ")
+    : "";
+
 export const getTrabajadores = (): Trabajador[] =>
   leer<Partial<Trabajador>[]>(KEYS.TRABAJADORES, []).map(normalizarTrabajador).filter((t) => t.id);
 
@@ -1770,6 +1783,9 @@ function validarTrabajador(t: Trabajador): void {
   if (!t.id) throw new ErpError("Ingrese el N° de huella.");
   if (!t.nombre) throw new ErpError("Ingrese el nombre completo.");
   if (t.dni && !/^\d{8}$/.test(t.dni)) throw new ErpError("DNI inválido (8 dígitos).");
+  if (t.bancoNumeroCuenta && !/^\d{6,20}$/.test(t.bancoNumeroCuenta)) throw new ErpError("N° de cuenta inválido: solo números (sin guiones).");
+  if (t.bancoCci && !/^\d{20}$/.test(t.bancoCci)) throw new ErpError("El CCI debe tener 20 dígitos (solo números).");
+  if ((t.bancoNumeroCuenta || t.bancoCci) && !t.bancoNombre) throw new ErpError("Seleccione el banco de la cuenta.");
   if (!t.fechaIngreso || !FECHA_RE.test(t.fechaIngreso)) throw new ErpError("Ingrese la fecha de ingreso.");
   if (t.fechaIngreso > hoy() && !esContratista(t)) throw new ErpError("La fecha de ingreso no puede ser futura."); // un contrato puede empezar después
   if (!(t.tipoSueldo in TIPOS_SUELDO)) throw new ErpError("Seleccione el tipo de sueldo.");

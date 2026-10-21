@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Briefcase, HeartPulse, History, Power, Save, Trash2, User, UserCheck, X } from "lucide-react";
+import { Briefcase, HeartPulse, History, Landmark, Power, Save, Trash2, User, UserCheck, X } from "lucide-react";
 import { Badge, Button, Field, Input, Modal, Select, Textarea, cn, ejecutar, toast } from "@/components/ui";
 import { SEDES } from "@/lib/empresa";
 import { historialPagosTrabajador, type PagoTrabajador } from "@/lib/historial";
-import { AFP_OPTIONS, ESTADOS_CIVILES, TIPOS_SUELDO, cambiarEstadoTrabajador, edad, eliminarTrabajador, fechaPE, guardarTrabajador, hoy, soles } from "@/lib/storage";
+import { AFP_OPTIONS, BANCOS, ESTADOS_CIVILES, TIPOS_SUELDO, cambiarEstadoTrabajador, edad, eliminarTrabajador, fechaPE, guardarTrabajador, hoy, soles } from "@/lib/storage";
 import type { EstadoCivil, TipoAfp, TipoSueldo, Trabajador } from "@/lib/types";
 
 const OPC_SUELDO = (Object.keys(TIPOS_SUELDO) as TipoSueldo[]).map((k) => ({ value: k, label: TIPOS_SUELDO[k].label.toUpperCase() }));
@@ -140,6 +140,32 @@ export function FichaTrabajador({
             </Field>
             <Field label="N° de afiliación (CUSPP)">
               <Input value={f.nroAfiliacion ?? ""} onChange={(e) => set("nroAfiliacion", e.target.value.toUpperCase() || undefined)} />
+            </Field>
+          </Seccion>
+
+          {/* Cuenta para el pago de la planilla: no se muestra en la tabla, sí en la ficha y en las boletas / planilla PDF */}
+          <Seccion icono={<Landmark size={16} className="text-azul-700" />} titulo="Datos bancarios">
+            <Field label="Banco">
+              <Select value={f.bancoNombre ?? ""} onChange={(e) => set("bancoNombre", e.target.value || undefined)} placeholder="—" options={BANCOS.map((b) => ({ value: b, label: b }))} />
+            </Field>
+            <Field label="Tipo de cuenta">
+              <Select
+                value={f.bancoTipoCuenta ?? "Ahorros"}
+                onChange={(e) => set("bancoTipoCuenta", e.target.value as "Ahorros" | "Corriente")}
+                options={[
+                  { value: "Ahorros", label: "Ahorros" },
+                  { value: "Corriente", label: "Corriente" },
+                ]}
+              />
+            </Field>
+            <Field label="N° de cuenta" hint="Solo números">
+              <Input value={f.bancoNumeroCuenta ?? ""} inputMode="numeric" maxLength={20} onChange={(e) => set("bancoNumeroCuenta", e.target.value.replace(/\D/g, "") || undefined)} />
+            </Field>
+            <Field label="CCI" hint={f.bancoCci && f.bancoCci.length !== 20 ? `⚠ ${f.bancoCci.length}/20 dígitos` : "20 dígitos"}>
+              <Input value={f.bancoCci ?? ""} inputMode="numeric" maxLength={20} onChange={(e) => set("bancoCci", e.target.value.replace(/\D/g, "") || undefined)} />
+            </Field>
+            <Field label="Titular (opcional)" hint="Solo si la cuenta no es del trabajador" className="lg:col-span-2">
+              <Input value={f.bancoTitular ?? ""} onChange={(e) => set("bancoTitular", e.target.value || undefined)} />
             </Field>
           </Seccion>
 

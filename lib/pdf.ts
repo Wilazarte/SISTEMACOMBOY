@@ -8,7 +8,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import QRCode from "qrcode";
 import { EMPRESA } from "./empresa";
-import { CUENTAS_ORIGEN_PAGO, codigoContratista, codigoGasto, fechaPE, soles } from "./storage";
+import { CUENTAS_ORIGEN_PAGO, codigoContratista, codigoGasto, cuentaBancariaTxt, fechaPE, getTrabajadores, soles } from "./storage";
 import { codigoDesdeNumero, estadoDocumento } from "./utils/codigos";
 import { equipoDeLinea, sedeEquipo } from "./equipos";
 import { ESTADOS_OD, LUGARES_ENTREGA, estadoOD, origenOD, type EstadoAlmacen } from "./ventas";
@@ -513,7 +513,11 @@ function filasAdelantos(d: DatosBoleta): string[][] {
 }
 
 /** Boleta individual de pago (Planilla del periodo): se descarga como BOL-xxx-AAAA.pdf. */
+/** Cuenta bancaria del trabajador (ficha) para las boletas y la planilla. */
+const cuentaDe = (id: string): string => cuentaBancariaTxt(getTrabajadores().find((t) => t.id === id));
+
 export function pdfBoletaPago(d: DatosBoleta, codigo: string): void {
+  const cuenta = cuentaDe(d.id);
   const doc = construir({
     titulo: "BOLETA DE PAGO",
     numero: codigo,
@@ -531,6 +535,7 @@ export function pdfBoletaPago(d: DatosBoleta, codigo: string): void {
       ["Periodo", d.periodo],
       ["Liquidación", d.modo],
       ["Pensión", `${d.pension} (${d.afpPorcentaje}%)`],
+      ...(cuenta ? ([["Cuenta de pago", cuenta]] as [string, string][]) : []),
     ],
     head: ["Tipo", "Concepto", "Detalle", "Importe"],
     body: [
@@ -570,10 +575,11 @@ export function pdfPlanillaHistorial(h: HistorialPlanilla, detalle: HistorialDet
         ["Trabajadores", String(h.cantidad_trabajadores)],
         ["Asistencia", h.asistencia_desde ? `${fechaPE(h.asistencia_desde)} al ${fechaPE(h.asistencia_hasta ?? h.asistencia_desde)}` : "-"],
       ],
-      head: ["N°", "Trabajador", "Sueldo / Tipo", "Pensión", "Días", "Horas", "Tard.", "Bruto", "Dscto", "Neto", "Adelantos", "A pagar"],
+      head: ["N°", "Trabajador", "Cuenta de pago", "Sueldo / Tipo", "Pensión", "Días", "Horas", "Tard.", "Bruto", "Dscto", "Neto", "Adelantos", "A pagar"],
       body: detalle.map((d) => [
         d.trabajador_id,
         d.nombre,
+        cuentaDe(d.trabajador_id) || "-",
         `${soles(d.sueldo)} ${d.tipo_sueldo ?? ""}`,
         `${d.pension ?? "-"} ${d.afp_porcentaje}%`,
         d.dias,
@@ -585,7 +591,7 @@ export function pdfPlanillaHistorial(h: HistorialPlanilla, detalle: HistorialDet
         d.adelantos ? `- ${soles(d.adelantos)}` : "-",
         soles(d.total_pagar),
       ]),
-      alinearDerecha: [4, 5, 6, 7, 8, 9, 10, 11],
+      alinearDerecha: [5, 6, 7, 8, 9, 10, 11, 12],
       totales: [
         ["Total horas", horas(h.total_horas)],
         ["Total bruto", soles(h.total_bruto)],
