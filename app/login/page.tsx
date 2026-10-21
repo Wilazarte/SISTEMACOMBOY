@@ -230,21 +230,18 @@ function Login() {
   );
 }
 
-const LOGOS = ["/logo.png", "/logo-vid-comboy.png", "/logo-comboy.png"];
-
-/** Logo tal cual (sin fondo): /logo.png, si no existe /logo-vid-comboy.png, y luego /logo-comboy.png. */
+/** Logo tal cual (sin fondo): /logo-comboy.png es el único logo en public/. */
 function Logo() {
-  const [i, setI] = useState(0);
-  return <Image src={LOGOS[i]} alt="COMBOY" width={380} height={110} priority onError={() => setI((n) => Math.min(n + 1, LOGOS.length - 1))} className="h-auto max-w-full object-contain" />;
+  return <Image src="/logo-comboy.png" alt="COMBOY" width={380} height={110} priority className="h-auto max-w-full object-contain" />;
 }
 
-/** Fondo: imagen de referencia /login-bg.jpg a pantalla completa con overlay negro 30%. */
+/** Fondo: imagen de referencia /login-bg.jpg a pantalla completa con overlay negro 45%. */
 function Fondo({ children }: { children?: React.ReactNode }) {
   return (
     <div className="relative isolate min-h-screen overflow-hidden bg-black">
       <div aria-hidden className="pointer-events-none fixed inset-0 z-[-1]">
-        <Image src="/login-bg.jpg" alt="" fill priority sizes="100vw" className="object-cover" />
-        <div className="absolute inset-0 bg-black/30" />
+        <Image src="/login-bg.jpg" alt="" fill priority quality={90} sizes="100vw" className="object-cover object-center" />
+        <div className="absolute inset-0 bg-black/45" />
       </div>
       <main className="relative z-10 flex min-h-screen flex-col">{children}</main>
     </div>
