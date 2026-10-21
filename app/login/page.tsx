@@ -2,13 +2,14 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle, ArrowLeft, BarChart3, Box, Building2, Eye, EyeOff, Loader2, Lock, LogIn, ShieldCheck, User, Wallet, type LucideIcon } from "lucide-react";
+import { AlertCircle, ArrowLeft, BarChart3, Eye, EyeOff, Loader2, Lock, LogIn, Package, ShieldCheck, ShoppingCart, User, Users, type LucideIcon } from "lucide-react";
 import { CLAVE_MODULO, CLAVE_USUARIO, MODULOS_LOGIN, login, logout, moduloGuardado, perteneceAModulo, useSesion, type ModuloLogin } from "@/lib/auth";
 
+/** Módulos del login. Para más perfiles, agregar aquí (la grilla se adapta a 3 + 2). */
 const TARJETAS: { id: ModuloLogin; titulo: string; desc: string; icon: LucideIcon }[] = [
-  { id: "tesoreria", titulo: "Tesorería / Compras", desc: "Finanzas y adquisiciones", icon: Wallet },
-  { id: "almacen", titulo: "Almacén", desc: "Inventarios y materiales", icon: Box },
-  { id: "planilla", titulo: "Planilla", desc: "Recursos humanos y pagos", icon: Building2 },
+  { id: "tesoreria", titulo: "Tesorería / Compras", desc: "Finanzas y adquisiciones", icon: ShoppingCart },
+  { id: "almacen", titulo: "Almacén", desc: "Inventarios y materiales", icon: Package },
+  { id: "planilla", titulo: "Planilla", desc: "Recursos humanos y pagos", icon: Users },
   { id: "gerencia", titulo: "Gerencia", desc: "Reportes y analíticas", icon: BarChart3 },
 ];
 
@@ -20,7 +21,10 @@ const ENCARGADOS_LOGIN: Record<ModuloLogin, { nombre: string; cargo: string }> =
   gerencia: { nombre: "Gerencia General", cargo: "Gerencia - COMBOY VID" },
 };
 
-/** ?modulo= de la URL (acepta "compras" como alias de Tesorería). */
+/** Último módulo elegido en la pantalla de selección (solo recuerda la elección; la sesión usa CLAVE_MODULO). */
+const CLAVE_SELECCION = "modulo_seleccionado";
+
+/** ?modulo= de la URL (acepta "compras" como alias de Tesorería). Otro valor, ej. "seleccion" = elegir módulo. */
 function moduloDeUrl(v: string | null): ModuloLogin | "" {
   const m = (v ?? "").trim().toLowerCase();
   if (m === "compras") return "tesoreria";
@@ -66,18 +70,20 @@ function Login() {
     if (sesion && m && !enviando) router.replace(MODULOS_LOGIN[m].ruta);
   }, [sesion, router, enviando]);
 
-  const elegir = (m: ModuloLogin | "") => {
+  const elegir = (m: ModuloLogin) => {
     setError("");
-    router.replace(m ? `/login?modulo=${m}` : "/login", { scroll: false });
+    try {
+      window.localStorage.setItem(CLAVE_SELECCION, m);
+    } catch {
+      /* almacenamiento bloqueado */
+    }
+    router.push(`/login?modulo=${m}`, { scroll: false });
   };
 
   const entrar = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!modulo) {
-      setError("Selecciona tu módulo primero.");
-      return;
-    }
+    if (!modulo) return;
     if (!usuario.trim() || !pass) {
       setError("Ingrese usuario y contraseña.");
       return;
@@ -107,45 +113,56 @@ function Login() {
     router.replace(MODULOS_LOGIN[modulo].ruta);
   };
 
-  const elegido = TARJETAS.find((t) => t.id === modulo);
-  const encargado = modulo ? ENCARGADOS_LOGIN[modulo] : null;
+  const logoImg = (cls: string) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img ref={imgRef} src={logo} onError={() => setLogo("/logo-comboy.png")} alt="COMBOY VID" className={cls} />
+  );
+
+  // Selección de módulo (sin ?modulo= válido, ej. /login o /login?modulo=seleccion)
+  if (!modulo)
+    return (
+      <Fondo>
+        <section className="relative z-10 w-[92vw] max-w-[480px] animate-aparecer rounded-[24px] border-t-[5px] border-[#E30613] bg-white/95 p-6 text-center shadow-[0_0_50px_rgba(227,6,19,0.4)] backdrop-blur-xl sm:w-[95%] md:p-8">
+          {logoImg("mx-auto h-auto w-[180px] object-contain md:w-[220px]")}
+          <h1 className="mt-5 text-base font-bold uppercase tracking-wider text-[#0F1E3A]">BIENVENIDO AL SISTEMA ERP COMBOY VID</h1>
+          <div className="mx-auto mb-2 mt-2 h-1 w-12 rounded-full bg-[#E30613]" />
+          <p className="mt-3 text-xs uppercase tracking-widest text-gray-400">Selecciona tu módulo</p>
+          <div className="mt-6 grid grid-cols-2 gap-3 text-left md:gap-4">
+            {TARJETAS.map(({ id, titulo, desc, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                data-modulo={id}
+                onClick={() => elegir(id)}
+                className="group cursor-pointer rounded-xl border border-[#E30613]/15 bg-[#F8F9FF] p-4 text-left transition-all duration-200 hover:scale-[1.02] hover:border-[#E30613] hover:bg-white hover:shadow-[0_0_20px_rgba(227,6,19,0.2)] focus-visible:border-[#E30613] active:scale-[0.99]"
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#FEF2F2] text-[#E30613] transition-colors duration-200 group-hover:bg-[#E30613] group-hover:text-white md:h-8 md:w-8">
+                  <Icon className="h-4 w-4 md:h-[18px] md:w-[18px]" />
+                </span>
+                <span className="mt-3 block text-sm font-bold leading-tight text-[#0F1E3A]">{titulo}</span>
+                <span className="mt-1 block text-[11px] leading-snug text-gray-500">{desc}</span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-6 flex items-center justify-center gap-1.5 text-[11px] text-gray-400">
+            <ShieldCheck size={13} /> Acceso restringido por módulo según su usuario
+          </p>
+        </section>
+      </Fondo>
+    );
+
+  const elegido = TARJETAS.find((t) => t.id === modulo)!;
+  const encargado = ENCARGADOS_LOGIN[modulo];
 
   return (
     <Fondo>
-      {/* Tarjeta 1: bienvenida del módulo, o selección si la URL no trae ?modulo= */}
-      <section key={modulo || "elegir"} className={`${TARJETA} animate-aparecer text-center`}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img ref={imgRef} src={logo} onError={() => setLogo("/logo-comboy.png")} alt="COMBOY VID" className="mx-auto h-16 w-auto object-contain md:h-20" />
+      {/* Tarjeta 1: bienvenida del módulo */}
+      <section key={modulo} className={`${TARJETA} animate-aparecer text-center`}>
+        {logoImg("mx-auto h-16 w-auto object-contain md:h-20")}
         <h1 className="mt-4 text-lg font-bold uppercase leading-snug text-[#0F1E3A]">BIENVENIDO AL SISTEMA ERP COMBOY VID</h1>
-        {encargado ? (
-          <>
-            <p className="mt-2 text-xl font-bold uppercase text-[#E30613]">{encargado.nombre}</p>
-            <p className="mt-1 text-sm text-gray-600">{encargado.cargo}</p>
-            <div className="mx-auto mt-3 h-1 w-[60px] rounded-full bg-[#E30613]" />
-          </>
-        ) : (
-          <>
-            <div className="mx-auto mt-3 h-1 w-[60px] rounded-full bg-[#E30613]" />
-            <p className="mt-5 text-xs font-medium uppercase tracking-wider text-gray-500">Selecciona tu módulo</p>
-            <div className="mt-3 grid grid-cols-2 gap-2.5 text-left">
-              {TARJETAS.map(({ id, titulo, desc, icon: Icon }) => (
-                <button
-                  key={id}
-                  type="button"
-                  data-modulo={id}
-                  onClick={() => elegir(id)}
-                  className="group min-h-[88px] rounded-xl border border-gray-200 p-3 transition hover:-translate-y-0.5 hover:border-[#E30613] hover:shadow-[0_6px_20px_rgba(227,6,19,0.15)] focus-visible:border-[#E30613]"
-                >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FEF2F2] text-[#E30613] transition group-hover:bg-[#E30613] group-hover:text-white">
-                    <Icon size={17} />
-                  </span>
-                  <span className="mt-2 block text-[13px] font-semibold leading-tight text-[#0F1E3A]">{titulo}</span>
-                  <span className="mt-0.5 block text-[11px] leading-tight text-gray-500">{desc}</span>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
+        <p className="mt-2 text-xl font-bold uppercase text-[#E30613]">{encargado.nombre}</p>
+        <p className="mt-1 text-sm text-gray-600">{encargado.cargo}</p>
+        <div className="mx-auto mt-3 h-1 w-[60px] rounded-full bg-[#E30613]" />
       </section>
 
       {/* Tarjeta 2: formulario */}
@@ -153,20 +170,18 @@ function Login() {
         <h2 className="font-serif text-3xl font-semibold tracking-tight text-[#0F1E3A]">Iniciar sesión</h2>
         <p className="mt-1 text-sm text-gray-500">Ingresa con el usuario asignado a su área.</p>
 
-        {elegido ? (
-          <div className="mt-5 flex flex-wrap items-center gap-2">
-            <p className="flex items-center gap-2 rounded-full bg-[#FEF2F2] px-3 py-1 text-sm font-medium text-[#E30613]">
-              <elegido.icon size={15} /> Módulo seleccionado: {elegido.titulo}
-            </p>
-            <button type="button" onClick={() => elegir("")} className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs text-gray-500 transition hover:bg-gray-100 hover:text-[#0F1E3A]">
-              <ArrowLeft size={13} /> Cambiar
-            </button>
-          </div>
-        ) : (
-          <p role="status" className="mt-5 flex items-center gap-2 rounded-full bg-[#FEF2F2] px-3 py-1 text-sm font-medium text-[#E30613]">
-            <AlertCircle size={15} /> Selecciona tu módulo arriba
+        <div className="mt-5 flex flex-wrap items-center gap-2">
+          <p className="flex items-center gap-2 rounded-full bg-[#FEF2F2] px-3 py-1 text-sm font-medium text-[#E30613]">
+            <elegido.icon size={15} /> Módulo seleccionado: {elegido.titulo}
           </p>
-        )}
+          <button
+            type="button"
+            onClick={() => router.push("/login?modulo=seleccion", { scroll: false })}
+            className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs text-gray-500 transition hover:bg-gray-100 hover:text-[#0F1E3A]"
+          >
+            <ArrowLeft size={13} /> Cambiar
+          </button>
+        </div>
 
         <form onSubmit={entrar} className="mt-6 space-y-4" noValidate>
           <label className="block">
@@ -216,7 +231,7 @@ function Login() {
 
           <button
             type="submit"
-            disabled={enviando || !modulo}
+            disabled={enviando}
             className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#E30613] p-3 font-bold text-white shadow-[0_6px_20px_rgba(227,6,19,0.35)] transition hover:bg-[#B8050F] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 md:h-11"
           >
             {enviando ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />} Ingresar
@@ -231,22 +246,48 @@ function Login() {
   );
 }
 
-/** Fondo azul noche con el globo rojo 3D fijo detrás de las tarjetas. */
+/** Meridianos y paralelos del globo (elipses en un viewBox 200×200, radio 90). */
+const MERIDIANOS = [15, 35, 55, 72, 85];
+const PARALELOS = [-60, -36, -12, 12, 36, 60];
+
+/** Fondo azul noche #0F1E3A con un globo 3D rojo de malla, fijo detrás de las tarjetas. */
 function Fondo({ children }: { children?: React.ReactNode }) {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#0F1E3A]">
-      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 flex items-center justify-center">
-        {/* Halo */}
-        <div className="absolute h-[130vmin] w-[130vmin] rounded-full bg-[radial-gradient(circle,rgba(227,6,19,0.28)_0%,rgba(227,6,19,0.08)_45%,transparent_70%)] blur-2xl" />
-        {/* Globo: luz arriba a la izquierda, sombra abajo a la derecha */}
-        <div className="h-[92vmin] w-[92vmin] rounded-full bg-[radial-gradient(circle_at_32%_28%,#FF7A80_0%,#F2303B_16%,#E30613_38%,#A2040F_68%,#4E020A_100%)] opacity-90 shadow-[inset_-40px_-50px_90px_rgba(0,0,0,0.45),inset_30px_30px_70px_rgba(255,255,255,0.12),0_0_120px_rgba(227,6,19,0.45)] blur-[2px] motion-safe:animate-flotar md:h-[78vmin] md:w-[78vmin]">
+    <div className="relative isolate min-h-screen overflow-hidden bg-[#0F1E3A]">
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-[-1] flex items-center justify-center">
+        {/* Halo rojo */}
+        <div className="absolute h-[130vmin] w-[130vmin] rounded-full bg-[radial-gradient(circle,rgba(227,6,19,0.32)_0%,rgba(227,6,19,0.1)_40%,transparent_70%)] blur-2xl" />
+        {/* Globo de malla: esfera con volumen + líneas de latitud y longitud */}
+        <svg viewBox="0 0 200 200" className="h-[110vmin] w-[110vmin] blur-[1.2px] motion-safe:animate-flotar md:h-[90vmin] md:w-[90vmin]">
+          <defs>
+            <radialGradient id="globo-relleno" cx="35%" cy="30%" r="75%">
+              <stop offset="0%" stopColor="#FF4D57" stopOpacity="0.55" />
+              <stop offset="45%" stopColor="#E30613" stopOpacity="0.28" />
+              <stop offset="100%" stopColor="#5A0209" stopOpacity="0.1" />
+            </radialGradient>
+            <linearGradient id="globo-linea" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor="#FF6B73" />
+              <stop offset="100%" stopColor="#E30613" stopOpacity="0.5" />
+            </linearGradient>
+          </defs>
+          <g transform="rotate(-18 100 100)" fill="none" stroke="url(#globo-linea)" strokeWidth="0.55">
+            <circle cx="100" cy="100" r="90" fill="url(#globo-relleno)" strokeWidth="0.9" />
+            {MERIDIANOS.map((rx) => (
+              <ellipse key={rx} cx="100" cy="100" rx={rx} ry="90" opacity={0.35 + rx / 200} />
+            ))}
+            <line x1="100" y1="10" x2="100" y2="190" opacity="0.8" />
+            {PARALELOS.map((lat) => {
+              const y = 100 + 90 * Math.sin((lat * Math.PI) / 180);
+              const rx = 90 * Math.cos((lat * Math.PI) / 180);
+              return <ellipse key={lat} cx="100" cy={y} rx={rx} ry={rx * 0.16} opacity="0.7" />;
+            })}
+            <ellipse cx="100" cy="100" rx="90" ry="14.4" opacity="0.9" />
+          </g>
           {/* Brillo especular */}
-          <div className="ml-[18%] mt-[14%] h-[22%] w-[30%] -rotate-[25deg] rounded-full bg-white/25 blur-xl" />
-        </div>
+          <ellipse cx="68" cy="58" rx="26" ry="14" fill="#FFFFFF" opacity="0.08" transform="rotate(-30 68 58)" />
+        </svg>
       </div>
-      {/* Velo para que el globo no compita con el texto */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 bg-[#0F1E3A]/25 backdrop-blur-[1px]" />
-      <main className="relative z-10 mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-[2.5vw] py-8 md:px-4">{children}</main>
+      <main className="relative z-10 mx-auto flex h-full min-h-screen max-w-[480px] flex-col items-center justify-center px-[2.5vw] py-8 md:px-4">{children}</main>
     </div>
   );
 }
