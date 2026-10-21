@@ -55,7 +55,7 @@ async function boletaHistorial(h: HistorialPlanilla, d: HistorialDetalle): Promi
 export function DetalleHistorial({ id }: { id: string }) {
   const { datos, cargando, error } = useHistorialDetalle(id);
   const volver = (
-    <Link href="/dashboard/planilla?tab=historial" className="inline-flex items-center gap-1.5 text-sm font-medium text-plomo-600 hover:text-fg">
+    <Link href="/dashboard/compras?tab=planilla&sub=historial" className="inline-flex items-center gap-1.5 text-sm font-medium text-plomo-600 hover:text-fg">
       <ArrowLeft size={16} /> Volver al historial
     </Link>
   );

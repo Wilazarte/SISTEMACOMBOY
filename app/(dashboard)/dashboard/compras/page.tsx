@@ -20,6 +20,7 @@ import {
   Truck,
   Upload,
   X,
+  Users,
 } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
@@ -71,10 +72,11 @@ import {
 import { ALMACENES, ALMACEN_DEFECTO, SEDES, UNIDADES } from "@/lib/empresa";
 import { pdfCotizacion, pdfFactura, pdfOrdenCompra, pdfRequerimiento } from "@/lib/pdf";
 import { asientoOrdenCompra, reasentarOrdenCompra } from "@/lib/contable";
-import { getSesion } from "@/lib/auth";
+import { getSesion, puedeVer } from "@/lib/auth";
+import { PlanillaExistente } from "@/components/tesoreria/PlanillaExistente";
 import type { Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, Proveedor, Requerimiento, Rol, StockItem, TipoComprobanteCompra } from "@/lib/types";
 
-type Tab = "registrar" | "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias";
+type Tab = "registrar" | "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias" | "planilla";
 
 const FORMAS_PAGO: FormaPago[] = ["CONTADO", "CREDITO 15 DIAS", "CREDITO 30 DIAS", "CREDITO 60 DIAS", "ADELANTO 50%"];
 const DIAS_CREDITO: Record<FormaPago, number> = {
@@ -109,7 +111,11 @@ export default function ComprasPage() {
   const compras = useStore<Compra[]>(KEYS.COMPRAS, []);
   const stock = useStore<StockItem[]>(KEYS.STOCK, []);
 
-  const [tab, setTab] = useState<Tab>(puede(rol, "compra.crear") ? "registrar" : "antecedentes");
+  // Planilla vive aquí (antes /dashboard/planilla): quien solo tiene Planilla ve solo esa pestaña
+  const sesion = getSesion();
+  const veCompras = puedeVer(sesion, "/dashboard/compras");
+  const vePlanilla = puedeVer(sesion, "/dashboard/planilla");
+  const [tab, setTab] = useState<Tab>(!veCompras ? "planilla" : puede(rol, "compra.crear") ? "registrar" : "antecedentes");
   const [pre, setPre] = useState<{ req?: string; coti?: string; oc?: string; fac?: string }>({});
 
   const ir = (t: Tab, p: typeof pre = {}) => {
@@ -137,18 +143,23 @@ export default function ComprasPage() {
         )}
       </div>
 
-      <Notificaciones pendientes={pendientes} rol={rol} />
+      {veCompras && <Notificaciones pendientes={pendientes} rol={rol} />}
 
       <Tabs<Tab>
         value={tab}
         onChange={(t) => ir(t)}
         tabs={[
-          { id: "registrar", label: "Registrar gasto / compra", icon: <PackagePlus size={16} /> },
-          { id: "antecedentes", label: "Antecedentes", icon: <History size={16} /> },
-          { id: "cotizaciones", label: "Cotizaciones", icon: <FileSpreadsheet size={16} />, count: cotizables.filter((r) => r.estado === "ACEPTADO").length },
-          { id: "ordenes", label: "Órdenes de compra", icon: <ShoppingBag size={16} />, count: cotisSinOC.length },
-          { id: "facturas", label: "Facturas", icon: <Receipt size={16} />, count: ocsSinFactura.length },
-          // Guías de remisión: ya no son parte del flujo (pestaña oculta; las guías cargadas siguen guardadas)
+          ...(veCompras
+            ? [
+                { id: "registrar" as const, label: "Registrar gasto / compra", icon: <PackagePlus size={16} /> },
+                { id: "antecedentes" as const, label: "Antecedentes", icon: <History size={16} /> },
+                { id: "cotizaciones" as const, label: "Cotizaciones", icon: <FileSpreadsheet size={16} />, count: cotizables.filter((r) => r.estado === "ACEPTADO").length },
+                { id: "ordenes" as const, label: "Órdenes de compra", icon: <ShoppingBag size={16} />, count: cotisSinOC.length },
+                { id: "facturas" as const, label: "Facturas", icon: <Receipt size={16} />, count: ocsSinFactura.length },
+                // Guías de remisión: ya no son parte del flujo (pestaña oculta; las guías cargadas siguen guardadas)
+              ]
+            : []),
+          ...(vePlanilla ? [{ id: "planilla" as const, label: "Planilla", icon: <Users size={16} /> }] : []),
         ]}
       />
 
@@ -161,6 +172,7 @@ export default function ComprasPage() {
         <Ordenes key={pre.coti ?? "o"} rol={rol} cotis={cotisSinOC} todasCotis={cotizaciones} ordenes={ordenes} reqs={procesados} preCoti={pre.coti} onFacturar={(id) => ir("facturas", { oc: id })} />
       )}
       {tab === "facturas" && <Facturas key={pre.oc ?? "f"} rol={rol} ocs={ocsSinFactura} ordenes={ordenes} facturas={facturas} preOc={pre.oc} />}
+      {tab === "planilla" && vePlanilla && <PlanillaExistente />}
       {tab === "guias" && <Guias key={pre.fac ?? "g"} rol={rol} facturas={facturasSinGuia} guias={guias} preFac={pre.fac} />}
     </div>
   );

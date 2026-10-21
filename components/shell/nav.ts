@@ -54,6 +54,7 @@ export const NAV: ItemNav[] = [
       { label: "Cotizaciones", tab: "cotizaciones" },
       { label: "Órdenes de compra", tab: "ordenes" },
       { label: "Facturas", tab: "facturas" },
+      { label: "Planilla", tab: "planilla" },
     ],
   },
   {

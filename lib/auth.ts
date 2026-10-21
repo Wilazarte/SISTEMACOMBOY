@@ -157,6 +157,9 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
 
 export const RUTA_PRODUCCION = "/dashboard/produccion";
 
+/** Tesorería / Compras: también entra quien solo tiene Planilla (ve solo esa pestaña). */
+export const veTesoreria = (sesion: Sesion | null): boolean => puedeVer(sesion, "/dashboard/compras") || puedeVer(sesion, "/dashboard/planilla");
+
 /** Primer módulo al que entra el usuario tras el login. */
 export function inicioDe(sesion: Sesion): string {
   if (sesion.modulos.includes("*") || veDashboard(sesion)) return "/dashboard";

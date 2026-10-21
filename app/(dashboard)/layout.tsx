@@ -15,7 +15,7 @@ import { CommandPalette, IconoDoc, type Comando } from "@/components/shell/Comma
 import { useIr } from "@/components/shell/ir";
 import { accionesDe, hrefSub, moduloDe, navDe } from "@/components/shell/nav";
 import { BottomNav } from "@/components/layout/BottomNav";
-import { inicioDe, logout, puedeVer, useSesion } from "@/lib/auth";
+import { inicioDe, logout, puedeVer, useSesion, veTesoreria } from "@/lib/auth";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
 import { useNotificaciones } from "@/lib/notificaciones";
 import { limpiarPrefs, usePrefs } from "@/lib/preferencias";
@@ -210,7 +210,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
   };
 
-  const permitido = puedeVer(sesion, path);
+  const permitido = path === "/dashboard/compras" ? veTesoreria(sesion) : puedeVer(sesion, path);
   const actual = moduloDe(path);
   const modulo = actual && actual.href !== "/dashboard" ? actual.href : undefined;
   const subActual = actual?.subs.find((s) => (s.href ? s.href === path : tabActiva?.id === s.tab));

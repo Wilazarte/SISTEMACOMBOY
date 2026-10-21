@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BarChart3, LayoutDashboard, Receipt, ShoppingCart, Warehouse, type LucideIcon } from "lucide-react";
 import { cn } from "@/components/ui";
-import { puedeVer, veDashboard, type Sesion } from "@/lib/auth";
+import { puedeVer, veDashboard, veTesoreria, type Sesion } from "@/lib/auth";
 
 /** Dock inferior de módulos. `corto` es la etiqueta en móvil (ancho de 1/5 de pantalla). */
 const ITEMS: { href: string; label: string; corto: string; icon: LucideIcon }[] = [
@@ -21,7 +21,7 @@ const activoEn = (ruta: string, href: string) => (href === "/dashboard" ? ruta =
 /** Solo muestra los módulos que el usuario puede abrir (ver puedeVer en lib/auth.ts). */
 export function BottomNav({ sesion }: { sesion: Sesion }) {
   const ruta = usePathname();
-  const items = ITEMS.filter((i) => (i.href === "/dashboard" ? veDashboard(sesion) : puedeVer(sesion, i.href)));
+  const items = ITEMS.filter((i) => (i.href === "/dashboard" ? veDashboard(sesion) : i.href === "/dashboard/compras" ? veTesoreria(sesion) : puedeVer(sesion, i.href)));
   if (items.length === 0) return null;
 
   return (

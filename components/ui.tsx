@@ -208,20 +208,24 @@ export function Tabs<T extends string>({
   tabs,
   value,
   onChange,
+  enLinea = false,
 }: {
   tabs: { id: T; label: string; icon?: ReactNode; count?: number }[];
   value: T;
   onChange: (id: T) => void;
+  /** Sub-pestañas dentro de otra pestaña: se dibujan en su lugar y no leen ni cambian ?tab=. */
+  enLinea?: boolean;
 }) {
   // Las pestañas se dibujan en la barra fija del layout (si existe); si no, en su lugar.
   const [destino, setDestino] = useState<HTMLElement | null>(null);
-  useEffect(() => setDestino(document.getElementById(ID_BARRA_PESTANAS)), []);
+  useEffect(() => setDestino(enLinea ? null : document.getElementById(ID_BARRA_PESTANAS)), [enLinea]);
   const principal = !!destino;
 
   // ?tab=<id> en la URL o un submenú del layout abren la pestaña (solo si existe en esta barra)
   const ref = useRef({ tabs, value, onChange });
   ref.current = { tabs, value, onChange };
   useEffect(() => {
+    if (enLinea) return;
     const abrir = (id: string | null) => {
       const { tabs: ts, value: v, onChange: cambiar } = ref.current;
       if (id && id !== v && ts.some((t) => t.id === id)) cambiar(id as T);
