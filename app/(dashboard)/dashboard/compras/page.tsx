@@ -593,7 +593,7 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
       <Card>
         <CardHeader title="Compras registradas" subtitle={`${compras.length} compra(s) · ${gastos.length} gasto(s) de Tesorería · Total ${soles(totalRegistros)}`} />
         {/* Vista previa: una línea por registro. Comprobante, almacén / gasto, ítems, subtotal e IGV se ven en "Ver". */}
-        <Table head={["Fecha", "Proveedor", "RUC", "Total", "Acciones"]} empty={registros.length === 0}>
+        <Table head={["Fecha", "Proveedor", "Total", "Acciones"]} empty={registros.length === 0}>
           {registros.map((r) => {
             if (r.tipo === "GASTO_TESORERIA") {
               const g = r.gasto;
@@ -605,7 +605,6 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
                     {g.tipoGasto === "PLANILLA" && <span className="ml-2 text-xs text-plomo-500">{g.numero.replace(/^PLLA\s+/, "")}</span>}
                   </Td>
                   <Td className="max-w-[320px] truncate"><span title={g.proveedor}>{g.proveedor}</span></Td>
-                  <Td>{g.ruc || "-"}</Td>
                   <Td className="text-right font-semibold">{soles(g.total)}</Td>
                   <Td>
                     <div className="flex gap-1">
@@ -628,7 +627,6 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
               <tr key={c.id} className="hover:bg-plomo-50">
                 <Td className="whitespace-nowrap">{fechaPE(c.fecha)}</Td>
                 <Td className="max-w-[320px] truncate"><span title={c.proveedor}>{c.proveedor}</span></Td>
-                <Td>{c.ruc}</Td>
                 <Td className="text-right font-semibold">{soles(c.total)}</Td>
                 <Td>
                   <div className="flex gap-1">

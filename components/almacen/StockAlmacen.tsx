@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { productoNormalizado, sedeNormalizada } from "@/lib/constantes";
 import { FileDown, FileSpreadsheet, History, PackageMinus, Truck, Upload } from "lucide-react";
 import { Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, cn, ejecutar, toast } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
@@ -29,18 +30,40 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
   const [kardexDe_, setKardexDe] = useState<StockItem | null>(null);
   const [retiroDe, setRetiroDe] = useState<StockItem | null>(null);
   const [importar, setImportar] = useState(false);
+  // Agrupa el mismo producto en sedes que son el mismo lugar (SEDE_MAP) y escrito distinto: 15 + 7 = 22
+  const [agrupar, setAgrupar] = useState(true);
+  const mismaSede = (a: string, b: string) => (agrupar ? sedeNormalizada(a) === sedeNormalizada(b) : a === b);
 
   const lista = stock
-    .filter((s) => (!sede || s.sede === sede) && (!q || s.nombre.toLowerCase().includes(q.toLowerCase())) && (!soloSinValor || !(s.costoUnit > 0)))
+    .filter((s) => (!sede || mismaSede(s.sede, sede)) && (!q || s.nombre.toLowerCase().includes(q.toLowerCase())) && (!soloSinValor || !(s.costoUnit > 0)))
     .sort((a, b) => a.sede.localeCompare(b.sede) || a.nombre.localeCompare(b.nombre));
-  const valorizado = lista.reduce((a, s) => a + s.cantidad * s.costoUnit, 0);
-  const sinValor = lista.filter((s) => !(s.costoUnit > 0)).length;
+  const filas = useMemo(() => {
+    if (!agrupar) return lista.map((s) => ({ s, partes: [s], valor: s.cantidad * s.costoUnit, base: s }));
+    const grupos = new Map<string, StockItem[]>();
+    for (const s of lista) {
+      const k = `${sedeNormalizada(s.sede)}|${productoNormalizado(s.nombre)}|${s.unidad}`;
+      grupos.set(k, [...(grupos.get(k) ?? []), s]);
+    }
+    return Array.from(grupos.values())
+      .map((partes) => {
+        // Las acciones (kardex, retiros) van sobre el registro con más stock; el costo, el más reciente
+        const mayor = [...partes].sort((a, b) => b.cantidad - a.cantidad)[0];
+        const reciente = [...partes].sort((a, b) => b.actualizado.localeCompare(a.actualizado))[0];
+        const s: StockItem = { ...mayor, sede: sedeNormalizada(mayor.sede), cantidad: partes.reduce((a, p) => a + p.cantidad, 0), costoUnit: reciente.costoUnit, actualizado: reciente.actualizado };
+        return { s, partes, valor: partes.reduce((a, p) => a + p.cantidad * p.costoUnit, 0), base: mayor };
+      })
+      .sort((a, b) => a.s.sede.localeCompare(b.s.sede) || a.s.nombre.localeCompare(b.s.nombre));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stock, sede, q, soloSinValor, agrupar]);
+  const valorizado = filas.reduce((a, f) => a + f.valor, 0);
+  const sinValor = filas.filter((f) => !(f.s.costoUnit > 0)).length;
+  const duplicados = filas.filter((f) => f.partes.length > 1).length;
 
   return (
     <Card>
       <CardHeader
         title="Stock de almacén"
-        subtitle={`${lista.length} producto(s) · Valorizado ${soles(valorizado)}${sinValor ? ` · ${sinValor} sin valorizar` : ""} (último costo: sin IGV en factura/OC, con IGV en boleta)`}
+        subtitle={`${filas.length} producto(s)${agrupar && duplicados ? ` (${duplicados} agrupados)` : ""} · Valorizado ${soles(valorizado)}${sinValor ? ` · ${sinValor} sin valorizar` : ""} (último costo: sin IGV en factura/OC, con IGV en boleta)`}
         action={
           <div className="flex flex-wrap items-center justify-end gap-2">
             <div className="w-48">
@@ -70,17 +93,30 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
               sede === s ? "border-azul-900 bg-azul-900 text-white" : "border-plomo-200 bg-surface text-plomo-600 hover:border-azul-900"
             )}
           >
-            {s || "Todas"} <span className="opacity-70">{s ? stock.filter((x) => x.sede === s).length : stock.length}</span>
+            {s || "Todas"} <span className="opacity-70">{s ? stock.filter((x) => mismaSede(x.sede, s)).length : stock.length}</span>
           </button>
         ))}
-        <label className="ml-auto flex cursor-pointer items-center gap-2 text-xs font-semibold text-amber-800">
+        <label className="ml-auto flex cursor-pointer items-center gap-2 text-xs font-semibold text-plomo-600" title="Suma el mismo producto de Taller Principal Aqp y Almacen Aqp (AQP Principal)">
+          <input type="checkbox" checked={agrupar} onChange={(e) => setAgrupar(e.target.checked)} className="h-4 w-4 accent-azul-900" /> Agrupar duplicados
+        </label>
+        <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-amber-800">
           <input type="checkbox" checked={soloSinValor} onChange={(e) => setSoloSinValor(e.target.checked)} className="h-4 w-4 accent-amber-500" /> Solo sin valorizar
         </label>
       </div>
-      <Table head={["Sede", "Producto", "Unidad", "Cantidad", "Último costo", "Valorizado", "Actualizado", "Acciones"]} empty={lista.length === 0}>
-        {lista.map((s) => (
+      <Table head={["Sede", "Producto", "Unidad", "Cantidad", "Último costo", "Valorizado", "Actualizado", "Acciones"]} empty={filas.length === 0}>
+        {filas.map(({ s, partes, valor, base }) => (
           <tr key={s.id} className="hover:bg-plomo-50" data-stock={s.id}>
-            <Td>{s.sede}</Td>
+            <Td>
+              {s.sede}
+              {partes.length > 1 && (
+                <span
+                  className="tip ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800"
+                  data-tip={partes.map((p) => `${p.sede}: ${num(p.cantidad)}`).join(" + ")}
+                >
+                  {partes.length} registros
+                </span>
+              )}
+            </Td>
             <Td className="font-medium text-fg">{s.nombre}</Td>
             <Td>{s.unidad}</Td>
             <Td className={cn("text-right font-semibold", s.cantidad <= 0 && "text-red-600")}>{num(s.cantidad)}</Td>
@@ -93,16 +129,16 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
                 </span>
               )}
             </Td>
-            <Td className="text-right">{soles(s.cantidad * s.costoUnit)}</Td>
+            <Td className="text-right">{soles(valor)}</Td>
             <Td>{fechaCorta(s.actualizado)}</Td>
             <Td>
               <div className="flex flex-nowrap gap-1">
-                <Button size="sm" variant="secondary" onClick={() => setKardexDe(s)} title="Ver Kardex">
+                <Button size="sm" variant="secondary" onClick={() => setKardexDe(base)} title={partes.length > 1 ? `Kardex de ${base.sede} (registro con más stock)` : "Ver Kardex"}>
                   <History size={14} /> Kardex
                 </Button>
                 {puedeOperar && (
                   <>
-                    <Button size="sm" onClick={() => setRetiroDe(s)} disabled={s.cantidad <= 0} title="Retiro para producción (Vale de Producción Interno)">
+                    <Button size="sm" onClick={() => setRetiroDe(base)} disabled={base.cantidad <= 0} title={partes.length > 1 ? `Retiro desde ${base.sede} (${num(base.cantidad)} disponibles)` : "Retiro para producción (Vale de Producción Interno)"}>
                       <PackageMinus size={14} /> Retiro Producción
                     </Button>
                     <Button
