@@ -46,7 +46,7 @@ export const Kbd = ({ children, className }: { children: ReactNode; className?: 
 
 // ---------------------------------------------------------------- Card
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("rounded-xl border border-plomo-200 bg-surface shadow-card", className)}>{children}</div>;
+  return <div className={cn("rounded-xl border border-plomo-200 bg-surface/80 shadow-card backdrop-blur-xl", className)}>{children}</div>;
 }
 
 export function CardHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
@@ -256,8 +256,8 @@ export function Tabs<T extends string>({
             aria-selected={activo}
             onClick={() => elegir(t.id)}
             className={cn(
-              "flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition duration-150",
-              activo ? "bg-surface text-fg shadow-card ring-1 ring-plomo-200" : "text-plomo-500 hover:bg-plomo-100 hover:text-fg"
+              "flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] font-medium transition duration-150",
+              activo ? "border-[#2a7bff] bg-[#1e2a45] text-[#2a7bff] shadow-[0_0_14px_rgba(42,123,255,0.35)]" : "border-transparent text-plomo-500 hover:bg-plomo-100 hover:text-fg"
             )}
           >
             <span className={cn("transition-colors", activo && "text-corp")}>{t.icon}</span>

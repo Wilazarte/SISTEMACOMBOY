@@ -93,6 +93,10 @@ const diasCredito = (forma?: string): number => {
 };
 
 // =====================================================================
+/** Botones de acción de la tarjeta REQ por revisar (tema azul): pill compacta con glow. */
+const BTN_REQ =
+  "inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-medium text-white transition duration-150 hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100";
+
 export default function ComprasPage() {
   const [rol] = useRol();
   const pendientes = useStore<Requerimiento[]>(KEYS.REQS_PENDIENTES, []);
@@ -187,7 +191,7 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
       </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {pendientes.map((r) => (
-          <div key={r.id} className="flex flex-col rounded-xl border-2 border-amber-300 bg-amber-50 p-4 shadow-sm">
+          <div key={r.id} className="flex flex-col rounded-xl border-2 border-[#fbbf24]/50 bg-[#1a1500]/60 p-4 shadow-sm backdrop-blur-xl">
             <div className="flex items-start justify-between">
               <div>
                 <p className="font-bold text-fg">{r.numero}</p>
@@ -195,7 +199,7 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
                   {fechaPE(r.fecha)} · {r.sede}
                 </p>
               </div>
-              <Badge estado="PENDIENTE" />
+              <span className="rounded-full bg-[#fbbf24] px-2 py-0.5 text-[11px] font-bold text-black">PENDIENTE</span>
             </div>
             <p className="mt-2 text-sm text-slate-700">
               <span className="font-medium">{r.solicitante}:</span> {r.motivo}
@@ -209,18 +213,18 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
               {r.items.length > 3 && <li className="font-medium">+ {r.items.length - 3} producto(s) más</li>}
             </ul>
             <div className="mt-auto flex flex-wrap gap-1.5 pt-3">
-              <Button size="sm" variant="secondary" onClick={() => abrirDoc({ tipo: "REQ", id: r.id })}>
+              <button className={`${BTN_REQ} border-[#60a5fa] bg-[#1e3a8a] shadow-[0_0_12px_rgba(30,58,138,0.6)]`} onClick={() => abrirDoc({ tipo: "REQ", id: r.id })}>
                 <Eye size={14} /> Ver
-              </Button>
-              <Button size="sm" variant="success" disabled={!habilitado} onClick={() => ejecutar(() => aceptarRequerimiento(r.id, rol), `${r.numero} ACEPTADO`)}>
+              </button>
+              <button className={`${BTN_REQ} border-[#2a7bff] bg-[#2a7bff] shadow-[0_0_14px_rgba(42,123,255,0.6)]`} disabled={!habilitado} onClick={() => ejecutar(() => aceptarRequerimiento(r.id, rol), `${r.numero} ACEPTADO`)}>
                 <Check size={14} /> Aceptar
-              </Button>
-              <Button size="sm" variant="warning" disabled={!habilitado} onClick={() => { setMotivo(""); setObs(r); }}>
+              </button>
+              <button className={`${BTN_REQ} border-[#2a7bff] bg-[#0e2a5f] shadow-[0_0_12px_rgba(42,123,255,0.35)]`} disabled={!habilitado} onClick={() => { setMotivo(""); setObs(r); }}>
                 <MessageSquareWarning size={14} /> Observar
-              </Button>
-              <Button size="sm" variant="danger" disabled={!habilitado} onClick={() => setRechazo(r)}>
+              </button>
+              <button className={`${BTN_REQ} border-[#ff1a1a] bg-[#ff1a1a] font-bold shadow-[0_0_14px_rgba(255,26,26,0.6)]`} disabled={!habilitado} onClick={() => setRechazo(r)}>
                 <X size={14} /> Rechazar
-              </Button>
+              </button>
             </div>
           </div>
         ))}

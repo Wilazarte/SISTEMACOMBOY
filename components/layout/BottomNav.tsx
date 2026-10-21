@@ -40,7 +40,7 @@ export function BottomNav({ sesion }: { sesion: Sesion }) {
             className={cn(
               "flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-full border text-[11px] font-semibold transition-all duration-200",
               activo
-                ? "border-[#ff3a3a]/50 bg-[#ff1a1a]/20 text-[#ff3a3a] shadow-[0_0_18px_rgba(255,26,26,0.45)]"
+                ? "border-[#2a7bff] bg-[#2a7bff]/20 text-[#2a7bff] shadow-[0_0_20px_rgba(42,123,255,0.5)]"
                 : "border-transparent text-white/60 hover:bg-white/10 hover:text-white"
             )}
           >

@@ -93,6 +93,33 @@
   --blue-50: 15 27 46; --blue-200: 30 58 95; --blue-600: 96 165 250; --blue-800: 191 219 254;
 }
 
+/* Tema AZUL OSCURO premium de los módulos (app/(dashboard)/layout.tsx: clases "dark tema-azul").
+   Va después de .dark para ganarle: fondo #070b14, cards #0e1424, bordes #1e2a45, primario #2a7bff, secundario #1e3a8a. */
+.tema-azul {
+  --canvas: 7 11 20;
+  --surface: 14 20 36;
+  --corp: 42 123 255;
+  --vino-900: 30 100 230;
+  --azul-900: 30 58 138;
+  --plomo-50: 14 20 36;
+  --plomo-100: 17 26 47;
+  --plomo-200: 30 42 69;
+  --plomo-500: 138 153 184;
+  --plomo-600: 168 182 210;
+  --slate-100: 17 26 47; --slate-200: 30 42 69; --slate-300: 30 58 95;
+  --sb-activo: 42 123 255;
+}
+/* Inputs del tema azul (sin pisar los transparentes como el buscador de la paleta) */
+.tema-azul :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea):not(.bg-transparent) {
+  background-color: #111a2f;
+  border-color: #1e3a5f;
+  color: #fff;
+}
+.tema-azul :is(input, select, textarea):not(.bg-transparent):focus {
+  border-color: #2a7bff;
+  box-shadow: 0 0 0 3px rgb(42 123 255 / 0.3);
+}
+
 /* Menú lateral rojo sólido (preferencia del usuario) */
 [data-sidebar="rojo"] {
   --sb: 204 0 0;

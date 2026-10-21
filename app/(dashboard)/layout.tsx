@@ -217,15 +217,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const migas = [actual?.label ?? "Inicio", subActual?.label ?? tabActiva?.label ?? (path === "/dashboard" ? "Resumen" : undefined)].filter(Boolean) as string[];
 
   return (
-    // Tema unificado COMBOY VID: siempre oscuro (.dark en el contenedor) sobre el fondo del login
-    <div className="dark relative isolate flex min-h-screen flex-col pb-32 text-fg">
-      <div aria-hidden className="pointer-events-none fixed inset-0 z-[-1] bg-black">
-        <Image src="/login-bg.jpg" alt="" fill priority quality={90} sizes="100vw" className="object-cover object-center" />
-        <div className="absolute inset-0 bg-black/70" />
+    // Tema azul oscuro COMBOY VID: siempre oscuro (.dark + .tema-azul, app/globals.css) sobre el mapa azul
+    <div className="dark tema-azul relative isolate flex min-h-screen flex-col pb-32 text-fg">
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-[-1] bg-[#070b14]">
+        <Image src="/blue-globe.jpg" alt="" fill priority quality={90} sizes="100vw" className="object-cover object-center" />
+        <div className="absolute inset-0 bg-[#172554]/15" />
+        <div className="absolute inset-0 bg-black/85" />
       </div>
 
       {/* Barra superior: ruta, buscador global, campana y tema */}
-      <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-3 border-b border-white/10 bg-black/50 px-4 backdrop-blur-xl lg:px-7">
+      <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-3 border-b border-[#1e2a45] bg-[#070b14]/70 px-4 backdrop-blur-xl lg:px-7">
         <Link href={inicioDe(sesion)} className="shrink-0" aria-label="Inicio">
           <Image src="/logo.png" alt="COMBOY VID" width={94} height={40} className="h-9 w-auto object-contain" />
         </Link>
@@ -307,7 +308,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <div className="animate-velo space-y-5" key={path} /* solo opacidad: un transform rompería los modales fijos */>
               <Header sesion={sesion} flujo={flujoDe(path)} />
               {/* Pestañas del módulo (components/ui Tabs se dibuja aquí): fijas al hacer scroll */}
-              <div id={ID_BARRA_PESTANAS} className="sticky top-14 z-10 -mx-1 bg-black/40 px-1 py-2 backdrop-blur-md empty:hidden" />
+              <div id={ID_BARRA_PESTANAS} className="sticky top-14 z-10 -mx-1 bg-[#070b14]/60 px-1 py-2 backdrop-blur-md empty:hidden" />
               {sesion.soloLectura && (
                 <div className="flex w-full items-center gap-2 rounded-xl border border-plomo-200 bg-surface px-4 py-2.5 text-sm text-fg-2 shadow-card">
                   <Eye size={16} className="shrink-0 text-plomo-500" /> Modo solo lectura: puede revisar todo y registrar observaciones, pero no guardar, editar ni eliminar.
