@@ -27,7 +27,7 @@ export default function ProduccionPage() {
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-serif text-2xl font-light leading-tight text-azul-900 lg:text-3xl">Producción</h1>
+          <h1 className="font-serif tracking-tight text-2xl font-semibold leading-tight text-fg lg:text-[28px]">Producción</h1>
           <p className="mt-1 text-[13px] text-plomo-600">Orden de producción → control de calidad firmado → ingreso automático a Almacén (equipo terminado DISPONIBLE)</p>
         </div>
         {habilitado && (
@@ -64,10 +64,10 @@ export default function ProduccionPage() {
           <Table head={["OP", "Fecha", "Equipo", "Chasis", "Motor", "Almacén destino", "Estado", "QC / equipo", "Acciones"]}>
             {lista.map((o) => (
               <tr key={o.id} className="hover:bg-plomo-50">
-                <Td className="font-mono text-xs font-semibold text-azul-900">{o.id}</Td>
+                <Td className="font-mono text-xs font-semibold text-fg">{o.id}</Td>
                 <Td>{fechaPE(o.fecha)}</Td>
                 <Td>
-                  <p className="font-semibold text-azul-900">{o.modelo}</p>
+                  <p className="font-semibold text-fg">{o.modelo}</p>
                   <p className="text-xs text-plomo-500">{o.tipo_equipo}</p>
                 </Td>
                 <Td className="font-mono text-xs">{o.codigo_chasis}</Td>
@@ -85,7 +85,7 @@ export default function ProduccionPage() {
                       <p>
                         {o.qc.supervisor} · {fechaPE(o.qc.fecha)}
                       </p>
-                      <Link href="/dashboard/almacen" className="font-mono font-semibold text-corp hover:underline">
+                      <Link href="/dashboard/almacen" className="font-mono font-semibold text-rojo hover:underline">
                         {o.equipo_id}
                       </Link>
                     </>

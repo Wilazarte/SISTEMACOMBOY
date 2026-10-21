@@ -85,13 +85,13 @@ export default function LoginPage() {
   const elegido = TARJETAS.find((t) => t.id === selectedModulo);
 
   return (
-    <div className="flex min-h-screen flex-col bg-white lg:flex-row">
+    <div className="flex min-h-screen flex-col bg-surface lg:flex-row">
       {/* Izquierda: marca + selección de módulo */}
-      <aside className="flex w-full flex-col justify-center bg-[#0f2238] px-6 py-10 text-white sm:px-10 lg:w-1/2 lg:px-14">
+      <aside className="flex w-full flex-col justify-center bg-azul-900 px-6 py-10 text-white sm:px-10 lg:w-1/2 lg:px-14">
         <div className="mx-auto w-full max-w-lg">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img ref={imgRef} src={logo} onError={() => setLogo("/logo-comboy.png")} alt="COMBOY VID" className="h-32 w-auto rounded-2xl bg-white object-contain px-6 py-4 shadow-2xl shadow-black/40 motion-safe:animate-flotar sm:h-40" />
-          <h1 className="mt-8 font-serif text-3xl font-light leading-tight sm:text-[38px]">Sistema de gestión ERP COMBOY VID</h1>
+          <img ref={imgRef} src={logo} onError={() => setLogo("/logo-comboy.png")} alt="COMBOY VID" className="h-32 w-auto rounded-2xl bg-surface object-contain px-6 py-4 shadow-2xl shadow-black/40 motion-safe:animate-flotar sm:h-40" />
+          <h1 className="mt-8 font-serif tracking-tight text-3xl font-semibold leading-tight sm:text-[38px]">Sistema de gestión ERP COMBOY VID</h1>
           <p className="mt-3 text-sm leading-relaxed text-white/60">Plataforma integral para la gestión minera: compras, tesorería, almacén, planilla y gerencia en un solo lugar.</p>
 
           <p className="mt-8 text-[11px] font-semibold uppercase tracking-[0.25em] text-white/50">Selecciona tu módulo</p>
@@ -109,7 +109,7 @@ export default function LoginPage() {
                     setError("");
                   }}
                   className={`rounded-xl border p-4 text-left transition ${
-                    activo ? "border-[#dc2626] bg-[#dc2626] shadow-lg shadow-red-900/30" : "border-white/10 bg-white/[0.05] hover:border-white/30 hover:bg-white/10"
+                    activo ? "border-corp bg-corp shadow-lg shadow-red-900/30" : "border-white/10 bg-white/[0.05] hover:border-white/30 hover:bg-white/10"
                   }`}
                 >
                   <Icon size={24} className={activo ? "text-white" : "text-white/70"} />
@@ -129,15 +129,15 @@ export default function LoginPage() {
             <div key={selectedModulo} data-bienvenida className="mb-6 animate-aparecer rounded-xl border border-slate-100 bg-white/95 p-5 text-center shadow-[0_8px_30px_rgba(0,0,0,0.12)] backdrop-blur animate-in fade-in zoom-in-95 duration-300">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={logo} alt="COMBOY VID" className="mx-auto mb-4 h-20 w-auto object-contain drop-shadow-[0_10px_12px_rgba(15,34,56,0.25)] motion-safe:animate-flotar md:h-24" />
-              <h2 className="text-[18px] font-extrabold uppercase leading-tight tracking-[0.02em] text-[#0f2238] md:text-[20px]">BIENVENIDO AL SISTEMA ERP COMBOY VID</h2>
-              <p className="mt-2 text-[18px] font-black uppercase tracking-wide text-[#dc2626] md:text-[22px]">{ENCARGADOS_LOGIN[selectedModulo.toLowerCase()]?.nombre}</p>
+              <h2 className="text-[18px] font-extrabold uppercase leading-tight tracking-[0.02em] text-fg md:text-[20px]">BIENVENIDO AL SISTEMA ERP COMBOY VID</h2>
+              <p className="mt-2 text-[18px] font-black uppercase tracking-wide text-corp md:text-[22px]">{ENCARGADOS_LOGIN[selectedModulo.toLowerCase()]?.nombre}</p>
               <p className="mt-1 text-[13px] font-semibold text-slate-600 md:text-[14px]">{ENCARGADOS_LOGIN[selectedModulo.toLowerCase()]?.cargo}</p>
-              <div className="mx-auto mt-3 h-[3px] w-24 rounded-full bg-[#dc2626]"></div>
+              <div className="mx-auto mt-3 h-[3px] w-24 rounded-full bg-corp"></div>
             </div>
           )}
 
-          <div className="rounded-xl border border-plomo-200 border-t-[3px] border-t-[#dc2626] bg-white p-7 shadow-[0_4px_12px_rgba(15,36,64,0.06)]">
-          <h2 className="font-serif text-3xl text-azul-900">Iniciar sesión</h2>
+          <div className="rounded-xl border border-plomo-200 border-t-[3px] border-t-corp bg-surface p-7 shadow-card">
+          <h2 className="font-serif text-3xl text-fg">Iniciar sesión</h2>
           <p className="mt-1 text-sm text-plomo-500">Ingrese con el usuario asignado a su área.</p>
 
           {elegido ? (
@@ -199,7 +199,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={enviando || selectedModulo === ""}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#dc2626] py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-corp py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {enviando ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />} Ingresar
             </button>

@@ -59,7 +59,7 @@ export default function AlmacenPage() {
   return (
     <div className="w-full space-y-6">
       <div>
-        <h1 className="font-serif text-2xl font-light leading-tight text-azul-900 lg:text-3xl">Almacén</h1>
+        <h1 className="font-serif tracking-tight text-2xl font-semibold leading-tight text-fg lg:text-[28px]">Almacén</h1>
         <p className="mt-1 text-[13px] text-plomo-600">Emisión de requerimientos, ingresos de mercadería y stock</p>
       </div>
 
@@ -236,8 +236,8 @@ function ListaReq({ reqs, rol }: { reqs: Requerimiento[]; rol: Rol }) {
     <>
       <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
         {conteo.map(({ e, n }) => (
-          <button key={e} onClick={() => setEstado(estado === e ? "" : e)} className={cn("rounded-xl border bg-white p-3 text-left shadow-sm transition", estado === e ? "border-azul-900 ring-2 ring-slate-900" : "border-plomo-200 hover:border-plomo-200")}>
-            <p className="text-2xl font-bold text-azul-900">{n}</p>
+          <button key={e} onClick={() => setEstado(estado === e ? "" : e)} className={cn("rounded-xl border bg-surface p-3 text-left shadow-sm transition", estado === e ? "border-azul-900 ring-2 ring-slate-900" : "border-plomo-200 hover:border-plomo-200")}>
+            <p className="text-2xl font-bold text-fg">{n}</p>
             <Badge estado={e} />
           </button>
         ))}
@@ -258,7 +258,7 @@ function ListaReq({ reqs, rol }: { reqs: Requerimiento[]; rol: Rol }) {
         <Table head={["Nro REQ", "Fecha", "Sede", "Solicitante", "Motivo", "Items", "Estado", "Acciones"]} empty={lista.length === 0}>
           {lista.map((r) => (
             <tr key={r.id} className={cn("hover:bg-plomo-50", r.estado === "OBSERVADO" && "bg-orange-50/60")}>
-              <Td className="font-semibold text-azul-900">{r.numero}</Td>
+              <Td className="font-semibold text-fg">{r.numero}</Td>
               <Td>{fechaPE(r.fecha)}</Td>
               <Td>{r.sede}</Td>
               <Td>{r.solicitante}</Td>
@@ -360,7 +360,7 @@ function Ingresos({ rol, porVB, ordenes, facturas, guias }: { rol: Rol; porVB: O
               <Card key={o.id} className="border-plomo-200">
                 <div className="flex items-start justify-between p-5 pb-3">
                   <div>
-                    <p className="text-lg font-bold text-azul-900">{o.numero}</p>
+                    <p className="text-lg font-bold text-fg">{o.numero}</p>
                     <p className="text-sm text-plomo-500">
                       {o.proveedor} · {o.reqNumero} · {o.lugarEntrega}
                     </p>
@@ -414,7 +414,7 @@ function Ingresos({ rol, porVB, ordenes, facturas, guias }: { rol: Rol; porVB: O
         <Table head={["OC", "REQ", "Proveedor", "Recibido por", "Fecha V°B°", "Total", ""]} empty={finalizadas.length === 0}>
           {finalizadas.map((o) => (
             <tr key={o.id} className="hover:bg-plomo-50">
-              <Td className="font-semibold text-azul-900">{o.numero}</Td>
+              <Td className="font-semibold text-fg">{o.numero}</Td>
               <Td>{o.reqNumero}</Td>
               <Td>{o.proveedor}</Td>
               <Td>{o.vistoBueno?.recibidoPor}</Td>
@@ -614,7 +614,7 @@ function RegistrarIngreso({ rol, stock, ordenes }: { rol: Rol; stock: StockItem[
             <tr key={m.id} className="hover:bg-plomo-50">
               <Td>{new Date(m.fecha).toLocaleString("es-PE")}</Td>
               <Td>{m.sede}</Td>
-              <Td className="font-semibold text-azul-900">{m.producto}</Td>
+              <Td className="font-semibold text-fg">{m.producto}</Td>
               <Td>
                 {m.cantidad} {m.unidad}
               </Td>

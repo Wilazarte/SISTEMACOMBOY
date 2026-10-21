@@ -29,7 +29,7 @@ const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "
 const ORIGEN: Record<OrigenAsiento, { label: string; cls: string }> = {
   NP: { label: "VENTA (NP)", cls: "bg-emerald-50 text-emerald-800 ring-emerald-200" },
   VENTA: { label: "VENTAS", cls: "bg-emerald-50 text-emerald-800 ring-emerald-200" },
-  OC: { label: "COMPRA (OC)", cls: "bg-[#EEF2F7] text-azul-700 ring-[#C9D4E3]" },
+  OC: { label: "COMPRA (OC)", cls: "bg-plomo-100 text-azul-700 ring-plomo-200" },
   PLANILLA: { label: "PLANILLA", cls: "bg-red-50 text-vino ring-red-200" },
   MANUAL: { label: "MANUAL", cls: "bg-plomo-100 text-plomo-600 ring-plomo-200" },
 };
@@ -78,7 +78,7 @@ export default function ContablePage() {
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-serif text-2xl font-light leading-tight text-azul-900 lg:text-3xl">Contable</h1>
+          <h1 className="font-serif tracking-tight text-2xl font-semibold leading-tight text-fg lg:text-[28px]">Contable</h1>
           <p className="mt-1 text-[13px] text-plomo-600">Libro Diario, Mayor, Balance de comprobación y Estados Financieros · asientos automáticos desde Ventas, Compras y Planilla</p>
         </div>
         {puedeGenerar && (
@@ -94,7 +94,7 @@ export default function ContablePage() {
         </div>
       )}
 
-      <div className="grid gap-3 rounded-xl border border-plomo-200 bg-white p-4 shadow-[0_4px_12px_rgba(15,36,64,0.06)] sm:grid-cols-[160px_200px_1fr]">
+      <div className="grid gap-3 rounded-xl border border-plomo-200 bg-surface p-4 shadow-card sm:grid-cols-[160px_200px_1fr]">
         <Field label="Año">
           <Select value={String(filtro.anio)} onChange={(e) => setFiltro({ ...filtro, anio: Number(e.target.value) })} options={anios.map((a) => ({ value: String(a), label: String(a) }))} />
         </Field>
@@ -150,7 +150,7 @@ function Stat({ label, valor }: { label: string; valor: string }) {
   return (
     <div className="rounded-lg bg-plomo-50 px-3 py-2">
       <p className="text-[11px] font-semibold uppercase tracking-wider text-plomo-500">{label}</p>
-      <p className="font-semibold text-azul-900">{valor}</p>
+      <p className="font-semibold text-fg">{valor}</p>
     </div>
   );
 }
@@ -178,7 +178,7 @@ function LibroDiario({ asientos, titulo }: { asientos: AsientoDiario[]; titulo: 
                 <td className="px-4 py-2 font-mono text-xs text-plomo-500">{String(i + 1).padStart(4, "0")}</td>
                 <td className="whitespace-nowrap px-4 py-2 text-plomo-600">{fechaPE(a.fecha)}</td>
                 <td className="px-4 py-2" colSpan={4}>
-                  <span className="mr-2 font-medium text-azul-900">{a.glosa}</span>
+                  <span className="mr-2 font-medium text-fg">{a.glosa}</span>
                   <OrigenBadge a={a} />
                 </td>
               </tr>
@@ -222,7 +222,7 @@ function Mayor({ asientos, titulo }: { asientos: AsientoDiario[]; titulo: string
           {cuentas.map((c) => (
             <Fragment key={c.cuenta}>
               <tr className="cursor-pointer hover:bg-plomo-50" onClick={() => setAbierta(abierta === c.cuenta ? null : c.cuenta)}>
-                <Td className="font-mono font-semibold text-azul-900">
+                <Td className="font-mono font-semibold text-fg">
                   <span className="inline-flex items-center gap-1">
                     {abierta === c.cuenta ? <ChevronDown size={14} /> : <ChevronRight size={14} />} {c.cuenta}
                   </span>
@@ -230,7 +230,7 @@ function Mayor({ asientos, titulo }: { asientos: AsientoDiario[]; titulo: string
                 <Td>{c.nombre}</Td>
                 <Td className="text-right">{num(c.debe)}</Td>
                 <Td className="text-right">{num(c.haber)}</Td>
-                <Td className={cn("text-right font-semibold", c.saldo < 0 ? "text-vino" : "text-azul-900")}>
+                <Td className={cn("text-right font-semibold", c.saldo < 0 ? "text-vino" : "text-fg")}>
                   {num(Math.abs(c.saldo))} {c.saldo > 0 ? "D" : c.saldo < 0 ? "A" : ""}
                 </Td>
               </tr>
@@ -299,7 +299,7 @@ function Balance({
           <Table head={["Cuenta", "Denominación", "Sumas debe", "Sumas haber", "Saldo deudor", "Saldo acreedor"]}>
             {cuentas.map((c) => (
               <tr key={c.cuenta}>
-                <Td className="font-mono font-semibold text-azul-900">{c.cuenta}</Td>
+                <Td className="font-mono font-semibold text-fg">{c.cuenta}</Td>
                 <Td>{c.nombre}</Td>
                 <Td className="text-right">{num(c.debe)}</Td>
                 <Td className="text-right">{num(c.haber)}</Td>
@@ -325,7 +325,7 @@ function Balance({
           <Table head={["Periodo", "Cerrado el", "Por", "Asientos", "Debe", "Haber", "Resultado del mes"]}>
             {[...cierres].sort((a, b) => b.periodo.localeCompare(a.periodo)).map((c) => (
               <tr key={c.id}>
-                <Td className="font-semibold text-azul-900">{c.periodo}</Td>
+                <Td className="font-semibold text-fg">{c.periodo}</Td>
                 <Td>{new Date(c.fecha).toLocaleString("es-PE")}</Td>
                 <Td>{c.usuario}</Td>
                 <Td className="text-right">{c.asientos}</Td>
@@ -344,7 +344,7 @@ function Balance({
 function EEFF({ asientos, titulo }: { asientos: AsientoDiario[]; titulo: string }) {
   const { resultados: r, situacion: s } = estadosFinancieros(asientos);
   const Linea = ({ c, nombre, monto, fuerte }: { c?: string; nombre: string; monto: number; fuerte?: boolean }) => (
-    <div className={cn("flex justify-between gap-3 border-b border-plomo-100 py-1.5 text-sm", fuerte && "border-t-2 border-t-azul-900 font-bold text-azul-900")}>
+    <div className={cn("flex justify-between gap-3 border-b border-plomo-100 py-1.5 text-sm", fuerte && "border-t-2 border-t-azul-900 font-bold text-fg")}>
       <span>
         {c && <span className="mr-2 font-mono text-xs text-plomo-500">{c}</span>}
         {nombre}
@@ -367,7 +367,7 @@ function EEFF({ asientos, titulo }: { asientos: AsientoDiario[]; titulo: string 
             <Linea key={c.cuenta} c={c.cuenta} nombre={c.nombre} monto={c.monto} />
           ))}
           <Linea nombre="Total gastos" monto={r.totalGastos} fuerte />
-          <div className={cn("mt-4 flex justify-between rounded-lg px-4 py-3 font-bold text-white", r.resultado >= 0 ? "bg-azul-900" : "bg-vino")}>
+          <div className={cn("mt-4 flex justify-between rounded-lg px-4 py-3 font-bold text-white", r.resultado >= 0 ? "bg-azul-900" : "bg-vino-900")}>
             <span>{r.resultado >= 0 ? "UTILIDAD DEL PERIODO" : "PÉRDIDA DEL PERIODO"}</span>
             <span>{soles(r.resultado)}</span>
           </div>

@@ -88,7 +88,7 @@ export function EquiposTerminados({ puedeRegistrar, nuevo, onNuevoCerrado }: { p
                 aria-label="Estado"
               />
             </div>
-            <Link href="/dashboard/produccion" className="inline-flex items-center gap-1.5 rounded-lg border border-plomo-200 bg-white px-4 py-2 text-sm font-medium text-azul-900 hover:bg-plomo-50">
+            <Link href="/dashboard/produccion" className="inline-flex items-center gap-1.5 rounded-lg border border-plomo-200 bg-surface px-4 py-2 text-sm font-medium text-fg hover:bg-plomo-50">
               <Factory size={16} /> Ingresan desde Producción
             </Link>
           </div>
@@ -102,10 +102,10 @@ export function EquiposTerminados({ puedeRegistrar, nuevo, onNuevoCerrado }: { p
         <Table head={["Código", "Sede", "Modelo", "Chasis / VIN", "Marca motor", "Serie motor", "Origen", "QC", "Estado", "Actualizado"]}>
           {lista.map((e) => (
             <tr key={e.id} className="cursor-pointer hover:bg-plomo-50" onClick={() => setVer(e.id)} title="Ver detalle y QR">
-              <Td className="font-mono text-xs font-semibold text-azul-900">{e.id}</Td>
+              <Td className="font-mono text-xs font-semibold text-fg">{e.id}</Td>
               <Td>{sedeEquipo(e)}</Td>
               <Td>
-                <p className="font-semibold text-azul-900">{e.modelo}</p>
+                <p className="font-semibold text-fg">{e.modelo}</p>
                 <p className="text-xs text-plomo-500">{e.tipo_equipo}</p>
               </Td>
               <Td className="font-mono text-xs">{e.codigo_chasis}</Td>
@@ -216,7 +216,7 @@ function FormEquipo({ inicial, id, onClose }: { inicial: DatosEquipo; id?: strin
         <fieldset className="rounded-xl border border-plomo-200 p-4">
           <legend className="px-1 text-[12px] font-semibold uppercase tracking-wider text-plomo-500">Control de calidad</legend>
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-sm font-medium text-azul-900">¿Pasó supervisión QC?</span>
+            <span className="text-sm font-medium text-fg">¿Pasó supervisión QC?</span>
             <button
               type="button"
               role="switch"
@@ -225,7 +225,7 @@ function FormEquipo({ inicial, id, onClose }: { inicial: DatosEquipo; id?: strin
               onClick={() => set("qc_aprobado", !d.qc_aprobado)}
               className={cn("relative inline-flex h-7 w-14 items-center rounded-full transition", d.qc_aprobado ? "bg-emerald-600" : "bg-plomo-200")}
             >
-              <span className={cn("inline-block h-5 w-5 rounded-full bg-white shadow transition", d.qc_aprobado ? "translate-x-8" : "translate-x-1")} />
+              <span className={cn("inline-block h-5 w-5 rounded-full bg-surface shadow transition", d.qc_aprobado ? "translate-x-8" : "translate-x-1")} />
             </button>
             <span className={cn("text-sm font-bold", d.qc_aprobado ? "text-emerald-700" : "text-vino")}>{d.qc_aprobado ? "Sí → DISPONIBLE" : "No → EN QC"}</span>
           </div>
@@ -259,7 +259,7 @@ function FormEquipo({ inicial, id, onClose }: { inicial: DatosEquipo; id?: strin
                 <button
                   type="button"
                   onClick={() => setD((x) => ({ ...x, fotos: x.fotos.filter((_, j) => j !== i) }))}
-                  className="absolute -right-2 -top-2 rounded-full bg-vino p-1 text-white"
+                  className="absolute -right-2 -top-2 rounded-full bg-vino-900 p-1 text-white"
                   aria-label="Quitar foto"
                 >
                   <X size={12} />
@@ -329,7 +329,7 @@ function DetalleEquipo({
   const fila = (k: string, v: string) => (
     <div className="flex justify-between gap-3 border-b border-plomo-100 py-1.5 text-sm">
       <span className="text-plomo-500">{k}</span>
-      <span className="text-right font-medium text-azul-900">{v}</span>
+      <span className="text-right font-medium text-fg">{v}</span>
     </div>
   );
 
@@ -368,13 +368,13 @@ function DetalleEquipo({
           )}
         </div>
         <div className="flex flex-col items-center rounded-xl border-2 border-azul-900 p-4 text-center">
-          <p className="font-serif text-lg font-bold text-azul-900">
-            COMBOY <span className="text-corp">VID</span>
+          <p className="font-serif text-lg font-bold text-fg">
+            COMBOY <span className="text-rojo">VID</span>
           </p>
           <div className="my-2 h-1 w-full bg-corp" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {qr && <img src={qr} alt={`QR del chasis ${e.codigo_chasis}`} className="h-52 w-52" />}
-          <p className="mt-2 break-all font-mono text-sm font-bold text-azul-900">{e.codigo_chasis}</p>
+          <p className="mt-2 break-all font-mono text-sm font-bold text-fg">{e.codigo_chasis}</p>
           <p className="text-xs text-plomo-500">QR del código de chasis</p>
           <Button className="mt-3 w-full" onClick={imprimir} disabled={!qr}>
             <Printer size={16} /> Imprimir QR
@@ -387,10 +387,10 @@ function DetalleEquipo({
           {pasos.map((p, i) => (
             <li key={i} className="flex items-start">
               <div className="flex max-w-[170px] flex-col items-center text-center">
-                <span className={cn("flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold", p.hecho ? (i === pasos.length - 1 ? "bg-corp text-white" : "bg-azul-900 text-white") : "border-2 border-plomo-200 bg-white text-plomo-500")}>
+                <span className={cn("flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold", p.hecho ? (i === pasos.length - 1 ? "bg-corp text-white" : "bg-azul-900 text-white") : "border-2 border-plomo-200 bg-surface text-plomo-500")}>
                   {p.hecho ? "✓" : i + 1}
                 </span>
-                <span className={cn("mt-1 text-xs font-semibold", p.hecho ? "text-azul-900" : "text-plomo-500")}>{p.titulo}</span>
+                <span className={cn("mt-1 text-xs font-semibold", p.hecho ? "text-fg" : "text-plomo-500")}>{p.titulo}</span>
                 <span className="text-[11px] text-plomo-500">{p.detalle}</span>
                 {p.fecha && <span className="text-[10px] text-plomo-500">{fechaHora(p.fecha.length === 10 ? `${p.fecha}T12:00:00` : p.fecha)}</span>}
               </div>

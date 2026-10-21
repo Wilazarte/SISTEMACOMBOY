@@ -109,19 +109,19 @@ export default function AdelantosPage() {
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <Link href="/dashboard/planilla" className="mb-1 inline-flex items-center gap-1.5 text-sm font-medium text-plomo-500 hover:text-azul-900">
+          <Link href="/dashboard/planilla" className="mb-1 inline-flex items-center gap-1.5 text-sm font-medium text-plomo-500 hover:text-fg">
             <ArrowLeft size={16} /> Planilla
           </Link>
-          <h1 className="font-serif text-2xl font-light leading-tight text-azul-900 lg:text-3xl">Adelantos</h1>
+          <h1 className="font-serif tracking-tight text-2xl font-semibold leading-tight text-fg lg:text-[28px]">Adelantos</h1>
           <p className="mt-1 text-[13px] text-plomo-600">Adelantos de sueldo a los trabajadores. El monto se descontará en la planilla.</p>
         </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-plomo-200 bg-white p-3 text-sm shadow-sm">
+        <div className="rounded-xl border border-plomo-200 bg-surface p-3 text-sm shadow-sm">
           Adelantos registrados: <b>{lista.length}</b>
         </div>
-        <div className="rounded-xl border border-plomo-200 bg-white p-3 text-sm shadow-sm">
+        <div className="rounded-xl border border-plomo-200 bg-surface p-3 text-sm shadow-sm">
           Pendientes de descontar: <b>{lista.filter((a) => a.estado === "PENDIENTE").length}</b>
         </div>
         <div className="rounded-xl bg-azul-900 p-3 text-sm text-white">
@@ -219,7 +219,7 @@ export default function AdelantosPage() {
                 )}
               >
                 <Td>{fechaPE(a.fecha)}</Td>
-                <Td className="font-semibold text-azul-900">{a.trabajador_nombre}</Td>
+                <Td className="font-semibold text-fg">{a.trabajador_nombre}</Td>
                 <Td className="font-mono">{a.dni || "-"}</Td>
                 <Td className="text-right font-semibold">{soles(a.monto)}</Td>
                 <Td className="max-w-[260px]">

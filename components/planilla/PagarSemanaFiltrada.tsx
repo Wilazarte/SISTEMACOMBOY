@@ -92,7 +92,7 @@ export function PagarSemanaFiltrada({
       <Modal open={abierto} onClose={() => !guardando && setAbierto(false)} title={`Pagar semana filtrada · ${etiqueta}`}>
         <div className="space-y-4 text-sm">
           <p className="text-plomo-600">
-            Se pagará <b className="text-azul-900">{periodoPago}</b>
+            Se pagará <b className="text-fg">{periodoPago}</b>
             {rango.desde && (
               <>
                 {" "}
@@ -110,8 +110,8 @@ export function PagarSemanaFiltrada({
             <b className="text-right text-red-600">- {soles(afp)}</b>
             <span className="text-plomo-500">Adelantos</span>
             <b className="text-right text-red-600">- {soles(adelantos)}</b>
-            <span className="font-semibold text-azul-900">Total a pagar (egreso)</span>
-            <b className="text-right text-azul-900">{soles(total)}</b>
+            <span className="font-semibold text-fg">Total a pagar (egreso)</span>
+            <b className="text-right text-fg">{soles(total)}</b>
           </div>
           <SelectorCaja value={caja} onChange={setCaja} />
           <div className="flex justify-end gap-2 border-t border-plomo-100 pt-4">

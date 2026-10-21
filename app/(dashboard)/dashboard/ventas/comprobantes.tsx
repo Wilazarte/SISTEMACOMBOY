@@ -175,12 +175,12 @@ export function Comprobantes({ preNp, onListo }: { preNp?: string; onListo: () =
         {lista.map((c) => (
           <tr key={c.id} className="hover:bg-plomo-50">
             <Td>{fechaPE(c.fecha)}</Td>
-            <Td className="font-semibold text-azul-900">
+            <Td className="font-semibold text-fg">
               {c.numero || <span className="text-slate-400">{c.serie}-(borrador)</span>}
               <p className="text-xs font-normal text-plomo-500">{tipoLabel[c.tipo]}</p>
             </Td>
             <Td>
-              <p className="font-medium text-azul-900">{c.cliente}</p>
+              <p className="font-medium text-fg">{c.cliente}</p>
               <p className="text-xs text-plomo-500">{c.clienteDoc}</p>
             </Td>
             <Td>{c.npNumero ?? "-"}</Td>
@@ -301,7 +301,7 @@ export function Comprobantes({ preNp, onListo }: { preNp?: string; onListo: () =
               )}
             </div>
             {npConOD ? (
-              <div className="flex items-center gap-2 rounded-xl border border-plomo-200 bg-plomo-50 px-4 py-3 text-sm text-azul-900">
+              <div className="flex items-center gap-2 rounded-xl border border-plomo-200 bg-plomo-50 px-4 py-3 text-sm text-fg">
                 <Truck size={16} /> Despacho: la orden <b>{npConOD.odNumero}</b> se generó al aprobar {npConOD.numero} y queda vinculada a este comprobante.
               </div>
             ) : (

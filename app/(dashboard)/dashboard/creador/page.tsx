@@ -49,8 +49,8 @@ export default function CreadorPage() {
   return (
     <div className="w-full space-y-6">
       <div>
-        <h1 className="flex items-center gap-3 font-serif text-2xl font-light leading-tight text-azul-900 lg:text-3xl">
-          <KeyRound size={22} className="text-corp" /> Módulo Creador
+        <h1 className="flex items-center gap-3 font-serif tracking-tight text-2xl font-semibold leading-tight text-fg lg:text-[28px]">
+          <KeyRound size={22} className="text-rojo" /> Módulo Creador
         </h1>
         <p className="mt-1 text-[13px] text-plomo-600">Edición manual de asistencia: corrige DÍAS y TARD. de la planilla. Queda registrado como origen CREADOR.</p>
       </div>
@@ -81,7 +81,7 @@ export default function CreadorPage() {
               return (
                 <tr key={t.id} className={cn(cambiado(t.id) && "bg-amber-50")}>
                   <Td className="font-mono">{t.id}</Td>
-                  <Td className="font-semibold text-azul-900">{t.nombre}</Td>
+                  <Td className="font-semibold text-fg">{t.nombre}</Td>
                   {(["dias", "tardanzas"] as const).map((campo) => (
                     <Td key={campo}>
                       <Input
@@ -103,7 +103,7 @@ export default function CreadorPage() {
                   ))}
                   <Td>
                     {reg ? (
-                      <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-bold", reg.origen_edicion === "CREADOR" ? "bg-red-50 text-vino" : "bg-[#EEF2F7] text-azul-700")}>
+                      <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-bold", reg.origen_edicion === "CREADOR" ? "bg-red-50 text-vino" : "bg-plomo-100 text-azul-700")}>
                         {reg.origen_edicion}
                       </span>
                     ) : (

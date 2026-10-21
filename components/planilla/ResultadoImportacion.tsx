@@ -59,7 +59,7 @@ export function ResultadoImportacion({
             {noEncontrados.map((x) => {
               const elegido = eleccion[x.huella] ?? x.candidatos[0]?.id ?? "";
               return (
-                <li key={x.huella} data-huella={x.huella} className="flex flex-wrap items-center gap-2 rounded-lg bg-white px-3 py-2.5 text-[15px]">
+                <li key={x.huella} data-huella={x.huella} className="flex flex-wrap items-center gap-2 rounded-lg bg-surface px-3 py-2.5 text-[15px]">
                   <span className="font-semibold">
                     ⚠️ No se pudo vincular: <b>{x.nombre}</b> <span className="text-sm font-normal text-plomo-500">(huella {x.huella})</span>
                   </span>
@@ -103,9 +103,9 @@ export function ResultadoImportacion({
       )}
 
       {detalle.length > 0 && (
-        <div className="rounded-xl border border-plomo-200 bg-white shadow-sm" data-resultado-importacion>
+        <div className="rounded-xl border border-plomo-200 bg-surface shadow-sm" data-resultado-importacion>
           <div className="flex items-center justify-between border-b border-plomo-100 px-4 py-2.5">
-            <button type="button" onClick={() => setAbierto((v) => !v)} className="text-left text-sm font-semibold text-azul-900 hover:underline" data-toggle-resultado>
+            <button type="button" onClick={() => setAbierto((v) => !v)} className="text-left text-sm font-semibold text-fg hover:underline" data-toggle-resultado>
               {abierto ? "▾" : "▸"} Resultado de la importación · {detalle.length} huella(s) del reloj · {detalle.filter((d) => d.destino).length} importada(s)
               {!abierto && <span className="ml-2 text-xs font-normal text-plomo-500">(ver detalle por huella)</span>}
             </button>

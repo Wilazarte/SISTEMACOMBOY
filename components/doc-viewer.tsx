@@ -119,7 +119,7 @@ export function DocViewer({ doc, onClose }: { doc: DocRef | null; onClose: () =>
               {r.filas.map(([k, v]) => (
                 <div key={k} className="grid grid-cols-[120px_1fr] gap-2 px-3 py-2 text-sm">
                   <dt className="font-medium text-plomo-500">{k}</dt>
-                  <dd className="text-azul-900">{v}</dd>
+                  <dd className="text-fg">{v}</dd>
                 </div>
               ))}
             </dl>

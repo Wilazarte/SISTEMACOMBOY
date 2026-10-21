@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { MapPin, UserCheck } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { cargoDe, moduloGuardado, nombreDe, type ModuloLogin, type Sesion } from "@/lib/auth";
 
 export const ENCARGADOS: Record<string, string> = {
@@ -24,8 +24,8 @@ function moduloDeRuta(ruta: string): ModuloLogin {
   return "gerencia";
 }
 
-/** Encabezado de cada módulo: bienvenida, usuario | cargo | empresa y el encargado del módulo. */
-export function Header({ sesion }: { sesion: Sesion }) {
+/** Franja de contexto de cada módulo: usuario | cargo | empresa, encargado, sede y flujo de trabajo. */
+export function Header({ sesion, flujo }: { sesion: Sesion; flujo?: string }) {
   const ruta = usePathname();
   const [moduloActual, setModuloActual] = useState<ModuloLogin>(() => moduloDeRuta(ruta));
   const [fecha, setFecha] = useState("");
@@ -35,22 +35,33 @@ export function Header({ sesion }: { sesion: Sesion }) {
     setFecha(new Date().toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric" }));
   }, [ruta]);
 
+  const pasos = flujo ? flujo.split("→").map((p) => p.trim()) : [];
   return (
-    <section className="flex w-full flex-col gap-4 rounded-xl border border-plomo-200 bg-white px-6 py-5 shadow-[0_4px_12px_rgba(15,36,64,0.06)] md:flex-row md:items-center md:justify-between">
-      <div className="min-w-0">
-        <h1 className="font-serif text-xl font-semibold text-azul-900 sm:text-2xl">Bienvenido al Sistema ERP COMBOY VID</h1>
-        <p className="mt-1 truncate text-sm text-plomo-600">
-          {nombreDe(sesion)} | {cargoDe(sesion)} | {NOMBRE_EMPRESA}
+    <section className="flex w-full flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="min-w-0 truncate text-[13px] text-plomo-500">
+          <span className="font-medium text-fg">{nombreDe(sesion)}</span> · {cargoDe(sesion)} · {NOMBRE_EMPRESA}
         </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-plomo-200 bg-surface px-2.5 py-1 text-xs text-fg-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden /> {ENCARGADOS[moduloActual]}
+          </span>
+          <span className="inline-flex items-center gap-1 rounded-full border border-plomo-200 bg-surface px-2.5 py-1 text-xs text-plomo-500">
+            <MapPin size={12} /> Sede {SEDE} · {fecha}
+          </span>
+        </div>
       </div>
-      <div className="flex shrink-0 flex-col items-start gap-1.5 md:items-end">
-        <span className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white shadow-sm">
-          <UserCheck size={14} /> {ENCARGADOS[moduloActual]}
-        </span>
-        <span className="inline-flex items-center gap-1 text-xs text-plomo-500">
-          <MapPin size={12} /> Sede: {SEDE} | {fecha}
-        </span>
-      </div>
+      {pasos.length > 1 && (
+        <ol className="flex flex-wrap items-center gap-1.5 text-xs text-plomo-500" aria-label="Flujo del módulo">
+          <li className="mr-1 font-medium">Flujo</li>
+          {pasos.map((p, i) => (
+            <li key={p} className="flex items-center gap-1.5">
+              {i > 0 && <span aria-hidden>→</span>}
+              <span className="rounded-md border border-plomo-200 bg-surface px-2 py-0.5">{p}</span>
+            </li>
+          ))}
+        </ol>
+      )}
     </section>
   );
 }

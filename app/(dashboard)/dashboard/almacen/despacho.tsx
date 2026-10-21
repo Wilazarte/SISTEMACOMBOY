@@ -76,13 +76,13 @@ export function OrdenesDespacho({ vista = "almacen" }: { vista?: "almacen" | "ve
               key={c.estado}
               onClick={() => setEstado(estado === c.estado ? "" : c.estado)}
               className={cn(
-                "rounded-xl border border-l-4 border-plomo-200 bg-white p-4 text-left shadow-[0_4px_12px_rgba(15,36,64,0.06)] transition hover:bg-plomo-50",
+                "rounded-xl border border-l-4 border-plomo-200 bg-surface p-4 text-left shadow-card transition hover:bg-plomo-50",
                 c.cls,
                 estado === c.estado && "ring-2 ring-azul-900"
               )}
             >
               <p className="text-[11px] font-semibold uppercase tracking-wider text-plomo-500">{c.label}</p>
-              <p className="mt-1 font-serif text-3xl text-azul-900">{n}</p>
+              <p className="mt-1 font-serif text-3xl text-fg">{n}</p>
             </button>
           );
         })}
@@ -129,14 +129,14 @@ export function OrdenesDespacho({ vista = "almacen" }: { vista?: "almacen" | "ve
           <Table head={["Código", "Fecha", "Cliente", "Venta origen", "Lugar entrega", "Encargado / quien recoge", "Estado", ...(vista === "ventas" ? ["Seguimiento"] : []), "Acciones"]}>
             {lista.map((o) => (
               <tr key={o.id} className="cursor-pointer hover:bg-plomo-50" onClick={() => setSelId(o.id)}>
-                <Td className="font-mono font-semibold text-azul-900">
+                <Td className="font-mono font-semibold text-fg">
                   {codigoOD(o)}
                   {o.vistoAlmacen === false && <span className="ml-2 rounded-full bg-corp px-1.5 py-0.5 font-sans text-[10px] font-bold text-white">NUEVA</span>}
                   <p className="font-sans text-xs font-normal text-plomo-500">{o.numero}</p>
                 </Td>
                 <Td>{fechaPE(o.fecha)}</Td>
                 <Td>
-                  <p className="font-medium text-azul-900">{o.cliente}</p>
+                  <p className="font-medium text-fg">{o.cliente}</p>
                   {o.clienteDoc && <p className="text-xs text-plomo-500">{o.clienteDoc}</p>}
                 </Td>
                 <Td>{origenOD(o)}</Td>
@@ -151,7 +151,7 @@ export function OrdenesDespacho({ vista = "almacen" }: { vista?: "almacen" | "ve
                 </Td>
                 <Td>
                   {o.lugar === "ENTREGA_ENCARGADO" ? (
-                    <span className="inline-flex flex-col rounded-lg bg-[#EEF2F7] px-2.5 py-1 text-xs font-semibold text-azul-900 ring-1 ring-inset ring-[#C9D4E3]">
+                    <span className="inline-flex flex-col rounded-lg bg-plomo-100 px-2.5 py-1 text-xs font-semibold text-fg ring-1 ring-inset ring-plomo-200">
                       Encargado: {o.encargadoNombre} - DNI {o.encargadoDni}
                       {o.encargadoTelefono && <span className="font-normal text-plomo-600">Tel. {o.encargadoTelefono}</span>}
                     </span>
@@ -318,7 +318,7 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
                 {modo && <th className="w-28 px-3 py-2 text-left">Entregar</th>}
               </tr>
             </thead>
-            <tbody className="bg-white [&>tr]:border-b [&>tr]:border-plomo-100">
+            <tbody className="bg-surface [&>tr]:border-b [&>tr]:border-plomo-100">
               {od.items.map((l) => {
                 const disp = dispLinea(l, sede);
                 const falta = !!modo && disp !== null && (cant[l.id] ?? 0) > disp + 1e-9;
@@ -373,7 +373,7 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
             <p className="mb-2 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wider text-plomo-500">
               <MapPin size={14} /> Lugar de entrega
             </p>
-            <p className="font-semibold text-azul-900">{lugarTxt(od)}</p>
+            <p className="font-semibold text-fg">{lugarTxt(od)}</p>
             {od.lugar === "ENVIO_AGENCIA" && (
               <ul className="mt-1 space-y-0.5 text-plomo-600">
                 <li>Agencia: {od.agenciaNombre}</li>
@@ -395,7 +395,7 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
             {od.recibidoPor && <p className="mt-2 text-plomo-600">Recibió: {od.recibidoPor}</p>}
             {od.firmaCliente && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={od.firmaCliente.url} alt="Firma del cliente" className="mt-2 h-16 rounded border border-plomo-200 bg-white" />
+              <img src={od.firmaCliente.url} alt="Firma del cliente" className="mt-2 h-16 rounded border border-plomo-200 bg-surface" />
             )}
             {od.fotoGuia && (
               <a href={od.fotoGuia.url} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-azul-700 underline">
@@ -410,7 +410,7 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
 
         {modo && (
           <div className="space-y-3 rounded-xl border-2 border-azul-900 p-4">
-            <p className="text-[12px] font-semibold uppercase tracking-wider text-azul-900">
+            <p className="text-[12px] font-semibold uppercase tracking-wider text-fg">
               {modo === "ENTREGADO" ? "Marcar entregado: salida de almacén y firma del cliente" : "Dejado en agencia: salida de almacén y guía"}
             </p>
             <div className="grid gap-3 md:grid-cols-3">
@@ -443,7 +443,7 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
             </div>
             {modo === "ENTREGADO" && <FirmaPad onChange={setFirma} />}
             {faltantes.length > 0 && (
-              <div role="alert" className="flex items-start gap-2 rounded-lg bg-vino px-4 py-3 text-sm font-medium text-white">
+              <div role="alert" className="flex items-start gap-2 rounded-lg bg-vino-900 px-4 py-3 text-sm font-medium text-white">
                 <AlertTriangle size={18} className="shrink-0" />
                 Stock insuficiente en {sede}: {faltantes.map((l) => `${l.descripcion} (hay ${dispLinea(l, sede) ?? 0} ${l.unidad}${equipoDeLinea(l) ? ` · el equipo está en ${ubicacionLinea(l)}` : ""})`).join(", ")}. Cambie de sede o entregue
                 menos (entrega parcial).
@@ -518,12 +518,12 @@ function Seguimiento({ od, grande }: { od: OrdenDespacho; grande?: boolean }) {
                 className={cn(
                   "flex items-center justify-center rounded-full font-bold",
                   grande ? "h-8 w-8 text-sm" : "h-5 w-5 text-[10px]",
-                  hecho ? (i === actual ? "bg-corp text-white" : "bg-azul-900 text-white") : "border-2 border-plomo-200 bg-white text-plomo-500"
+                  hecho ? (i === actual ? "bg-corp text-white" : "bg-azul-900 text-white") : "border-2 border-plomo-200 bg-surface text-plomo-500"
                 )}
               >
                 {hecho ? "✓" : i + 1}
               </span>
-              <span className={cn("mt-1 whitespace-nowrap", grande ? "text-xs" : "text-[10px]", hecho ? "font-semibold text-azul-900" : "text-plomo-500")}>{ESTADOS_OD[k]}</span>
+              <span className={cn("mt-1 whitespace-nowrap", grande ? "text-xs" : "text-[10px]", hecho ? "font-semibold text-fg" : "text-plomo-500")}>{ESTADOS_OD[k]}</span>
               {grande && hecho && <span className="text-[10px] text-plomo-500">{fecha(k)}</span>}
             </div>
             {i < pasos.length - 1 && <span className={cn("mt-2.5 h-0.5 flex-1", grande && "mt-4", i < actual ? "bg-azul-900" : "bg-plomo-200")} />}

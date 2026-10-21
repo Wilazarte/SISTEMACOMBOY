@@ -86,7 +86,7 @@ export function FichaTrabajador({
         {!nuevo && (
           <div className={cn("flex flex-wrap items-center gap-3 rounded-xl px-4 py-3", f.activo ? "bg-emerald-50" : "bg-red-50")}>
             <Badge estado={f.activo ? "ACTIVO" : "INACTIVO"} />
-            <span className="font-semibold text-azul-900">{f.nombre}</span>
+            <span className="font-semibold text-fg">{f.nombre}</span>
             {!f.activo && f.fechaBaja && (
               <span className="text-sm text-red-700">
                 Baja: {fechaPE(f.fechaBaja)}
@@ -97,7 +97,7 @@ export function FichaTrabajador({
         )}
 
         <fieldset disabled={soloLectura} className="min-w-0 space-y-4">
-          <Seccion icono={<Briefcase size={16} className="text-corp" />} titulo="Datos laborales">
+          <Seccion icono={<Briefcase size={16} className="text-rojo" />} titulo="Datos laborales">
             <Field label="N° de huella (reloj) *">
               <Input value={f.id} onChange={(e) => set("id", e.target.value.trim())} placeholder="Ej: 15" />
             </Field>
@@ -201,7 +201,7 @@ export function FichaTrabajador({
         {pagos && (
           <div className="rounded-xl border border-plomo-200">
             <div className="flex items-center justify-between border-b border-plomo-100 px-4 py-2">
-              <b className="text-sm text-azul-900">Historial de pagos ({pagos.length})</b>
+              <b className="text-sm text-fg">Historial de pagos ({pagos.length})</b>
               <button type="button" onClick={() => setPagos(null)} className="text-slate-400 hover:text-slate-700" aria-label="Cerrar historial">
                 <X size={16} />
               </button>

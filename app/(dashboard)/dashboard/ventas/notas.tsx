@@ -114,10 +114,10 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
       <Table head={["N° NP", "Fecha", "Cliente", "Total", "Condición pago", "Estado", "Despacho", "Vendedor", "Acciones"]} empty={lista.length === 0}>
         {lista.map((n) => (
           <tr key={n.id} className="hover:bg-plomo-50">
-            <Td className="font-semibold text-azul-900">{n.numero}</Td>
+            <Td className="font-semibold text-fg">{n.numero}</Td>
             <Td>{fechaPE(n.fecha)}</Td>
             <Td>
-              <p className="font-medium text-azul-900">{n.cliente}</p>
+              <p className="font-medium text-fg">{n.cliente}</p>
               <p className="text-xs text-plomo-500">{n.clienteDoc}</p>
             </Td>
             <Td className="text-right font-semibold">{soles(n.total)}</Td>
@@ -138,7 +138,7 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
                 const od = odDeNP(n, ods) ?? (n.odId ? ods.find((o) => o.id === n.odId) : undefined);
                 return od ? (
                   <div>
-                    <p className="font-mono text-xs font-semibold text-azul-900">{codigoDesdeNumero("OD", od.numero, od.fecha)}</p>
+                    <p className="font-mono text-xs font-semibold text-fg">{codigoDesdeNumero("OD", od.numero, od.fecha)}</p>
                     <Badge estado={estadoOD(od)} />
                   </div>
                 ) : n.estado === "APROBADA" || n.estado === "FACTURADA" ? (
@@ -238,8 +238,8 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
                     />
                   </Field>
                   <Field label="Fecha de vencimiento" hint="Automática: fecha + días">
-                    <div className="flex items-center gap-2 rounded-lg border border-plomo-200 bg-plomo-50 px-3 py-2 text-sm font-semibold text-azul-900">
-                      <CalendarClock size={16} className="text-corp" />
+                    <div className="flex items-center gap-2 rounded-lg border border-plomo-200 bg-plomo-50 px-3 py-2 text-sm font-semibold text-fg">
+                      <CalendarClock size={16} className="text-rojo" />
                       {form.fecha && diasNP >= 0 ? fechaPE(sumarDias(form.fecha, diasNP)) : "-"}
                     </div>
                   </Field>

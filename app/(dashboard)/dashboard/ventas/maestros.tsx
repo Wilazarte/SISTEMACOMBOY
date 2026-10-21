@@ -176,7 +176,7 @@ export function Clientes() {
             <Input placeholder="Buscar…" value={q} onChange={(e) => setQ(e.target.value)} className="w-48" />
             {habilitado && (
               <>
-                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-plomo-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-plomo-50">
+                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-plomo-200 bg-surface px-4 py-2 text-sm font-medium text-slate-700 hover:bg-plomo-50">
                   <Upload size={16} /> Importar Excel
                   <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={importar} />
                 </label>
@@ -197,7 +197,7 @@ export function Clientes() {
                 {c.tipoDoc} {c.numDoc}
               </Td>
               <Td>
-                <p className="font-semibold text-azul-900">{c.razonSocial}</p>
+                <p className="font-semibold text-fg">{c.razonSocial}</p>
                 <p className="max-w-xs truncate text-xs text-plomo-500">{c.direccionFiscal || "-"}</p>
               </Td>
               <Td>

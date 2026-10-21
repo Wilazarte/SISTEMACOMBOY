@@ -150,7 +150,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
 
         {/* Orden de compra opcional */}
         <div className="rounded-xl border border-plomo-200 p-4 md:col-span-3">
-          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-azul-900">
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-fg">
             <input type="checkbox" checked={conOC} onChange={(e) => setConOC(e.target.checked)} className="h-4 w-4 accent-corp" />
             <ShoppingBag size={15} /> ¿Emitir Orden de Compra por este gasto? (opcional)
           </label>
@@ -261,7 +261,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
 
         {/* Detracción */}
         <div className="rounded-xl border border-plomo-200 p-4 md:col-span-3">
-          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-azul-900">
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-fg">
             <input type="checkbox" checked={d.detraccion} onChange={(e) => set("detraccion", e.target.checked)} className="h-4 w-4 accent-corp" /> ¿Aplica detracción?
           </label>
           {d.detraccion && (
@@ -274,7 +274,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
                       key={p}
                       type="button"
                       onClick={() => set("detraccionPorc", p)}
-                      className={cn("rounded-lg border px-4 py-2 text-sm font-bold", d.detraccionPorc === p ? "border-azul-900 bg-azul-900 text-white" : "border-plomo-200 bg-white text-slate-700 hover:bg-red-50")}
+                      className={cn("rounded-lg border px-4 py-2 text-sm font-bold", d.detraccionPorc === p ? "border-azul-900 bg-azul-900 text-white" : "border-plomo-200 bg-surface text-slate-700 hover:bg-red-50")}
                     >
                       {p}%
                     </button>
@@ -293,7 +293,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
 
         {/* Bancarización */}
         <div className="rounded-xl border border-plomo-200 p-4 md:col-span-3">
-          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-azul-900">
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-fg">
             <input type="checkbox" checked={pagar} onChange={(e) => setPagar(e.target.checked)} className="h-4 w-4 accent-corp" /> Bancarización: registrar el pago ahora
           </label>
           <p className="mt-1 text-xs text-plomo-500">
@@ -328,7 +328,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
                     </button>
                   </>
                 ) : (
-                  <button type="button" onClick={() => ref.current?.click()} className="inline-flex items-center gap-1.5 text-plomo-600 hover:text-azul-900">
+                  <button type="button" onClick={() => ref.current?.click()} className="inline-flex items-center gap-1.5 text-plomo-600 hover:text-fg">
                     <FileUp size={14} /> {label}
                   </button>
                 )}
@@ -340,7 +340,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
       </div>
       <div className="flex items-center justify-between gap-3 border-t border-plomo-100 px-5 py-4">
         <p className="text-sm text-plomo-600">
-          Total <b className="text-azul-900">{soles(d.importe || 0)}</b>
+          Total <b className="text-fg">{soles(d.importe || 0)}</b>
           {d.detraccion && (
             <>
               {" "}

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowRight, ClipboardList, PackageSearch, Receipt, ShoppingCart, TrendingUp, Warehouse } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge, Card, CardHeader, Empty, Table, Td, cn } from "@/components/ui";
+import { TarjetasOrdenables } from "@/components/dashboard/TarjetasOrdenables";
 import { inicioDe, puedeVer, useSesion, veDashboard } from "@/lib/auth";
 import { KEYS, fechaPE, hoy, r2, soles, useStore } from "@/lib/storage";
 import type { ComprobanteVenta, NotaPedido, OrdenCompra, StockItem } from "@/lib/types";
@@ -63,55 +64,53 @@ export default function DashboardHome() {
   return (
     <div className="w-full space-y-6">
       <div>
-        <h1 className="font-serif text-2xl font-light leading-tight text-azul-900 lg:text-3xl">Dashboard</h1>
+        <h1 className="font-serif tracking-tight text-2xl font-semibold leading-tight text-fg lg:text-[28px]">Dashboard</h1>
         <p className="mt-1 text-[13px] text-plomo-600">
           Resumen de {nombreMes} · {sesion.nombre}
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {veVentas && (
-          <Kpi
-            icon={<TrendingUp size={18} />}
-            label="Ventas del mes"
-            valor={soles(totalVentasMes)}
-            detalle={`${ventasMes.length} comprobante(s) emitido(s)`}
-            href="/dashboard/ventas"
-            borde="border-l-emerald-600"
-          />
-        )}
-        {veCompras && (
-          <Kpi
-            icon={<ShoppingCart size={18} />}
-            label="Compras del mes"
-            valor={soles(totalComprasMes)}
-            detalle={`${ocMes.length} orden(es) de compra`}
-            href="/dashboard/compras"
-            borde="border-l-azul-700"
-          />
-        )}
-        {veAlmacen && (
-          <Kpi
-            icon={<PackageSearch size={18} />}
-            label="Stock crítico"
-            valor={String(criticos.length)}
-            detalle={criticos.length ? `Producto(s) con ${STOCK_CRITICO} o menos` : "Sin productos en nivel crítico"}
-            href="/dashboard/almacen"
-            borde="border-l-corp"
-            alerta={criticos.length > 0}
-          />
-        )}
-        {veVentas && (
-          <Kpi
-            icon={<ClipboardList size={18} />}
-            label="NP pendientes"
-            valor={String(pendientes.length)}
-            detalle={pendientes.length ? `${soles(r2(pendientes.reduce((a, n) => a + n.total, 0)))} por aprobar` : "Ninguna por aprobar"}
-            href="/dashboard/ventas"
-            borde="border-l-amber-500"
-          />
-        )}
-      </div>
+      <TarjetasOrdenables
+        tarjetas={[
+          veVentas && {
+            id: "ventas",
+            icon: <TrendingUp size={17} />,
+            label: "Ventas del mes",
+            valor: soles(totalVentasMes),
+            detalle: `${ventasMes.length} comprobante(s) emitido(s)`,
+            href: "/dashboard/ventas",
+            tono: "rojo" as const,
+          },
+          veCompras && {
+            id: "compras",
+            icon: <ShoppingCart size={17} />,
+            label: "Compras del mes",
+            valor: soles(totalComprasMes),
+            detalle: `${ocMes.length} orden(es) de compra`,
+            href: "/dashboard/compras",
+            tono: "grafito" as const,
+          },
+          veAlmacen && {
+            id: "stock",
+            icon: <PackageSearch size={17} />,
+            label: "Stock crítico",
+            valor: String(criticos.length),
+            detalle: criticos.length ? `Producto(s) con ${STOCK_CRITICO} o menos` : "Sin productos en nivel crítico",
+            href: "/dashboard/almacen?tab=stock",
+            tono: "rojo" as const,
+            alerta: criticos.length > 0,
+          },
+          veVentas && {
+            id: "np",
+            icon: <ClipboardList size={17} />,
+            label: "NP pendientes",
+            valor: String(pendientes.length),
+            detalle: pendientes.length ? `${soles(r2(pendientes.reduce((a, n) => a + n.total, 0)))} por aprobar` : "Ninguna por aprobar",
+            href: "/dashboard/ventas?tab=notas",
+            tono: "neutro" as const,
+          },
+        ]}
+      />
 
       <div className="grid gap-4 xl:grid-cols-5">
         {veVentas && (
@@ -120,23 +119,23 @@ export default function DashboardHome() {
             <div className="h-72 px-4 pb-4 pt-2" role="img" aria-label={`Ventas por día: ${serie.map((s) => `${s.dia} ${soles(s.total)}`).join(", ")}`}>
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={serie} margin={{ top: 12, right: 8, left: 8, bottom: 0 }}>
-                  <CartesianGrid vertical={false} stroke="#E2E8F0" />
-                  <XAxis dataKey="dia" tickLine={false} axisLine={{ stroke: "#E2E8F0" }} tick={{ fill: "#475569", fontSize: 12 }} />
+                  <CartesianGrid vertical={false} stroke="rgba(128,128,140,0.18)" />
+                  <XAxis dataKey="dia" tickLine={false} axisLine={{ stroke: "rgba(128,128,140,0.25)" }} tick={{ fill: "#8B8B95", fontSize: 12 }} />
                   <YAxis
                     tickLine={false}
                     axisLine={false}
                     width={64}
-                    tick={{ fill: "#64748B", fontSize: 11 }}
+                    tick={{ fill: "#8B8B95", fontSize: 11 }}
                     tickFormatter={(v: number) => (v >= 1000 ? `S/ ${(v / 1000).toLocaleString("es-PE", { maximumFractionDigits: 1 })}k` : `S/ ${v}`)}
                   />
                   <Tooltip
-                    cursor={{ fill: "rgba(15,36,64,0.06)" }}
+                    cursor={{ fill: "rgba(227,6,19,0.06)" }}
                     content={({ active, payload }) => {
                       if (!active || !payload?.length) return null;
                       const p = payload[0].payload as (typeof serie)[number];
                       return (
-                        <div className="rounded-lg border border-plomo-200 bg-white px-3 py-2 text-xs shadow-[0_4px_12px_rgba(15,36,64,0.12)]">
-                          <p className="font-semibold text-azul-900">{fechaPE(p.fecha)}</p>
+                        <div className="rounded-lg border border-plomo-200 bg-surface px-3 py-2 text-xs shadow-pop">
+                          <p className="font-semibold text-fg">{fechaPE(p.fecha)}</p>
                           <p className="text-plomo-600">
                             {soles(p.total)} · {p.n} comprobante(s)
                           </p>
@@ -144,7 +143,7 @@ export default function DashboardHome() {
                       );
                     }}
                   />
-                  <Bar dataKey="total" fill="#0F2440" radius={[4, 4, 0, 0]} maxBarSize={44} />
+                  <Bar dataKey="total" fill="#E30613" radius={[6, 6, 2, 2]} maxBarSize={44} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -178,7 +177,7 @@ export default function DashboardHome() {
               <ul className="space-y-1 text-sm">
                 {criticos.slice(0, 5).map((s) => (
                   <li key={s.id} className="flex justify-between gap-3">
-                    <span className="truncate text-azul-900">
+                    <span className="truncate text-fg">
                       {s.nombre} <span className="text-xs text-plomo-500">· {s.sede}</span>
                     </span>
                     <span className="whitespace-nowrap font-semibold text-vino">
@@ -197,7 +196,7 @@ export default function DashboardHome() {
           <CardHeader
             title="Últimas notas de pedido"
             action={
-              <Link href="/dashboard/ventas" className="inline-flex items-center gap-1 text-sm font-semibold text-corp hover:text-vino-900">
+              <Link href="/dashboard/ventas" className="inline-flex items-center gap-1 text-sm font-semibold text-rojo hover:text-vino-900">
                 Ver todas <ArrowRight size={14} />
               </Link>
             }
@@ -210,10 +209,10 @@ export default function DashboardHome() {
             <Table head={["N° NP", "Fecha", "Cliente", "Total", "Estado", "Despacho"]}>
               {ultimasNP.map((n) => (
                 <tr key={n.id} className="hover:bg-plomo-50">
-                  <Td className="font-semibold text-azul-900">{n.numero}</Td>
+                  <Td className="font-semibold text-fg">{n.numero}</Td>
                   <Td>{fechaPE(n.fecha)}</Td>
                   <Td>
-                    <p className="font-medium text-azul-900">{n.cliente}</p>
+                    <p className="font-medium text-fg">{n.cliente}</p>
                     <p className="text-xs text-plomo-500">{n.clienteDoc}</p>
                   </Td>
                   <Td className="text-right font-semibold">{soles(n.total)}</Td>
@@ -231,33 +230,15 @@ export default function DashboardHome() {
   );
 }
 
-function Kpi({ icon, label, valor, detalle, href, borde, alerta }: { icon: React.ReactNode; label: string; valor: string; detalle: string; href: string; borde: string; alerta?: boolean }) {
-  return (
-    <Link
-      href={href}
-      className={cn("group rounded-xl border border-l-4 border-plomo-200 bg-white p-5 shadow-[0_4px_12px_rgba(15,36,64,0.06)] transition hover:bg-plomo-50", borde)}
-    >
-      <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-plomo-500">
-        {icon} {label}
-      </p>
-      <p className={cn("mt-2 font-serif text-3xl text-azul-900", alerta && "text-vino")}>{valor}</p>
-      <p className="mt-1 flex items-center justify-between text-xs text-plomo-600">
-        {detalle}
-        <ArrowRight size={14} className="text-plomo-500 transition group-hover:translate-x-0.5 group-hover:text-corp" />
-      </p>
-    </Link>
-  );
-}
-
 function Rapido({ href, icon, titulo, texto }: { href: string; icon: React.ReactNode; titulo: string; texto: string }) {
   return (
-    <Link href={href} className="group flex items-center gap-3 rounded-lg border border-plomo-200 px-4 py-3 transition hover:border-azul-900 hover:bg-plomo-50">
-      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-azul-900 text-white">{icon}</span>
+    <Link href={href} className="group flex items-center gap-3 rounded-lg border border-plomo-200 px-4 py-3 transition hover:border-red-200 hover:bg-plomo-50">
+      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-rojo-soft text-rojo">{icon}</span>
       <span className="flex-1">
-        <span className="block font-semibold text-azul-900">{titulo}</span>
+        <span className="block font-semibold text-fg">{titulo}</span>
         <span className="block text-xs text-plomo-500">{texto}</span>
       </span>
-      <ArrowRight size={16} className="text-plomo-500 group-hover:text-corp" />
+      <ArrowRight size={16} className="text-plomo-500 group-hover:text-rojo" />
     </Link>
   );
 }

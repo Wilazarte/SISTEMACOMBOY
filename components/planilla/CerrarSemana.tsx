@@ -72,7 +72,7 @@ export function CerrarSemana({
       <Modal open={abierto} onClose={() => !guardando && setAbierto(false)} title="Pagar planilla y cerrar semana">
         <div className="space-y-4 text-sm">
           <p className="text-plomo-600">
-            Se guardará una copia permanente de la planilla <b className="text-azul-900">{periodo}</b> tal como se ve ahora. Después no se podrá modificar ni borrar, aunque
+            Se guardará una copia permanente de la planilla <b className="text-fg">{periodo}</b> tal como se ve ahora. Después no se podrá modificar ni borrar, aunque
             cambie la asistencia o los trabajadores.
           </p>
           <div className="grid grid-cols-2 gap-2 rounded-xl border border-plomo-200 bg-plomo-50 p-3">
@@ -88,8 +88,8 @@ export function CerrarSemana({
             <b className="text-right">{soles(neto)}</b>
             <span className="text-plomo-500">Adelantos descontados ({nAdelantos})</span>
             <b className="text-right text-red-600">- {soles(adelantos)}</b>
-            <span className="font-semibold text-azul-900">Total a pagar</span>
-            <b className="text-right text-azul-900">{soles(totalPagar)}</b>
+            <span className="font-semibold text-fg">Total a pagar</span>
+            <b className="text-right text-fg">{soles(totalPagar)}</b>
             {rango?.desde && (
               <>
                 <span className="text-plomo-500">Asistencia</span>

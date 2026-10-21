@@ -48,11 +48,11 @@ export function Contratistas({ soloLectura }: { soloLectura: boolean }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-plomo-200 bg-white p-3 text-sm shadow-sm">
+        <div className="rounded-xl border border-plomo-200 bg-surface p-3 text-sm shadow-sm">
           Concesiones activas: <b>{activos.length}</b>
           <p className="text-xs text-plomo-500">{lista.length} registradas en total</p>
         </div>
-        <div className="rounded-xl border border-plomo-200 bg-white p-3 text-sm shadow-sm">
+        <div className="rounded-xl border border-plomo-200 bg-surface p-3 text-sm shadow-sm">
           Contratado (activas): <b>{soles(r2(activos.reduce((s, c) => s + c.monto_total, 0)))}</b>
           <p className="text-xs text-plomo-500">Pagado {soles(r2(activos.reduce((s, c) => s + pagado(c), 0)))}</p>
         </div>
@@ -93,7 +93,7 @@ export function Contratistas({ soloLectura }: { soloLectura: boolean }) {
             {visibles.map((c) => (
               <tr key={c.id} className={cn("hover:bg-plomo-50", c.estado === "ANULADO" && "opacity-60")}>
                 <Td>
-                  <p className="font-semibold text-azul-900">{c.razonSocial}</p>
+                  <p className="font-semibold text-fg">{c.razonSocial}</p>
                   <p className="text-xs text-plomo-500">
                     {c.ruc ? `RUC ${c.ruc}` : "Sin RUC"}
                     {c.representante ? ` · ${c.representante}` : ""}
@@ -198,7 +198,7 @@ function FormConcesion({ form, onChange, onClose }: { form: ConcesionContratista
         </Field>
         {form.adelanto > 0 && <SelectorCaja value={form.cajaAdelanto ?? ""} onChange={(v) => set("cajaAdelanto", v)} />}
         <div className="flex flex-col justify-center rounded-lg bg-plomo-50 px-3 text-sm">
-          Saldo: <b className="text-lg text-azul-900">{soles(calcularSaldo(form))}</b>
+          Saldo: <b className="text-lg text-fg">{soles(calcularSaldo(form))}</b>
         </div>
         <Field label="Observaciones" className="sm:col-span-2 lg:col-span-3">
           <Textarea value={form.observaciones} onChange={(e) => set("observaciones", e.target.value)} />
@@ -236,14 +236,14 @@ function PagosConcesion({ c, soloLectura, onClose }: { c: ConcesionContratista; 
           <div className="rounded-lg bg-red-50 p-3 text-red-700">
             Saldo: <b>{soles(saldo)}</b>
           </div>
-          <div className="rounded-lg bg-[#EEF2F7] p-3 text-azul-700">
+          <div className="rounded-lg bg-plomo-100 p-3 text-azul-700">
             Comprobantes: <b>{soles(facturado(c))}</b>
           </div>
         </div>
 
         {/* Pagos */}
         <section className="rounded-xl border border-plomo-200">
-          <h4 className="flex items-center gap-2 border-b border-plomo-100 px-4 py-2 font-semibold text-azul-900">
+          <h4 className="flex items-center gap-2 border-b border-plomo-100 px-4 py-2 font-semibold text-fg">
             <HandCoins size={16} className="text-emerald-600" /> Pagos
           </h4>
           <table className="w-full">
@@ -300,7 +300,7 @@ function PagosConcesion({ c, soloLectura, onClose }: { c: ConcesionContratista; 
 
         {/* Comprobantes */}
         <section className="rounded-xl border border-plomo-200">
-          <h4 className="flex items-center gap-2 border-b border-plomo-100 px-4 py-2 font-semibold text-azul-900">
+          <h4 className="flex items-center gap-2 border-b border-plomo-100 px-4 py-2 font-semibold text-fg">
             <Receipt size={16} className="text-azul-700" /> Comprobantes (RH / factura)
           </h4>
           {c.comprobantes.length === 0 ? (

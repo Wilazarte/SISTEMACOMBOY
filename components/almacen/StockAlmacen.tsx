@@ -67,7 +67,7 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
             onClick={() => setSede(s)}
             className={cn(
               "rounded-full border px-3.5 py-1.5 text-xs font-semibold transition",
-              sede === s ? "border-[#0f2238] bg-[#0f2238] text-white" : "border-plomo-200 bg-white text-plomo-600 hover:border-[#0f2238]"
+              sede === s ? "border-azul-900 bg-azul-900 text-white" : "border-plomo-200 bg-surface text-plomo-600 hover:border-azul-900"
             )}
           >
             {s || "Todas"} <span className="opacity-70">{s ? stock.filter((x) => x.sede === s).length : stock.length}</span>
@@ -81,7 +81,7 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
         {lista.map((s) => (
           <tr key={s.id} className="hover:bg-plomo-50" data-stock={s.id}>
             <Td>{s.sede}</Td>
-            <Td className="font-medium text-azul-900">{s.nombre}</Td>
+            <Td className="font-medium text-fg">{s.nombre}</Td>
             <Td>{s.unidad}</Td>
             <Td className={cn("text-right font-semibold", s.cantidad <= 0 && "text-red-600")}>{num(s.cantidad)}</Td>
             <Td className="text-right">
@@ -146,7 +146,7 @@ function KardexModal({ item, onClose }: { item: StockItem; onClose: () => void }
   return (
     <Modal open onClose={onClose} title={`Kardex · ${item.nombre}`} wide>
       <p className="mb-3 text-sm text-plomo-600">
-        {item.sede} · {item.unidad} · saldo actual <b className="text-azul-900">{num(item.cantidad)}</b>
+        {item.sede} · {item.unidad} · saldo actual <b className="text-fg">{num(item.cantidad)}</b>
       </p>
       <div className="max-h-[60vh] overflow-auto rounded-xl border border-plomo-200">
         <table className="w-full text-xs">
@@ -167,7 +167,7 @@ function KardexModal({ item, onClose }: { item: StockItem; onClose: () => void }
                   <span className={cn("inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset", color[m.tipo_movimiento])}>{ETIQUETA_KARDEX[m.tipo_movimiento]}</span>
                 </td>
                 <td className="break-all px-2.5 py-1.5 font-mono">{m.documento}</td>
-                <td className={cn("px-2.5 py-1.5", m.tipo_movimiento === "SALIDA-PRODUCCION" ? (m.chasis ? "font-mono font-semibold text-azul-900" : "text-[10px] font-semibold text-amber-700") : "font-mono")}>
+                <td className={cn("px-2.5 py-1.5", m.tipo_movimiento === "SALIDA-PRODUCCION" ? (m.chasis ? "font-mono font-semibold text-fg" : "text-[10px] font-semibold text-amber-700") : "font-mono")}>
                   {m.tipo_movimiento === "SALIDA-PRODUCCION" ? textoChasis(m.chasis) : m.chasis || "-"}
                 </td>
                 <td className={cn("px-2.5 py-1.5 text-right font-semibold", m.cantidad < 0 ? "text-red-600" : "text-emerald-700")}>

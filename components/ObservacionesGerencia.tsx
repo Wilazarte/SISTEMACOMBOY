@@ -59,7 +59,7 @@ export function ObservacionesGerencia({ modulo, sesion }: { modulo: string; sesi
     <Card className="border-amber-300 bg-amber-50/60">
       <div className="flex items-center gap-2 border-b border-amber-200 px-5 py-3">
         <MessageSquareText size={18} className="text-amber-700" />
-        <h3 className="font-semibold text-azul-900">Observaciones de Gerencia · {NOMBRES[modulo] ?? modulo}</h3>
+        <h3 className="font-semibold text-fg">Observaciones de Gerencia · {NOMBRES[modulo] ?? modulo}</h3>
         {lista.length > 0 && <span className="rounded-full bg-corp px-2 text-xs font-bold text-white">{lista.length}</span>}
       </div>
       <div className="space-y-3 p-5">
@@ -71,7 +71,7 @@ export function ObservacionesGerencia({ modulo, sesion }: { modulo: string; sesi
             }}
             className="flex flex-col gap-2 sm:flex-row sm:items-end"
           >
-            <Textarea value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Escriba una observación para el responsable de este módulo…" className="flex-1 bg-white" />
+            <Textarea value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Escriba una observación para el responsable de este módulo…" className="flex-1 bg-surface" />
             <Button type="submit" variant="warning" className="sm:self-stretch">
               <Send size={16} /> Enviar
             </Button>
@@ -82,9 +82,9 @@ export function ObservacionesGerencia({ modulo, sesion }: { modulo: string; sesi
         ) : (
           <ul className="space-y-2">
             {lista.map((o) => (
-              <li key={o.id} className="flex items-start gap-3 rounded-lg border border-amber-200 bg-white px-3 py-2">
+              <li key={o.id} className="flex items-start gap-3 rounded-lg border border-amber-200 bg-surface px-3 py-2">
                 <div className="flex-1">
-                  <p className="whitespace-pre-wrap text-sm text-azul-900">{o.texto}</p>
+                  <p className="whitespace-pre-wrap text-sm text-fg">{o.texto}</p>
                   <p className="mt-0.5 text-xs text-slate-400">
                     {new Date(o.fecha).toLocaleString("es-PE")} · {o.usuario}
                   </p>

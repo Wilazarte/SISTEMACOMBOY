@@ -125,7 +125,7 @@ export default function ComprasPage() {
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-serif text-2xl font-light leading-tight text-azul-900 lg:text-3xl">Tesorería / Compras</h1>
+          <h1 className="font-serif tracking-tight text-2xl font-semibold leading-tight text-fg lg:text-[28px]">Tesorería / Compras</h1>
           <p className="mt-1 text-[13px] text-plomo-600">Requerimiento → Cotización → Orden de Compra → Bancarización → Factura</p>
         </div>
         {!puede(rol, "req.revisar") && (
@@ -182,7 +182,7 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
     <section>
       <div className="mb-3 flex items-center gap-2">
         <Bell size={18} className="text-amber-600" />
-        <h2 className="font-semibold text-azul-900">Requerimientos por revisar</h2>
+        <h2 className="font-semibold text-fg">Requerimientos por revisar</h2>
         <span className="rounded-full bg-corp px-2 text-xs font-bold text-white">{pendientes.length}</span>
       </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -190,7 +190,7 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
           <div key={r.id} className="flex flex-col rounded-xl border-2 border-amber-300 bg-amber-50 p-4 shadow-sm">
             <div className="flex items-start justify-between">
               <div>
-                <p className="font-bold text-azul-900">{r.numero}</p>
+                <p className="font-bold text-fg">{r.numero}</p>
                 <p className="text-xs text-plomo-600">
                   {fechaPE(r.fecha)} · {r.sede}
                 </p>
@@ -464,7 +464,7 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
                   </Td>
                   <Td>{fechaPE(g.fecha)}</Td>
                   <Td>
-                    <span className="font-semibold text-azul-900">{g.numero}</span>
+                    <span className="font-semibold text-fg">{g.numero}</span>
                     <p className="text-xs text-plomo-500">{g.comprobanteGasto ? COMPROBANTES_GASTO[g.comprobanteGasto] : "-"}</p>
                   </Td>
                   <Td>{g.proveedor}</Td>
@@ -490,7 +490,7 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
               </Td>
               <Td>{fechaPE(c.fecha)}</Td>
               <Td>
-                <span className="font-semibold text-azul-900">{c.numero}</span>
+                <span className="font-semibold text-fg">{c.numero}</span>
                 <p className="text-xs text-plomo-500">{c.tipoComprobante === "FACTURA" ? "Factura" : "Boleta"}</p>
               </Td>
               <Td>{c.proveedor}</Td>
@@ -575,7 +575,7 @@ function Antecedentes({ reqs, ordenes, rol, onCotizar }: { reqs: Requerimiento[]
           const oc = ordenes.find((o) => o.reqId === r.id);
           return (
             <tr key={r.id} className="hover:bg-plomo-50">
-              <Td className="font-semibold text-azul-900">{r.numero}</Td>
+              <Td className="font-semibold text-fg">{r.numero}</Td>
               <Td>{fechaPE(r.fecha)}</Td>
               <Td>{r.sede}</Td>
               <Td>{r.solicitante}</Td>
@@ -739,12 +739,12 @@ function Cotizaciones({
           {cotizaciones.map((c) => (
             <tr key={c.id} className="hover:bg-plomo-50">
               <Td>{fechaPE(c.fechaEmision)}</Td>
-              <Td className="font-semibold text-azul-900">{c.numero}</Td>
+              <Td className="font-semibold text-fg">{c.numero}</Td>
               <Td>{c.reqNumero}</Td>
               <Td>{c.proveedor}</Td>
               <Td>{c.ruc}</Td>
               <Td className="text-right font-semibold">
-                {minPorReq[c.reqId] === c.total && <span className="mr-1 text-corp">★</span>}
+                {minPorReq[c.reqId] === c.total && <span className="mr-1 text-rojo">★</span>}
                 {soles(c.total)}
               </Td>
               <Td>
@@ -946,7 +946,7 @@ function Ordenes({
                   </button>
                 ) : (
                   <div className="flex flex-col gap-3 rounded-xl border border-plomo-200 bg-plomo-50 p-3 md:flex-row">
-                    <div className="h-40 overflow-hidden rounded-lg border border-plomo-200 bg-white md:w-56">
+                    <div className="h-40 overflow-hidden rounded-lg border border-plomo-200 bg-surface md:w-56">
                       {voucher.file.type.startsWith("image/") ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={voucher.url} alt="Vista previa baucher" className="h-full w-full object-contain" />
@@ -956,7 +956,7 @@ function Ordenes({
                     </div>
                     <div className="flex flex-1 flex-col justify-between gap-2">
                       <div>
-                        <p className="break-all text-sm font-medium text-azul-900">{voucher.file.name}</p>
+                        <p className="break-all text-sm font-medium text-fg">{voucher.file.name}</p>
                         <p className="text-xs text-plomo-500">{(voucher.file.size / 1048576).toFixed(2)} MB</p>
                       </div>
                       <div className="flex gap-2">
@@ -1008,7 +1008,7 @@ function Ordenes({
         <Table head={["Nro OC", "Fecha", "Proveedor", "Cotización", "REQ", "Forma pago", "Cuenta pago", "Baucher", "Total", "Estado", "Acciones"]} empty={ordenes.length === 0}>
           {ordenes.map((o) => (
             <tr key={o.id} className="hover:bg-plomo-50">
-              <Td className="font-semibold text-azul-900">{o.numero}</Td>
+              <Td className="font-semibold text-fg">{o.numero}</Td>
               <Td>{fechaPE(o.fecha)}</Td>
               <Td>{o.proveedor}</Td>
               <Td>{o.cotizacionNumero}</Td>
@@ -1085,7 +1085,7 @@ function Ordenes({
         {bancarizar && (
           <div className="space-y-4 text-sm">
             <p className="text-plomo-600">
-              {bancarizar.proveedor} · <b className="text-azul-900">{soles(bancarizar.total)}</b>. Después de bancarizar se registra la factura y termina el proceso.
+              {bancarizar.proveedor} · <b className="text-fg">{soles(bancarizar.total)}</b>. Después de bancarizar se registra la factura y termina el proceso.
             </p>
             <FormBancarizacion value={banc} onChange={setBanc} />
             <div className="flex justify-end gap-2 border-t border-plomo-100 pt-4">
@@ -1310,7 +1310,7 @@ function Facturas({
             action={
               <div className="flex rounded-lg bg-plomo-100 p-0.5 text-sm">
                 {(["FACTURA", "DJ"] as const).map((m) => (
-                  <button key={m} onClick={() => { setModo(m); setOcId(""); }} className={cn("rounded-md px-3 py-1.5 font-medium", modo === m ? "bg-white shadow" : "text-plomo-500")}>
+                  <button key={m} onClick={() => { setModo(m); setOcId(""); }} className={cn("rounded-md px-3 py-1.5 font-medium", modo === m ? "bg-surface shadow" : "text-plomo-500")}>
                     {m === "FACTURA" ? "Factura" : "Decl. Jurada"}
                   </button>
                 ))}
@@ -1355,7 +1355,7 @@ function Facturas({
             ) : (
               <>
                 {rol !== "GERENCIA" && (
-                  <div className="flex items-center gap-2 rounded-lg bg-[#EEF2F7] px-3 py-2 text-sm text-azul-700 md:col-span-3">
+                  <div className="flex items-center gap-2 rounded-lg bg-plomo-100 px-3 py-2 text-sm text-azul-700 md:col-span-3">
                     <AlertTriangle size={16} /> Solo el rol GERENCIA puede aprobar una declaración jurada. Cambie de rol en el menú lateral.
                   </div>
                 )}
@@ -1422,14 +1422,14 @@ function Facturas({
                     <Badge estado={f.tipo} />
                   )}
                 </Td>
-                <Td className="font-semibold text-azul-900">{f.numero}</Td>
+                <Td className="font-semibold text-fg">{f.numero}</Td>
                 <Td>{fechaPE(f.fecha)}</Td>
                 <Td className={cn(vencida && "font-semibold text-red-600")}>{fechaPE(f.fechaVencimiento)}</Td>
                 <Td>{f.proveedor}</Td>
                 <Td>
                   {f.esGastoTesoreria ? (
                     <>
-                      {f.codigo && <p className="font-mono text-xs font-semibold text-azul-900">{f.codigo}</p>}
+                      {f.codigo && <p className="font-mono text-xs font-semibold text-fg">{f.codigo}</p>}
                       <span className="text-xs text-plomo-600">{f.tipoGasto ? TIPOS_GASTO[f.tipoGasto] : "Gasto"}</span>
                     </>
                   ) : (
@@ -1491,7 +1491,7 @@ function Facturas({
         {pagarFac && (
           <div className="space-y-4 text-sm">
             <p className="text-plomo-600">
-              {pagarFac.proveedor} · <b className="text-azul-900">{soles(pagarFac.netoPagar ?? pagarFac.total)}</b>
+              {pagarFac.proveedor} · <b className="text-fg">{soles(pagarFac.netoPagar ?? pagarFac.total)}</b>
             </p>
             {requiereBancarizacion(pagarFac.netoPagar ?? pagarFac.total, pagarFac.ruc) ? (
               <>
@@ -1661,7 +1661,7 @@ function Guias({ rol, facturas, guias, preFac }: { rol: Rol; facturas: Factura[]
           <Table head={["Nro guía", "Fecha", "Factura", "OC", "Archivo", "Estado", ""]}>
             {guias.map((g) => (
               <tr key={g.id} className="hover:bg-plomo-50">
-                <Td className="font-semibold text-azul-900">{g.numero}</Td>
+                <Td className="font-semibold text-fg">{g.numero}</Td>
                 <Td>{fechaPE(g.fecha)}</Td>
                 <Td>{g.facturaNumero}</Td>
                 <Td>{g.ocNumero}</Td>

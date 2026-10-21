@@ -468,13 +468,13 @@ export default function PlanillaPage() {
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-serif text-2xl font-light leading-tight text-azul-900 lg:text-3xl">Planilla</h1>
+          <h1 className="font-serif tracking-tight text-2xl font-semibold leading-tight text-fg lg:text-[28px]">Planilla</h1>
           <p className="mt-1 text-[13px] text-plomo-600">Trabajadores, liquidación del periodo, historial y contratistas</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
             href="/dashboard/planilla/adelantos"
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-plomo-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-plomo-50"
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-plomo-200 bg-surface px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-plomo-50"
           >
             <HandCoins size={16} /> Adelantos
           </Link>
@@ -493,7 +493,7 @@ export default function PlanillaPage() {
             <Copy size={16} /> {duplicados.length} posible(s) trabajador(es) duplicado(s)
           </p>
           {duplicados.map((d) => (
-            <div key={d.duplicado.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-white px-3 py-2">
+            <div key={d.duplicado.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-surface px-3 py-2">
               <span>
                 <b>
                   N° {d.duplicado.id} · {d.duplicado.nombre}
@@ -542,7 +542,7 @@ export default function PlanillaPage() {
             action={
               <div className="flex flex-wrap items-center gap-3">
                 <Input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar nombre, DNI, N°, cargo…" className="w-60" />
-                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-plomo-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">
+                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-plomo-200 bg-surface px-3 py-2 text-sm font-medium text-slate-700">
                   <input type="checkbox" checked={verInactivos} onChange={(e) => setVerInactivos(e.target.checked)} className="h-4 w-4 accent-red-600" /> Mostrar inactivos
                 </label>
               </div>
@@ -558,7 +558,7 @@ export default function PlanillaPage() {
                 <tr key={t.id} className={cn("transition hover:bg-plomo-50", !t.activo && "bg-plomo-100 text-slate-400")}>
                   <Td className="font-mono text-base">{t.id}</Td>
                   <Td>
-                    <p className={cn("font-semibold", t.activo ? "text-azul-900" : "text-plomo-500 line-through decoration-slate-300")}>{t.nombre}</p>
+                    <p className={cn("font-semibold", t.activo ? "text-fg" : "text-plomo-500 line-through decoration-slate-300")}>{t.nombre}</p>
                     <p className="text-xs text-plomo-500">
                       DNI {t.dni || "-"}
                       {edad(t.fechaNacimiento) !== null ? ` · ${edad(t.fechaNacimiento)} años` : ""}
@@ -619,7 +619,7 @@ export default function PlanillaPage() {
       {tab === "planilla" && (
         <>
           <div className="grid gap-3 lg:grid-cols-4">
-            <label className="block rounded-xl border border-plomo-200 bg-white p-3 shadow-sm">
+            <label className="block rounded-xl border border-plomo-200 bg-surface p-3 shadow-sm">
               <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-plomo-500">Periodo</span>
               <Input
                 value={periodo}
@@ -634,7 +634,7 @@ export default function PlanillaPage() {
                   <option key={p} value={p} />
                 ))}
               </datalist>
-              <span className="mt-2 block text-[13px] font-semibold text-azul-900" data-semana>
+              <span className="mt-2 block text-[13px] font-semibold text-fg" data-semana>
                 {sinPeriodo ? "Importe la asistencia o elija un periodo" : etiquetaSemana(periodo, rango.desde, rango.hasta)}
               </span>
               <span className="mt-1 flex items-center gap-1.5">
@@ -657,7 +657,7 @@ export default function PlanillaPage() {
                 />
               </span>
             </label>
-            <div className="rounded-xl border border-plomo-200 bg-white p-3 text-sm shadow-sm">
+            <div className="rounded-xl border border-plomo-200 bg-surface p-3 text-sm shadow-sm">
               Trabajadores ({filtroActual.label}): <b>{visibles.length}</b>
               {filtro !== "TODOS" && <span className="text-plomo-500"> de {calculados.length}</span>}
               <p className="text-xs text-plomo-500">
@@ -668,7 +668,7 @@ export default function PlanillaPage() {
                     : "Sin asistencia en este periodo"}
               </p>
             </div>
-            <div className="rounded-xl border border-plomo-200 bg-white p-3 text-sm shadow-sm">
+            <div className="rounded-xl border border-plomo-200 bg-surface p-3 text-sm shadow-sm">
               Básico {soles(totales.basico)} · Extra {soles(totales.extra)}
               <p className="text-xs text-red-600">
                 AFP − {soles(totales.afp)} · Adelantos − {soles(totales.adelantos)}
@@ -745,7 +745,7 @@ export default function PlanillaPage() {
                         onClick={() => setFiltro(f.id)}
                         className={cn(
                           "rounded-full border px-4 py-2 text-sm font-semibold transition",
-                          filtro === f.id ? "border-[#0f2238] bg-[#0f2238] text-white" : "border-plomo-200 bg-white text-plomo-600 hover:border-[#0f2238] hover:text-[#0f2238]"
+                          filtro === f.id ? "border-azul-900 bg-azul-900 text-white" : "border-plomo-200 bg-surface text-plomo-600 hover:border-azul-900 hover:text-fg"
                         )}
                       >
                         {f.label} <span className={cn("ml-1 text-xs", filtro === f.id ? "text-white/70" : "text-plomo-500")}>{n}</span>
@@ -775,11 +775,11 @@ export default function PlanillaPage() {
                   aria-checked={soloAsistencia}
                   data-solo-asistencia
                   onClick={() => setSoloAsistencia((v) => !v)}
-                  className="inline-flex items-center gap-2 rounded-full border border-plomo-200 bg-white py-1.5 pl-1.5 pr-4 text-sm font-semibold text-azul-900"
+                  className="inline-flex items-center gap-2 rounded-full border border-plomo-200 bg-surface py-1.5 pl-1.5 pr-4 text-sm font-semibold text-fg"
                   title={soloAsistencia ? "Mostrando solo los de la lista de pago (con asistencia o agregados a mano)" : "Mostrando todos los trabajadores"}
                 >
                   <span className={cn("relative h-6 w-11 rounded-full transition", soloAsistencia ? "bg-emerald-600" : "bg-plomo-200")}>
-                    <span className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all", soloAsistencia ? "left-[22px]" : "left-0.5")} />
+                    <span className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-surface shadow transition-all", soloAsistencia ? "left-[22px]" : "left-0.5")} />
                   </span>
                   {soloAsistencia ? "✓ Solo con asistencia" : "Todos"}
                 </button>
@@ -795,7 +795,7 @@ export default function PlanillaPage() {
                       onClick={() => m !== liq.modo && ejecutar(() => cambiarModo(periodo, m), `Modo: ${MODOS_LIQUIDACION[m].label}`)}
                       className={cn(
                         "px-5 py-2.5 text-sm font-bold transition disabled:cursor-not-allowed",
-                        liq.modo === m ? "bg-azul-900 text-white" : "bg-white text-plomo-600 hover:bg-red-50"
+                        liq.modo === m ? "bg-azul-900 text-white" : "bg-surface text-plomo-600 hover:bg-red-50"
                       )}
                     >
                       {MODOS_LIQUIDACION[m].label.toUpperCase()}
@@ -919,7 +919,7 @@ export default function PlanillaPage() {
                       )}
                     </Td>
                     <Td className="min-w-[170px] max-w-[230px] whitespace-normal">
-                      <p className="font-semibold text-azul-900">
+                      <p className="font-semibold text-fg">
                         <span className="mr-1 font-mono text-xs text-slate-400">{t.id}</span>
                         {t.nombre}
                         {pagado(t) && !periodoCerrado && <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">PAGADO</span>}
@@ -1008,8 +1008,8 @@ export default function PlanillaPage() {
         <div className="space-y-6">
           <ContratistasMaestro trabajadores={maestro} soloLectura={!puedeEditar} />
           <div>
-            <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-azul-900">
-              <Building2 size={18} className="text-corp" /> Concesiones / servicios externos
+            <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-fg">
+              <Building2 size={18} className="text-rojo" /> Concesiones / servicios externos
             </h2>
             <Contratistas soloLectura={!puedeEditar} />
           </div>

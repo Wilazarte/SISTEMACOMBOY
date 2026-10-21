@@ -69,9 +69,9 @@ export function EditarListaSemana({ periodo, filas, onClose }: { periodo: string
               data-lista={f.id}
               className={cn("flex cursor-pointer items-center gap-3 border-b border-plomo-100 px-3 py-2 last:border-0 hover:bg-plomo-50", f.pagado && "cursor-not-allowed opacity-60")}
             >
-              <input type="checkbox" className="h-4 w-4 accent-[#0f2238]" checked={marcados.has(f.id)} disabled={f.pagado} onChange={(e) => cambiar(f.id, e.target.checked)} />
+              <input type="checkbox" className="h-4 w-4 accent-corp" checked={marcados.has(f.id)} disabled={f.pagado} onChange={(e) => cambiar(f.id, e.target.checked)} />
               <span className="w-10 font-mono text-xs text-slate-400">{f.id}</span>
-              <span className="flex-1 font-semibold text-azul-900">{f.nombre}</span>
+              <span className="flex-1 font-semibold text-fg">{f.nombre}</span>
               <span className="w-24 text-xs text-plomo-500">{f.tipo}</span>
               {f.tieneAsistencia ? (
                 <span className="w-28 text-xs text-emerald-700">✅ {f.horas.toLocaleString("es-PE", { maximumFractionDigits: 2 })} h</span>

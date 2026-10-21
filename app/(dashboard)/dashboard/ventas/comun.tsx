@@ -311,7 +311,7 @@ export function DatosDespachoForm({ value, onChange, direccionCliente }: { value
             key={k}
             className={cn(
               "flex cursor-pointer items-start gap-2.5 rounded-lg border px-3.5 py-2.5 text-sm transition",
-              value.lugar === k ? "border-azul-900 bg-azul-900 text-white" : "border-plomo-200 bg-white text-azul-900 hover:bg-plomo-50"
+              value.lugar === k ? "border-azul-900 bg-azul-900 text-white" : "border-plomo-200 bg-surface text-fg hover:bg-plomo-50"
             )}
           >
             <input type="radio" name="lugar-entrega" value={k} checked={value.lugar === k} onChange={() => elegir(k)} className="mt-0.5 accent-corp" />

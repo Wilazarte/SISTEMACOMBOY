@@ -70,7 +70,7 @@ export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadore
         subtitle={`${activos.length} activo(s) · contratado ${soles(r2(activos.reduce((s, t) => s + t.sueldo, 0)))} · no entran a la planilla del periodo`}
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-plomo-200 bg-white px-3 py-2 text-sm font-medium text-slate-700">
+            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-plomo-200 bg-surface px-3 py-2 text-sm font-medium text-slate-700">
               <input type="checkbox" checked={verInactivos} onChange={(e) => setVerInactivos(e.target.checked)} className="h-4 w-4 accent-red-600" /> Mostrar inactivos
             </label>
             {!soloLectura && (
@@ -93,7 +93,7 @@ export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadore
               <tr key={t.id} className={cn("hover:bg-plomo-50", !t.activo && "bg-plomo-100 text-slate-400")}>
                 <Td className="font-mono">{t.id}</Td>
                 <Td>
-                  <p className={cn("font-semibold", t.activo ? "text-azul-900" : "text-plomo-500")}>{t.nombre}</p>
+                  <p className={cn("font-semibold", t.activo ? "text-fg" : "text-plomo-500")}>{t.nombre}</p>
                   <p className="text-xs text-plomo-500">{t.ruc ? `RUC ${t.ruc}` : t.dni ? `DNI ${t.dni}` : "Sin documento"}</p>
                 </Td>
                 <Td>
