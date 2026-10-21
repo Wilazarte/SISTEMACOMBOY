@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { FileUp, Paperclip, Plus, Receipt, ShoppingBag, Trash2, X } from "lucide-react";
 import { FormBancarizacion, bancarizacionVacia } from "@/components/compras/FormBancarizacion";
 import { UNIDADES } from "@/lib/empresa";
+import { pdfDeclaracionJurada } from "@/lib/pdf";
 import { Button, Card, CardHeader, Field, Input, Select, Textarea, cn, ejecutarAsync, toast } from "@/components/ui";
 import {
   COMPROBANTES_GASTO,
@@ -26,7 +27,7 @@ import {
   type DatosGasto,
   subirBaucher,
 } from "@/lib/storage";
-import type { ArchivoGasto, Bancarizacion, ComprobanteGasto, Proveedor, Rol, StockItem, TipoGasto } from "@/lib/types";
+import type { ArchivoGasto, Factura, Bancarizacion, ComprobanteGasto, Proveedor, Rol, StockItem, TipoGasto } from "@/lib/types";
 
 type FilaOC = { id: string; nombre: string; unidad: string; cantidad: number; precioUnit: number };
 const filaOC = (): FilaOC => ({ id: Math.random().toString(36).slice(2), nombre: "", unidad: "UND", cantidad: 1, precioUnit: 0 });
@@ -98,16 +99,23 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
   const guardar = async () => {
     setGuardando(true);
     let id = "";
+    let dj: Factura | undefined;
     const ok = await ejecutarAsync(
       async () => {
         const r = await registrarGastoCompleto({ ...d, fecha: fechaISO }, { items: conOC ? filas : undefined, bancarizacion: pagar ? banc : undefined }, rol);
         id = r.gasto.id;
+        if (r.gasto.comprobanteGasto === "DJ") dj = r.gasto;
         return r;
       },
       `Gasto registrado${conOC ? " con su orden de compra" : ""} · ${pagar ? `PAGADO desde ${banc.caja}` : `en Facturas como POR PAGAR${monto ? ` (neto ${soles(neto)})` : ""}`}`
     );
     setGuardando(false);
     if (!ok) return;
+    // Declaración jurada: N° correlativo asignado por el servidor y su PDF al instante
+    if (dj) {
+      toast(`Declaración jurada ${dj.numero} registrada`);
+      pdfDeclaracionJurada(dj);
+    }
     setD(vacio());
     setConOC(false);
     setFilas([filaOC()]);
@@ -229,11 +237,12 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
             options={(Object.keys(COMPROBANTES_GASTO) as ComprobanteGasto[]).map((k) => ({ value: k, label: COMPROBANTES_GASTO[k] }))}
           />
         </Field>
-        <Field label={d.comprobante === "DJ" ? "N° DJ *" : `N° ${COMPROBANTES_GASTO[d.comprobante].toLowerCase()} *`}>
+        <Field label={d.comprobante === "DJ" ? "N° DJ" : `N° ${COMPROBANTES_GASTO[d.comprobante].toLowerCase()} *`} hint={d.comprobante === "DJ" ? "Se asigna solo al guardar (correlativo)" : undefined}>
           <Input
-            value={d.numero}
+            value={d.comprobante === "DJ" ? "" : d.numero}
+            disabled={d.comprobante === "DJ"}
             onChange={(e) => set("numero", e.target.value.toUpperCase())}
-            placeholder={d.comprobante === "FACTURA" ? "F001-00001234" : d.comprobante === "BOLETA" ? "B001-00000456" : d.comprobante === "DJ" ? "DJ-001" : "N° de recibo"}
+            placeholder={d.comprobante === "FACTURA" ? "F001-00001234" : d.comprobante === "BOLETA" ? "B001-00000456" : d.comprobante === "DJ" ? "Auto: DJ-XXXX" : "N° de recibo"}
           />
         </Field>
         <div />

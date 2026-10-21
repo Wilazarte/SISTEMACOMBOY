@@ -719,7 +719,39 @@ function pdfGasto(f: Factura, codigo: string): void {
   );
 }
 
+/** Declaración jurada de gasto (gasto sin comprobante) con su N° correlativo DJ-0001. */
+export function pdfDeclaracionJurada(f: Factura): void {
+  guardar(
+    construir({
+      titulo: `DECLARACIÓN JURADA DE GASTO N° ${f.numero}`,
+      numero: f.numero,
+      estado: estadoDocumento(f.estadoPago),
+      datos: [
+        ["Fecha", fechaPE(f.fecha)],
+        ["Importe", soles(f.total)],
+        ["Descripción", f.descripcion ?? "-"],
+        ["Proveedor", f.proveedor],
+        ["DNI / RUC", f.ruc || "-"],
+        ["Concepto", "Gasto sin comprobante"],
+      ],
+      head: ["#", "Descripción", "Importe"],
+      body: [[1, f.descripcion ?? "-", soles(f.total)]],
+      alinearDerecha: [2],
+      totales: [["TOTAL", soles(f.total)]],
+      notas: [
+        `Declaro bajo juramento que el gasto detallado por ${soles(f.total)} se realizó a favor de ${EMPRESA.razonSocial} y que el proveedor ${f.proveedor} no emitió comprobante de pago. Documento sustentatorio interno; no otorga derecho a crédito fiscal.`,
+      ],
+      firmas: ["Declarante", "Tesorería", "Gerencia"],
+    }),
+    f.numero
+  );
+}
+
 export function pdfFactura(f: Factura, oc?: OrdenCompra): void {
+  if (f.esGastoTesoreria && f.comprobanteGasto === "DJ") {
+    pdfDeclaracionJurada(f);
+    return;
+  }
   if (f.esGastoTesoreria) {
     void conCodigo(async () => pdfGasto(f, await codigoGasto(f.id)));
     return;

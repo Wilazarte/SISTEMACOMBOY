@@ -2303,6 +2303,20 @@ const NUM_GASTO: Partial<Record<ComprobanteGasto, RegExp>> = {
   BOLETA: /^[BE][A-Z0-9]{3}-\d{1,8}$/,
 };
 
+const DJ_AUTO = "DJ-AUTO";
+
+/** Siguiente N° de declaración jurada de gasto: correlativo atómico en Supabase (tabla correlativos, next_correlativo). */
+async function siguienteDJ(): Promise<string> {
+  const { data, error } = await createClient().rpc("next_correlativo", { t: "DJ" });
+  if (error) {
+    if (error.code === "42501") throw new ErpError("Su usuario no puede emitir declaraciones juradas.");
+    if (error.code === "PGRST202" || /could not find the function/i.test(error.message))
+      throw new ErpError("Falta la numeración de DJ en Supabase: ejecute supabase/migrations/20261021_correlativo_dj.sql.");
+    throw new ErpError(`No se pudo numerar la declaración jurada: ${error.message}`);
+  }
+  return `DJ-${data}`;
+}
+
 /** Registra un gasto / servicio: NO ingresa a stock; queda en Facturas como POR PAGAR. */
 export function registrarGastoTesoreria(d: DatosGasto, rol: Rol): Factura {
   const f = prepararGasto(d, rol);
@@ -2324,7 +2338,9 @@ export async function registrarGastoCompleto(
   opc: { items?: ItemOCGasto[]; bancarizacion?: Bancarizacion },
   rol: Rol
 ): Promise<{ gasto: Factura; oc?: OrdenCompra }> {
-  const f = prepararGasto(d, rol);
+  // Declaración jurada: el N° lo pone el servidor (DJ-0001, DJ-0002…) al final, cuando todo lo demás ya validó
+  const esDJ = d.comprobante === "DJ";
+  const f = prepararGasto(esDJ ? { ...d, numero: DJ_AUTO } : d, rol);
   const b = opc.bancarizacion ? validarBancarizacion(opc.bancarizacion) : undefined;
   let oc: OrdenCompra | undefined;
   if (opc.items) {
@@ -2372,6 +2388,13 @@ export async function registrarGastoCompleto(
     };
     f.ocId = oc.id;
     f.ocNumero = numero;
+  }
+  if (esDJ) {
+    const numero = await siguienteDJ();
+    const poner = (h: EventoHistorial[]) => h.map((e) => (e.detalle ? { ...e, detalle: e.detalle.replace(DJ_AUTO, numero) } : e));
+    f.numero = numero;
+    f.historial = poner(f.historial);
+    if (oc) oc.historial = poner(oc.historial);
   }
   if (b) {
     f.estadoPago = "PAGADA";
@@ -2465,8 +2488,8 @@ export function editarGasto(id: string, c: EdicionGasto, rol: Rol): Factura {
   if (!/^d{4}-d{2}-d{2}$/.test(c.fecha) || c.fecha > hoy()) throw new ErpError("Fecha del gasto inválida (no puede ser futura).");
   if (!(c.tipoGasto in TIPOS_GASTO)) throw new ErpError("Seleccione el tipo de gasto.");
   if (!c.descripcion?.trim()) throw new ErpError("Describa el gasto.");
-  const numero = c.numero.trim().toUpperCase();
   const comp = f.comprobanteGasto ?? "FACTURA";
+  const numero = comp === "DJ" ? f.numero : c.numero.trim().toUpperCase(); // el N° de DJ es correlativo: no se edita
   const re = NUM_GASTO[comp];
   if (!numero || (re && !re.test(numero))) throw new ErpError(`N° de ${COMPROBANTES_GASTO[comp].toLowerCase()} inválido.`);
   const proveedor = c.proveedor.trim().toUpperCase();
