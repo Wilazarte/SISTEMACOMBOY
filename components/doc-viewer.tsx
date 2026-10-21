@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { FileText } from "lucide-react";
 import { Badge, Button, Modal, Timeline } from "./ui";
 import { ArchivoFrame, ArchivoImg } from "./ArchivoRef";
-import { COMPROBANTES_GASTO, TIPOS_GASTO, buscarReq, fechaPE, getCotizaciones, getFacturas, getGuias, getOrdenes, soles } from "@/lib/storage";
+import { COMPROBANTES_GASTO, CUENTAS_ORIGEN_PAGO, TIPOS_GASTO, buscarReq, fechaPE, getCotizaciones, getFacturas, getGuias, getOrdenes, soles } from "@/lib/storage";
 import { pdfActaIngreso, pdfCotizacion, pdfFactura, pdfOrdenCompra, pdfRequerimiento } from "@/lib/pdf";
 import type { EventoHistorial, TipoDoc } from "@/lib/types";
 
@@ -40,7 +40,14 @@ function resolver(ref: DocRef): Resuelto | null {
     return {
       titulo: `Cotización ${c.numero}`,
       estado: c.estado,
-      filas: [["Proveedor", `${c.proveedor} (RUC ${c.ruc})`], ["Fecha", fechaPE(c.fechaEmision)], ["Requerimiento", c.reqNumero], ["Total", soles(c.total)]],
+      filas: [
+        ["Proveedor", `${c.proveedor} (RUC ${c.ruc})`],
+        ["Fecha", fechaPE(c.fechaEmision)],
+        ["Requerimiento", c.reqNumero],
+        ["Productos", c.items.map((i) => `${i.cantidad} ${i.unidad} ${i.nombre} × ${soles(i.precioUnit)}`).join(" · ")],
+        ["Subtotal / IGV", `${soles(c.subtotal)} / ${soles(c.igv)}`],
+        ["Total", soles(c.total)],
+      ],
       historial: c.historial,
       pdf: () => pdfCotizacion(c),
     };
@@ -53,9 +60,26 @@ function resolver(ref: DocRef): Resuelto | null {
     return {
       titulo: o.numero,
       estado: o.estado,
-      filas: [["Proveedor", o.proveedor], ["Cotización", o.cotizacionNumero], ["Requerimiento", o.reqNumero], ["Pago", o.formaPago], ["Entrega", `${o.tiempoEntrega} · ${o.lugarEntrega}`], ["Total", soles(o.total)]],
+      filas: [
+        ["Proveedor", `${o.proveedor}${o.ruc ? ` (RUC ${o.ruc})` : ""}`],
+        ["Fecha", fechaPE(o.fecha)],
+        ["Cotización", o.cotizacionNumero],
+        ["Requerimiento", o.reqNumero],
+        ["Forma de pago", o.formaPago],
+        ["Cuenta de pago", o.caja || (o.cuentaOrigenPago ? CUENTAS_ORIGEN_PAGO[o.cuentaOrigenPago] : "-")],
+        ...(o.bancarizacion ? ([["Bancarización", `${o.bancarizacion.tipo}${o.bancarizacion.nroOperacion ? ` · N° ${o.bancarizacion.nroOperacion}` : ""}`]] as [string, string][]) : []),
+        ...(o.voucherMonto !== undefined ? ([["Monto baucher", soles(o.voucherMonto)]] as [string, string][]) : []),
+        ["Entrega", `${o.tiempoEntrega} · ${o.lugarEntrega}`],
+        ...(o.vistoBueno ? ([["V°B° almacén", `${o.vistoBueno.recibidoPor} · ${new Date(o.vistoBueno.fecha).toLocaleString("es-PE")}`]] as [string, string][]) : []),
+        ["Subtotal / IGV", `${soles(o.subtotal)} / ${soles(o.igv)}`],
+        ["Total", soles(o.total)],
+      ],
       historial: o.historial,
       pdf: () => (o.estado === "FINALIZADA" ? pdfActaIngreso(o, f, g) : pdfOrdenCompra(o)),
+      // El baucher (ruta en el bucket privado) se muestra en el visor con URL firmada
+      ...(o.voucherUrl
+        ? { archivo: { url: /^(data:|sb:)/.test(o.voucherUrl) ? o.voucherUrl : `sb:tesoreria/${o.voucherUrl}`, tipo: o.voucherTipo ?? "image/jpeg", nombre: o.voucherNombre ?? "Baucher" } }
+        : {}),
     };
   }
   if (ref.tipo === "FACTURA") {

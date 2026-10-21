@@ -128,47 +128,17 @@ export function OrdenesDespacho({ vista = "almacen" }: { vista?: "almacen" | "ve
             <Empty icon={<Truck size={28} />} text="No hay órdenes de despacho" />
           </div>
         ) : (
-          <Table head={["Código", "Fecha", "Cliente", "Venta origen", "Lugar entrega", "Encargado / quien recoge", "Estado", ...(vista === "ventas" ? ["Seguimiento"] : []), "Acciones"]}>
+          <Table head={["Fecha", "Cliente", "Doc. referencia", "Acciones"]}>
             {lista.map((o) => (
               <tr key={o.id} className="cursor-pointer hover:bg-plomo-50" onClick={() => setSelId(o.id)}>
-                <Td className="font-mono font-semibold text-fg">
-                  {codigoOD(o)}
-                  {o.vistoAlmacen === false && <span className="ml-2 rounded-full bg-corp px-1.5 py-0.5 font-sans text-[10px] font-bold text-white">NUEVA</span>}
-                  <p className="font-sans text-xs font-normal text-plomo-500">{o.numero}</p>
-                </Td>
-                <Td>{fechaPE(o.fecha)}</Td>
+                <Td className="whitespace-nowrap">{fechaPE(o.fecha)}</Td>
+                <Td className="font-medium text-fg">{o.cliente}</Td>
                 <Td>
-                  <p className="font-medium text-fg">{o.cliente}</p>
-                  {o.clienteDoc && <p className="text-xs text-plomo-500">{o.clienteDoc}</p>}
+                  <span className="font-mono font-semibold text-fg">{codigoOD(o)}</span>
+                  {o.vistoAlmacen === false && <span className="ml-2 rounded-full bg-corp px-1.5 py-0.5 text-[10px] font-bold text-white">NUEVA</span>}
+                  <span className="ml-1.5 text-xs text-plomo-500">{origenOD(o)}</span>
+                  <span className="ml-2 inline-block align-middle"><Badge estado={estadoOD(o)} /></span>
                 </Td>
-                <Td>{origenOD(o)}</Td>
-                <Td>
-                  <p className="font-medium">{lugarTxt(o)}</p>
-                  {o.lugar === "ENVIO_AGENCIA" && (
-                    <p className="text-xs text-plomo-500">
-                      {o.agenciaNombre} · guía {o.guiaNro}
-                    </p>
-                  )}
-                  {o.clienteDireccionEntrega && <p className="max-w-[220px] truncate text-xs text-plomo-500" title={o.clienteDireccionEntrega}>{o.clienteDireccionEntrega}</p>}
-                </Td>
-                <Td>
-                  {o.lugar === "ENTREGA_ENCARGADO" ? (
-                    <span className="inline-flex flex-col rounded-lg bg-plomo-100 px-2.5 py-1 text-xs font-semibold text-fg ring-1 ring-inset ring-plomo-200">
-                      Encargado: {o.encargadoNombre} - DNI {o.encargadoDni}
-                      {o.encargadoTelefono && <span className="font-normal text-plomo-600">Tel. {o.encargadoTelefono}</span>}
-                    </span>
-                  ) : (
-                    <span className="text-plomo-500">-</span>
-                  )}
-                </Td>
-                <Td>
-                  <Badge estado={estadoOD(o)} />
-                </Td>
-                {vista === "ventas" && (
-                  <Td>
-                    <Seguimiento od={o} />
-                  </Td>
-                )}
                 <Td>
                   <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                     <Button size="sm" variant="secondary" onClick={() => setSelId(o.id)}>

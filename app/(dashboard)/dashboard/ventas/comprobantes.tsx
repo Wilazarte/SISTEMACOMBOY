@@ -171,33 +171,20 @@ export function Comprobantes({ preNp, onListo }: { preNp?: string; onListo: () =
           </button>
         ))}
       </div>
-      <Table head={["Fecha", "Serie-Número", "Cliente", "NP origen", "Base", "IGV", "Total", "Condición", "Saldo", "Estado", "SUNAT", "Entrega", "Acciones"]} empty={lista.length === 0}>
+      <Table head={["Fecha", "Cliente", "Comprobante", "Total", "Acciones"]} empty={lista.length === 0}>
         {lista.map((c) => (
           <tr key={c.id} className="hover:bg-plomo-50">
-            <Td>{fechaPE(c.fecha)}</Td>
-            <Td className="font-semibold text-fg">
-              {c.numero || <span className="text-slate-400">{c.serie}-(borrador)</span>}
-              <p className="text-xs font-normal text-plomo-500">{tipoLabel[c.tipo]}</p>
-            </Td>
+            <Td className="whitespace-nowrap">{fechaPE(c.fecha)}</Td>
+            <Td className="font-medium text-fg">{c.cliente}</Td>
             <Td>
-              <p className="font-medium text-fg">{c.cliente}</p>
-              <p className="text-xs text-plomo-500">{c.clienteDoc}</p>
+              <span className="font-semibold text-fg">{c.numero || <span className="text-slate-400">{c.serie}-(borrador)</span>}</span>
+              {c.npNumero && <span className="ml-1.5 text-xs text-plomo-500">{c.npNumero}</span>}
+              <span className="ml-2 inline-block align-middle"><Badge estado={c.estado} /></span>
             </Td>
-            <Td>{c.npNumero ?? "-"}</Td>
-            <Td className="text-right">{soles(c.base)}</Td>
-            <Td className="text-right">{soles(c.igv)}</Td>
-            <Td className="text-right font-semibold">{soles(c.total)}</Td>
-            <Td>
-              <Badge estado={c.formaPago} />
+            <Td className="text-right font-semibold">
+              {soles(c.total)}
+              {c.estado === "EMITIDO" && c.saldo > 0 && <p className="text-[11px] font-semibold text-red-600">saldo {soles(c.saldo)}</p>}
             </Td>
-            <Td className={cn("text-right", c.saldo > 0 && c.estado === "EMITIDO" && "font-semibold text-red-600")}>{c.estado === "EMITIDO" ? soles(c.saldo) : "-"}</Td>
-            <Td>
-              <Badge estado={c.estado} />
-            </Td>
-            <Td>
-              <Badge estado={c.estadoSunat} />
-            </Td>
-            <Td>{estadoEntrega(c, ods) === "-" ? "-" : <Badge estado={estadoEntrega(c, ods)} />}</Td>
             <Td>
               <div className="flex flex-wrap gap-1">
                 <Button size="sm" variant="secondary" onClick={() => pdfComprobanteVenta(c)} title="PDF A4">

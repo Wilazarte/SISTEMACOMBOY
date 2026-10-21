@@ -8,7 +8,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import QRCode from "qrcode";
 import { EMPRESA } from "./empresa";
-import { codigoContratista, codigoGasto, fechaPE, soles } from "./storage";
+import { CUENTAS_ORIGEN_PAGO, codigoContratista, codigoGasto, fechaPE, soles } from "./storage";
 import { codigoDesdeNumero, estadoDocumento } from "./utils/codigos";
 import { equipoDeLinea, sedeEquipo } from "./equipos";
 import { ESTADOS_OD, LUGARES_ENTREGA, estadoOD, origenOD, type EstadoAlmacen } from "./ventas";
@@ -663,6 +663,10 @@ export function pdfOrdenCompra(o: OrdenCompra): void {
         ["Lugar entrega", o.lugarEntrega],
         ["Cotización", o.cotizacionNumero],
         ["Requerimiento", o.reqNumero],
+        // Lo que ya no se ve en la tabla de Órdenes de compra: pago, baucher y bancarización
+        ["Cuenta de pago", o.caja || (o.cuentaOrigenPago ? CUENTAS_ORIGEN_PAGO[o.cuentaOrigenPago] : "-")],
+        ...(o.voucherUrl ? ([["Baucher", `${o.voucherNombre ?? "adjunto"}${o.voucherMonto !== undefined ? ` · ${soles(o.voucherMonto)}` : ""}`]] as [string, string][]) : []),
+        ...(o.bancarizacion ? ([["Bancarización", `${o.bancarizacion.tipo}${o.bancarizacion.nroOperacion ? ` · N° ${o.bancarizacion.nroOperacion}` : ""}`]] as [string, string][]) : []),
       ],
       head: ["#", "Descripción", "Marca", "Cant.", "Und.", "P. Unit.", "Importe"],
       body: o.items.map((i, k) => [k + 1, i.nombre, i.marca || "-", i.cantidad, i.unidad, soles(i.precioUnit), soles(i.subtotal)]),

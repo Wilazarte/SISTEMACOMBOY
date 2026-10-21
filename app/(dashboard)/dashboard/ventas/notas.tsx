@@ -137,44 +137,20 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
           </div>
         }
       />
-      <Table head={["N° NP", "Fecha", "Cliente", "Total", "Condición pago", "Estado", "Despacho", "Vendedor", "Acciones"]} empty={lista.length === 0}>
+      <Table head={["Fecha", "Cliente", "N° NP", "Total", "Acciones"]} empty={lista.length === 0}>
         {lista.map((n) => (
           <tr key={n.id} className="hover:bg-plomo-50">
-            <Td className="font-semibold text-fg">{n.numero}</Td>
-            <Td>{fechaPE(n.fecha)}</Td>
+            <Td className="whitespace-nowrap">{fechaPE(n.fecha)}</Td>
+            <Td className="font-medium text-fg">{n.cliente}</Td>
             <Td>
-              <p className="font-medium text-fg">{n.cliente}</p>
-              <p className="text-xs text-plomo-500">{n.clienteDoc}</p>
-            </Td>
-            <Td className="text-right font-semibold">{soles(n.total)}</Td>
-            <Td>
-              {n.condPagoNombre}
-              {n.fechaVencimiento && (
-                <p className="text-xs text-plomo-500">
-                  {n.diasCredito} días · vence {fechaPE(n.fechaVencimiento)}
-                </p>
-              )}
-              {n.condPagoDetalle && <p className="max-w-[200px] truncate text-xs text-plomo-500" title={n.condPagoDetalle}>{n.condPagoDetalle}</p>}
-            </Td>
-            <Td>
-              <Badge estado={n.estado} />
-            </Td>
-            <Td>
+              <span className="font-semibold text-fg">{n.numero}</span>
               {(() => {
                 const od = odDeNP(n, ods) ?? (n.odId ? ods.find((o) => o.id === n.odId) : undefined);
-                return od ? (
-                  <div>
-                    <p className="font-mono text-xs font-semibold text-fg">{codigoDesdeNumero("OD", od.numero, od.fecha)}</p>
-                    <Badge estado={estadoOD(od)} />
-                  </div>
-                ) : n.estado === "APROBADA" || n.estado === "FACTURADA" ? (
-                  <span className="text-xs font-semibold text-vino">Sin orden</span>
-                ) : (
-                  "-"
-                );
+                return od ? <span className="ml-1.5 font-mono text-xs text-plomo-500">{codigoDesdeNumero("OD", od.numero, od.fecha)}</span> : null;
               })()}
+              <span className="ml-2 inline-block align-middle"><Badge estado={n.estado} /></span>
             </Td>
-            <Td>{n.vendedor}</Td>
+            <Td className="text-right font-semibold">{soles(n.total)}</Td>
             <Td>
               <div className="flex flex-wrap gap-1">
                 {(() => {

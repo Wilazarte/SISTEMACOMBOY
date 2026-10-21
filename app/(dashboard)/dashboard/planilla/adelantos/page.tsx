@@ -206,7 +206,7 @@ export default function AdelantosPage() {
             <Empty icon={<HandCoins size={28} />} text={lista.length ? "Ningún adelanto coincide con el filtro." : "Aún no hay adelantos registrados."} />
           </div>
         ) : (
-          <Table head={["Fecha", "Trabajador", "DNI", "Monto", "Motivo", "Estado", ...(puedeEditar ? ["Acciones"] : [])]}>
+          <Table head={["Fecha", "Trabajador", "Estado", "Monto", ...(puedeEditar ? ["Acciones"] : [])]}>
             {visibles.map((a) => (
               <tr
                 key={a.id}
@@ -218,25 +218,16 @@ export default function AdelantosPage() {
                   a.estado === "ANULADO" && "opacity-60"
                 )}
               >
-                <Td>{fechaPE(a.fecha)}</Td>
-                <Td className="font-semibold text-fg">{a.trabajador_nombre}</Td>
-                <Td className="font-mono">{a.dni || "-"}</Td>
-                <Td className="text-right font-semibold">{soles(a.monto)}</Td>
-                <Td className="max-w-[260px]">
-                  <span className="block truncate" title={a.motivo ?? ""}>
-                    {a.motivo || "-"}
-                  </span>
-                  {(a.medio_pago || a.caja_nombre) && <span className="block text-[11px] text-plomo-500">{[a.medio_pago, a.caja_nombre].filter(Boolean).join(" · ")}</span>}
+                <Td className="whitespace-nowrap">{fechaPE(a.fecha)}</Td>
+                <Td className="font-semibold text-fg">
+                  {/* DNI, motivo, medio y caja: al pasar el mouse y en el formulario de edición */}
+                  <span title={[a.dni && `DNI ${a.dni}`, a.motivo, a.medio_pago, a.caja_nombre].filter(Boolean).join(" · ")}>{a.trabajador_nombre}</span>
                 </Td>
                 <Td>
                   <Badge estado={a.estado} />
-                  {a.estado === "DESCONTADO" && (
-                    <p className="mt-1 text-[11px] text-emerald-700">
-                      {a.planilla_periodo ? `En ${a.planilla_periodo}` : "En planilla"}
-                      {a.descontado_en ? ` · ${new Date(a.descontado_en).toLocaleDateString("es-PE")}` : ""}
-                    </p>
-                  )}
+                  {a.estado === "DESCONTADO" && <span className="ml-1.5 text-[11px] text-emerald-700">{a.planilla_periodo ? `En ${a.planilla_periodo}` : "En planilla"}</span>}
                 </Td>
+                <Td className="text-right font-semibold">{soles(a.monto)}</Td>
                 {puedeEditar && (
                   <Td>
                     {a.estado === "DESCONTADO" ? (

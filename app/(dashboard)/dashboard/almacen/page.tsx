@@ -207,18 +207,15 @@ function ListaReq({ reqs, rol }: { reqs: Requerimiento[]; rol: Rol }) {
             </div>
           }
         />
-        <Table head={["Nro REQ", "Fecha", "Sede", "Solicitante", "Motivo", "Items", "Estado", "Acciones"]} empty={lista.length === 0}>
+        <Table head={["Fecha", "Solicitante", "Doc. referencia", "Acciones"]} empty={lista.length === 0}>
           {lista.map((r) => (
             <tr key={r.id} className={cn("hover:bg-plomo-50", r.estado === "OBSERVADO" && "bg-orange-50/60")}>
-              <Td className="font-semibold text-fg">{r.numero}</Td>
-              <Td>{fechaPE(r.fecha)}</Td>
-              <Td>{r.sede}</Td>
+              <Td className="whitespace-nowrap">{fechaPE(r.fecha)}</Td>
               <Td>{r.solicitante}</Td>
-              <Td className="max-w-[240px] truncate">{r.motivo}</Td>
-              <Td>{(r.items || []).length}</Td>
               <Td>
-                <Badge estado={r.estado} />
-                {r.observacion && r.estado === "OBSERVADO" && <p className="mt-1 max-w-[220px] whitespace-normal text-xs text-orange-700">{r.observacion}</p>}
+                <span className="font-semibold text-fg">{r.numero}</span>
+                <span className="ml-2 inline-block align-middle"><Badge estado={r.estado} /></span>
+                {r.observacion && r.estado === "OBSERVADO" && <p className="mt-1 max-w-[320px] whitespace-normal text-xs text-orange-700">{r.observacion}</p>}
               </Td>
               <Td>
                 <div className="flex gap-1">
@@ -323,23 +320,29 @@ function Ingresos({ rol, porVB, ordenes, facturas, guias }: { rol: Rol; porVB: O
       {finalizadas.length > 0 && (
       <Card>
         <CardHeader title="Ingresos finalizados" subtitle="Procesos de compra cerrados con visto bueno de almacén" />
-        <Table head={["OC", "REQ", "Proveedor", "Recibido por", "Fecha V°B°", "Total", ""]} empty={finalizadas.length === 0}>
+        <Table head={["Fecha", "Proveedor", "Doc. referencia", "Total", "Acciones"]} empty={finalizadas.length === 0}>
           {finalizadas.map((o) => (
             <tr key={o.id} className="hover:bg-plomo-50">
-              <Td className="font-semibold text-fg">{o.numero}</Td>
-              <Td>{o.reqNumero}</Td>
+              <Td className="whitespace-nowrap">{o.vistoBueno ? fechaPE(o.vistoBueno.fecha.slice(0, 10)) : fechaPE(o.fecha)}</Td>
               <Td>{o.proveedor}</Td>
-              <Td>{o.vistoBueno?.recibidoPor}</Td>
-              <Td>{o.vistoBueno ? new Date(o.vistoBueno.fecha).toLocaleString("es-PE") : "-"}</Td>
+              <Td>
+                <span className="font-semibold text-fg">{o.numero}</span>
+                <span className="ml-1.5 text-xs text-plomo-500">{o.reqNumero}</span>
+              </Td>
               <Td className="text-right font-semibold">{soles(o.total)}</Td>
               <Td>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => pdfActaIngreso(o, facturas.find((f) => f.ocId === o.id), guias.find((g) => g.ocId === o.id))}
-                >
-                  <FileText size={14} /> Acta PDF
-                </Button>
+                <div className="flex gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "OC", id: o.id })} title="Ver (recibido por, V°B°, historial)">
+                    <Eye size={15} />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => pdfActaIngreso(o, facturas.find((f) => f.ocId === o.id), guias.find((g) => g.ocId === o.id))}
+                  >
+                    <FileText size={14} /> Acta PDF
+                  </Button>
+                </div>
               </Td>
             </tr>
           ))}

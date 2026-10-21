@@ -593,7 +593,7 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
       <Card>
         <CardHeader title="Compras registradas" subtitle={`${compras.length} compra(s) · ${gastos.length} gasto(s) de Tesorería · Total ${soles(totalRegistros)}`} />
         {/* Vista previa: una línea por registro. Comprobante, almacén / gasto, ítems, subtotal e IGV se ven en "Ver". */}
-        <Table head={["Fecha", "Proveedor", "Total", "Acciones"]} empty={registros.length === 0}>
+        <Table head={["Fecha", "Proveedor", "Doc. referencia", "Total", "Acciones"]} empty={registros.length === 0}>
           {registros.map((r) => {
             if (r.tipo === "GASTO_TESORERIA") {
               const g = r.gasto;
@@ -605,6 +605,7 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
                     {g.tipoGasto === "PLANILLA" && <span className="ml-2 text-xs text-plomo-500">{g.numero.replace(/^PLLA\s+/, "")}</span>}
                   </Td>
                   <Td className="max-w-[320px] truncate"><span title={g.proveedor}>{g.proveedor}</span></Td>
+                  <Td className="whitespace-nowrap font-semibold text-fg">{g.codigo ?? g.numero}</Td>
                   <Td className="text-right font-semibold">{soles(g.total)}</Td>
                   <Td>
                     <div className="flex gap-1">
@@ -627,6 +628,7 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
               <tr key={c.id} className="hover:bg-plomo-50">
                 <Td className="whitespace-nowrap">{fechaPE(c.fecha)}</Td>
                 <Td className="max-w-[320px] truncate"><span title={c.proveedor}>{c.proveedor}</span></Td>
+                <Td className="whitespace-nowrap font-semibold text-fg">{c.numero}</Td>
                 <Td className="text-right font-semibold">{soles(c.total)}</Td>
                 <Td>
                   <div className="flex gap-1">
@@ -775,21 +777,18 @@ function Antecedentes({ reqs, ordenes, rol, onCotizar }: { reqs: Requerimiento[]
           </div>
         }
       />
-      <Table head={["Nro REQ", "Fecha", "Sede", "Solicitante", "Items", "Estado", "OC", "Acciones"]} empty={lista.length === 0}>
+      <Table head={["Fecha", "Solicitante", "Doc. referencia", "Acciones"]} empty={lista.length === 0}>
         {lista.map((r) => {
           const oc = ordenes.find((o) => o.reqId === r.id);
           return (
             <tr key={r.id} className="hover:bg-plomo-50">
-              <Td className="font-semibold text-fg">{r.numero}</Td>
-              <Td>{fechaPE(r.fecha)}</Td>
-              <Td>{r.sede}</Td>
+              <Td className="whitespace-nowrap">{fechaPE(r.fecha)}</Td>
               <Td>{r.solicitante}</Td>
-              <Td>{(r.items || []).length}</Td>
               <Td>
-                <Badge estado={r.estado} />
-                {r.estado === "OBSERVADO" && <p className="mt-1 max-w-[200px] truncate text-xs text-orange-700" title={r.observacion}>{r.observacion}</p>}
+                <span className="font-semibold text-fg">{r.numero}</span>
+                {oc && <span className="ml-1.5 text-xs text-plomo-500">→ {oc.numero}</span>}
+                <span className="ml-2 inline-block align-middle"><Badge estado={r.estado} /></span>
               </Td>
-              <Td>{oc ? oc.numero : "-"}</Td>
               <Td>
                 <div className="flex gap-1">
                   <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "REQ", id: r.id })} title="Ver e historial">
@@ -940,20 +939,19 @@ function Cotizaciones({
 
       <Card>
         <CardHeader title="Cotizaciones registradas" subtitle="★ = menor precio del requerimiento" />
-        <Table head={["Fecha", "Nro Coti", "Nro REQ", "Proveedor", "RUC", "Monto total", "Estado", "Acciones"]} empty={cotizaciones.length === 0}>
+        <Table head={["Fecha", "Proveedor", "N° cotización", "Total", "Acciones"]} empty={cotizaciones.length === 0}>
           {cotizaciones.map((c) => (
             <tr key={c.id} className="hover:bg-plomo-50">
-              <Td>{fechaPE(c.fechaEmision)}</Td>
-              <Td className="font-semibold text-fg">{c.numero}</Td>
-              <Td>{c.reqNumero}</Td>
+              <Td className="whitespace-nowrap">{fechaPE(c.fechaEmision)}</Td>
               <Td>{c.proveedor}</Td>
-              <Td>{c.ruc}</Td>
+              <Td>
+                <span className="font-semibold text-fg">{c.numero}</span>
+                <span className="ml-1.5 text-xs text-plomo-500">{c.reqNumero}</span>
+                <span className="ml-2 inline-block align-middle"><Badge estado={c.estado} /></span>
+              </Td>
               <Td className="text-right font-semibold">
                 {minPorReq[c.reqId] === c.total && <span className="mr-1 text-rojo">★</span>}
                 {soles(c.total)}
-              </Td>
-              <Td>
-                <Badge estado={c.estado} />
               </Td>
               <Td>
                 <div className="flex gap-1">
@@ -1210,35 +1208,17 @@ function Ordenes({
 
       <Card>
         <CardHeader title="Órdenes de compra" />
-        <Table head={["Nro OC", "Fecha", "Proveedor", "Cotización", "REQ", "Forma pago", "Cuenta pago", "Baucher", "Total", "Estado", "Acciones"]} empty={ordenes.length === 0}>
+        <Table head={["Fecha", "Proveedor", "N° OC / cotización", "Total", "Acciones"]} empty={ordenes.length === 0}>
           {ordenes.map((o) => (
             <tr key={o.id} className="hover:bg-plomo-50">
-              <Td className="font-semibold text-fg">{o.numero}</Td>
-              <Td>{fechaPE(o.fecha)}</Td>
+              <Td className="whitespace-nowrap">{fechaPE(o.fecha)}</Td>
               <Td>{o.proveedor}</Td>
-              <Td>{o.cotizacionNumero}</Td>
-              <Td>{o.reqNumero}</Td>
-              <Td>{o.formaPago}</Td>
-              <Td>{o.caja || (o.cuentaOrigenPago ? CUENTAS_ORIGEN_PAGO[o.cuentaOrigenPago] : "-")}</Td>
               <Td>
-                {o.voucherUrl ? (
-                  <Button size="sm" variant="ghost" title={o.voucherNombre} onClick={() => verVoucher(o.voucherUrl!)}>
-                    <Receipt size={14} /> Ver{o.voucherMonto !== undefined ? ` · ${soles(o.voucherMonto)}` : ""}
-                  </Button>
-                ) : (
-                  "-"
-                )}
+                <span className="font-semibold text-fg">{o.numero}</span>
+                <span className="ml-1.5 text-xs text-plomo-500">{o.cotizacionNumero}</span>
+                <span className="ml-2 inline-block align-middle"><Badge estado={o.estado} /></span>
               </Td>
               <Td className="text-right font-semibold">{soles(o.total)}</Td>
-              <Td>
-                <Badge estado={o.estado} />
-                {o.bancarizacion && (
-                  <p className="mt-0.5 text-[11px] text-plomo-500">
-                    {o.bancarizacion.tipo}
-                    {o.bancarizacion.nroOperacion ? ` · ${o.bancarizacion.nroOperacion}` : ""}
-                  </p>
-                )}
-              </Td>
               <Td>
                 <div className="flex gap-1">
                   <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "OC", id: o.id })}>
@@ -1614,56 +1594,30 @@ function Facturas({
             />
           }
         />
-        <Table head={["Tipo", "Nro", "Fecha", "Vence", "Proveedor", "OC", "Subtotal", "IGV", "Total", "Pago", "Acciones"]} empty={lista.length === 0}>
+        <Table head={["Fecha", "Proveedor", "N° factura", "Total", "Acciones"]} empty={lista.length === 0}>
           {lista.map((f) => {
             const vencida = f.estadoPago === "POR_PAGAR" && f.fechaVencimiento < hoy();
             return (
               <tr key={f.id} className="hover:bg-plomo-50">
-                <Td>
-                  {f.esGastoTesoreria ? (
-                    <>
-                      <Badge estado="GASTO_TESORERIA" />
-                      <p className="mt-0.5 text-[11px] text-plomo-500">{f.comprobanteGasto ? COMPROBANTES_GASTO[f.comprobanteGasto] : ""}</p>
-                    </>
-                  ) : (
-                    <Badge estado={f.tipo} />
-                  )}
+                <Td className="whitespace-nowrap">
+                  {fechaPE(f.fecha)}
+                  {vencida && <p className="text-[11px] font-semibold text-red-600">venció {fechaPE(f.fechaVencimiento)}</p>}
                 </Td>
-                <Td className="font-semibold text-fg">{f.numero}</Td>
-                <Td>{fechaPE(f.fecha)}</Td>
-                <Td className={cn(vencida && "font-semibold text-red-600")}>{fechaPE(f.fechaVencimiento)}</Td>
                 <Td>{f.proveedor}</Td>
                 <Td>
-                  {f.esGastoTesoreria ? (
-                    <>
-                      {f.codigo && <p className="font-mono text-xs font-semibold text-fg">{f.codigo}</p>}
-                      <span className="text-xs text-plomo-600">{f.tipoGasto ? TIPOS_GASTO[f.tipoGasto] : "Gasto"}</span>
-                    </>
-                  ) : (
-                    f.ocNumero
-                  )}
-                </Td>
-                <Td className="text-right">{soles(f.subtotal)}</Td>
-                <Td className="text-right">{soles(f.igv)}</Td>
-                <Td className="text-right font-semibold">
-                  {soles(f.total)}
-                  {f.detraccionMonto ? (
-                    <p className="text-[11px] font-normal text-plomo-500">
-                      Detr. − {soles(f.detraccionMonto)} · neto {soles(f.netoPagar ?? f.total)}
-                    </p>
-                  ) : null}
-                </Td>
-                <Td>
+                  <span className="font-semibold text-fg">{f.numero}</span>
+                  <span className="ml-1.5 text-xs text-plomo-500">{f.esGastoTesoreria ? f.codigo ?? "Gasto" : f.ocNumero}</span>
+                  {/* El estado de pago sigue siendo el botón para pagar / revertir */}
                   <button
                     disabled={!puede(rol, "fac.pagar")}
                     onClick={() => (f.estadoPago === "POR_PAGAR" ? abrirPago(f) : ejecutar(() => marcarPago(f.id, false, rol), `${f.numero} revertida a por pagar`))}
                     title={f.estadoPago === "POR_PAGAR" ? "Marcar como pagada (elegir caja)" : "Revertir a por pagar"}
-                    className="disabled:cursor-not-allowed"
+                    className="ml-2 align-middle disabled:cursor-not-allowed"
                   >
                     <Badge estado={f.estadoPago} />
                   </button>
-                  {f.estadoPago === "PAGADA" && f.caja && <p className="mt-0.5 text-[11px] text-plomo-500">{f.caja}</p>}
                 </Td>
+                <Td className="text-right font-semibold">{soles(f.total)}</Td>
                 <Td>
                   <div className="flex gap-1">
                     <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "FACTURA", id: f.id })} title="Ver">
