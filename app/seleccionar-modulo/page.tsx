@@ -1,69 +1,91 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CLAVE_SELECCION, MODULOS_SELECCION, type TarjetaModulo } from "@/components/modulos-login";
+import { ClipboardPlus } from "lucide-react";
+import { CLAVE_SELECCION, MODULOS_SELECCION, RUTA_REQUERIMIENTO, type TarjetaModulo } from "@/components/modulos-login";
 
 /** Esquinas cortadas de 8 px de las tarjetas. */
 const CORTE = "[clip-path:polygon(8px_0,calc(100%-8px)_0,100%_8px,100%_calc(100%-8px),calc(100%-8px)_100%,8px_100%,0_calc(100%-8px),0_8px)]";
 
-/** Selección de módulo antes del login: 3 tarjetas arriba y 2 centradas abajo. */
+/** Selección de módulo antes del login: todo centrado, dock de 5 módulos sobre el globo rojo. */
 export default function SeleccionarModulo() {
   const router = useRouter();
   const [logo, setLogo] = useState("/logo-comboy.png");
+  // Módulo con brillo: el que se señala, o el último elegido
+  const [activo, setActivo] = useState<string | null>(null);
+  const [ultimo, setUltimo] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      setUltimo(window.localStorage.getItem(CLAVE_SELECCION));
+    } catch {
+      /* almacenamiento bloqueado */
+    }
+  }, []);
 
-  const elegir = (m: TarjetaModulo) => {
+  const ir = (m: TarjetaModulo, siguiente?: string) => {
     try {
       window.localStorage.setItem(CLAVE_SELECCION, m.id);
     } catch {
       /* almacenamiento bloqueado */
     }
-    router.push(`/login?modulo=${m.id}`);
+    router.push(`/login?modulo=${m.id}${siguiente ? `&siguiente=${encodeURIComponent(siguiente)}` : ""}`);
   };
 
-  const fila1 = MODULOS_SELECCION.slice(0, 3);
-  const fila2 = MODULOS_SELECCION.slice(3);
-
   return (
-    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#0F1E3A] p-6">
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-black px-4 py-10 md:px-6">
       <Globo />
 
-      <div className="relative z-10 rounded-xl bg-white px-8 py-4 shadow-[0_0_30px_rgba(227,6,19,0.3)]">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={logo} onError={() => setLogo("/logo_comboy_navy.png")} alt="COMBOY VID" className="h-16 w-auto object-contain" />
-      </div>
-      <h1 className="relative z-10 mt-8 text-center text-3xl font-bold tracking-tight text-white [text-shadow:0_2px_24px_rgba(227,6,19,0.45)] md:text-4xl">Sistema de gestión ERP COMBOY VID</h1>
-      <p className="relative z-10 mx-auto mt-3 max-w-4xl text-center text-sm text-gray-300 md:text-base">
-        Plataforma integral para la gestión minera: compras, tesorería, almacén, planilla y gerencia en un solo lugar. Selecciona tu módulo
-      </p>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={logo}
+        onError={() => setLogo("/logo_comboy_navy.png")}
+        alt="COMBOY VID"
+        className="relative z-10 mx-auto h-20 w-auto object-contain [filter:drop-shadow(0_0_14px_rgba(255,255,255,0.35))_drop-shadow(0_0_30px_rgba(227,6,19,0.35))]"
+      />
+      <h1 className="relative z-10 mt-8 text-center text-2xl font-bold uppercase tracking-wider text-white [text-shadow:0_2px_24px_rgba(227,6,19,0.5)] md:text-4xl">
+        Bienvenido al sistema ERP COMBOY VID
+      </h1>
+      <div className="relative z-10 mx-auto mt-3 h-1 w-12 rounded-full bg-[#E30613]" />
+      <p className="relative z-10 mt-3 text-center text-xs uppercase tracking-[0.3em] text-gray-300 md:text-sm">Selecciona tu módulo</p>
 
-      <div className="relative z-10 mx-auto mt-12 w-full max-w-6xl">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
-          {fila1.map((m) => (
-            <Tarjeta key={m.id} m={m} onElegir={elegir} />
-          ))}
-        </div>
-        <div className="mx-auto mt-4 flex max-w-[700px] flex-wrap justify-center gap-4 md:mt-6 md:gap-6">
-          {fila2.map((m) => (
-            <Tarjeta key={m.id} m={m} onElegir={elegir} className="w-full md:w-[calc(50%-12px)]" />
-          ))}
-        </div>
+      <div className="relative z-10 mx-auto mt-10 grid w-full max-w-6xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 lg:gap-5" onMouseLeave={() => setActivo(null)}>
+        {MODULOS_SELECCION.map((m) => (
+          <Tarjeta
+            key={m.id}
+            m={m}
+            brilla={!m.proximamente && (activo ?? ultimo) === m.id}
+            onSenalar={() => setActivo(m.id)}
+            onElegir={() => ir(m)}
+            onRequerimiento={m.id === "produccion" ? () => ir(m, RUTA_REQUERIMIENTO) : undefined}
+          />
+        ))}
       </div>
     </div>
   );
 }
 
-function Tarjeta({ m, onElegir, className = "" }: { m: TarjetaModulo; onElegir: (m: TarjetaModulo) => void; className?: string }) {
+function Tarjeta({ m, brilla, onSenalar, onElegir, onRequerimiento }: { m: TarjetaModulo; brilla: boolean; onSenalar: () => void; onElegir: () => void; onRequerimiento?: () => void }) {
   const Icon = m.icon;
-  const diagonal = "absolute h-[2px] w-[11.4px] origin-left bg-[#E30613]/60 transition-colors duration-300 group-hover:bg-[#E30613]";
+  const off = !!m.proximamente;
+  const diagonal = `absolute h-[2px] w-[11.4px] origin-left transition-colors duration-300 ${brilla ? "bg-[#E30613]" : "bg-[#E30613]/60"}`;
   return (
     // El brillo exterior va en este contenedor: el clip-path de la tarjeta recortaría un box-shadow
-    <div className={`group transition-all duration-300 [filter:drop-shadow(0_0_10px_rgba(227,6,19,0.2))] hover:scale-[1.03] hover:[filter:drop-shadow(0_0_25px_rgba(227,6,19,0.5))] ${className}`}>
-      <button
-        type="button"
-        data-modulo={m.id}
-        onClick={() => onElegir(m)}
-        className={`relative block h-full w-full cursor-pointer overflow-hidden rounded-[10px] border border-[#E30613]/60 bg-[#0A1628]/85 p-6 text-left shadow-[inset_0_0_15px_rgba(227,6,19,0.15)] backdrop-blur-md transition-all duration-300 group-hover:border-[#E30613] group-hover:shadow-[inset_0_0_22px_rgba(227,6,19,0.28)] ${CORTE}`}
+    <div
+      onMouseEnter={off ? undefined : onSenalar}
+      onFocus={off ? undefined : onSenalar}
+      className={`transition-all duration-300 ${
+        off
+          ? "opacity-55 grayscale"
+          : brilla
+            ? "scale-[1.03] [filter:drop-shadow(0_0_25px_rgba(227,6,19,0.55))]"
+            : "[filter:drop-shadow(0_0_10px_rgba(227,6,19,0.2))]"
+      }`}
+    >
+      <div
+        className={`relative flex h-full min-h-[190px] flex-col overflow-hidden rounded-[10px] border bg-[#0A1628]/85 p-5 text-left backdrop-blur-md transition-all duration-300 ${CORTE} ${
+          brilla ? "border-[#E30613] shadow-[inset_0_0_24px_rgba(227,6,19,0.3)]" : "border-[#E30613]/60 shadow-[inset_0_0_15px_rgba(227,6,19,0.15)]"
+        }`}
       >
         {/* Bordes de las esquinas cortadas */}
         <span aria-hidden className={`${diagonal} left-0 top-2 -rotate-45`} />
@@ -73,19 +95,44 @@ function Tarjeta({ m, onElegir, className = "" }: { m: TarjetaModulo; onElegir: 
         {/* Puntitos decorativos: 3 arriba a la derecha, 2 abajo a la izquierda */}
         <span aria-hidden className="absolute right-4 top-4 flex gap-1">
           {[0, 1, 2].map((i) => (
-            <span key={i} className="h-1 w-1 rounded-full bg-[#E30613] opacity-80 transition-opacity group-hover:opacity-100" />
+            <span key={i} className="h-1 w-1 rounded-full bg-[#E30613] opacity-80" />
           ))}
         </span>
-        <span aria-hidden className="absolute bottom-4 left-4 flex gap-1">
+        <span aria-hidden className="absolute bottom-3 left-4 flex gap-1">
           {[0, 1].map((i) => (
-            <span key={i} className="h-1 w-1 rounded-full bg-[#E30613] opacity-60 transition-opacity group-hover:opacity-100" />
+            <span key={i} className="h-1 w-1 rounded-full bg-[#E30613] opacity-60" />
           ))}
         </span>
 
-        <Icon className="h-7 w-7 text-[#E30613] transition-transform duration-300 group-hover:scale-110 md:h-9 md:w-9" strokeWidth={1.75} />
-        <p className="mt-4 text-lg font-bold uppercase leading-snug text-white">{m.titulo}</p>
-        <p className="mt-1 pb-2 text-sm text-gray-300">{m.desc}</p>
-      </button>
+        <Icon className={`h-7 w-7 text-[#E30613] transition-transform duration-300 md:h-9 md:w-9 ${brilla ? "scale-110" : ""}`} strokeWidth={1.75} />
+        {/* Toda la tarjeta es el botón del módulo (after:inset-0); "Realizar requerimiento" queda encima */}
+        <button
+          type="button"
+          data-modulo={m.id}
+          onClick={onElegir}
+          disabled={off}
+          aria-disabled={off}
+          className="mt-4 text-left after:absolute after:inset-0 after:content-[''] focus-visible:outline-none disabled:cursor-not-allowed [&:not(:disabled)]:cursor-pointer"
+        >
+          <span className="block text-base font-bold uppercase leading-snug text-white">{m.titulo}</span>
+        </button>
+        <p className="mt-1 text-sm text-gray-300">{m.desc}</p>
+
+        <div className="mt-auto pt-4">
+          {off && (
+            <span className="inline-flex rounded-full border border-gray-500/50 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-gray-300">Próximamente</span>
+          )}
+          {onRequerimiento && (
+            <button
+              type="button"
+              onClick={onRequerimiento}
+              className="relative z-10 inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-[#E30613] px-3 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-[0_0_14px_rgba(227,6,19,0.45)] transition hover:bg-[#B8050F]"
+            >
+              <ClipboardPlus size={15} /> Realizar requerimiento
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -149,7 +196,7 @@ function Globo() {
           <radialGradient id="globo-esfera" cx="38%" cy="32%" r="72%">
             <stop offset="0%" stopColor="#E30613" stopOpacity="0.35" />
             <stop offset="55%" stopColor="#8E0410" stopOpacity="0.18" />
-            <stop offset="100%" stopColor="#0F1E3A" stopOpacity="0" />
+            <stop offset="100%" stopColor="#000000" stopOpacity="0" />
           </radialGradient>
         </defs>
         <circle cx={R} cy={R} r={R} fill="url(#globo-esfera)" stroke="#E30613" strokeOpacity="0.7" strokeWidth="1.6" />

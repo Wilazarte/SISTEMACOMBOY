@@ -3,14 +3,15 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, ArrowLeft, Eye, EyeOff, Loader2, Lock, LogIn, ShieldCheck, User } from "lucide-react";
-import { CLAVE_MODULO, CLAVE_USUARIO, MODULOS_LOGIN, login, logout, moduloGuardado, perteneceAModulo, rutaDeModulo, useSesion, type ModuloLogin } from "@/lib/auth";
+import { CLAVE_MODULO, CLAVE_USUARIO, MODULOS_LOGIN, login, logout, moduloGuardado, perteneceAModulo, puedeVer, rutaDeModulo, useSesion, type ModuloLogin } from "@/lib/auth";
 import { CLAVE_SELECCION, ENCARGADOS_LOGIN, MODULOS_SELECCION, tarjetaDe } from "@/components/modulos-login";
 
 /** ?modulo= de la URL (acepta "compras" como alias de Tesorería). Otro valor, ej. "seleccion" = elegir módulo. */
 function moduloDeUrl(v: string | null): ModuloLogin | "" {
   const m = (v ?? "").trim().toLowerCase();
   if (m === "compras") return "tesoreria";
-  return m in MODULOS_LOGIN ? (m as ModuloLogin) : "";
+  if (!(m in MODULOS_LOGIN) || tarjetaDe(m as ModuloLogin).proximamente) return ""; // Logística: próximamente
+  return m as ModuloLogin;
 }
 
 // Colores fijos del login (no siguen el tema claro/oscuro del sistema)
@@ -32,6 +33,8 @@ function Login() {
   const params = useSearchParams();
   const { sesion } = useSesion();
   const modulo = moduloDeUrl(params.get("modulo"));
+  // ?siguiente=/dashboard/... (ej. "Realizar requerimiento" desde /seleccionar-modulo)
+  const siguiente = params.get("siguiente");
   const [usuario, setUsuario] = useState("");
   const [pass, setPass] = useState("");
   const [ver, setVer] = useState(false);
@@ -92,7 +95,8 @@ function Login() {
     } catch {
       /* almacenamiento bloqueado: el header usa la ruta actual */
     }
-    router.replace(rutaDeModulo(r.sesion, modulo));
+    const destino = siguiente?.startsWith("/dashboard/") && puedeVer(r.sesion, siguiente.split("?")[0]) ? siguiente : rutaDeModulo(r.sesion, modulo);
+    router.replace(destino);
   };
 
   const logoImg = (cls: string) => (
@@ -110,19 +114,21 @@ function Login() {
           <div className="mx-auto mb-2 mt-2 h-1 w-12 rounded-full bg-[#E30613]" />
           <p className="mt-3 text-xs uppercase tracking-widest text-gray-400">Selecciona tu módulo</p>
           <div className="mt-6 grid grid-cols-2 gap-3 text-left md:gap-4">
-            {MODULOS_SELECCION.map(({ id, titulo, desc, icon: Icon }) => (
+            {MODULOS_SELECCION.map(({ id, titulo, desc, icon: Icon, proximamente }) => (
               <button
                 key={id}
                 type="button"
                 data-modulo={id}
                 onClick={() => elegir(id)}
-                className="group cursor-pointer rounded-xl [&:last-child:nth-child(odd)]:col-span-2 border border-[#E30613]/15 bg-[#F8F9FF] p-4 text-left transition-all duration-200 hover:scale-[1.02] hover:border-[#E30613] hover:bg-white hover:shadow-[0_0_20px_rgba(227,6,19,0.2)] focus-visible:border-[#E30613] active:scale-[0.99]"
+                disabled={proximamente}
+                className="group relative cursor-pointer rounded-xl disabled:pointer-events-none disabled:opacity-50 disabled:grayscale [&:last-child:nth-child(odd)]:col-span-2 border border-[#E30613]/15 bg-[#F8F9FF] p-4 text-left transition-all duration-200 hover:scale-[1.02] hover:border-[#E30613] hover:bg-white hover:shadow-[0_0_20px_rgba(227,6,19,0.2)] focus-visible:border-[#E30613] active:scale-[0.99]"
               >
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#FEF2F2] text-[#E30613] transition-colors duration-200 group-hover:bg-[#E30613] group-hover:text-white md:h-8 md:w-8">
                   <Icon className="h-4 w-4 md:h-[18px] md:w-[18px]" />
                 </span>
                 <span className="mt-3 block text-sm font-bold leading-tight text-[#0F1E3A]">{titulo}</span>
                 <span className="mt-1 block text-[11px] leading-snug text-gray-500">{desc}</span>
+                {proximamente && <span className="absolute right-3 top-3 rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600">Próximamente</span>}
               </button>
             ))}
           </div>
