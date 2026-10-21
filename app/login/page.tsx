@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle, BarChart3, Calculator, Eye, EyeOff, Factory, Landmark, Loader2, Lock, LogIn, ShieldCheck, Truck, User, X, type LucideIcon } from "lucide-react";
+import { AlertCircle, BarChart3, Calculator, Eye, EyeOff, Factory, Landmark, Loader2, Lock, LogIn, Truck, User, X, type LucideIcon } from "lucide-react";
 import { CLAVE_MODULO, CLAVE_USUARIO, MODULOS_LOGIN, login, logout, moduloGuardado, perteneceAModulo, puedeVer, rutaDeModulo, useSesion, type ModuloLogin } from "@/lib/auth";
 import { CLAVE_SELECCION, ENCARGADOS_LOGIN, tarjetaDe } from "@/components/modulos-login";
 
@@ -10,9 +11,9 @@ import { CLAVE_SELECCION, ENCARGADOS_LOGIN, tarjetaDe } from "@/components/modul
 const DOCK: { id: ModuloLogin; slug: string; titulo: string; icon: LucideIcon }[] = [
   { id: "ventas", slug: "ventas", titulo: "VENTAS", icon: BarChart3 },
   { id: "contable", slug: "contable", titulo: "CONTABLE", icon: Calculator },
-  { id: "tesoreria", slug: "tesoreria", titulo: "TESORERÍA", icon: Landmark },
-  { id: "produccion", slug: "inventario", titulo: "PRODUCCIÓN", icon: Factory },
-  { id: "logistica", slug: "logistica", titulo: "LOGÍSTICA", icon: Truck },
+  { id: "tesoreria", slug: "tesoreria", titulo: "TESORERIA", icon: Landmark },
+  { id: "produccion", slug: "inventario", titulo: "PRODUCCION", icon: Factory },
+  { id: "logistica", slug: "logistica", titulo: "LOGISTICA", icon: Truck },
 ];
 
 /** Alias de URL: "compras" = Tesorería, "inventario" = Producción. */
@@ -109,19 +110,15 @@ function Login() {
 
   return (
     <Fondo>
-      {/* Logo */}
-      <header className="flex flex-col items-center pt-8 md:pt-12">
+      {/* Logo (tal cual, sin fondo) */}
+      <header className="mt-10 flex justify-center px-4">
         <Logo />
-        <p className="mt-3 text-[11px] font-medium tracking-[0.4em] text-white/70 md:text-xs">SOLUCIONES INDUSTRIALES</p>
       </header>
 
       {/* Título + formulario del módulo elegido */}
-      <section className="flex flex-1 flex-col items-center justify-center px-4 py-8 text-center">
-        <h1 className="max-w-3xl text-[26px] font-black uppercase leading-tight text-white [text-shadow:0_0_18px_rgba(255,30,30,0.75),0_0_42px_rgba(209,42,42,0.45)] md:text-[36px]">
-          BIENVENIDO AL SISTEMA ERP COMBOY VID
-        </h1>
-        <p className="mt-3 text-[18px] font-light text-[#a3b8ff]">{encargado ? `${encargado.nombre} · ${encargado.cargo}` : "Selecciona tu módulo"}</p>
-
+      <section className="flex flex-col items-center px-4 text-center">
+        <h1 className="mt-16 text-[26px] font-bold uppercase leading-tight text-white md:text-[36px]">BIENVENIDO AL SISTEMA ERP COMBOY VID</h1>
+        <p className="mt-3 text-[18px] text-[#8fb0ff]">{encargado ? `${encargado.nombre} · ${encargado.cargo}` : "Selecciona tu módulo"}</p>
         {proximamente && (
           <p className="mt-6 animate-aparecer rounded-full border border-white/20 bg-black/40 px-5 py-2 text-sm text-white/80 backdrop-blur-xl">
             {tarjetaDe(pedido as ModuloLogin).titulo.split(" (")[0]} estará disponible próximamente.
@@ -205,95 +202,48 @@ function Login() {
       </section>
 
       {/* Dock de módulos (scroll horizontal en mobile) */}
-      <nav className="w-full px-4 pb-6 md:pb-10">
-        <div className="mx-auto w-fit max-w-full overflow-x-auto rounded-full border border-white/20 bg-black/30 p-2 backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div className="flex w-max gap-2 p-1">
-            {DOCK.map(({ id, slug, titulo, icon: Icon }) => {
-              const sel = activo === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  data-modulo={id}
-                  aria-pressed={sel}
-                  onClick={() => elegir(id, slug)}
-                  className={`flex h-[82px] w-[132px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-full border text-[12px] font-bold tracking-wider transition-all duration-200 ${
-                    sel
-                      ? "scale-105 border-[#ff3a3a] bg-gradient-to-b from-[#c41e1e] to-[#7a0f0f] text-white shadow-[0_0_25px_rgba(255,0,0,0.8)]"
-                      : "border-white/20 bg-white/[0.06] text-white/80 hover:border-white/40 hover:bg-white/10 hover:text-white"
-                  }`}
-                >
-                  <Icon size={24} strokeWidth={1.75} />
-                  {titulo}
-                </button>
-              );
-            })}
-          </div>
+      <nav className="mt-10 w-full px-4 pb-10">
+        <div className="mx-auto flex w-full max-w-[980px] justify-between gap-3 overflow-x-auto rounded-full border border-white/30 bg-black/20 px-6 py-4 backdrop-blur-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {DOCK.map(({ id, slug, titulo, icon: Icon }) => {
+            const sel = activo === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                data-modulo={id}
+                aria-pressed={sel}
+                onClick={() => elegir(id, slug)}
+                className={`flex h-[72px] min-w-[112px] flex-1 flex-col items-center justify-center gap-1.5 rounded-full border text-[15px] font-bold text-white transition-all duration-200 ${
+                  sel
+                    ? "border-[#ff5a5a] bg-gradient-to-b from-[#e42323] to-[#7a0000] shadow-[0_0_22px_rgba(255,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.35)]"
+                    : "border-white/20 bg-white/10 text-white/85 hover:border-white/40 hover:bg-white/15 hover:text-white"
+                }`}
+              >
+                <Icon size={24} strokeWidth={2} />
+                {titulo}
+              </button>
+            );
+          })}
         </div>
-        <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-[11px] text-white/50">
-          <ShieldCheck size={13} /> Acceso restringido por módulo según su usuario
-        </p>
       </nav>
     </Fondo>
   );
 }
 
-/** Logo COMBOY: usa /logo-comboy.png; si no carga, lo recrea con texto (COM rojo, BOY azul, estrellas en las O). */
+const LOGOS = ["/logo.png", "/logo-vid-comboy.png", "/logo-comboy.png"];
+
+/** Logo tal cual (sin fondo): /logo.png, si no existe /logo-vid-comboy.png, y luego /logo-comboy.png. */
 function Logo() {
-  const [img, setImg] = useState(true);
-  if (img)
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src="/logo-comboy.png" onError={() => setImg(false)} alt="COMBOY" className="h-14 w-auto object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.15)] md:h-16" />;
-  const letra = (l: string, color: string) =>
-    l === "O" ? (
-      <span className="relative inline-block" style={{ color }}>
-        O<span className="absolute inset-0 flex items-center justify-center text-[0.38em] text-white">★</span>
-      </span>
-    ) : (
-      <span style={{ color }}>{l}</span>
-    );
-  return (
-    <p aria-label="COMBOY" className="text-5xl font-black tracking-tight md:text-6xl">
-      {[..."COM"].map((l, i) => <span key={i}>{letra(l, "#d12a2a")}</span>)}
-      {[..."BOY"].map((l, i) => <span key={i}>{letra(l, "#153a5e")}</span>)}
-    </p>
-  );
+  const [i, setI] = useState(0);
+  return <Image src={LOGOS[i]} alt="COMBOY" width={380} height={110} priority onError={() => setI((n) => Math.min(n + 1, LOGOS.length - 1))} className="h-auto max-w-full object-contain" />;
 }
 
-/** Meridianos y paralelos del globo de respaldo (elipses en un viewBox 200×200, radio 90). */
-const MERIDIANOS = [15, 35, 55, 72, 85];
-const PARALELOS = [-60, -36, -12, 12, 36, 60];
-
-/** Fondo oscuro full-screen con overlay negro 30%. */
+/** Fondo: imagen de referencia /login-bg.jpg a pantalla completa con overlay negro 30%. */
 function Fondo({ children }: { children?: React.ReactNode }) {
   return (
     <div className="relative isolate min-h-screen overflow-hidden bg-black">
       <div aria-hidden className="pointer-events-none fixed inset-0 z-[-1]">
-        {/* TODO: agregar /public/login-bg.jpg (globo terráqueo futurista rojo) y reemplazar este gradiente + SVG por:
-            <div className="absolute inset-0 bg-[url('/login-bg.jpg')] bg-cover bg-center" /> */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,#4a0a0a_0%,#1a0303_45%,#000_80%)]" />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <svg viewBox="0 0 200 200" className="h-[120vmin] w-[120vmin] opacity-70 motion-safe:animate-flotar">
-            <defs>
-              <radialGradient id="globo-relleno" cx="35%" cy="30%" r="75%">
-                <stop offset="0%" stopColor="#ff5a1f" stopOpacity="0.35" />
-                <stop offset="45%" stopColor="#d12a2a" stopOpacity="0.2" />
-                <stop offset="100%" stopColor="#3a0202" stopOpacity="0.05" />
-              </radialGradient>
-            </defs>
-            <g transform="rotate(-18 100 100)" fill="none" stroke="#ff3a3a" strokeWidth="0.4">
-              <circle cx="100" cy="100" r="90" fill="url(#globo-relleno)" strokeWidth="0.7" />
-              {MERIDIANOS.map((rx) => (
-                <ellipse key={rx} cx="100" cy="100" rx={rx} ry="90" opacity={0.25 + rx / 250} />
-              ))}
-              {PARALELOS.map((lat) => {
-                const y = 100 + 90 * Math.sin((lat * Math.PI) / 180);
-                const rx = 90 * Math.cos((lat * Math.PI) / 180);
-                return <ellipse key={lat} cx="100" cy={y} rx={rx} ry={rx * 0.16} opacity="0.5" />;
-              })}
-            </g>
-          </svg>
-        </div>
+        <Image src="/login-bg.jpg" alt="" fill priority sizes="100vw" className="object-cover" />
         <div className="absolute inset-0 bg-black/30" />
       </div>
       <main className="relative z-10 flex min-h-screen flex-col">{children}</main>
