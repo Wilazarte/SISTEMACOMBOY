@@ -1,26 +1,26 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, ChevronRight, CloudUpload, Eye, Home, Loader2, LogOut, Menu, Moon, PanelLeft, Search, ShieldAlert, Sun } from "lucide-react";
+import { AlertTriangle, ChevronRight, CloudUpload, Eye, Home, Loader2, LogOut, Search, ShieldAlert } from "lucide-react";
 import { EV_PESTANA, ID_BARRA_PESTANAS, Kbd, Toaster, cn, toast, type PestanaActiva } from "@/components/ui";
 import { DocViewerHost, abrirDoc, type DocRef } from "@/components/doc-viewer";
 import { ObservacionesGerencia } from "@/components/ObservacionesGerencia";
 import { Header } from "@/components/Header";
 import { AccionRapida } from "@/components/shell/AccionRapida";
-import { Apariencia } from "@/components/shell/Apariencia";
 import { Campana } from "@/components/shell/Campana";
 import { CommandPalette, IconoDoc, type Comando } from "@/components/shell/CommandPalette";
 import { useIr } from "@/components/shell/ir";
 import { accionesDe, hrefSub, moduloDe, navDe } from "@/components/shell/nav";
-import { Sidebar } from "@/components/shell/Sidebar";
+import { BottomNav } from "@/components/layout/BottomNav";
 import { inicioDe, logout, puedeVer, useSesion } from "@/lib/auth";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
 import { useNotificaciones } from "@/lib/notificaciones";
-import { guardarPrefs, limpiarPrefs, usePrefs } from "@/lib/preferencias";
+import { limpiarPrefs, usePrefs } from "@/lib/preferencias";
 import { KEYS, detenerDatos, getCotizaciones, getFacturas, getGuias, getOrdenes, getPendientes, getProcesados, useDatos, useStore } from "@/lib/storage";
-import type { OrdenDespacho, Requerimiento } from "@/lib/types";
+import type { OrdenDespacho } from "@/lib/types";
 import { avisoOD, getDespachos, odsNuevas } from "@/lib/ventas";
 
 interface Resultado extends DocRef {
@@ -63,14 +63,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const datos = useDatos(!!sesion);
   const prefs = usePrefs();
   const notifs = useNotificaciones(sesion);
-  const pendientes = useStore<Requerimiento[]>(KEYS.REQS_PENDIENTES, []);
   const ods = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, []);
-  const [menu, setMenu] = useState(false);
   const [paleta, setPaleta] = useState(false);
   const [pestana, setPestana] = useState<PestanaActiva | null>(null);
   const [locales, setLocales] = useState(0);
   const [subiendo, setSubiendo] = useState(false);
-  const plegado = prefs.menuPlegado ?? false;
 
   useEffect(() => {
     if (listo && !sesion) {
@@ -111,10 +108,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const tabActiva = pestana && pestana.ruta === path ? pestana : null;
 
   const acciones = useMemo(() => (sesion ? accionesDe(sesion) : []), [sesion]);
-  const alternarTema = useCallback(() => guardarPrefs({ tema: document.documentElement.classList.contains("dark") ? "claro" : "oscuro" }), []);
-  const alternarMenu = useCallback(() => guardarPrefs({ menuPlegado: !plegado }), [plegado]);
 
-  // Atajos de teclado: Ctrl+K / "/" buscador, N P R G acciones, T tema, [ menú
+  // Atajos de teclado: Ctrl+K / "/" buscador, N P R G acciones
   useEffect(() => {
     if (!sesion) return;
     const tecla = (e: KeyboardEvent) => {
@@ -130,9 +125,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       if (e.key === "/") {
         e.preventDefault();
         setPaleta(true);
-      } else if (e.key === "[") alternarMenu();
-      else if (k === "T") alternarTema();
-      else {
+      } else {
         const a = acciones.find((x) => x.tecla === k);
         if (a) {
           e.preventDefault();
@@ -142,7 +135,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     };
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
-  }, [sesion, acciones, alternarMenu, alternarTema, ir]);
+  }, [sesion, acciones, ir]);
 
   const veCompras = sesion ? puedeVer(sesion, "/dashboard/compras") : false;
   const buscador = !!sesion && (veCompras || puedeVer(sesion, "/dashboard/almacen"));
@@ -154,17 +147,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       ...acciones.map((a) => ({ id: a.id, grupo: "Acciones", label: a.label, detalle: a.detalle, icon: a.icon, teclas: [a.tecla], run: () => ir(a.href) })),
       ...nav.map((n) => ({ id: n.href, grupo: "Ir a", label: n.label, detalle: n.subs.map((s) => s.label).slice(0, 4).join(" · "), icon: n.icon, run: () => ir(n.href) })),
       ...nav.flatMap((n) => n.subs.map((s) => ({ id: `${n.href}-${s.label}`, grupo: "Secciones", label: s.label, detalle: n.label, icon: n.icon, run: () => ir(hrefSub(n, s)) }))),
-      { id: "tema", grupo: "Preferencias", label: "Cambiar tema claro / oscuro", icon: Moon, teclas: ["T"], claves: "modo oscuro claro dark", run: alternarTema },
-      { id: "menu", grupo: "Preferencias", label: plegado ? "Expandir menú lateral" : "Contraer menú lateral", icon: PanelLeft, teclas: ["["], run: alternarMenu },
-      {
-        id: "estilo",
-        grupo: "Preferencias",
-        label: prefs.menuEstilo === "rojo" ? "Menú lateral grafito" : "Menú lateral rojo sólido",
-        icon: PanelLeft,
-        run: () => guardarPrefs({ menuEstilo: prefs.menuEstilo === "rojo" ? "grafito" : "rojo" }),
-      },
     ];
-  }, [sesion, acciones, ir, alternarTema, alternarMenu, plegado, prefs.menuEstilo]);
+  }, [sesion, acciones, ir]);
 
   const documentos = useCallback(
     (q: string): Comando[] =>
@@ -226,68 +210,25 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
   };
 
-  const nav = navDe(sesion);
   const permitido = puedeVer(sesion, path);
-  // Contador de Almacén: órdenes de despacho nuevas que creó Ventas
-  const veDespacho = puedeVer(sesion, "/dashboard/almacen") && ["creador", "almacen"].includes(sesion.rol);
-  const contadores: Record<string, number> = {
-    "/dashboard/compras": pendientes.length,
-    "/dashboard/almacen": veDespacho ? odsNuevas(ods).length : 0,
-  };
   const actual = moduloDe(path);
   const modulo = actual && actual.href !== "/dashboard" ? actual.href : undefined;
   const subActual = actual?.subs.find((s) => (s.href ? s.href === path : tabActiva?.id === s.tab));
   const migas = [actual?.label ?? "Inicio", subActual?.label ?? tabActiva?.label ?? (path === "/dashboard" ? "Resumen" : undefined)].filter(Boolean) as string[];
-  const soloIconos = plegado;
 
   return (
-    <div className={cn("flex min-h-screen flex-col bg-canvas transition-[padding] duration-300 ease-suave", plegado ? "lg:pl-[68px]" : "lg:pl-[252px]")}>
-      <Sidebar
-        nav={nav}
-        ruta={path}
-        tab={tabActiva?.id ?? null}
-        plegado={plegado}
-        estilo={prefs.menuEstilo ?? "grafito"}
-        abierto={menu}
-        contadores={contadores}
-        onPlegar={alternarMenu}
-        onCerrar={() => setMenu(false)}
-        pie={
-          <div className="space-y-0.5">
-            {locales > 0 && (
-              <button
-                onClick={subirLocales}
-                disabled={subiendo}
-                className="mb-1 flex w-full items-center gap-2 rounded-lg bg-white/[0.08] px-3 py-2 text-left text-xs font-medium text-white hover:bg-white/[0.12] disabled:opacity-60"
-                title="Sube a Supabase los datos que este navegador tenía de la versión anterior"
-              >
-                {subiendo ? <Loader2 size={15} className="shrink-0 animate-spin" /> : <CloudUpload size={15} className="shrink-0" />}
-                <span className={cn("truncate", soloIconos && "lg:hidden")}>Subir datos de este navegador ({locales})</span>
-              </button>
-            )}
-            <Apariencia tema={prefs.tema ?? "sistema"} menu={prefs.menuEstilo ?? "grafito"} soloIcono={soloIconos} />
-            <div className="flex items-center gap-2.5 px-1.5 pt-1.5">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-sidebar-borde bg-white/[0.07] text-[11px] font-semibold uppercase text-white">
-                {sesion.usuario.slice(0, 2)}
-              </span>
-              <div className={cn("min-w-0 flex-1 leading-tight", soloIconos && "lg:hidden")}>
-                <p className="truncate text-[13px] font-medium text-white">{sesion.usuario}</p>
-                <p className="truncate text-xs text-sidebar-sub">{sesion.nombre}</p>
-              </div>
-              <button onClick={salir} className={cn("rounded-lg p-2 text-sidebar-sub transition hover:bg-white/10 hover:text-white", soloIconos && "lg:hidden")} title="Cerrar sesión" aria-label="Cerrar sesión">
-                <LogOut size={16} />
-              </button>
-            </div>
-          </div>
-        }
-      />
-      {menu && <div className="fixed inset-0 z-30 animate-velo bg-black/50 lg:hidden" onClick={() => setMenu(false)} />}
+    // Tema unificado COMBOY VID: siempre oscuro (.dark en el contenedor) sobre el fondo del login
+    <div className="dark relative isolate flex min-h-screen flex-col pb-32 text-fg">
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-[-1] bg-black">
+        <Image src="/login-bg.jpg" alt="" fill priority quality={90} sizes="100vw" className="object-cover object-center" />
+        <div className="absolute inset-0 bg-black/70" />
+      </div>
 
       {/* Barra superior: ruta, buscador global, campana y tema */}
-      <header className="sticky top-0 z-20 flex h-[60px] items-center gap-3 border-b border-plomo-200 bg-canvas/85 px-4 backdrop-blur-md lg:px-7">
-        <button className="rounded-lg p-1.5 text-fg hover:bg-plomo-100 lg:hidden" onClick={() => setMenu(true)} aria-label="Abrir menú">
-          <Menu size={20} />
-        </button>
+      <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-3 border-b border-white/10 bg-black/50 px-4 backdrop-blur-xl lg:px-7">
+        <Link href={inicioDe(sesion)} className="shrink-0" aria-label="Inicio">
+          <Image src="/logo.png" alt="COMBOY VID" width={94} height={40} className="h-9 w-auto object-contain" />
+        </Link>
         <nav aria-label="Ruta" className="flex min-w-0 items-center gap-1.5 text-[13px] text-plomo-500">
           <Link href={inicioDe(sesion)} className="hidden rounded p-0.5 hover:text-fg sm:block" aria-label="Inicio">
             <Home size={15} />
@@ -319,20 +260,34 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             </span>
           </button>
           <Campana notifs={notifs} vistas={prefs.notifVistas ?? []} />
+          {locales > 0 && (
+            <button
+              onClick={subirLocales}
+              disabled={subiendo}
+              className="tip flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/10 hover:text-white disabled:opacity-60"
+              data-tip={`Subir datos de este navegador (${locales})`}
+              aria-label="Subir datos de este navegador"
+            >
+              {subiendo ? <Loader2 size={16} className="animate-spin" /> : <CloudUpload size={16} />}
+            </button>
+          )}
+          <span className="hidden h-9 items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] pl-1 pr-3 md:flex" title={sesion.nombre}>
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-[11px] font-semibold uppercase text-white">{sesion.usuario.slice(0, 2)}</span>
+            <span className="max-w-[140px] truncate text-[13px] font-medium text-white">{sesion.usuario}</span>
+          </span>
           <button
-            onClick={alternarTema}
-            className="tip flex h-9 w-9 items-center justify-center rounded-lg border border-plomo-200 bg-surface text-fg-2 transition hover:bg-plomo-50 hover:text-fg"
-            data-tip="Cambiar tema · T"
-            aria-label="Cambiar tema claro / oscuro"
+            onClick={salir}
+            className="tip flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-[#ff1a1a]/20 hover:text-[#ff3a3a]"
+            data-tip="Cerrar sesión"
+            aria-label="Cerrar sesión"
           >
-            <Sun size={17} className="hidden dark:block" />
-            <Moon size={17} className="dark:hidden" />
+            <LogOut size={16} />
           </button>
         </div>
       </header>
 
       <main className="w-full flex-1">
-        <div className="mx-auto w-full max-w-[1600px] px-4 pb-28 pt-6 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-[1600px] px-4 pt-20 sm:px-6 lg:px-8">
           {sesion.modulos.length === 0 ? (
             <Aviso titulo="Sin módulos asignados">
               Su usuario ({sesion.usuario}, rol {sesion.rol}) inició sesión, pero todavía no tiene módulos habilitados. El administrador debe asignarlos en la tabla perfiles (columna modulos).
@@ -352,7 +307,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <div className="animate-velo space-y-5" key={path} /* solo opacidad: un transform rompería los modales fijos */>
               <Header sesion={sesion} flujo={flujoDe(path)} />
               {/* Pestañas del módulo (components/ui Tabs se dibuja aquí): fijas al hacer scroll */}
-              <div id={ID_BARRA_PESTANAS} className="sticky top-[60px] z-10 -mx-1 bg-canvas/90 px-1 py-2 backdrop-blur-md empty:hidden" />
+              <div id={ID_BARRA_PESTANAS} className="sticky top-14 z-10 -mx-1 bg-black/40 px-1 py-2 backdrop-blur-md empty:hidden" />
               {sesion.soloLectura && (
                 <div className="flex w-full items-center gap-2 rounded-xl border border-plomo-200 bg-surface px-4 py-2.5 text-sm text-fg-2 shadow-card">
                   <Eye size={16} className="shrink-0 text-plomo-500" /> Modo solo lectura: puede revisar todo y registrar observaciones, pero no guardar, editar ni eliminar.
@@ -368,12 +323,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           )}
         </div>
       </main>
-      <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-plomo-200 px-4 py-4 text-xs text-plomo-500 sm:px-6 lg:px-8">
+      <footer className="mt-8 flex flex-wrap items-center justify-between gap-2 border-t border-white/10 px-4 py-4 text-xs text-plomo-500 sm:px-6 lg:px-8">
         <span>
           <span className="font-semibold text-fg">COMBOY</span> <span className="font-semibold text-rojo">VID</span> © 2025 · ERP COMBOYVID · Arequipa, Perú · Área Informática
         </span>
         <span className="font-mono">v3.2.1</span>
       </footer>
+      <BottomNav sesion={sesion} />
       <AccionRapida acciones={acciones} />
       <CommandPalette abierto={paleta} onCerrar={() => setPaleta(false)} comandos={comandos} documentos={documentos} />
       <DocViewerHost />

@@ -26,7 +26,7 @@ export function AccionRapida({ acciones }: { acciones: Accion[] }) {
 
   if (acciones.length === 0) return null;
   return (
-    <div ref={caja} className="fixed bottom-6 right-6 z-[75] print:hidden">
+    <div ref={caja} className="fixed bottom-24 right-4 z-[75] print:hidden lg:bottom-6 lg:right-6">
       {abierto && (
         <div role="menu" aria-label="Acciones rápidas" className="absolute bottom-[68px] right-0 w-[290px] animate-emerger rounded-2xl border border-plomo-200 bg-surface p-1.5 shadow-pop">
           <p className="px-2.5 pb-1.5 pt-2 text-[11px] font-medium text-plomo-500">Acción rápida</p>
