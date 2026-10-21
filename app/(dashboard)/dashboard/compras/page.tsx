@@ -88,6 +88,7 @@ import PlanillaInterna from "@/components/tesoreria/PlanillaTab";
 import { DeclaracionesJuradas } from "@/components/tesoreria/DeclaracionesJuradas";
 import { pdfDeclaracionJurada } from "@/lib/pdf";
 import { EditarReq, permisoEditarReq } from "@/components/compras/EditarReq";
+import TesoreriaLeftDrawer from "@/components/tesoreria/TesoreriaLeftDrawer";
 import { EditarGasto } from "@/components/compras/EditarGasto";
 import type { Trabajador } from "@/lib/types";
 import type { Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, Proveedor, Requerimiento, Rol, StockItem, TipoComprobanteCompra } from "@/lib/types";
@@ -115,6 +116,9 @@ const diasCredito = (forma?: string): number => {
 const BTN_REQ =
   "inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-medium text-white transition duration-150 hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100";
 
+/** Barra izquierda de requerimientos abierta o cerrada (por navegador). */
+const CLAVE_BARRA = "tesoreria-barra-requerimientos";
+
 /** Última pestaña abierta de Tesorería / Compras (por navegador). */
 const CLAVE_TAB = "tesoreria-tab-activa";
 
@@ -135,6 +139,23 @@ export default function ComprasPage() {
   const veCompras = puedeVer(sesion, "/dashboard/compras");
   const vePlanilla = puedeVer(sesion, "/dashboard/planilla");
   const [tab, setTab] = useState<Tab>(!veCompras ? "planilla" : puede(rol, "compra.crear") ? "registrar" : "antecedentes");
+  // Barra izquierda: abierta por defecto en escritorio, cerrada en celular; se recuerda la última elección
+  const [barra, setBarra] = useState(false);
+  useEffect(() => {
+    try {
+      const g = window.localStorage.getItem(CLAVE_BARRA);
+      setBarra(g ? g === "1" : window.matchMedia("(min-width: 1024px)").matches);
+    } catch {
+      setBarra(window.matchMedia("(min-width: 1024px)").matches);
+    }
+  }, []);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(CLAVE_BARRA, barra ? "1" : "0");
+    } catch {
+      /* almacenamiento bloqueado */
+    }
+  }, [barra]);
   // Contador de la pestaña Planilla (solo se descarga si el usuario ve planilla)
   const trabajadores = useStore<Trabajador[]>(KEYS.TRABAJADORES, [], vePlanilla);
   const activos = trabajadores.filter((t) => t.activo && !esContratista(t)).length;
@@ -172,7 +193,8 @@ export default function ComprasPage() {
   const facturasSinGuia = facturas.filter((f) => f.tipo === "FACTURA" && !f.esGastoTesoreria && (!guias.some((g) => g.facturaId === f.id) || guias.some((g) => g.facturaId === f.id && g.estado === "OBSERVADA")));
 
   return (
-    <div className="w-full space-y-6">
+    // Con la barra de requerimientos abierta, en escritorio el contenido se corre a la derecha
+    <div className={cn("w-full space-y-6 transition-[margin] duration-300", veCompras && barra && "lg:ml-[320px] lg:w-[calc(100%-320px)]")}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-serif tracking-tight text-2xl font-semibold leading-tight text-fg lg:text-[28px]">Tesorería / Compras</h1>
@@ -183,7 +205,7 @@ export default function ComprasPage() {
         )}
       </div>
 
-      {veCompras && <Notificaciones pendientes={pendientes} rol={rol} />}
+      {veCompras && <Notificaciones pendientes={pendientes} rol={rol} abierto={barra} onToggle={() => setBarra((b) => !b)} />}
 
       <Tabs<Tab>
         value={tab}
@@ -227,7 +249,7 @@ export default function ComprasPage() {
 // =====================================================================
 // NOTIFICACIONES (cards amarillas)
 // =====================================================================
-function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol: Rol }) {
+function Notificaciones({ pendientes, rol, abierto, onToggle }: { pendientes: Requerimiento[]; rol: Rol; abierto: boolean; onToggle: () => void }) {
   const [rechazo, setRechazo] = useState<Requerimiento | null>(null);
   const [obs, setObs] = useState<Requerimiento | null>(null);
   const [motivo, setMotivo] = useState("");
@@ -253,40 +275,43 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
 
   if (pendientes.length === 0)
     return (
-      <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
-        <Check size={18} /> No hay requerimientos pendientes de revisión.
-      </div>
+      <TesoreriaLeftDrawer open={abierto} onToggle={onToggle} cantidad={0}>
+        <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-300">
+          <Check size={16} /> No hay requerimientos pendientes de revisión.
+        </div>
+      </TesoreriaLeftDrawer>
     );
 
   return (
-    <section>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <Bell size={18} className="text-amber-600" />
-        <h2 className="font-semibold text-fg">Requerimientos por revisar</h2>
-        <span className="rounded-full bg-corp px-2 text-xs font-bold text-white">{pendientes.length}</span>
-        {habilitado && (
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <label className="flex cursor-pointer items-center gap-2 rounded-md border border-[#1e2a45] bg-[#0e1424]/80 px-3 py-1.5 text-xs font-medium text-fg">
-              <input
-                type="checkbox"
-                className="h-4 w-4 accent-[#2a7bff]"
-                checked={todos}
-                onChange={() => setMarcados(todos ? new Set() : new Set(pendientes.map((r) => r.id)))}
-              />
-              Seleccionar todos ({pendientes.length})
-            </label>
-            <button className={`${BTN_REQ} border-[#2a7bff] bg-[#2a7bff] shadow-[0_0_14px_rgba(42,123,255,0.6)]`} disabled={elegidos.length === 0} onClick={aceptarLote}>
-              <Check size={14} /> Aceptar seleccionados{elegidos.length ? ` (${elegidos.length})` : ""}
-            </button>
-            <button className={`${BTN_REQ} border-[#ff1a1a] bg-[#ff1a1a] font-bold shadow-[0_0_14px_rgba(255,26,26,0.6)]`} disabled={elegidos.length === 0} onClick={() => setRechazoLote(true)}>
-              <X size={14} /> Rechazar seleccionados{elegidos.length ? ` (${elegidos.length})` : ""}
-            </button>
-          </div>
-        )}
-      </div>
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+    <>
+      <TesoreriaLeftDrawer
+        open={abierto}
+        onToggle={onToggle}
+        cantidad={pendientes.length}
+        acciones={
+          habilitado && (
+            <>
+              <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-white/10 bg-white/10 px-2 py-1 text-xs font-medium text-white">
+                <input
+                  type="checkbox"
+                  className="h-3.5 w-3.5 accent-[#2a7bff]"
+                  checked={todos}
+                  onChange={() => setMarcados(todos ? new Set() : new Set(pendientes.map((r) => r.id)))}
+                />
+                Seleccionar todos ({pendientes.length})
+              </label>
+              <button className={`${BTN_REQ} h-7 border-[#2a7bff] bg-[#2a7bff] px-2`} disabled={elegidos.length === 0} onClick={aceptarLote}>
+                <Check size={13} /> Aceptar{elegidos.length ? ` (${elegidos.length})` : ""}
+              </button>
+              <button className={`${BTN_REQ} h-7 border-[#ff1a1a] bg-[#ff1a1a] px-2 font-bold`} disabled={elegidos.length === 0} onClick={() => setRechazoLote(true)}>
+                <X size={13} /> Rechazar{elegidos.length ? ` (${elegidos.length})` : ""}
+              </button>
+            </>
+          )
+        }
+      >
         {pendientes.map((r) => (
-          <div key={r.id} className={cn("flex flex-col rounded-xl border-2 bg-[#1a1500]/60 p-4 shadow-sm backdrop-blur-xl", marcados.has(r.id) ? "border-[#2a7bff]" : "border-[#fbbf24]/50")}>
+          <div key={r.id} className={cn("flex flex-col rounded-lg border bg-[#111827] p-3", marcados.has(r.id) ? "border-[#2a7bff]" : "border-amber-500/30")}>
             <div className="flex items-start justify-between">
               <div className="flex items-start gap-2.5">
                 {habilitado && (
@@ -307,7 +332,7 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
               </div>
               <span className="rounded-full bg-[#fbbf24] px-2 py-0.5 text-[11px] font-bold text-black">PENDIENTE</span>
             </div>
-            <p className="mt-2 text-sm text-slate-700">
+            <p className="mt-2 line-clamp-2 text-xs text-white">
               <span className="font-medium">{r.solicitante}:</span> {r.motivo}
             </p>
             <ul className="mt-2 space-y-0.5 text-xs text-plomo-600">
@@ -344,7 +369,7 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
             </div>
           </div>
         ))}
-      </div>
+      </TesoreriaLeftDrawer>
 
       {editReq && <EditarReq req={editReq} rol={rol} onClose={() => setEditReq(null)} />}
 
@@ -403,7 +428,7 @@ function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol:
           </Button>
         </div>
       </Modal>
-    </section>
+    </>
   );
 }
 
