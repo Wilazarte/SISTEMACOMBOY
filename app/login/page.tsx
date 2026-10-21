@@ -2,27 +2,9 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle, ArrowLeft, BarChart3, Eye, EyeOff, Loader2, Lock, LogIn, Package, ShieldCheck, ShoppingCart, User, Users, type LucideIcon } from "lucide-react";
-import { CLAVE_MODULO, CLAVE_USUARIO, MODULOS_LOGIN, login, logout, moduloGuardado, perteneceAModulo, useSesion, type ModuloLogin } from "@/lib/auth";
-
-/** Módulos del login. Para más perfiles, agregar aquí (la grilla se adapta a 3 + 2). */
-const TARJETAS: { id: ModuloLogin; titulo: string; desc: string; icon: LucideIcon }[] = [
-  { id: "tesoreria", titulo: "Tesorería / Compras", desc: "Finanzas y adquisiciones", icon: ShoppingCart },
-  { id: "almacen", titulo: "Almacén", desc: "Inventarios y materiales", icon: Package },
-  { id: "planilla", titulo: "Planilla", desc: "Recursos humanos y pagos", icon: Users },
-  { id: "gerencia", titulo: "Gerencia", desc: "Reportes y analíticas", icon: BarChart3 },
-];
-
-/** Encargado que se muestra en la bienvenida según el módulo elegido. */
-const ENCARGADOS_LOGIN: Record<ModuloLogin, { nombre: string; cargo: string }> = {
-  tesoreria: { nombre: "LIZBETH CAHUANA APFATA", cargo: "Tesorera - Módulo de Compras" },
-  almacen: { nombre: "JOSE MANUEL ORTIZ ARAPA", cargo: "Jefe de Almacén - Módulo de Almacén" },
-  planilla: { nombre: "Encargado de Planilla", cargo: "RRHH - Módulo de Planilla" },
-  gerencia: { nombre: "Gerencia General", cargo: "Gerencia - COMBOY VID" },
-};
-
-/** Último módulo elegido en la pantalla de selección (solo recuerda la elección; la sesión usa CLAVE_MODULO). */
-const CLAVE_SELECCION = "modulo_seleccionado";
+import { AlertCircle, ArrowLeft, Eye, EyeOff, Loader2, Lock, LogIn, ShieldCheck, User } from "lucide-react";
+import { CLAVE_MODULO, CLAVE_USUARIO, MODULOS_LOGIN, login, logout, moduloGuardado, perteneceAModulo, rutaDeModulo, useSesion, type ModuloLogin } from "@/lib/auth";
+import { CLAVE_SELECCION, ENCARGADOS_LOGIN, MODULOS_SELECCION, tarjetaDe } from "@/components/modulos-login";
 
 /** ?modulo= de la URL (acepta "compras" como alias de Tesorería). Otro valor, ej. "seleccion" = elegir módulo. */
 function moduloDeUrl(v: string | null): ModuloLogin | "" {
@@ -67,7 +49,7 @@ function Login() {
   // Sesión ya abierta con un módulo elegido: ir directo a ese módulo
   useEffect(() => {
     const m = moduloGuardado();
-    if (sesion && m && !enviando) router.replace(MODULOS_LOGIN[m].ruta);
+    if (sesion && m && !enviando) router.replace(rutaDeModulo(sesion, m));
   }, [sesion, router, enviando]);
 
   const elegir = (m: ModuloLogin) => {
@@ -110,7 +92,7 @@ function Login() {
     } catch {
       /* almacenamiento bloqueado: el header usa la ruta actual */
     }
-    router.replace(MODULOS_LOGIN[modulo].ruta);
+    router.replace(rutaDeModulo(r.sesion, modulo));
   };
 
   const logoImg = (cls: string) => (
@@ -128,13 +110,13 @@ function Login() {
           <div className="mx-auto mb-2 mt-2 h-1 w-12 rounded-full bg-[#E30613]" />
           <p className="mt-3 text-xs uppercase tracking-widest text-gray-400">Selecciona tu módulo</p>
           <div className="mt-6 grid grid-cols-2 gap-3 text-left md:gap-4">
-            {TARJETAS.map(({ id, titulo, desc, icon: Icon }) => (
+            {MODULOS_SELECCION.map(({ id, titulo, desc, icon: Icon }) => (
               <button
                 key={id}
                 type="button"
                 data-modulo={id}
                 onClick={() => elegir(id)}
-                className="group cursor-pointer rounded-xl border border-[#E30613]/15 bg-[#F8F9FF] p-4 text-left transition-all duration-200 hover:scale-[1.02] hover:border-[#E30613] hover:bg-white hover:shadow-[0_0_20px_rgba(227,6,19,0.2)] focus-visible:border-[#E30613] active:scale-[0.99]"
+                className="group cursor-pointer rounded-xl [&:last-child:nth-child(odd)]:col-span-2 border border-[#E30613]/15 bg-[#F8F9FF] p-4 text-left transition-all duration-200 hover:scale-[1.02] hover:border-[#E30613] hover:bg-white hover:shadow-[0_0_20px_rgba(227,6,19,0.2)] focus-visible:border-[#E30613] active:scale-[0.99]"
               >
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#FEF2F2] text-[#E30613] transition-colors duration-200 group-hover:bg-[#E30613] group-hover:text-white md:h-8 md:w-8">
                   <Icon className="h-4 w-4 md:h-[18px] md:w-[18px]" />
@@ -151,7 +133,7 @@ function Login() {
       </Fondo>
     );
 
-  const elegido = TARJETAS.find((t) => t.id === modulo)!;
+  const elegido = tarjetaDe(modulo);
   const encargado = ENCARGADOS_LOGIN[modulo];
 
   return (
@@ -176,7 +158,7 @@ function Login() {
           </p>
           <button
             type="button"
-            onClick={() => router.push("/login?modulo=seleccion", { scroll: false })}
+            onClick={() => router.push("/seleccionar-modulo")}
             className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs text-gray-500 transition hover:bg-gray-100 hover:text-[#0F1E3A]"
           >
             <ArrowLeft size={13} /> Cambiar

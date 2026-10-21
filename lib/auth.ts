@@ -171,23 +171,43 @@ export const rolNegocio = (sesion: Sesion | null): Rol => (sesion ? ROL_NEGOCIO[
 // Módulos del login: el usuario elige su módulo ANTES de ingresar.
 // =====================================================================
 
-export type ModuloLogin = "tesoreria" | "almacen" | "planilla" | "gerencia";
+/**
+ * ventas, contable, tesoreria, produccion y logistica: los 5 de /seleccionar-modulo.
+ * almacen, planilla y gerencia: los anteriores, siguen válidos en /login?modulo= y en sesiones guardadas.
+ */
+export type ModuloLogin = "ventas" | "contable" | "tesoreria" | "produccion" | "logistica" | "almacen" | "planilla" | "gerencia";
 
-export const MODULOS_LOGIN: Record<ModuloLogin, { nombre: string; ruta: string }> = {
-  tesoreria: { nombre: "Tesorería / Compras", ruta: "/dashboard/compras" },
-  almacen: { nombre: "Almacén", ruta: "/dashboard/almacen" },
-  planilla: { nombre: "Planilla", ruta: "/dashboard/planilla" },
-  gerencia: { nombre: "Gerencia", ruta: "/dashboard" },
+/**
+ * `ruta`: a dónde entra. `rutas`: rutas del módulo (basta tener asignada una en perfiles.modulos).
+ * `roles`: roles que también pertenecen al módulo (además del rol con el mismo nombre y creador).
+ */
+export const MODULOS_LOGIN: Record<ModuloLogin, { nombre: string; ruta: string; rutas: string[]; roles?: RolAuth[] }> = {
+  ventas: { nombre: "Ventas", ruta: "/dashboard/ventas", rutas: ["/dashboard/ventas"] },
+  contable: { nombre: "Área Contable", ruta: "/dashboard/contable", rutas: ["/dashboard/contable"] },
+  tesoreria: { nombre: "Tesorería (Planilla - Compras)", ruta: "/dashboard/compras", rutas: ["/dashboard/compras", "/dashboard/planilla"], roles: ["planilla"] },
+  produccion: { nombre: "Producción (Almacén)", ruta: "/dashboard/produccion", rutas: ["/dashboard/produccion", "/dashboard/almacen"], roles: ["almacen"] },
+  logistica: { nombre: "Logística", ruta: "/dashboard/almacen?tab=despacho", rutas: ["/dashboard/almacen"], roles: ["almacen"] },
+  almacen: { nombre: "Almacén", ruta: "/dashboard/almacen", rutas: ["/dashboard/almacen"] },
+  planilla: { nombre: "Planilla", ruta: "/dashboard/planilla", rutas: ["/dashboard/planilla"] },
+  gerencia: { nombre: "Gerencia", ruta: "/dashboard", rutas: [] },
 };
 
 export const CLAVE_MODULO = "erp_modulo";
 export const CLAVE_USUARIO = "erp_usuario";
 
-/** El usuario pertenece al módulo: su rol es ese módulo, es creador, o tiene la ruta asignada en perfiles.modulos. */
+/** El usuario pertenece al módulo: es creador, su rol es ese módulo (o uno de sus roles), o tiene una de sus rutas en perfiles.modulos. */
 export function perteneceAModulo(sesion: Sesion, modulo: ModuloLogin): boolean {
   if (sesion.rol === "creador" || sesion.rol === modulo) return true;
-  const ruta = MODULOS_LOGIN[modulo].ruta;
-  return ruta !== "/dashboard" && sesion.modulos.some((m) => ruta === m || ruta.startsWith(`${m}/`));
+  const { rutas, roles } = MODULOS_LOGIN[modulo];
+  if (roles?.includes(sesion.rol)) return true;
+  return rutas.some((ruta) => sesion.modulos.some((m) => ruta === m || ruta.startsWith(`${m}/`)));
+}
+
+/** Ruta de entrada al módulo: la principal, o la primera del módulo que el usuario puede ver (ej. Planilla en Tesorería). */
+export function rutaDeModulo(sesion: Sesion, modulo: ModuloLogin): string {
+  const { ruta, rutas } = MODULOS_LOGIN[modulo];
+  if (puedeVer(sesion, ruta.split("?")[0])) return ruta;
+  return rutas.find((r) => puedeVer(sesion, r)) ?? ruta;
 }
 
 export function moduloGuardado(): ModuloLogin | null {

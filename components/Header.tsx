@@ -11,6 +11,10 @@ export const ENCARGADOS: Record<string, string> = {
   almacen: "Encargado: JOSE MANUEL ORTIZ ARAPA - Almacén",
   planilla: "Encargado: RRHH - Planilla",
   gerencia: "Encargado: Gerencia General - COMBOY VID",
+  ventas: "Encargada: LIZBETH CAHUANA APFATA - Tesorera / Ventas",
+  contable: "Encargado: Área Contable - COMBOY VID",
+  produccion: "Encargado: JOSE MANUEL ORTIZ ARAPA - Producción / Almacén",
+  logistica: "Encargado: JOSE MANUEL ORTIZ ARAPA - Logística",
 };
 
 const NOMBRE_EMPRESA = "COMBOY VID SOLUCIONES INDUSTRIALES";
