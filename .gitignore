@@ -4,3 +4,6 @@ node_modules
 .vercel
 .env*
 !.env.example
+
+# Backups con datos personales (DNIs, sueldos): no se suben
+supabase/backups/*.csv
