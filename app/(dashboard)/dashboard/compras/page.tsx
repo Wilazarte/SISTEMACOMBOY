@@ -83,7 +83,7 @@ import { ALMACENES, ALMACEN_DEFECTO, SEDES, UNIDADES } from "@/lib/empresa";
 import { pdfCotizacion, pdfFactura, pdfOrdenCompra, pdfRequerimiento } from "@/lib/pdf";
 import { asientoOrdenCompra, reasentarOrdenCompra } from "@/lib/contable";
 import { getSesion, puedeVer } from "@/lib/auth";
-import { PlanillaTab } from "@/components/tesoreria/PlanillaTab";
+import PlanillaInterna from "@/components/tesoreria/PlanillaTab";
 import { EditarReq, permisoEditarReq } from "@/components/compras/EditarReq";
 import { EditarGasto } from "@/components/compras/EditarGasto";
 import type { Trabajador } from "@/lib/types";
@@ -209,7 +209,11 @@ export default function ComprasPage() {
         <Ordenes key={pre.coti ?? "o"} rol={rol} cotis={cotisSinOC} todasCotis={cotizaciones} ordenes={ordenes} reqs={procesados} preCoti={pre.coti} onFacturar={(id) => ir("facturas", { oc: id })} />
       )}
       {tab === "facturas" && <Facturas key={pre.oc ?? "f"} rol={rol} ocs={ocsSinFactura} ordenes={ordenes} facturas={facturas} preOc={pre.oc} />}
-      {tab === "planilla" && vePlanilla && <PlanillaTab />}
+      {tab === "planilla" && vePlanilla && (
+        <div>
+          <PlanillaInterna />
+        </div>
+      )}
       {tab === "guias" && <Guias key={pre.fac ?? "g"} rol={rol} facturas={facturasSinGuia} guias={guias} preFac={pre.fac} />}
     </div>
   );

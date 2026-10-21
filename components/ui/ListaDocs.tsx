@@ -49,7 +49,7 @@ const rango = (pagina: number): [number, number] => (pagina === 1 ? [0, PAGE1] :
  * con buscador, filtros (fecha, contraparte, tipo, estado) y paginación 15 / 30.
  * El detalle completo (RUC, ítems, IGV, pago, baucher…) queda en el modal Ver y en el PDF de cada documento.
  */
-export function ListaDocs({ filas, tipo, conAcciones = true }: { filas: FilaDoc[]; tipo: TipoLista; conAcciones?: boolean }) {
+export function ListaDocs({ filas, tipo, conAcciones = true, conRef = true }: { filas: FilaDoc[]; tipo: TipoLista; conAcciones?: boolean; conRef?: boolean }) {
   const et = ETIQUETAS[tipo];
   const [q, setQ] = useState("");
   const [desde, setDesde] = useState("");
@@ -119,7 +119,7 @@ export function ListaDocs({ filas, tipo, conAcciones = true }: { filas: FilaDoc[
         )}
       </div>
 
-      <Table head={["Fecha", et.contraparte, et.ref, et.total, ...(conAcciones ? ["Acciones"] : [])]} empty={visibles.length === 0}>
+      <Table head={["Fecha", et.contraparte, ...(conRef ? [et.ref] : []), et.total, ...(conAcciones ? ["Acciones"] : [])]} empty={visibles.length === 0}>
         {visibles.map((f) => (
           <tr key={f.id} className={cn("hover:bg-plomo-50", f.claseFila)}>
             <Td className="whitespace-nowrap">
@@ -131,7 +131,7 @@ export function ListaDocs({ filas, tipo, conAcciones = true }: { filas: FilaDoc[
                 {f.contraparte}
               </span>
             </Td>
-            <Td>{f.ref}</Td>
+            {conRef && <Td>{f.ref}</Td>}
             <Td className="whitespace-nowrap text-right font-semibold">{f.total}</Td>
             {conAcciones && <Td>{f.acciones}</Td>}
           </tr>
