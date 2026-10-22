@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Briefcase, FileText, Pencil, Plus, Power, Trash2, UserCheck } from "lucide-react";
+import { Briefcase, FileText, Pencil, Power, Trash2, UserCheck } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, cn, ejecutar, toast } from "@/components/ui";
 import QuickActions, { QA_IDS } from "@/components/tesoreria/QuickActions";
 import { SEDES } from "@/lib/empresa";
@@ -87,11 +87,7 @@ export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadore
             <label className="flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg border border-plomo-200 bg-surface px-3 py-2 text-sm font-medium text-slate-700">
               <input type="checkbox" checked={verInactivos} onChange={(e) => setVerInactivos(e.target.checked)} className="h-4 w-4 accent-red-600" /> Mostrar inactivos
             </label>
-            {!soloLectura && (
-              <Button variant="warning" onClick={() => setForm({ datos: vacio() })} className="whitespace-nowrap px-5 py-2.5">
-                <Plus size={18} /> Registrar contratista
-              </Button>
-            )}
+            {/* Registrar: botón "Registrar Contratista" de las acciones rápidas (abre el formulario) */}
           </div>
         }
       />

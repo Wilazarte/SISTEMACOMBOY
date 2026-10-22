@@ -59,6 +59,7 @@ interface Accion {
 export default function QuickActions({
   tab,
   onIr,
+  onBuscar,
   onNuevo,
   onVerCoti,
   onPdf,
@@ -68,7 +69,9 @@ export default function QuickActions({
   tab: string;
   /** setTab de la página (o de Planilla) para saltar a otra pestaña. */
   onIr?: (tab: string) => void;
-  /** Reemplaza el "Nuevo" por defecto (p. ej. abrir el modal de registro). */
+  /** Antes de ir al buscador (p. ej. ocultar el formulario y mostrar la lista). */
+  onBuscar?: () => void;
+  /** Al pulsar Nuevo: muestra el formulario (luego se enfoca) o abre el modal de registro. */
   onNuevo?: () => void;
   /** Órdenes: solo con cotización seleccionada. */
   onVerCoti?: () => void;
@@ -79,8 +82,28 @@ export default function QuickActions({
   className?: string;
 }) {
   const ir = useIr();
-  const buscar = (label: string, id: string): Accion => ({ icono: <Search size={14} />, label, run: () => irABuscador(id) });
-  const nuevo = (label: string, form?: string): Accion => ({ icono: <Plus size={14} />, label, run: !puedeCrear ? undefined : onNuevo ?? (form ? () => irAFormulario(form) : undefined) });
+  // Tras mostrar la lista o el formulario se espera al render para hacer scroll y foco
+  const luego = (fn: () => void) => requestAnimationFrame(() => requestAnimationFrame(fn));
+  const buscar = (label: string, id: string): Accion => ({
+    icono: <Search size={14} />,
+    label,
+    run: () => {
+      onBuscar?.();
+      luego(() => irABuscador(id));
+    },
+  });
+  const nuevo = (label: string, form?: string): Accion => ({
+    icono: <Plus size={14} />,
+    label,
+    run: !puedeCrear
+      ? undefined
+      : form
+        ? () => {
+            onNuevo?.();
+            luego(() => irAFormulario(form));
+          }
+        : onNuevo,
+  });
   const salto = (label: string, destino: string, icono: ReactNode = <ArrowRight size={14} />): Accion => ({ icono, label, run: onIr && (() => onIr(destino)) });
   const pdf: Accion = { icono: <FileText size={14} />, label: "PDF", run: onPdf };
 
