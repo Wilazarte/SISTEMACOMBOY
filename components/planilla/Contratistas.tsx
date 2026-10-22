@@ -23,11 +23,30 @@ import {
 } from "@/lib/contratistas";
 import { SEDES } from "@/lib/empresa";
 import { pdfContratoConcesion } from "@/lib/pdf";
+import { BotonImprimir } from "@/components/planilla/ContratistasMaestro";
+import { PrintServicioModal, type ReciboServicio } from "@/components/planilla/PrintServicioModal";
 import { KEYS, fechaPE, hoy, r2, rucValido, soles, useStore } from "@/lib/storage";
 import type { ComprobanteContratista, ConcesionContratista, PagoContratista, TipoServicioContratista } from "@/lib/types";
 
 const OPC_TIPO = (Object.keys(TIPOS_SERVICIO) as TipoServicioContratista[]).map((k) => ({ value: k, label: TIPOS_SERVICIO[k] }));
 const OPC_SEDE = SEDES.map((s) => ({ value: s, label: s }));
+
+const reciboDe = (c: ConcesionContratista): ReciboServicio => ({
+  tipo: "CONCESION",
+  numero: c.codigo ? `REC-${c.codigo}` : `REC-CON-${c.id.slice(0, 8).toUpperCase()}`,
+  servicio: TIPOS_SERVICIO[c.tipoServicio] ?? c.tipoServicio,
+  descripcion: c.descripcion,
+  contratista: c.representante || c.razonSocial,
+  documento: c.ruc ? `${c.ruc.length === 11 ? "RUC" : "DNI"} ${c.ruc}` : "",
+  empresa: c.razonSocial,
+  sede: c.sede,
+  inicio: c.fecha_inicio,
+  fin: c.fecha_fin,
+  monto: c.monto_total,
+  // Modalidad: medios con los que se pagó (adelanto + pagos)
+  modalidad: Array.from(new Set([...(c.adelanto ? ["Adelanto"] : []), ...(c.pagos ?? []).map((p) => p.medio)])).join(" · "),
+  estado: c.estado,
+});
 
 /** Planilla › Contratistas / concesiones: servicios externos dados a terceros. */
 export function Contratistas({ soloLectura }: { soloLectura: boolean }) {
@@ -36,6 +55,7 @@ export function Contratistas({ soloLectura }: { soloLectura: boolean }) {
   const [filtroSede, setFiltroSede] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("ACTIVO");
   const [form, setForm] = useState<ConcesionContratista | null>(null);
+  const [recibo, setRecibo] = useState<ReciboServicio | null>(null);
   const [detalle, setDetalle] = useState<string | null>(null); // id de la concesión con pagos / comprobantes abiertos
 
   const visibles = useMemo(
@@ -120,6 +140,7 @@ export function Contratistas({ soloLectura }: { soloLectura: boolean }) {
                 </Td>
                 <Td>
                   <div className="flex flex-wrap gap-1">
+                    <BotonImprimir onClick={() => setRecibo(reciboDe(c))} />
                     <Button size="sm" variant="secondary" onClick={() => setDetalle(c.id)} title="Pagos y comprobantes">
                       <Wallet size={14} /> Pagos
                     </Button>
@@ -139,6 +160,7 @@ export function Contratistas({ soloLectura }: { soloLectura: boolean }) {
         )}
       </Card>
 
+      {recibo && <PrintServicioModal recibo={recibo} onClose={() => setRecibo(null)} />}
       {form && <FormConcesion form={form} onChange={setForm} onClose={() => setForm(null)} />}
       {sel && <PagosConcesion c={sel} soloLectura={soloLectura} onClose={() => setDetalle(null)} />}
     </div>
