@@ -11,6 +11,7 @@ import { UNIDADES } from "@/lib/empresa";
 import { KEYS, fechaPE, r2, recargarDatos, useStore } from "@/lib/storage";
 import {
   UMBRAL_SUGERENCIA,
+  aprobarSolicitud,
   crearProducto,
   editarProducto,
   esAdminProductos,
@@ -271,7 +272,6 @@ function ModalEditar({ producto, onClose }: { producto: ProductoMaestro; onClose
 
 // ---------------------------------------------------------------------
 function Solicitudes({ solicitudes, productos, admin }: { solicitudes: SolicitudProducto[]; productos: ProductoMaestro[]; admin: boolean }) {
-  const [aprobar, setAprobar] = useState<SolicitudProducto | null>(null);
   const parecidos = (s: SolicitudProducto) =>
     productos
       .map((p) => ({ p, sim: similitud(s.nombre, p.nombre_normalizado) }))
@@ -280,13 +280,6 @@ function Solicitudes({ solicitudes, productos, admin }: { solicitudes: Solicitud
       .slice(0, 2);
   return (
     <div className="space-y-4">
-      {aprobar && (
-        <FormProducto
-          inicial={{ nombre: aprobar.nombre, unidad: aprobar.unidad, marca: aprobar.marca ?? "", categoria: aprobar.categoria ?? "" }}
-          solicitudId={aprobar.id}
-          onListo={() => setAprobar(null)}
-        />
-      )}
       <Card>
         <CardHeader title="Solicitudes de producto nuevo" subtitle={admin ? "Apruebe (crea el producto), asígnelo a uno parecido o recháce la solicitud" : "Sus solicitudes y la respuesta del administrador"} />
         <Table head={["Fecha", "Producto pedido", "Unidad", "Pedido por", "Parecidos en catálogo", "Estado", ...(admin ? ["Acciones"] : [])]} empty={solicitudes.length === 0}>
@@ -322,7 +315,7 @@ function Solicitudes({ solicitudes, productos, admin }: { solicitudes: Solicitud
                   <Td>
                     {s.estado === "pendiente" && (
                       <div className="flex gap-1">
-                        <Button size="sm" onClick={() => setAprobar(s)}>
+                        <Button size="sm" onClick={() => void ejecutarAsync(() => aprobarSolicitud(s.id), `${s.nombre} aprobado: ya está en el catálogo`)}>
                           <Check size={14} /> Aprobar
                         </Button>
                         <Button
