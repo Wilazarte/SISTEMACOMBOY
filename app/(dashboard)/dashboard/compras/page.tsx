@@ -128,9 +128,6 @@ function CerrarForm({ onClick }: { onClick: () => void }) {
 const BTN_REQ =
   "inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-medium text-white transition duration-150 hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100";
 
-/** Barra izquierda de requerimientos abierta o cerrada (por navegador). */
-const CLAVE_BARRA = "tesoreria-barra-requerimientos";
-
 /** Última pestaña abierta de Tesorería / Compras (por navegador). */
 const CLAVE_TAB = "tesoreria-tab-activa";
 
@@ -151,23 +148,6 @@ export default function ComprasPage() {
   const veCompras = puedeVer(sesion, "/dashboard/compras");
   const vePlanilla = puedeVer(sesion, "/dashboard/planilla");
   const [tab, setTab] = useState<Tab>(!veCompras ? "planilla" : puede(rol, "compra.crear") ? "registrar" : "antecedentes");
-  // Barra izquierda: abierta por defecto en escritorio, cerrada en celular; se recuerda la última elección
-  const [barra, setBarra] = useState(false);
-  useEffect(() => {
-    try {
-      const g = window.localStorage.getItem(CLAVE_BARRA);
-      setBarra(g ? g === "1" : window.matchMedia("(min-width: 1024px)").matches);
-    } catch {
-      setBarra(window.matchMedia("(min-width: 1024px)").matches);
-    }
-  }, []);
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(CLAVE_BARRA, barra ? "1" : "0");
-    } catch {
-      /* almacenamiento bloqueado */
-    }
-  }, [barra]);
   // Contador de la pestaña Planilla (solo se descarga si el usuario ve planilla)
   const trabajadores = useStore<Trabajador[]>(KEYS.TRABAJADORES, [], vePlanilla);
   const activos = trabajadores.filter((t) => t.activo && !esContratista(t)).length;
@@ -176,7 +156,8 @@ export default function ComprasPage() {
   useEffect(() => {
     try {
       const guardada = window.localStorage.getItem(CLAVE_TAB) as Tab | null;
-      if (!new URLSearchParams(window.location.search).get("tab") && guardada && tabsPermitidas.includes(guardada)) setTab(guardada);
+      // Planilla tiene su propio botón en el dock: "Tesorería / Compras" nunca reabre en Planilla
+      if (!new URLSearchParams(window.location.search).get("tab") && guardada && guardada !== "planilla" && tabsPermitidas.includes(guardada)) setTab(guardada);
     } catch {
       /* almacenamiento bloqueado */
     }
@@ -184,7 +165,7 @@ export default function ComprasPage() {
   }, []);
   useEffect(() => {
     try {
-      window.localStorage.setItem(CLAVE_TAB, tab);
+      if (tab !== "planilla") window.localStorage.setItem(CLAVE_TAB, tab);
     } catch {
       /* almacenamiento bloqueado */
     }
@@ -206,37 +187,48 @@ export default function ComprasPage() {
   // Los gastos de Tesorería no llevan guía ni V°B° (no ingresan a almacén)
   const facturasSinGuia = facturas.filter((f) => f.tipo === "FACTURA" && !f.esGastoTesoreria && (!guias.some((g) => g.facturaId === f.id) || guias.some((g) => g.facturaId === f.id && g.estado === "OBSERVADA")));
 
+  const enPlanilla = tab === "planilla";
+
   return (
-    // Con la barra de requerimientos abierta, en escritorio el contenido se corre a la derecha
-    <div className={cn("w-full space-y-6 transition-[margin] duration-300", veCompras && barra && "lg:ml-[320px] lg:w-[calc(100%-320px)]")}>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-serif tracking-tight text-2xl font-semibold leading-tight text-fg lg:text-[28px]">Tesorería / Compras</h1>
-          <p className="mt-1 text-[13px] text-plomo-600">Requerimiento → Cotización → Orden de Compra → Bancarización → Factura</p>
+    // Requerimientos por revisar: sección de la barra derecha de notificaciones (layout)
+    <div className="w-full space-y-6">
+      {/* Planilla (botón propio del dock) muestra solo su título, isla y contenido */}
+      {!enPlanilla && (
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="font-serif tracking-tight text-2xl font-bold leading-tight text-fg lg:text-[28px]">Tesorería / Compras</h1>
+          </div>
+          {!puede(rol, "req.revisar") && (
+            <span className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-plomo-600">Modo lectura para su rol</span>
+          )}
         </div>
-        {!puede(rol, "req.revisar") && (
-          <span className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-plomo-600">Modo lectura para su rol</span>
-        )}
-      </div>
+      )}
 
-      {veCompras && <Notificaciones pendientes={pendientes} rol={rol} abierto={barra} onToggle={() => setBarra((b) => !b)} />}
+      {veCompras && <Notificaciones pendientes={pendientes} rol={rol} />}
 
+      {/* Isla de Tesorería sin Planilla: Planilla abre desde su botón del dock y dibuja su propia isla */}
       <Tabs<Tab>
         value={tab}
         onChange={(t) => ir(t)}
+        fueraDeIsla={["planilla"]}
         tabs={[
+          // Isla: Registrar gasto · Cotizaciones · Órdenes compra · Facturas · Declaraciones · Antecedentes
           ...(veCompras
             ? [
-                { id: "registrar" as const, label: "Registrar gasto / compra", icon: <PackagePlus size={16} /> },
-                { id: "antecedentes" as const, label: "Antecedentes", icon: <History size={16} /> },
+                { id: "registrar" as const, label: "Registrar gasto", icon: <PackagePlus size={16} /> },
                 { id: "cotizaciones" as const, label: "Cotizaciones", icon: <FileSpreadsheet size={16} />, count: cotizables.filter((r) => r.estado === "ACEPTADO").length },
-                { id: "ordenes" as const, label: "Órdenes de compra", icon: <ShoppingBag size={16} />, count: cotisSinOC.length },
+                { id: "ordenes" as const, label: "Órdenes compra", icon: <ShoppingBag size={16} />, count: cotisSinOC.length },
                 { id: "facturas" as const, label: "Facturas", icon: <Receipt size={16} />, count: ocsSinFactura.length },
                 // Guías de remisión: ya no son parte del flujo (pestaña oculta; las guías cargadas siguen guardadas)
               ]
             : []),
           ...(vePlanilla ? [{ id: "planilla" as const, label: "Planilla", icon: <Users size={16} />, count: activos }] : []),
-          ...(veCompras ? [{ id: "declaraciones" as const, label: "Declaraciones juradas", icon: <FileText size={16} />, count: facturas.filter(esDeclaracionJurada).length }] : []),
+          ...(veCompras
+            ? [
+                { id: "declaraciones" as const, label: "Declaraciones", icon: <FileText size={16} />, count: facturas.filter(esDeclaracionJurada).length },
+                { id: "antecedentes" as const, label: "Antecedentes", icon: <History size={16} /> },
+              ]
+            : []),
         ]}
       />
 
@@ -263,7 +255,9 @@ export default function ComprasPage() {
 // =====================================================================
 // NOTIFICACIONES (cards amarillas)
 // =====================================================================
-function Notificaciones({ pendientes, rol, abierto, onToggle }: { pendientes: Requerimiento[]; rol: Rol; abierto: boolean; onToggle: () => void }) {
+function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requerimiento[]; rol: Rol }) {
+  // Cada REQ una sola vez (por número), aunque llegue repetido de la caché
+  const pendientes = todosPendientes.filter((r, i, arr) => i === arr.findIndex((x) => x.id === r.id || (!!x.numero && x.numero === r.numero)));
   const [rechazo, setRechazo] = useState<Requerimiento | null>(null);
   const [obs, setObs] = useState<Requerimiento | null>(null);
   const [motivo, setMotivo] = useState("");
@@ -289,7 +283,7 @@ function Notificaciones({ pendientes, rol, abierto, onToggle }: { pendientes: Re
 
   if (pendientes.length === 0)
     return (
-      <TesoreriaLeftDrawer open={abierto} onToggle={onToggle} cantidad={0}>
+      <TesoreriaLeftDrawer cantidad={0}>
         <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-300">
           <Check size={16} /> No hay requerimientos pendientes de revisión.
         </div>
@@ -299,8 +293,6 @@ function Notificaciones({ pendientes, rol, abierto, onToggle }: { pendientes: Re
   return (
     <>
       <TesoreriaLeftDrawer
-        open={abierto}
-        onToggle={onToggle}
         cantidad={pendientes.length}
         acciones={
           habilitado && (

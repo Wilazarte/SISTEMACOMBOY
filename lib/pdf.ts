@@ -33,14 +33,14 @@ const M = 14; // margen lateral (mm)
 /** Alto del footer negro (mm). El contenido nunca baja de aquí. */
 const ALTO_PIE = 19;
 
-// ------------------------------------------------------------- Logo (public/logo-comboy.png)
+// ------------------------------------------------------------- Logo (public/comboy-logo.png)
 let logo: { data: string; w: number; h: number } | null = null;
 
 /** Precarga el logo como dataURL (jsPDF dibuja síncrono; el PDF se abre en el mismo clic). */
 export async function cargarLogo(): Promise<void> {
   if (logo || typeof window === "undefined") return;
   try {
-    const blob = await (await fetch("/logo-comboy.png")).blob();
+    const blob = await (await fetch("/comboy-logo.png")).blob();
     const data = await new Promise<string>((ok, mal) => {
       const r = new FileReader();
       r.onload = () => ok(String(r.result));

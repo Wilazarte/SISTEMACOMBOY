@@ -11,7 +11,7 @@ const CORTE = "[clip-path:polygon(8px_0,calc(100%-8px)_0,100%_8px,100%_calc(100%
 /** Selección de módulo antes del login: todo centrado, dock de 5 módulos sobre el globo rojo. */
 export default function SeleccionarModulo() {
   const router = useRouter();
-  const [logo, setLogo] = useState("/logo-comboy.png");
+  const [logo, setLogo] = useState("/comboy-logo.png");
   // Módulo con brillo: el que se señala, o el último elegido
   const [activo, setActivo] = useState<string | null>(null);
   const [ultimo, setUltimo] = useState<string | null>(null);

@@ -205,8 +205,8 @@ function KardexModal({ item, onClose }: { item: StockItem; onClose: () => void }
                 <td className="px-2.5 py-1.5">
                   <span className={cn("inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset", color[m.tipo_movimiento])}>{ETIQUETA_KARDEX[m.tipo_movimiento]}</span>
                 </td>
-                <td className="break-all px-2.5 py-1.5 font-mono">{m.documento}</td>
-                <td className={cn("px-2.5 py-1.5", m.tipo_movimiento === "SALIDA-PRODUCCION" ? (m.chasis ? "font-mono font-semibold text-fg" : "text-[10px] font-semibold text-amber-700") : "font-mono")}>
+                <td className="break-all px-2.5 py-1.5">{m.documento}</td>
+                <td className={cn("px-2.5 py-1.5", m.tipo_movimiento === "SALIDA-PRODUCCION" ? (m.chasis ? "font-semibold text-fg" : "text-[10px] font-semibold text-amber-700") : "")}>
                   {m.tipo_movimiento === "SALIDA-PRODUCCION" ? textoChasis(m.chasis) : m.chasis || "-"}
                 </td>
                 <td className={cn("px-2.5 py-1.5 text-right font-semibold", m.cantidad < 0 ? "text-red-600" : "text-emerald-700")}>
@@ -283,7 +283,7 @@ function RetiroProduccionModal({ item, onClose }: { item: StockItem; onClose: ()
             {excede && <span className="mt-1 block text-xs font-semibold text-red-600">Stock insuficiente: hay {num(item.cantidad)}.</span>}
           </Field>
           <Field label={requiereChasis(motivo) ? "Chasis / OT *" : "Chasis / OT (opcional)"}>
-            <Input value={chasis} list="chasis-ot" onChange={(e) => setChasis(e.target.value.toUpperCase())} placeholder="Ej: PLUS-2026-008" className="font-mono" />
+            <Input value={chasis} list="chasis-ot" onChange={(e) => setChasis(e.target.value.toUpperCase())} placeholder="Ej: PLUS-2026-008" />
             <datalist id="chasis-ot">
               {opciones.map((o) => (
                 <option key={o.valor + o.etiqueta} value={o.valor}>

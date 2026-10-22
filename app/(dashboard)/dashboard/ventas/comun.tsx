@@ -110,7 +110,7 @@ export function LineasEditor({ items, onChange, stock }: { items: LineaVenta[]; 
                     <Input type="number" min={0} step="any" value={l[c] || ""} onChange={(e) => set(l.id, { [c]: parseFloat(e.target.value) || 0 })} className="text-right" aria-label={c} />
                   </td>
                 ))}
-                <td className="px-2 py-1.5 text-right font-mono text-plomo-600">{l.m2 > 0 ? l.m2.toFixed(2) : "-"}</td>
+                <td className="px-2 py-1.5 text-right text-plomo-600">{l.m2 > 0 ? l.m2.toFixed(2) : "-"}</td>
                 <td className="px-2 py-1.5">
                   <Input type="number" min={0} step="0.01" value={l.precio || ""} onChange={(e) => set(l.id, { precio: parseFloat(e.target.value) || 0 })} className="text-right" title={l.m2 > 0 ? "Precio por m²" : "Precio por unidad"} aria-label="precio" />
                 </td>

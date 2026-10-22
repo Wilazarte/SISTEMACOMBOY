@@ -236,6 +236,7 @@ export default function PlanillaTab() {
   const soloLectura = !!sesion?.soloLectura; // Gerencia: ver sin editar
   const puedeEditar = !soloLectura && ["creador", "planilla", "tesoreria", "admin"].includes(sesion?.rol ?? "");
   const [tab, setTab] = useState<Tab>("trabajadores");
+
   const historial = useHistorialPlanilla();
   const adelantos = useAdelantosPendientes();
 
@@ -522,13 +523,15 @@ export default function PlanillaTab() {
 
       <Tabs<Tab>
         enLinea
+        // Isla superior propia de Planilla (Tesorería no dibuja la suya mientras Planilla está abierta)
+        enBarra
         value={tab}
         onChange={setTab}
         tabs={[
+          { id: "planilla", label: "Planilla periodo", icon: <Calculator size={16} /> },
+          { id: "contratistas", label: "Contratistas", icon: <Building2 size={16} />, count: nContratistas },
           { id: "trabajadores", label: "Trabajadores", icon: <Users size={16} />, count: incompletos.length },
-          { id: "planilla", label: "Planilla del periodo", icon: <Calculator size={16} /> },
           { id: "historial", label: "Historial", icon: <Archive size={16} /> },
-          { id: "contratistas", label: "Contratistas / Concesiones", icon: <Building2 size={16} /> },
         ]}
       />
 
@@ -563,7 +566,7 @@ export default function PlanillaTab() {
                   contraparte: t.nombre,
                   ref: (
                     <>
-                      <span className="font-mono font-semibold text-fg">N° {t.id}</span>
+                      <span className="font-semibold text-fg">N° {t.id}</span>
                       <span className="ml-1.5 text-xs text-plomo-500">{t.cargo}</span>
                       <span className="ml-2 inline-block align-middle"><Badge estado={t.activo ? "ACTIVO" : "INACTIVO"} /></span>
                     </>
@@ -908,7 +911,7 @@ export default function PlanillaTab() {
                     </Td>
                     <Td className="min-w-[170px] max-w-[230px] whitespace-normal">
                       <p className="font-semibold text-fg">
-                        <span className="mr-1 font-mono text-xs text-slate-400">{t.id}</span>
+                        <span className="mr-1 text-xs text-slate-400">{t.id}</span>
                         {t.nombre}
                         {pagado(t) && !periodoCerrado && <span className="ml-2 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">PAGADO</span>}
                       </p>

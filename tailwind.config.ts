@@ -55,9 +55,10 @@ const config: Config = {
       },
       transitionTimingFunction: { suave: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
       fontFamily: {
-        serif: ["var(--font-serif)"],
-        sans: ["var(--font-sans)"],
-        mono: ["var(--font-mono)"],
+        // Times New Roman en todo el sistema (ver app/globals.css)
+        sans: ['"Times New Roman"', "Times", "serif"],
+        serif: ['"Times New Roman"', "Times", "serif"],
+        mono: ['"Times New Roman"', "Times", "serif"],
       },
     },
   },

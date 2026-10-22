@@ -130,7 +130,7 @@ export function ResultadoImportacion({
               <tbody>
                 {detalle.map((d) => (
                   <tr key={d.huella} data-detalle={d.huella} className={cn("border-t border-plomo-100", !d.destino && "bg-red-50")}>
-                    <td className="px-3 py-1.5 font-mono">{d.huella}</td>
+                    <td className="px-3 py-1.5">{d.huella}</td>
                     <td className="px-3 py-1.5">{d.nombre}</td>
                     <td className={cn("px-3 py-1.5 text-right font-semibold", d.dias > 7 && "text-orange-600")} title={d.dias > 7 ? "Más de 7 días: el Excel trae más de una semana" : undefined}>
                       {d.dias}

@@ -153,7 +153,7 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
               <span className="font-semibold text-fg">{n.numero}</span>
               {(() => {
                 const od = odDeNP(n, ods) ?? (n.odId ? ods.find((o) => o.id === n.odId) : undefined);
-                return od ? <span className="ml-1.5 font-mono text-xs text-plomo-500">{codigoDesdeNumero("OD", od.numero, od.fecha)}</span> : null;
+                return od ? <span className="ml-1.5 text-xs text-plomo-500">{codigoDesdeNumero("OD", od.numero, od.fecha)}</span> : null;
               })()}
               <span className="ml-2 inline-block align-middle"><Badge estado={n.estado} /></span>
             </>

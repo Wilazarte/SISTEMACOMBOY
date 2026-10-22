@@ -106,15 +106,15 @@ export function EquiposTerminados({ puedeRegistrar, nuevo, onNuevoCerrado }: { p
         <Table head={["Código", "Sede", "Modelo", "Chasis / VIN", "Marca motor", "Serie motor", "Origen", "QC", "Estado", "Actualizado"]}>
           {lista.map((e) => (
             <tr key={e.id} className="cursor-pointer hover:bg-plomo-50" onClick={() => setVer(e.id)} title="Ver detalle y QR">
-              <Td className="font-mono text-xs font-semibold text-fg">{e.id}</Td>
+              <Td className="text-xs font-semibold text-fg">{e.id}</Td>
               <Td>{sedeEquipo(e)}</Td>
               <Td>
                 <p className="font-semibold text-fg">{e.modelo}</p>
                 <p className="text-xs text-plomo-500">{e.tipo_equipo}</p>
               </Td>
-              <Td className="font-mono text-xs">{e.codigo_chasis}</Td>
+              <Td className="text-xs">{e.codigo_chasis}</Td>
               <Td>{e.marca_motor}</Td>
-              <Td className="font-mono text-xs">{e.serie_motor}</Td>
+              <Td className="text-xs">{e.serie_motor}</Td>
               <Td>
                 {e.origen === "PRODUCCION" ? (
                   <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-800 ring-1 ring-inset ring-emerald-200" title={e.op_id}>
@@ -204,10 +204,10 @@ function FormEquipo({ inicial, id, onClose }: { inicial: DatosEquipo; id?: strin
             <Select value={d.marca_motor} onChange={(e) => set("marca_motor", e.target.value as MarcaMotor)} placeholder="Selecciona marca" options={MARCAS_MOTOR.map((x) => ({ value: x, label: x }))} />
           </Field>
           <Field label="Serie de motor * (única)">
-            <Input value={d.serie_motor} onChange={(e) => set("serie_motor", e.target.value.toUpperCase())} placeholder="Ej: 8X123456" className="font-mono" />
+            <Input value={d.serie_motor} onChange={(e) => set("serie_motor", e.target.value.toUpperCase())} placeholder="Ej: 8X123456" />
           </Field>
           <Field label="Código de chasis / VIN * (único)" className="md:col-span-2">
-            <Input value={d.codigo_chasis} onChange={(e) => set("codigo_chasis", e.target.value.toUpperCase())} placeholder="Ej: COMBOY-CV-D500-2026-001" className="font-mono" />
+            <Input value={d.codigo_chasis} onChange={(e) => set("codigo_chasis", e.target.value.toUpperCase())} placeholder="Ej: COMBOY-CV-D500-2026-001" />
           </Field>
           <Field label="Color *">
             <Input value={d.color} onChange={(e) => set("color", e.target.value)} placeholder="Ej: Amarillo Minero" />
@@ -376,7 +376,7 @@ function DetalleEquipo({
           <div className="my-2 h-1 w-full bg-corp" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           {qr && <img src={qr} alt={`QR del chasis ${e.codigo_chasis}`} className="h-52 w-52" />}
-          <p className="mt-2 break-all font-mono text-sm font-bold text-fg">{e.codigo_chasis}</p>
+          <p className="mt-2 break-all text-sm font-bold text-fg">{e.codigo_chasis}</p>
           <p className="text-xs text-plomo-500">QR del código de chasis</p>
           <Button className="mt-3 w-full" onClick={imprimir} disabled={!qr}>
             <Printer size={16} /> Imprimir QR

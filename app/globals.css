@@ -1,8 +1,15 @@
-@import url("https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap");
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Fuente única del ERP: Times New Roman en todos los módulos, tablas, botones y modales */
+* {
+  font-family: "Times New Roman", Times, serif !important;
+}
+
+html, body, button, input, select, textarea, table, th, td, div, span, p, h1, h2, h3, h4, h5, h6, a, label {
+  font-family: "Times New Roman", Times, serif !important;
+}
 
 /* ===================== Sistema de diseño COMBOY VID v2 =====================
    Rojo COMBOY (#E30613) como primario + grises grafito. Cada color es un canal
@@ -51,9 +58,9 @@
   --slate-600: 82 82 91; --slate-700: 63 63 70; --slate-900: 24 24 27;
   --blue-50: 239 246 255; --blue-200: 191 219 254; --blue-600: 37 99 235; --blue-800: 30 64 175;
 
-  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --font-serif: var(--font-sans); /* los títulos usan la misma familia (antes Libre Baskerville) */
-  --font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --font-sans: "Times New Roman", Times, serif;
+  --font-serif: var(--font-sans); /* títulos y datos: Times New Roman en todo el ERP */
+  --font-mono: var(--font-sans); /* también los códigos (REQ, OC, N°) */
 }
 
 .dark {
@@ -130,7 +137,7 @@
   --sb-activo-texto: 184 0 0;
 }
 
-html { font-family: var(--font-sans); font-feature-settings: "cv11", "ss01"; }
+html { font-family: var(--font-sans); }
 body { @apply bg-canvas text-fg antialiased; font-family: var(--font-sans); }
 h1, h2, h3 { letter-spacing: -0.02em; }
 ::selection { background: rgb(var(--corp) / 0.18); }
@@ -151,7 +158,7 @@ table, .tabular { font-variant-numeric: tabular-nums; }
 
 /* Campo de solo lectura (DÍAS / TARD. de Planilla del periodo): no se puede clickear ni editar */
 .readonly-field {
-  @apply inline-flex cursor-not-allowed select-none items-center gap-1 rounded-md bg-plomo-100 px-2 py-0.5 font-mono text-sm font-semibold text-plomo-600;
+  @apply inline-flex cursor-not-allowed select-none items-center gap-1 rounded-md bg-plomo-100 px-2 py-0.5 text-sm font-semibold text-plomo-600;
 }
 
 /* Tooltip simple: <span data-tip="Texto" class="tip">…</span> */
@@ -164,5 +171,5 @@ table, .tabular { font-variant-numeric: tabular-nums; }
   .dark .tip::after { @apply bg-fg text-canvas; }
   .tip:hover::after, .tip:focus-visible::after { @apply translate-y-0 opacity-100; }
   .tip-arriba::after { @apply bottom-[calc(100%+8px)] top-auto; }
-  .kbd { @apply inline-flex h-5 min-w-[20px] items-center justify-center rounded-[5px] border border-plomo-200 bg-plomo-50 px-1 font-mono text-[11px] font-medium text-plomo-500; }
+  .kbd { @apply inline-flex h-5 min-w-[20px] items-center justify-center rounded-[5px] border border-plomo-200 bg-plomo-50 px-1 text-[11px] font-medium text-plomo-500; }
 }
