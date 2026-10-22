@@ -45,8 +45,8 @@ export function Button({
 export const Kbd = ({ children, className }: { children: ReactNode; className?: string }) => <kbd className={cn("kbd", className)}>{children}</kbd>;
 
 // ---------------------------------------------------------------- Card
-export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("rounded-xl border border-plomo-200 bg-surface/80 shadow-card backdrop-blur-xl", className)}>{children}</div>;
+export function Card({ children, className, id }: { children: ReactNode; className?: string; id?: string }) {
+  return <div id={id} className={cn("rounded-xl border border-plomo-200 bg-surface/80 shadow-card backdrop-blur-xl", className)}>{children}</div>;
 }
 
 export function CardHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {

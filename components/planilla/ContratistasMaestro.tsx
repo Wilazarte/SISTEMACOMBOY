@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Briefcase, FileText, Pencil, Plus, Power, Trash2, UserCheck } from "lucide-react";
-import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, cn, ejecutar } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, cn, ejecutar, toast } from "@/components/ui";
+import QuickActions, { QA_IDS } from "@/components/tesoreria/QuickActions";
 import { SEDES } from "@/lib/empresa";
 import { descargarRecibo, estadoContratista } from "@/components/planilla/generateReciboPDF";
 import {
@@ -54,22 +55,35 @@ const estadoDe = estadoContratista;
 export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadores: Trabajador[]; soloLectura: boolean }) {
   const [form, setForm] = useState<{ datos: DatosContratista; idOriginal?: string } | null>(null);
   const [verInactivos, setVerInactivos] = useState(false);
+  const [buscar, setBuscar] = useState("");
   const todos = useMemo(() => trabajadores.filter(esContratista), [trabajadores]);
   const lista = todos
     .filter((t) => verInactivos || t.activo)
+    .filter((t) => !buscar || `${t.id} ${t.nombre} ${t.dni ?? ""} ${t.ruc ?? ""} ${t.empresa ?? ""}`.toLowerCase().includes(buscar.toLowerCase()))
     .sort((a, b) => Number(b.activo) - Number(a.activo) || a.nombre.localeCompare(b.nombre));
   const activos = todos.filter((t) => t.activo);
 
   const guardar = () =>
     form && ejecutar(() => guardarContratista(form.datos, form.idOriginal), form.idOriginal ? "Contratista actualizado" : "Contratista registrado") && setForm(null);
 
+  // Acción rápida PDF: recibo de cada contratista activo de la lista (filtrada por el buscador)
+  const descargarRecibos = async () => {
+    const sel = lista.filter((t) => t.activo);
+    if (!sel.length) return toast("No hay contratistas activos en la lista", "error");
+    if (sel.length > 1 && !confirm(`¿Descargar ${sel.length} recibos PDF (uno por contratista)?`)) return;
+    for (const t of sel) await descargarRecibo(t, "CONTRATISTA");
+  };
+
   return (
-    <Card>
+    <div>
+    <QuickActions tab="planilla-contratistas" onNuevo={() => setForm({ datos: vacio() })} puedeCrear={!soloLectura} onPdf={descargarRecibos} />
+    <Card id={QA_IDS.listaContratistas}>
       <CardHeader
         title="Contratistas"
         subtitle={`${activos.length} activo(s) · contratado ${soles(r2(activos.reduce((s, t) => s + t.sueldo, 0)))} · no entran a la planilla del periodo`}
         action={
           <div className="flex flex-wrap items-center gap-2">
+            <Input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar nombre, DNI, RUC…" className="w-52" aria-label="Buscar" />
             <label className="flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg border border-plomo-200 bg-surface px-3 py-2 text-sm font-medium text-slate-700">
               <input type="checkbox" checked={verInactivos} onChange={(e) => setVerInactivos(e.target.checked)} className="h-4 w-4 accent-red-600" /> Mostrar inactivos
             </label>
@@ -83,7 +97,7 @@ export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadore
       />
       {lista.length === 0 ? (
         <div className="p-5">
-          <Empty icon={<Briefcase size={28} />} text={todos.length ? "No hay contratistas activos." : "Aún no hay contratistas. Use “Registrar contratista” o ponga cargo “Contratista” en la ficha de un trabajador."} />
+          <Empty icon={<Briefcase size={28} />} text={buscar ? "Ningún contratista coincide." : todos.length ? "No hay contratistas activos." : "Aún no hay contratistas. Use “Registrar contratista” o ponga cargo “Contratista” en la ficha de un trabajador."} />
         </div>
       ) : (
         <Table compacto head={["N°", "Nombre del contratista", "Empresa / Servicio", "Sede", "Monto contratado", "Inicio / Fin", "Estado", "Acciones"]}>
@@ -160,6 +174,7 @@ export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadore
 
       {form && <FormContratista datos={form.datos} editando={!!form.idOriginal} onChange={(datos) => setForm({ ...form, datos })} onCancel={() => setForm(null)} onSave={guardar} />}
     </Card>
+    </div>
   );
 }
 

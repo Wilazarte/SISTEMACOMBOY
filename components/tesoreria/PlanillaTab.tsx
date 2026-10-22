@@ -46,6 +46,7 @@ import { periodoDeFecha } from "@/lib/periodo";
 import { emparejar, sinHuellas, type DetalleHuella, type NoEncontrado } from "@/lib/emparejarReloj";
 import { ResultadoImportacion } from "@/components/planilla/ResultadoImportacion";
 import { Contratistas } from "@/components/planilla/Contratistas";
+import QuickActions, { QA_IDS } from "@/components/tesoreria/QuickActions";
 import { ContratistasMaestro } from "@/components/planilla/ContratistasMaestro";
 import { FichaTrabajador } from "@/components/planilla/FichaTrabajador";
 import { HistorialPlanilla } from "@/components/planilla/HistorialPlanilla";
@@ -538,7 +539,9 @@ export default function PlanillaTab() {
 
       {/* ================= TRABAJADORES ================= */}
       {tab === "trabajadores" && (
-        <Card>
+        <div>
+        <QuickActions tab="planilla-trabajadores" onIr={(t) => setTab(t as Tab)} onNuevo={() => setFicha({ form: trabajadorVacio() })} puedeCrear={puedeEditar} />
+        <Card id={QA_IDS.listaTrabajadores}>
           <CardHeader
             title="Maestro de trabajadores"
             subtitle={`${trabajadores.filter((t) => t.activo).length} activo(s) · ${trabajadores.filter((t) => !t.activo).length} inactivo(s)${nContratistas ? ` · ${nContratistas} contratista(s) en la pestaña Contratistas / Concesiones` : ""}`}
@@ -604,6 +607,7 @@ export default function PlanillaTab() {
             />
           )}
         </Card>
+        </div>
       )}
 
       {/* ================= PLANILLA DEL PERIODO ================= */}

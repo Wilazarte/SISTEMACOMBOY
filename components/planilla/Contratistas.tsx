@@ -4,7 +4,7 @@ import { SelectorCaja } from "@/components/SelectorCaja";
 import { CAJA_POR_DEFECTO } from "@/lib/cajas";
 import { useMemo, useState } from "react";
 import { Ban, Building2, CheckCircle2, FileDown, FilePlus2, HandCoins, Pencil, Plus, Receipt, Trash2, Wallet } from "lucide-react";
-import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, Textarea, cn, ejecutar } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, Textarea, cn, ejecutar, toast } from "@/components/ui";
 import {
   MEDIOS_PAGO_CONTRATISTA,
   TIPOS_COMPROBANTE,
@@ -25,6 +25,7 @@ import { SEDES } from "@/lib/empresa";
 import { pdfContratoConcesion } from "@/lib/pdf";
 import { BotonPDF } from "@/components/planilla/ContratistasMaestro";
 import { descargarRecibo } from "@/components/planilla/generateReciboPDF";
+import QuickActions, { QA_IDS } from "@/components/tesoreria/QuickActions";
 import { KEYS, fechaPE, hoy, r2, rucValido, soles, useStore } from "@/lib/storage";
 import type { ComprobanteContratista, ConcesionContratista, PagoContratista, TipoServicioContratista } from "@/lib/types";
 
@@ -37,13 +38,28 @@ export function Contratistas({ soloLectura }: { soloLectura: boolean }) {
   const [filtroTipo, setFiltroTipo] = useState("");
   const [filtroSede, setFiltroSede] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("ACTIVO");
+  const [buscar, setBuscar] = useState("");
   const [form, setForm] = useState<ConcesionContratista | null>(null);
   const [detalle, setDetalle] = useState<string | null>(null); // id de la concesión con pagos / comprobantes abiertos
 
   const visibles = useMemo(
-    () => lista.filter((c) => (!filtroTipo || c.tipoServicio === filtroTipo) && (!filtroSede || c.sede === filtroSede) && (!filtroEstado || c.estado === filtroEstado)),
-    [lista, filtroTipo, filtroSede, filtroEstado]
+    () =>
+      lista.filter(
+        (c) =>
+          (!filtroTipo || c.tipoServicio === filtroTipo) &&
+          (!filtroSede || c.sede === filtroSede) &&
+          (!filtroEstado || c.estado === filtroEstado) &&
+          (!buscar || `${c.razonSocial} ${c.ruc ?? ""} ${c.descripcion ?? ""}`.toLowerCase().includes(buscar.toLowerCase()))
+      ),
+    [lista, filtroTipo, filtroSede, filtroEstado, buscar]
   );
+  // Acción rápida PDF: recibo de cada concesión no anulada de la lista filtrada
+  const descargarRecibos = async () => {
+    const sel = visibles.filter((c) => c.estado !== "ANULADO");
+    if (!sel.length) return toast("No hay concesiones en la lista", "error");
+    if (sel.length > 1 && !confirm(`¿Descargar ${sel.length} recibos PDF (uno por concesión)?`)) return;
+    for (const c of sel) await descargarRecibo(c, "CONCESION");
+  };
   const activos = lista.filter((c) => c.estado === "ACTIVO");
   const sel = lista.find((c) => c.id === detalle) ?? null;
 
@@ -63,7 +79,8 @@ export function Contratistas({ soloLectura }: { soloLectura: boolean }) {
         </div>
       </div>
 
-      <Card>
+      <QuickActions tab="planilla-concesiones" onNuevo={() => setForm(concesionVacia())} puedeCrear={!soloLectura} onPdf={descargarRecibos} className="!mb-0" />
+      <Card id={QA_IDS.listaConcesiones}>
         <CardHeader
           title="Contratistas / concesiones"
           subtitle="Servicios externos: asesorías, trámites, construcción, implementación de equipos y sistemas, servicios básicos…"
@@ -76,6 +93,7 @@ export function Contratistas({ soloLectura }: { soloLectura: boolean }) {
           }
         />
         <div className="flex flex-wrap gap-2 border-b border-plomo-100 px-5 py-3">
+          <Input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar razón social, RUC…" className="w-56" aria-label="Buscar" />
           <Select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)} placeholder="Todos los servicios" options={OPC_TIPO} className="w-56" />
           <Select value={filtroSede} onChange={(e) => setFiltroSede(e.target.value)} placeholder="Todas las sedes" options={OPC_SEDE} className="w-56" />
           <Select
