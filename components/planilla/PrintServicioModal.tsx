@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useReactToPrint } from "react-to-print";
 import { FileDown, Printer, X } from "lucide-react";
 import { EMPRESA } from "@/lib/empresa";
-import { pdfReciboServicio } from "@/lib/pdf";
+import { toast } from "@/components/ui";
 import { fechaPE, hoy, soles } from "@/lib/storage";
 
 /** Datos que muestra el recibo: un contratista del maestro o una concesión / servicio externo. */
@@ -59,17 +59,25 @@ export function PrintServicioModal({ recibo, onClose }: { recibo: ReciboServicio
     ["Estado", recibo.estado],
   ];
 
-  const descargar = () =>
-    pdfReciboServicio({
-      titulo,
-      numero: recibo.numero,
-      estado: recibo.estado,
-      datos: [...filas.slice(1), ["Monto", soles(recibo.monto)]],
-      servicio: recibo.servicio,
-      descripcion: recibo.descripcion,
-      monto: recibo.monto,
-      firmas: [EMPRESA.razonSocial, "EL CONTRATISTA"],
-    });
+  const [generando, setGenerando] = useState(false);
+  /** PDF A4 idéntico a la vista previa: captura el div blanco del recibo (logo incluido) con html2canvas. */
+  const descargar = async () => {
+    if (!ref.current) return;
+    setGenerando(true);
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
+      const canvas = await html2canvas(ref.current, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+      const doc = new jsPDF({ unit: "mm", format: "a4" });
+      const ancho = doc.internal.pageSize.getWidth() - 24;
+      doc.addImage(canvas.toDataURL("image/png"), "PNG", 12, 12, ancho, (canvas.height * ancho) / canvas.width);
+      doc.setProperties({ title: recibo.numero });
+      doc.save(`${recibo.numero}.pdf`);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "No se pudo generar el PDF", "error");
+    } finally {
+      setGenerando(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex animate-velo items-start justify-center overflow-y-auto bg-black/70 p-4 pt-[5vh] backdrop-blur-[2px]" onMouseDown={onClose}>
@@ -143,8 +151,8 @@ export function PrintServicioModal({ recibo, onClose }: { recibo: ReciboServicio
           <button onClick={onClose} className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-slate-800">
             Cerrar
           </button>
-          <button onClick={descargar} className="inline-flex items-center gap-2 rounded-lg border border-[#3B82F6] px-4 py-2 text-sm font-semibold text-[#3B82F6] transition hover:bg-[#3B82F6]/10">
-            <FileDown size={16} /> Descargar PDF
+          <button onClick={descargar} disabled={generando} className="inline-flex items-center gap-2 rounded-lg border border-[#3B82F6] px-4 py-2 text-sm font-semibold text-[#3B82F6] transition hover:bg-[#3B82F6]/10 disabled:opacity-60">
+            <FileDown size={16} /> {generando ? "Generando…" : "Descargar PDF"}
           </button>
           <button onClick={() => imprimir()} className="inline-flex items-center gap-2 rounded-lg bg-[#3B82F6] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#2563EB]">
             <Printer size={16} /> Imprimir

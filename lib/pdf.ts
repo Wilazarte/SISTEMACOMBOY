@@ -1207,30 +1207,3 @@ export function pdfOrdenDespacho(o: OrdenDespacho): void {
     codigo
   );
 }
-
-/** Recibo de servicio de un contratista o de una concesión (Planilla › Contratistas / Concesiones). */
-export function pdfReciboServicio(r: {
-  titulo: string;
-  numero: string;
-  estado: string;
-  datos: [string, string][];
-  servicio: string;
-  descripcion?: string;
-  monto: number;
-  firmas: string[];
-}): void {
-  guardar(
-    construir({
-      titulo: r.titulo,
-      numero: r.numero,
-      estado: r.estado,
-      datos: r.datos,
-      head: ["Servicio", "Detalle", "Monto"],
-      body: [[r.servicio, r.descripcion || "-", soles(r.monto)]],
-      alinearDerecha: [2],
-      totales: [["MONTO", soles(r.monto)]],
-      firmas: r.firmas,
-    }),
-    r.numero
-  );
-}
