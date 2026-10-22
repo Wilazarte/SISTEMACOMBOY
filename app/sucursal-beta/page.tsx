@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Dirección antigua: la Sucursal ahora es un sistema aparte en /sucursal. */
+/** Dirección antigua: la Sucursal ahora es el módulo Secocha (/secocha). */
 export default function SucursalBeta() {
-  redirect("/sucursal");
+  redirect("/secocha");
 }

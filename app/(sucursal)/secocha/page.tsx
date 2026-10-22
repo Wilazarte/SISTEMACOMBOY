@@ -34,7 +34,7 @@ type TabSuc = "registrar-venta" | "entregar-producto" | "derivar-taller" | "requ
 /** Última pestaña abierta de la Sucursal (por navegador). */
 const CLAVE_TAB = "sucursal-tab-activa";
 
-/** COMBOY VID SUCURSAL (/sucursal): sistema aparte con su propio login (/sucursal/login). */
+/** COMBOY VID SECOCHA (/secocha, antes /sucursal): sistema aparte con su propio login (/secocha/login). Solo Secocha. */
 export default function SucursalApp() {
   return (
     <SucursalShell>
@@ -44,8 +44,8 @@ export default function SucursalApp() {
 }
 
 function SucursalPage() {
-  // Solo la sede en pantalla: un usuario de sede ya recibe solo la suya (RLS sede_isolation);
-  // el ERP central (Taller, Tesorería) tiene todas y ve la que eligió en el header
+  // Solo Secocha: un usuario de sede ya recibe solo la suya (RLS sede_isolation);
+  // el ERP central (Taller, Tesorería) recibe todas y aquí se filtra a Secocha (lib/sedes)
   useSedes();
   useStore<Sucursal[]>(KEYS.SUC_SUCURSALES, []);
   const ventas = deSede(useStore<VentaSucursal[]>(KEYS.SUC_VENTAS, []));
@@ -56,7 +56,7 @@ function SucursalPage() {
   const cierres = deSede(useStore<CierreCaja[]>(KEYS.SUC_CIERRES, []));
   const stock = deSede(useStore<StockLocal[]>(KEYS.SUC_STOCK, []));
   const clientes = deSede(useStore<ClienteSuc[]>(KEYS.SUC_CLIENTES, []));
-  // Estado de cada REQ-SUC en Tesorería (la sucursal solo ve los suyos, RLS)
+  // Estado de cada REQ-SECOCHA en Almacén / Tesorería (la sucursal solo ve los suyos, RLS)
   const pendientes = useStore<Requerimiento[]>(KEYS.REQS_PENDIENTES, []);
   const procesados = useStore<Requerimiento[]>(KEYS.REQS_PROCESADOS, []);
   const enTesoreria = deSede([...pendientes, ...procesados].filter((r) => r.origen === "SUCURSAL"));
@@ -111,9 +111,9 @@ function SucursalPage() {
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-serif text-2xl font-bold leading-tight tracking-tight text-fg lg:text-[28px]">Sucursal {sucursal.nombre}</h1>
+          <h1 className="font-serif text-2xl font-bold leading-tight tracking-tight text-fg lg:text-[28px]">{sucursal.nombre}</h1>
           <p className="mt-1 flex items-center gap-1 text-[13px] text-plomo-500">
-            <MapPin size={13} /> Sucursal {sucursal.nombre} · Sede {sucursal.sede}
+            <MapPin size={13} /> Sede {sucursal.sede}
           </p>
         </div>
         {!operaSucursal(sesion) && (

@@ -64,8 +64,10 @@ export interface Requerimiento {
   creadoPor?: string;
   editadoPor?: string;
   editadoEn?: string;
-  /** "SUCURSAL": lo emitió la Sucursal Beta (REQ-SUC-001); el resto viene de Almacén. */
+  /** "SUCURSAL": lo emitió el módulo Secocha (REQ-SECOCHA-001); el resto viene de Almacén. */
   origen?: "SUCURSAL";
+  /** A quién llega (REQ-SECOCHA: "Almacén Taller Principal (Arequipa)"). */
+  destino?: string;
   sucursalId?: string;
   /** Sede que lo emitió (multi-sede): la pone la base al guardar. */
   sedeId?: string;

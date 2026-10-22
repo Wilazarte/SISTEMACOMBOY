@@ -16,7 +16,7 @@ const CAMPO =
   "h-12 w-full rounded-xl border border-white/15 bg-white/[0.06] pl-10 text-[15px] text-white outline-none transition placeholder:text-white/30 focus:border-red-600 focus:bg-white/[0.09] focus:ring-2 focus:ring-red-600/30";
 
 /**
- * Login de COMBOY VID SUCURSAL: sistema aparte, misma identidad visual que el login del ERP
+ * Login de COMBOY VID SECOCHA (módulo Secocha, antes Sucursal): sistema aparte, misma identidad visual que el login del ERP
  * (mapa mundial rojo, logo grande, tema oscuro). Usuarios de sede (p. ej. sucsecocha@comboyvid.com)
  * y también Taller y Tesorería del ERP central.
  */
@@ -28,12 +28,6 @@ export default function LoginSucursal() {
   const [ver, setVer] = useState(false);
   const [error, setError] = useState("");
   const [enviando, setEnviando] = useState(false);
-  // ?sede=SEC (botón SUCURSAL SECOCHA del login del ERP): solo cambia el subtítulo; la sede real la da usuarios_sedes
-  const [subtitulo, setSubtitulo] = useState("Sede Secocha");
-  useEffect(() => {
-    const c = new URLSearchParams(window.location.search).get("sede")?.toUpperCase();
-    if (c === "ARE") setSubtitulo("Sede Arequipa");
-  }, []);
 
   // Sesión ya abierta de un usuario de la sucursal: entra directo
   useEffect(() => {
@@ -57,7 +51,7 @@ export default function LoginSucursal() {
       setError(msg);
     };
     if (!r.sesion) return negar(r.error ?? "Usuario o contraseña incorrectos.");
-    if (!perteneceAModulo(r.sesion, "sucursal")) return negar("Este usuario no tiene acceso a COMBOY VID SUCURSAL.");
+    if (!perteneceAModulo(r.sesion, "sucursal")) return negar("Este usuario no tiene acceso al módulo Secocha.");
     // Un usuario de sucursal debe tener su sede asignada (usuarios_sedes): sin sede no ve nada
     if (r.sesion.rol === "sucursal") {
       const sb = createClient();
@@ -94,8 +88,8 @@ export default function LoginSucursal() {
           <LogoComboy size="lg" />
         </header>
 
-        <h1 className="mt-10 text-center text-4xl font-bold uppercase leading-tight text-white">COMBOY VID SUCURSAL</h1>
-        <p className="mt-3 text-center text-[20px] text-blue-300">{subtitulo}</p>
+        <h1 className="mt-10 text-center text-4xl font-bold uppercase leading-tight text-white">COMBOY VID SECOCHA</h1>
+        <p className="mt-3 text-center text-[20px] text-blue-300">Sede Secocha</p>
 
         <form onSubmit={entrar} noValidate className="mt-8 w-full max-w-sm space-y-4 rounded-2xl border border-red-900/50 bg-black/60 p-6 shadow-2xl backdrop-blur-xl">
           <h2 className="text-lg font-bold text-white">Iniciar sesión</h2>
@@ -144,7 +138,7 @@ export default function LoginSucursal() {
           </button>
         </form>
 
-        <p className="mt-8 text-center text-xs text-white/50">COMBOY VID © 2025 - Sistema de Sucursales</p>
+        <p className="mt-8 text-center text-xs text-white/50">COMBOY VID © 2025 - Módulo Secocha</p>
       </main>
     </div>
   );

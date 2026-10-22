@@ -8,13 +8,13 @@ import { ID_BARRA_PESTANAS, Toaster } from "@/components/ui";
 import { DatalistCatalogo } from "@/components/productos/ProductoInput";
 import { RUTA_LOGIN_SUCURSAL, cargoDe, logout, nombreDe, perteneceAModulo, useSesion } from "@/lib/auth";
 import { detenerCatalogo, iniciarCatalogo } from "@/lib/productos";
-import { cargarSedes, elegirSede, olvidarSedes, useSedes } from "@/lib/sedes";
+import { cargarSedes, olvidarSedes, sedeSucursal, useSedes } from "@/lib/sedes";
 import { detenerDatos, useDatos } from "@/lib/storage";
 
 /**
- * Marco de COMBOY VID SUCURSAL: header blanco con el logo, la sede y el usuario. Nada del ERP
- * (sin Tesorería, dock, buscador ni barra de notificaciones). Un usuario de sede trabaja solo en
- * la suya; Taller y Tesorería (ERP central) eligen la sede.
+ * Marco de COMBOY VID SECOCHA (módulo Secocha, /secocha): header blanco con el logo, la sede y el usuario.
+ * Nada del ERP (sin Tesorería, dock, buscador ni barra de notificaciones). Solo Secocha: Arequipa es la
+ * Planta Principal (el ERP) y no se muestra aquí; Taller y Tesorería entran directo a Secocha, sin selector.
  */
 export function SucursalShell({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -73,7 +73,13 @@ export function SucursalShell({ children }: { children: ReactNode }) {
       </Centro>
     );
 
-  const error = datos.error || sedes.error || (!sede ? "Su usuario no tiene una sede visible. El administrador debe asignarla en usuarios_sedes." : "");
+  const secocha = sedeSucursal(sedes.sedes);
+  const error =
+    datos.error ||
+    sedes.error ||
+    (!sede || !secocha ? "No se encontró la sede Secocha. El administrador debe revisar public.sedes y usuarios_sedes." : "") ||
+    // Usuario de sede asignado a Arequipa (Planta Principal): el módulo Secocha es solo de Secocha
+    (sedes.asignada && sedes.asignada.sedeId !== secocha!.id ? `Su usuario es de ${sede!.nombre}. El módulo Secocha es solo para la sede Secocha.` : "");
   if (error)
     return (
       <Centro>
@@ -97,30 +103,12 @@ export function SucursalShell({ children }: { children: ReactNode }) {
         <div className="relative mx-auto flex h-16 w-full max-w-[1600px] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
           <Image src="/comboy-logo.png" alt="COMBOY VID" width={150} height={48} priority className="h-10 w-auto object-contain" />
           <h1 className="pointer-events-none absolute left-1/2 hidden -translate-x-1/2 whitespace-nowrap text-center text-[20px] font-bold uppercase tracking-wide text-slate-900 md:block lg:text-[24px]">
-            COMBOY VID SUCURSAL
+            COMBOY VID SECOCHA
           </h1>
           <div className="flex items-center gap-2">
-            {sedes.asignada ? (
-              <span className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[13px] font-semibold text-slate-700">
-                <MapPin size={14} className="text-[#c41e1e]" /> Sede {sede!.nombre}
-              </span>
-            ) : (
-              <label className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 py-1 pl-3 pr-1 text-[13px] font-semibold text-slate-700">
-                <MapPin size={14} className="text-[#c41e1e]" /> Sede
-                <select
-                  value={sedes.actualId}
-                  onChange={(e) => elegirSede(e.target.value)}
-                  className="rounded-full border-0 bg-white px-2 py-1 text-[13px] font-semibold text-slate-900 outline-none"
-                  aria-label="Sede"
-                >
-                  {sedes.sedes.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.nombre}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
+            <span className="flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[13px] font-semibold text-slate-700">
+              <MapPin size={14} className="text-[#c41e1e]" /> Sede {sede!.nombre}
+            </span>
             <div className="hidden text-right leading-tight sm:block">
               <p className="text-[13px] font-semibold text-slate-900">{nombreDe(sesion)}</p>
               <p className="text-[11px] text-slate-500">{sedes.asignada ? rolSede(sedes.asignada.rol) : cargoDe(sesion)}</p>
@@ -130,17 +118,16 @@ export function SucursalShell({ children }: { children: ReactNode }) {
             </button>
           </div>
         </div>
-        <h1 className="pb-2 text-center text-[17px] font-bold uppercase tracking-wide text-slate-900 md:hidden">COMBOY VID SUCURSAL</h1>
+        <h1 className="pb-2 text-center text-[17px] font-bold uppercase tracking-wide text-slate-900 md:hidden">COMBOY VID SECOCHA</h1>
       </header>
 
       <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 pb-16 pt-5 sm:px-6 lg:px-8">
         {/* Pestañas de la sucursal (components/ui Tabs dibuja aquí su isla) */}
         <div id={ID_BARRA_PESTANAS} className="sticky top-16 z-20 mb-5 empty:hidden" />
-        {/* key: al cambiar de sede (ERP central) la pantalla se vuelve a armar con la otra sede */}
         <div key={sedes.actualId}>{children}</div>
       </main>
       <footer className="border-t border-slate-200 bg-white px-4 py-4 text-center text-xs text-slate-500">
-        <span className="font-semibold text-slate-900">COMBOY</span> <span className="font-semibold text-[#c41e1e]">VID</span> SUCURSAL · Sede {sede!.nombre}
+        <span className="font-semibold text-slate-900">COMBOY</span> <span className="font-semibold text-[#c41e1e]">VID</span> SECOCHA · Sede {sede!.nombre}
       </footer>
       <DatalistCatalogo />
       <Toaster />

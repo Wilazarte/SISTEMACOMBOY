@@ -73,8 +73,8 @@ export const CLAVES_POR_MODULO: Record<string, StoreKey[]> = {
   "/dashboard/planilla": PLANILLA,
   "/dashboard/contable": ["contable_asientos", "contable_plan_cuentas", "contable_cierres", "ventas_asientos", "contable_mov_caja"],
   "/dashboard/creador": ["CV_TRABAJADORES_V2", "planilla_asistencia", "planilla_huellas_alias"],
-  // Sucursal (app aparte /sucursal): la base solo entrega las filas de la sede del usuario
-  "/sucursal": [
+  // Secocha (app aparte /secocha, antes /sucursal): la base solo entrega las filas de la sede del usuario
+  "/secocha": [
     "sucursal_sucursales",
     "sucursal_ventas",
     "sucursal_traslados",
@@ -84,7 +84,7 @@ export const CLAVES_POR_MODULO: Record<string, StoreKey[]> = {
     "sucursal_cierres",
     "sucursal_stock",
     "sucursal_clientes",
-    // Sus REQ-SUC en Tesorería (RLS: solo los de origen SUCURSAL)
+    // Sus REQ-SECOCHA en Almacén / Tesorería (RLS: solo los de origen SUCURSAL)
     "reqs_almacen_pendientes",
     "reqs_procesados_compras",
   ],
@@ -95,7 +95,9 @@ export function clavesDeModulos(modulos: string[], todas: StoreKey[]): StoreKey[
   if (modulos.includes("*")) return todas;
   const set = new Set<StoreKey>(CLAVES_SIEMPRE);
   for (const m of modulos) {
-    const ruta = Object.keys(CLAVES_POR_MODULO).find((r) => m === r || m.startsWith(`${r}/`));
+    // perfiles.modulos guardados antes del cambio de nombre: "/sucursal" = "/secocha"
+    const mod = m === "/sucursal" || m.startsWith("/sucursal/") ? m.replace("/sucursal", "/secocha") : m;
+    const ruta = Object.keys(CLAVES_POR_MODULO).find((r) => mod === r || mod.startsWith(`${r}/`));
     if (ruta) CLAVES_POR_MODULO[ruta].forEach((k) => set.add(k));
   }
   return todas.filter((k) => set.has(k));

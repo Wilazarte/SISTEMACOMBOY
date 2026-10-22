@@ -17,7 +17,7 @@ export const MODULOS_SELECCION: TarjetaModulo[] = [
   { id: "tesoreria", titulo: "Tesorería (Planilla - Compras)", desc: "Finanzas, planilla y compras", icon: Landmark },
   { id: "produccion", titulo: "Inventario", desc: "Producción e inventarios en almacén", icon: Factory },
   { id: "logistica", titulo: "Logística (Requerimientos - En camino - Entregado)", desc: "Requerimientos • En camino • Entregado", icon: Truck, proximamente: true },
-  { id: "sucursal", titulo: "Sucursal", desc: "Sistema aparte por sede: Arequipa · Secocha", icon: Store },
+  { id: "sucursal", titulo: "Secocha", desc: "Sistema aparte de la sede Secocha (Arequipa es la Planta Principal)", icon: Store },
 ];
 
 /** Módulos anteriores: ya no se ofrecen, pero /login?modulo=almacen|planilla|gerencia sigue funcionando. */
@@ -36,7 +36,7 @@ export const ENCARGADOS_LOGIN: Record<ModuloLogin, { nombre: string; cargo: stri
   tesoreria: { nombre: "LIZBETH CAHUANA APFATA", cargo: "Tesorera - Módulo de Compras" },
   produccion: { nombre: "JOSE MANUEL ORTIZ ARAPA", cargo: "Jefe de Almacén - Módulo de Inventario" },
   logistica: { nombre: "JOSE MANUEL ORTIZ ARAPA", cargo: "Jefe de Almacén - Módulo de Logística" },
-  sucursal: { nombre: "COMBOY VID SUCURSAL", cargo: "Arequipa · Secocha" },
+  sucursal: { nombre: "COMBOY VID SECOCHA", cargo: "Sede Secocha" },
   almacen: { nombre: "JOSE MANUEL ORTIZ ARAPA", cargo: "Jefe de Almacén - Módulo de Almacén" },
   planilla: { nombre: "Encargado de Planilla", cargo: "RRHH - Módulo de Planilla" },
   gerencia: { nombre: "Gerencia General", cargo: "Gerencia - COMBOY VID" },
