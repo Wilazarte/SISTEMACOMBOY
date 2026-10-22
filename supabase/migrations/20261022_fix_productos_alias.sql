@@ -6,10 +6,17 @@
 -- Corre antes de 20261022_unificar_productos.sql (que trae el mismo bloque, por si se ejecuta sola).
 -- =====================================================================
 
-create or replace function public.normalizar_producto(nombre text) returns text
-language sql immutable as $$
-  select regexp_replace(regexp_replace(upper(btrim(coalesce(nombre, ''))), '\s+', ' ', 'g'), '\s*/\s*', '/', 'g')
-$$;
+-- Si normalizar_producto ya existe con otro nombre de parámetro (p. ej. "t") se conserva ese nombre
+do $$
+declare arg text;
+begin
+  select p.proargnames[1] into arg from pg_proc p where p.oid = to_regprocedure('public.normalizar_producto(text)');
+  execute format($f$
+    create or replace function public.normalizar_producto(%I text) returns text
+    language sql immutable as $b$
+      select regexp_replace(regexp_replace(upper(btrim(coalesce($1, ''))), '\s+', ' ', 'g'), '\s*/\s*', '/', 'g')
+    $b$ $f$, coalesce(nullif(arg, ''), 'nombre'));
+end $$;
 
 -- productos_alias de producción (id, producto_id, nombre_alias, nombre_alias_norm, created_at)
 -- -> alias_normalizado text primary key. Ver 20261022_fix_productos_alias.sql (mismo bloque; se puede repetir).

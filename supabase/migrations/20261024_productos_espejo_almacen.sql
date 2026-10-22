@@ -3,51 +3,44 @@
 -- Ejecutar en Supabase › SQL Editor DESPUÉS de 20261022_unificar_productos.sql y
 -- 20261023_sedes_multisede.sql. Sin BEGIN/COMMIT; se puede repetir.
 --
--- La tabla almacen guarda documentos (tipo, id, data jsonb): el stock es tipo = 'stock' con
--- data->>'nombre', data->>'sede', data->>'cantidad', data->>'productoId', data->>'sku'.
--- No tiene columnas producto_id / sku / nombre_display / cantidad, por eso aquí se leen de data.
+-- Sirve para public.almacen de cualquier forma (ver almacen_* en 20261022_unificar_productos.sql):
+--   relacional  producto (PK, PROD-0001), sku, nombre_display | nombre, cantidad, almacen_id, sede_id
+--   documentos  (tipo, id, data jsonb) con data->>'nombre', data->>'sede', data->>'cantidad'
 --
 -- No se hace TRUNCATE productos_maestro CASCADE: borraría también productos_alias y
--- productos_solicitudes (tienen FK al catálogo) y dejaría el stock con productoId que ya no existen.
+-- productos_solicitudes (tienen FK al catálogo) y dejaría el stock apuntando a productos que ya no existen.
 -- En su lugar se agrega al catálogo todo lo que está en almacén y aún no figura, sin borrar nada.
 -- =====================================================================
 
--- 1. Todo producto del stock de almacén existe en el catálogo (nombre normalizado = MAYÚSCULAS,
---    como exige productos_nombre_norm_chk; un alias cuenta como ya existente)
-insert into public.productos_maestro (nombre_normalizado, nombre_display, unidad)
-select public.normalizar_producto(data->>'nombre'),
-       min(btrim(regexp_replace(data->>'nombre', '\s+', ' ', 'g'))),
-       coalesce(mode() within group (order by nullif(data->>'unidad', '')), 'UND')
-  from public.almacen
- where tipo = 'stock'
-   and public.normalizar_producto(data->>'nombre') <> ''
-   and public.producto_de_nombre(data->>'nombre') is null
- group by 1
-on conflict (nombre_normalizado) do nothing;
+-- 1. Todo producto del almacén existe en el catálogo (un alias cuenta como ya existente).
+--    Si la fila trae SKU (PROD-0001) y el catálogo no lo usa, el producto conserva ese SKU.
+select public.sembrar_productos() as productos_nuevos;
 
--- 2. Cada fila de stock queda enlazada a su producto (nombre oficial, productoId y SKU)
-update public.almacen a
-   set data = a.data || jsonb_build_object('nombre', p.nombre_normalizado, 'productoId', p.id, 'sku', p.sku)
-  from public.productos_maestro p
- where a.tipo = 'stock' and p.id = public.producto_de_nombre(a.data->>'nombre')
-   and (a.data->>'productoId' is distinct from p.id::text or a.data->>'sku' is distinct from p.sku
-        or a.data->>'nombre' is distinct from p.nombre_normalizado);
+-- 2. Cada fila de stock queda enlazada a su producto (nombre oficial y SKU)
+select public.enlazar_stock() as filas_enlazadas;
 
--- 3. Vista pedida: productos con su stock por almacén (security_invoker: respeta RLS y sede_isolation)
+-- 3. Vista pedida: productos con su stock por almacén (security_invoker: respeta RLS y sede_isolation).
+--    id = código del almacén (columna producto) o, si no tiene, el id del catálogo.
+--    Una fila cuyo producto aún no está en el catálogo también sale (producto_id vacío).
 drop view if exists public.v_productos_stock;
 create view public.v_productos_stock with (security_invoker = true) as
-select p.id,
-       p.sku,
-       p.nombre_display,
+select coalesce(x.j->>'producto', p.id::text)                                as id,
+       p.id                                                                  as producto_id,
+       coalesce(p.sku, public.almacen_sku(x.j))                              as sku,
+       coalesce(p.nombre_display, public.almacen_nombre(x.j), x.j->>'producto') as nombre_display,
        p.nombre_normalizado,
-       a.data->>'sede'                                   as almacen_id,
-       coalesce((a.data->>'cantidad')::numeric, 0)       as stock_actual,
-       coalesce((a.data->>'cantidad')::numeric, 0) > 0   as tiene_stock,
-       a.sede_id
-  from public.almacen a
-  join public.productos_maestro p on p.id = public.producto_de_nombre(a.data->>'nombre')
- where a.tipo = 'stock';
+       public.almacen_ubicacion(x.j)                                         as almacen_id,
+       public.almacen_cantidad(x.j)                                          as stock_actual,
+       public.almacen_cantidad(x.j) > 0                                      as tiene_stock,
+       (x.j->>'sede_id')::uuid                                               as sede_id
+  from (select to_jsonb(a) j from public.almacen a) x
+  left join public.productos_maestro p on p.id = public.almacen_producto_id(x.j)
+ where public.almacen_es_stock(x.j);
 grant select on public.v_productos_stock to authenticated;
+
+-- 4. v_stock_almacenes con la misma lectura
+select public.crear_vista_stock_almacenes();
 
 -- Revisión:
 -- select * from public.v_productos_stock order by nombre_display;
+-- select * from public.v_productos_stock where producto_id is null;   -- filas sin producto en el catálogo
