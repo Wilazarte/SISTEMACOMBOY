@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle, BarChart3, Calculator, Eye, EyeOff, Factory, Landmark, Loader2, Lock, LogIn, Truck, User, X, type LucideIcon } from "lucide-react";
+import { AlertCircle, BarChart3, Calculator, Eye, EyeOff, Factory, Landmark, Loader2, Lock, LogIn, Store, Truck, User, X, type LucideIcon } from "lucide-react";
 import { CLAVE_MODULO, CLAVE_USUARIO, MODULOS_LOGIN, RUTA_LOGIN_SUCURSAL, login, logout, moduloGuardado, perteneceAModulo, puedeVer, rutaDeModulo, useSesion, type ModuloLogin } from "@/lib/auth";
 import { CLAVE_SELECCION, ENCARGADOS_LOGIN, tarjetaDe } from "@/components/modulos-login";
 
@@ -15,6 +15,12 @@ const DOCK: { id: ModuloLogin; slug: string; titulo: string; icon: LucideIcon }[
   { id: "produccion", slug: "inventario", titulo: "PRODUCCION", icon: Factory },
   { id: "logistica", slug: "logistica", titulo: "LOGISTICA", icon: Truck },
 ];
+
+/**
+ * SUCURSAL SECOCHA: sistema aparte (no es un módulo del ERP). Abre su propio login (/sucursal/login);
+ * ahí y en la base (RLS sede_isolation) se controla que solo entren usuarios de Secocha o del ERP central.
+ */
+const SUCURSAL_SECOCHA = { titulo: "SUCURSAL SECOCHA", href: `${RUTA_LOGIN_SUCURSAL}?sede=SEC` };
 
 /** Alias de URL: "compras" = Tesorería, "inventario" = Producción. */
 function moduloPedido(v: string | null): ModuloLogin | "" {
@@ -229,6 +235,18 @@ function Login() {
               </button>
             );
           })}
+          {/* Sistema aparte: botón azul; se oculta solo si ya hay sesión de un usuario sin acceso a la sucursal */}
+          {(!sesion || perteneceAModulo(sesion, "sucursal")) && (
+            <button
+              type="button"
+              data-modulo="sucursal-secocha"
+              onClick={() => router.push(SUCURSAL_SECOCHA.href)}
+              className="flex h-20 min-w-[132px] flex-1 flex-col items-center justify-center gap-1.5 rounded-full border border-blue-500 bg-blue-500/15 text-center text-[14px] font-bold leading-tight text-blue-100 shadow-[0_0_15px] shadow-blue-500/50 transition-all duration-200 hover:bg-blue-500/25 hover:shadow-blue-500/80"
+            >
+              <Store size={24} strokeWidth={2} />
+              {SUCURSAL_SECOCHA.titulo}
+            </button>
+          )}
         </div>
       </nav>
     </Fondo>
