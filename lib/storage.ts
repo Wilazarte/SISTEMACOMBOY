@@ -45,6 +45,8 @@ import type {
 } from "./types";
 import { generarCodigo } from "./utils/codigos";
 import { clavesDeModulos } from "./storage.por-modulo";
+import { canonizarItems } from "./productos";
+import { normalizarNombre } from "./productos-modelos";
 
 export const KEYS = {
   REQS_PENDIENTES: "reqs_almacen_pendientes",
@@ -921,7 +923,8 @@ export async function crearRequerimiento(
   if (!data.sede.trim()) throw new ErpError("Seleccione la sede.");
   if (!data.solicitante.trim()) throw new ErpError("Ingrese el solicitante.");
   if (!data.motivo.trim()) throw new ErpError("Ingrese el motivo del requerimiento.");
-  const items = data.items.filter((i) => i.nombre.trim());
+  // Catálogo maestro: el mismo producto con el mismo nombre en todos los almacenes
+  const items = canonizarItems(data.items.filter((i) => i.nombre.trim()));
   if (items.length === 0) throw new ErpError("Agregue al menos un producto.");
   if (items.some((i) => !(i.cantidad > 0))) throw new ErpError("Todas las cantidades deben ser mayores a 0.");
 
@@ -953,7 +956,7 @@ export function editarRequerimiento(
   if (!cambios.sede.trim()) throw new ErpError("Seleccione la sede.");
   if (!cambios.solicitante.trim()) throw new ErpError("Ingrese el solicitante.");
   if (!cambios.motivo.trim()) throw new ErpError("Ingrese el motivo del requerimiento.");
-  const items = cambios.items.filter((i) => i.nombre.trim());
+  const items = canonizarItems(cambios.items.filter((i) => i.nombre.trim()));
   if (items.length === 0) throw new ErpError("Agregue al menos un producto.");
   if (items.some((i) => !(i.cantidad > 0))) throw new ErpError("Todas las cantidades deben ser mayores a 0.");
   const editado: Requerimiento = {
@@ -976,7 +979,7 @@ export function reenviarRequerimiento(
   const lista = getProcesados();
   const req = lista.find((r) => r.id === id);
   if (!req || req.estado !== "OBSERVADO") throw new ErpError("Solo se pueden reenviar requerimientos OBSERVADOS.");
-  const items = cambios.items.filter((i) => i.nombre.trim());
+  const items = canonizarItems(cambios.items.filter((i) => i.nombre.trim()));
   if (items.length === 0) throw new ErpError("Agregue al menos un producto.");
   const actualizado: Requerimiento = {
     ...req,
@@ -2113,8 +2116,7 @@ export function crearProveedor(data: Pick<Proveedor, "razonSocial" | "ruc">): Pr
 }
 
 /** Clave de producto en stock: misma sede + mismo nombre (sin mayúsculas/espacios extra) + misma unidad. */
-const claveStock = (sede: string, nombre: string, unidad: string): string =>
-  `${sede}|${nombre.trim().replace(/\s+/g, " ").toUpperCase()}|${unidad}`;
+const claveStock = (sede: string, nombre: string, unidad: string): string => `${sede}|${normalizarNombre(nombre)}|${unidad}`;
 
 // ---------------------------------------------------------------------
 // KARDEX: cada movimiento de stock (ingreso por V°B°, salida por venta / producción, transferencia)
@@ -2140,16 +2142,19 @@ function ingresarStock(sede: string, items: { nombre: string; unidad: string; ca
   const ahora = new Date().toISOString();
   const stock = getStock();
   const movs: Omit<MovimientoKardex, "id" | "fecha" | "usuario">[] = [];
-  items.forEach((i) => {
-    const nombre = i.nombre.trim().replace(/\s+/g, " ").toUpperCase();
+  // Solo productos del catálogo maestro (con su nombre oficial): valida todo antes de mover nada
+  const oficiales = canonizarItems(items);
+  oficiales.forEach((i) => {
+    const nombre = i.nombre;
     const k = claveStock(sede, nombre, i.unidad);
     let existente = stock.find((s) => claveStock(s.sede, s.nombre, s.unidad) === k);
     if (existente) {
       existente.cantidad = r2(existente.cantidad + i.cantidad);
       existente.costoUnit = i.precioUnit;
       existente.actualizado = ahora;
+      if (i.productoId) Object.assign(existente, { productoId: i.productoId, sku: i.sku });
     } else {
-      existente = { id: uid(), sede, nombre, unidad: i.unidad, cantidad: i.cantidad, costoUnit: i.precioUnit, actualizado: ahora };
+      existente = { id: uid(), sede, nombre, unidad: i.unidad, cantidad: i.cantidad, costoUnit: i.precioUnit, actualizado: ahora, ...(i.productoId ? { productoId: i.productoId, sku: i.sku } : {}) };
       stock.push(existente);
     }
     if (ref) movs.push({ sede, stock_id: existente.id, producto: nombre, unidad: i.unidad, tipo_movimiento: ref.tipo, documento: ref.documento, chasis: ref.chasis, motivo: ref.motivo, cantidad: i.cantidad, saldo: existente.cantidad });
@@ -2172,8 +2177,9 @@ export function importarSaldosStock(productos: { nombre: string; unidad: string;
   const movs: Omit<MovimientoKardex, "id" | "fecha" | "usuario">[] = [];
   let nuevos = 0;
   let actualizados = 0;
-  productos.forEach((p) => {
-    const nombre = p.nombre.trim().replace(/\s+/g, " ").toUpperCase();
+  // Todos los productos del archivo deben estar en el catálogo maestro (se avisa con la lista de los que faltan)
+  canonizarItems(productos).forEach((p) => {
+    const nombre = p.nombre;
     const cantidad = Math.max(0, Math.round(p.cantidad));
     let e = stock.find((s) => claveStock(s.sede, s.nombre, s.unidad) === claveStock(p.sede, nombre, p.unidad));
     if (e) {
@@ -2242,10 +2248,10 @@ export function registrarIngresoAlmacen(d: { sede: string; ocId?: string; lote?:
   const oc = d.ocId ? getOrdenes().find((o) => o.id === d.ocId) : undefined;
   if (d.ocId && !oc) throw new ErpError("OC no encontrada.");
   const stock = getStock();
-  const items = filas.map((i) => {
-    const nombre = i.nombre.trim().replace(/\s+/g, " ").toUpperCase();
+  const items = canonizarItems(filas).map((i) => {
+    const nombre = i.nombre;
     const enStock = stock.find((s) => claveStock(s.sede, s.nombre, s.unidad) === claveStock(d.sede, nombre, i.unidad));
-    const deOC = oc?.items.find((x) => x.nombre.trim().toUpperCase() === nombre);
+    const deOC = oc?.items.find((x) => normalizarNombre(x.nombre) === nombre || (!!i.productoId && x.productoId === i.productoId));
     // Costo: el de la OC; si no, el último del stock
     return { nombre, unidad: i.unidad, cantidad: i.cantidad, precioUnit: i.costoUnit ?? deOC?.precioUnit ?? enStock?.costoUnit ?? 0 };
   });
@@ -2426,9 +2432,10 @@ export async function registrarGastoCompleto(
     const filas = opc.items.filter((i) => i.nombre.trim());
     if (!filas.length) throw new ErpError("Agregue al menos un producto a la orden de compra.");
     if (filas.some((i) => !(i.cantidad > 0) || !(i.precioUnit > 0))) throw new ErpError("Cada producto de la OC necesita cantidad y precio mayores a 0.");
-    const items: ItemPrecio[] = filas.map((i) => ({
+    const items: ItemPrecio[] = canonizarItems(filas).map((i) => ({
       itemReqId: uid(),
-      nombre: i.nombre.trim().replace(/\s+/g, " ").toUpperCase(),
+      nombre: i.nombre,
+      ...(i.productoId ? { productoId: i.productoId, sku: i.sku } : {}),
       cantidad: i.cantidad,
       unidad: i.unidad || "UND",
       marca: "",
@@ -2732,9 +2739,9 @@ function prepararCompra(data: DatosCompra, excluirId?: string): Omit<Compra, "id
   if (filas.some((i) => !(i.cantidad > 0))) throw new ErpError("Todas las cantidades deben ser mayores a 0.");
   if (filas.some((i) => !(i.precioUnit > 0))) throw new ErpError("Ingrese precio unitario > 0 en todos los productos.");
 
-  const items: ItemCompra[] = filas.map((i) => ({
+  // Catálogo maestro: se valida aquí, antes de guardar la compra (luego ingresa al stock con el mismo nombre)
+  const items: ItemCompra[] = canonizarItems(filas).map((i) => ({
     ...i,
-    nombre: i.nombre.trim().replace(/\s+/g, " ").toUpperCase(),
     subtotal: r2(i.cantidad * i.precioUnit),
   }));
   const { subtotal, igv, total } = totalesCompra(data.tipoComprobante, items);

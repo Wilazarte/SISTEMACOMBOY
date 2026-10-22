@@ -11,10 +11,11 @@ import { puedeVer, type Sesion } from "./auth";
 import { getEquipos } from "./equipos";
 import { KEYS, fechaPE, hoy, soles, useStore } from "./storage";
 import type { Factura, OrdenDespacho, Requerimiento, StockItem } from "./types";
+import { esAdminProductos, useCatalogo } from "./productos";
 import type { CierreCaja, Derivacion, StockLocal, Traslado, VentaSucursal } from "./sucursal-modelos";
 import { avisoOD, odsNuevas } from "./ventas";
 
-export type TipoNotif = "despacho" | "requerimiento" | "factura" | "qc" | "stock" | "sucursal";
+export type TipoNotif = "despacho" | "requerimiento" | "factura" | "qc" | "stock" | "sucursal" | "producto";
 
 export interface Notificacion {
   /** Identifica el aviso para marcarlo como visto; cambia si cambia su contenido. */
@@ -54,6 +55,7 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
   const ventasSuc = useStore<VentaSucursal[]>(KEYS.SUC_VENTAS, [], opera);
   const stockSuc = useStore<StockLocal[]>(KEYS.SUC_STOCK, [], opera);
   const cierres = useStore<CierreCaja[]>(KEYS.SUC_CIERRES, [], veSuc && ["creador", "tesoreria"].includes(rol));
+  const { solicitudes } = useCatalogo();
 
   return useMemo(() => {
     if (!sesion) return [];
@@ -137,8 +139,16 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
           out.push({ clave: `cc:${c.id}`, tipo: "sucursal", titulo: `Cierre de caja ${c.numero} por recibir`, detalle: `Saldo ${soles(c.saldoFinal)} · ${fechaPE(c.fecha)}`, modulo: "Sucursal → Tesorería", href: `${S}?tab=caja-chica`, prioridad: 3 });
     }
 
+    // Catálogo maestro: solicitudes de producto nuevo (administrador) y respuesta a quien la pidió
+    for (const s of solicitudes) {
+      if (s.estado === "pendiente" && esAdminProductos(sesion.rol))
+        out.push({ clave: `sol:${s.id}`, tipo: "producto", titulo: `Producto nuevo solicitado: ${s.nombre}`, detalle: `${s.unidad}${s.modulo ? ` · ${s.modulo}` : ""}${s.solicitado_usuario ? ` · ${s.solicitado_usuario}` : ""}`, modulo: "Catálogo de productos", href: "/dashboard/productos?tab=solicitudes", prioridad: 2 });
+      else if (s.estado !== "pendiente" && !esAdminProductos(sesion.rol) && s.solicitado_usuario === sesion.usuario)
+        out.push({ clave: `solr:${s.id}:${s.estado}`, tipo: "producto", titulo: `Solicitud ${s.estado}: ${s.nombre}`, detalle: s.respuesta ?? (s.estado === "aprobada" ? "Ya está en el catálogo" : "Revise con el administrador"), modulo: "Catálogo de productos", href: "/dashboard/productos?tab=solicitudes", prioridad: 6 });
+    }
+
     return out.sort((a, b) => a.prioridad - b.prioridad);
     // equiposRaw: getEquipos() lee la misma caché; se usa para recalcular cuando cambia
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sesion, ods, reqs, facturas, stock, equiposRaw, derivaciones, traslados, ventasSuc, stockSuc, cierres]);
+  }, [sesion, ods, reqs, facturas, stock, equiposRaw, derivaciones, traslados, ventasSuc, stockSuc, cierres, solicitudes]);
 }

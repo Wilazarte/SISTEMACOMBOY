@@ -6,6 +6,7 @@ import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td
 import { BotonFiltros, BotonNuevo } from "@/components/ui/BotonFiltros";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { UNIDADES } from "@/lib/empresa";
+import { ProductoInput } from "@/components/productos/ProductoInput";
 import { fechaPE, r2, soles } from "@/lib/storage";
 import { bajoMinimo, eliminarCliente, eliminarStock, guardarCliente, guardarStock, operaSucursal, resumenCliente, solicitarReposicion, valorizado, type ClienteSuc, type StockLocal, type VentaSucursal } from "@/lib/sucursal";
 import { Acciones, EstadoSuc, Indicador } from "./comun";
@@ -148,7 +149,7 @@ function FormStock({ item, onListo }: { item?: StockLocal; onListo: () => void }
       <CardHeader title={item ? `Editar ${item.producto}` : "Nuevo producto en stock local"} />
       <div className="grid gap-4 p-5 md:grid-cols-7">
         <Field label="Producto *" className="md:col-span-2">
-          <Input value={f.producto} onChange={set("producto")} />
+          <ProductoInput value={f.producto} modulo="Sucursal Beta · Stock" onChange={(producto, p) => setF({ ...f, producto, ...(p ? { unidad: p.unidad } : {}) })} />
         </Field>
         <Field label="Código">
           <Input value={f.codigo} onChange={set("codigo")} />

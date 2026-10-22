@@ -9,6 +9,7 @@
 
 import { getSesion, nombreDe, type Sesion } from "./auth";
 import { createClient } from "./supabase/client";
+import { canonizar } from "./productos";
 import { ErpError, KEYS, escribir, getPendientes, hoy, leer, r2, uid } from "./storage";
 import type { EventoHistorial, ItemReq, Requerimiento, Rol } from "./types";
 import {
@@ -92,6 +93,11 @@ export const getClientesSuc = () => leer<ClienteSuc[]>(KEYS.SUC_CLIENTES, []);
 export const saldoCaja = (movs: MovCaja[]): number => r2(movs.reduce((a, m) => a + (m.tipo === "INGRESO" ? m.monto : -m.monto), 0));
 export const valorizado = (s: StockLocal[]): number => r2(s.reduce((a, x) => a + x.stock * x.costo, 0));
 export const bajoMinimo = (s: StockLocal) => s.stock < s.minimo;
+/** Nombre oficial del catálogo maestro (lanza si el producto no está catalogado). */
+const oficial = (nombre: string) => {
+  const c = canonizar(nombre);
+  return { producto: c.nombre, ...(c.productoId ? { productoMaestroId: c.productoId, sku: c.sku } : {}) };
+};
 const norm = (t: string) => t.trim().toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 // ---------------------------------------------------------------------
@@ -150,7 +156,7 @@ export async function registrarVenta(d: DatosVenta): Promise<VentaSucursal> {
   if (d.tipoDoc === "FA") exigir(/^\d{11}$/.test(d.clienteDoc?.trim() ?? ""), "Para factura (FA) ingrese el RUC del cliente (11 dígitos).");
   const lineas: LineaVentaSuc[] = d.lineas
     .filter((l) => l.producto.trim())
-    .map((l) => ({ ...l, id: uid(), producto: l.producto.trim(), cantidad: Number(l.cantidad), precio: r2(Number(l.precio)), subtotal: r2(Number(l.cantidad) * Number(l.precio)) }));
+    .map((l) => ({ ...l, ...oficial(l.producto), id: uid(), cantidad: Number(l.cantidad), precio: r2(Number(l.precio)), subtotal: r2(Number(l.cantidad) * Number(l.precio)) }));
   exigir(lineas.length > 0, "Agregue al menos un producto.");
   exigir(lineas.every((l) => l.cantidad > 0), "Las cantidades deben ser mayores a 0.");
   exigir(lineas.every((l) => l.precio >= 0), "Los precios no pueden ser negativos.");
@@ -285,7 +291,7 @@ export interface DatosTraslado {
 
 export async function crearTraslado(d: DatosTraslado): Promise<Traslado> {
   exigir(esTaller(), "Solo el Taller Principal (almacén) emite órdenes de traslado.");
-  const productos = d.productos.filter((p) => p.producto.trim()).map((p) => ({ ...p, producto: p.producto.trim(), cantidad: Number(p.cantidad) }));
+  const productos = d.productos.filter((p) => p.producto.trim()).map((p) => ({ ...p, ...oficial(p.producto), cantidad: Number(p.cantidad) }));
   exigir(productos.length > 0, "Agregue al menos un producto.");
   exigir(productos.every((p) => p.cantidad > 0), "Las cantidades deben ser mayores a 0.");
   const der = d.derivacionId ? getDerivaciones().find((x) => x.id === d.derivacionId) : undefined;
@@ -333,9 +339,9 @@ export function confirmarRecepcion(id: string, recibidoPor: string): void {
   // Stock local: por producto (id o nombre); lo que no existe se crea
   const stock = getStockLocal();
   for (const p of t!.productos) {
-    const s = stock.find((x) => (p.productoId && x.id === p.productoId) || norm(x.producto) === norm(p.producto));
+    const s = stock.find((x) => (p.productoId && x.id === p.productoId) || (!!p.productoMaestroId && x.productoMaestroId === p.productoMaestroId) || norm(x.producto) === norm(p.producto));
     if (s) s.stock = r2(s.stock + p.cantidad);
-    else stock.unshift({ id: uid(), producto: p.producto, unidad: p.unidad || "UND", stock: p.cantidad, minimo: 0, costo: p.costo ?? 0, precio: 0, sucursalId: suc.id });
+    else stock.unshift({ id: uid(), producto: p.producto, productoMaestroId: p.productoMaestroId, sku: p.sku, unidad: p.unidad || "UND", stock: p.cantidad, minimo: 0, costo: p.costo ?? 0, precio: 0, sucursalId: suc.id });
   }
   escribir(KEYS.SUC_STOCK, stock);
 
@@ -367,7 +373,7 @@ export function observarTraslado(id: string, tipo: "FALTANTE" | "DANADO", detall
 export async function crearReqSucursal(items: ProductoTraslado[], motivo: string, automatico = false): Promise<ReqSucursal> {
   exigir(operaSucursal(), "Su usuario no puede emitir requerimientos de la sucursal.");
   exigir(!!motivo.trim(), "Ingrese el motivo del requerimiento.");
-  const lista = items.filter((i) => i.producto.trim()).map((i) => ({ ...i, producto: i.producto.trim(), cantidad: Number(i.cantidad) }));
+  const lista = items.filter((i) => i.producto.trim()).map((i) => ({ ...i, ...oficial(i.producto), cantidad: Number(i.cantidad) }));
   exigir(lista.length > 0, "Agregue al menos un producto.");
   exigir(lista.every((i) => i.cantidad > 0), "Las cantidades deben ser mayores a 0.");
   const sesion = getSesion();
@@ -473,8 +479,9 @@ export function guardarStock(d: Omit<StockLocal, "id" | "sucursalId"> & { id?: s
   exigir(!!d.producto.trim(), "Ingrese el producto.");
   exigir(d.stock >= 0 && d.minimo >= 0 && d.costo >= 0 && d.precio >= 0, "Los valores no pueden ser negativos.");
   const lista = getStockLocal();
-  exigir(!lista.some((s) => s.id !== d.id && norm(s.producto) === norm(d.producto)), "Ese producto ya está en el stock local.");
-  const item: StockLocal = { ...d, id: d.id ?? uid(), producto: d.producto.trim(), sucursalId: getSucursal().id };
+  const of = oficial(d.producto);
+  exigir(!lista.some((s) => s.id !== d.id && norm(s.producto) === norm(of.producto)), "Ese producto ya está en el stock local.");
+  const item: StockLocal = { ...d, ...of, id: d.id ?? uid(), sucursalId: getSucursal().id };
   escribir(KEYS.SUC_STOCK, d.id ? lista.map((s) => (s.id === d.id ? item : s)) : [item, ...lista]);
 }
 

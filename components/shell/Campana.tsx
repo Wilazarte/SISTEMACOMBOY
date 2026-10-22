@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bell, BellOff, Boxes, ClipboardList, PackageCheck, Receipt, Store, Truck, type LucideIcon } from "lucide-react";
+import { Bell, BellOff, Boxes, ClipboardList, PackageCheck, PackagePlus, Receipt, Store, Truck, type LucideIcon } from "lucide-react";
 import { cn } from "@/components/ui";
 import type { Notificacion, TipoNotif } from "@/lib/notificaciones";
 import { guardarPrefs } from "@/lib/preferencias";
 import { useIr } from "./ir";
 
-const ICONO: Record<TipoNotif, LucideIcon> = { despacho: Truck, requerimiento: ClipboardList, factura: Receipt, qc: PackageCheck, stock: Boxes, sucursal: Store };
+const ICONO: Record<TipoNotif, LucideIcon> = { despacho: Truck, requerimiento: ClipboardList, factura: Receipt, qc: PackageCheck, stock: Boxes, sucursal: Store, producto: PackagePlus };
 
 /** Campana roja: avisos en vivo; "vistas" se guardan en las preferencias del usuario. */
 export function Campana({ notifs, vistas }: { notifs: Notificacion[]; vistas: string[] }) {

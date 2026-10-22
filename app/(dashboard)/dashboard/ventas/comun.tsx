@@ -8,6 +8,7 @@ import { KEYS, cargarCondicionesPago, r2, soles, useStore } from "@/lib/storage"
 import { DETALLE_LUGAR, LARGO_DOC, LUGARES_ENTREGA, lugarConDireccion, calcularLinea, lineaVacia, totalesVenta, validarDocumento } from "@/lib/ventas";
 import { normalizarEquipo, sedeEquipo, type EquipoTerminado } from "@/lib/equipos";
 import type { Cliente, CondicionPago, DatosDespacho, LugarEntrega, LineaVenta, StockItem, TipoDocCliente } from "@/lib/types";
+import { ProductoInput } from "@/components/productos/ProductoInput";
 
 /** Datos de Ventas sincronizados con Supabase (tiempo real). */
 export function useVentas() {
@@ -97,7 +98,14 @@ export function LineasEditor({ items, onChange, stock }: { items: LineaVenta[]; 
               <tr key={l.id}>
                 <td className="px-2 py-1.5 text-slate-400">{k + 1}</td>
                 <td className="px-2 py-1.5">
-                  <Input value={l.productoNombre} list="productos-almacen" placeholder="Buscar…" onChange={(e) => elegirProducto(l.id, e.target.value)} />
+                  <ProductoInput
+                    value={l.productoNombre}
+                    placeholder="Buscar… (vacío = servicio)"
+                    modulo="Ventas"
+                    listId="productos-almacen"
+                    libre={(t) => equipos.some((e) => e.codigo_chasis === t.trim().toUpperCase())}
+                    onChange={(nombre) => elegirProducto(l.id, nombre)}
+                  />
                 </td>
                 <td className="px-2 py-1.5">
                   <Input value={l.descripcion} onChange={(e) => set(l.id, { descripcion: e.target.value })} placeholder="Vidrio templado incoloro 8mm / Instalación" />

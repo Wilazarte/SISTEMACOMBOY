@@ -45,6 +45,9 @@ export interface LineaVentaSuc {
   cantidad: number;
   precio: number;
   subtotal: number;
+  /** Producto del catálogo maestro (productos_maestro.id) y su SKU. */
+  productoMaestroId?: string;
+  sku?: string;
 }
 
 export interface EntregaVenta {
@@ -93,6 +96,9 @@ export interface ProductoTraslado {
   unidad: string;
   cantidad: number;
   costo?: number;
+  /** Producto del catálogo maestro (productos_maestro.id) y su SKU. */
+  productoMaestroId?: string;
+  sku?: string;
 }
 
 export type EstadoDerivacion = "pendiente" | "en-preparacion" | "convertida" | "anulada";
@@ -205,6 +211,9 @@ export interface StockLocal {
   /** Precio de venta sugerido. */
   precio: number;
   sucursalId: string;
+  /** Producto del catálogo maestro (productos_maestro.id) y su SKU. */
+  productoMaestroId?: string;
+  sku?: string;
 }
 
 export interface ClienteSuc {

@@ -7,6 +7,7 @@ import type { Sesion } from "@/lib/auth";
 import { SEDES, UNIDADES } from "@/lib/empresa";
 import { editarRequerimiento, reenviarRequerimiento, uid } from "@/lib/storage";
 import type { ItemReq, Requerimiento, Rol } from "@/lib/types";
+import { ProductoInput } from "@/components/productos/ProductoInput";
 
 export const itemVacio = (): ItemReq => ({ id: uid(), nombre: "", cantidad: 1, unidad: "UND", marca: "", caracteristica: "" });
 
@@ -47,7 +48,11 @@ export function ItemsEditor({ items, onChange }: { items: ItemReq[]; onChange: (
             <tr key={i.id}>
               <td className="px-3 py-1.5 text-slate-400">{k + 1}</td>
               <td className="px-2 py-1.5">
-                <Input value={i.nombre} onChange={(e) => set(i.id, "nombre", e.target.value)} placeholder="Ej: Rodamiento 6205" />
+                <ProductoInput
+                  value={i.nombre}
+                  modulo="Almacén · Requerimiento"
+                  onChange={(nombre, p) => onChange(items.map((x) => (x.id === i.id ? { ...x, nombre, ...(p ? { unidad: p.unidad, marca: x.marca || p.marca || "", productoId: p.id, sku: p.sku } : {}) } : x)))}
+                />
               </td>
               <td className="px-2 py-1.5">
                 <Input type="number" min={0} step="any" value={i.cantidad || ""} onChange={(e) => set(i.id, "cantidad", parseFloat(e.target.value) || 0)} />

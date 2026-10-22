@@ -4,7 +4,9 @@ import { Plus, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge, Button, Input, cn } from "@/components/ui";
 import { UNIDADES } from "@/lib/empresa";
+import { ProductoInput } from "@/components/productos/ProductoInput";
 import { r2, soles, uid } from "@/lib/storage";
+import { buscarProducto } from "@/lib/productos";
 import type { EstadoDerivacion, EstadoReqSuc, EstadoTraslado, EstadoVenta, StockLocal } from "@/lib/sucursal";
 
 /** Estados de la sucursal -> claves de Badge (components/ui TONO_ESTADO). */
@@ -63,25 +65,19 @@ export function LineasEditor({ lineas, onChange, stock, conPrecio = true }: { li
   const set = (key: string, cambio: Partial<LineaEdit>) => onChange(lineas.map((l) => (l.key === key ? { ...l, ...cambio } : l)));
   const elegir = (key: string, texto: string) => {
     const s = stock.find((x) => x.producto.toUpperCase() === texto.trim().toUpperCase());
-    set(key, s ? { producto: s.producto, productoId: s.id, unidad: s.unidad, ...(conPrecio && s.precio > 0 ? { precio: String(s.precio) } : {}) } : { producto: texto, productoId: undefined });
+    const m = buscarProducto(texto);
+    set(key, s ? { producto: s.producto, productoId: s.id, unidad: s.unidad, ...(conPrecio && s.precio > 0 ? { precio: String(s.precio) } : {}) } : { producto: texto, productoId: undefined, ...(m && m.nombre_normalizado === texto ? { unidad: m.unidad } : {}) });
   };
   const total = r2(lineas.reduce((a, l) => a + (Number(l.cantidad) || 0) * (Number(l.precio) || 0), 0));
   return (
     <div className="space-y-2">
-      <datalist id="suc-productos">
-        {stock.map((s) => (
-          <option key={s.id} value={s.producto}>
-            {`Stock ${s.stock} ${s.unidad}`}
-          </option>
-        ))}
-      </datalist>
       {lineas.map((l, i) => {
         const s = l.productoId ? stock.find((x) => x.id === l.productoId) : undefined;
         const falta = !!l.producto.trim() && (!s || s.stock < (Number(l.cantidad) || 0));
         return (
           <div key={l.key} className="grid grid-cols-12 items-start gap-2">
             <div className="col-span-12 sm:col-span-5">
-              <Input list="suc-productos" value={l.producto} onChange={(e) => elegir(l.key, e.target.value)} placeholder={`Producto ${i + 1}`} aria-label={`Producto ${i + 1}`} />
+              <ProductoInput value={l.producto} onChange={(nombre) => elegir(l.key, nombre)} placeholder={`Producto ${i + 1} (catálogo)`} ariaLabel={`Producto ${i + 1}`} modulo="Sucursal Beta" />
               {l.producto.trim() && (
                 <p className={cn("mt-0.5 text-[11px]", falta ? "text-amber-500" : "text-plomo-500")}>
                   {s ? `Stock local: ${s.stock} ${s.unidad}${falta ? " · no alcanza" : ""}` : "Sin stock local (servicio o se pide al Taller)"}

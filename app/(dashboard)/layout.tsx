@@ -17,6 +17,8 @@ import { accionesDe, hrefSub, moduloDe, navDe } from "@/components/shell/nav";
 import { FloatingDock } from "@/components/layout/FloatingDock";
 import { ModuleHeader } from "@/components/layout/ModuleHeader";
 import { NotificationSidebar } from "@/components/layout/NotificationSidebar";
+import { DatalistCatalogo } from "@/components/productos/ProductoInput";
+import { detenerCatalogo, iniciarCatalogo } from "@/lib/productos";
 import { RUTA_SUCURSAL, inicioDe, logout, puedeVer, useSesion, veTesoreria } from "@/lib/auth";
 import { JEFE_SUCURSAL } from "@/lib/sucursal-modelos";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
@@ -54,6 +56,7 @@ const FLUJOS: [string, string][] = [
   ["/dashboard/planilla", "Trabajadores → Planilla del periodo → Historial → Contratistas"],
   ["/dashboard/contable", "Libro Diario → Mayor → Balance → Estados Financieros"],
   ["/dashboard/creador", "Asistencia → Edición manual → Planilla"],
+  ["/dashboard/productos", "Catálogo maestro → Solicitud → Aprobación → Mismo producto en todos los almacenes"],
   ["/dashboard/sucursal", "Venta → Entrega / Derivación → Requerimiento → Cotización → OC → OT con Guía → Recepción"],
   ["/dashboard", "Resumen → Compras → Almacén → Ventas → Contable"],
 ];
@@ -66,6 +69,7 @@ const NOMBRE_MODULO: [string, string][] = [
   ["/dashboard/produccion", "PRODUCCION"],
   ["/dashboard/creador", "CREADOR"],
   ["/dashboard/sucursal", "SUCURSAL BETA"],
+  ["/dashboard/productos", "PRODUCTOS"],
 ];
 const flujoDe = (ruta: string) => FLUJOS.find(([r]) => ruta === r || ruta.startsWith(`${r}/`))?.[1] ?? "";
 
@@ -130,6 +134,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         }, 2500);
       }
   }, [ods, sesion, datos.listo]);
+
+  // Catálogo maestro de productos: uno solo para todos los almacenes (lib/productos.ts)
+  useEffect(() => {
+    if (sesion) void iniciarCatalogo();
+  }, [sesion]);
 
   useEffect(() => {
     if (datos.listo && sesion?.rol === "creador") setLocales(contarDatosLocales());
@@ -196,6 +205,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   const salir = async () => {
     await detenerDatos();
+    await detenerCatalogo();
     await logout();
     limpiarPrefs();
     router.replace("/login");
@@ -353,6 +363,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <AccionRapida acciones={acciones} />
       <CommandPalette abierto={paleta} onCerrar={() => setPaleta(false)} comandos={comandos} documentos={documentos} />
       <DocViewerHost />
+      <DatalistCatalogo />
       <Toaster />
     </div>
   );
