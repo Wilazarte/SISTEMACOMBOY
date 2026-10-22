@@ -1,10 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Briefcase, Pencil, Plus, Power, Printer, Trash2, UserCheck } from "lucide-react";
+import { Briefcase, FileText, Pencil, Plus, Power, Trash2, UserCheck } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, cn, ejecutar } from "@/components/ui";
 import { SEDES } from "@/lib/empresa";
-import { PrintServicioModal, type ReciboServicio } from "@/components/planilla/PrintServicioModal";
+import { descargarRecibo, estadoContratista } from "@/components/planilla/generateReciboPDF";
 import {
   FORMAS_PAGO_CONTRATISTA,
   SERVICIOS_CONTRATISTA,
@@ -45,23 +45,7 @@ const desde = (t: Trabajador): DatosContratista => ({
   formaPago: t.formaPagoContrato ?? FORMAS_PAGO_CONTRATISTA[0],
 });
 
-const reciboDe = (t: Trabajador): ReciboServicio => ({
-  tipo: "CONTRATISTA",
-  numero: `REC-${t.id}`,
-  servicio: t.tipoServicio ? SERVICIOS_CONTRATISTA[t.tipoServicio] : "Sin servicio",
-  contratista: t.nombre,
-  documento: [t.dni && `DNI ${t.dni}`, t.ruc && `RUC ${t.ruc}`].filter(Boolean).join(" · "),
-  empresa: t.empresa ?? "",
-  sede: t.sede ?? "",
-  inicio: t.fechaIngreso,
-  fin: t.fechaFinContrato ?? "",
-  monto: t.sueldo,
-  modalidad: t.formaPagoContrato ?? "",
-  estado: estadoDe(t),
-});
-
-/** Estado mostrado: INACTIVO (dado de baja), FINALIZADO (pasó la fecha de fin) o ACTIVO. */
-const estadoDe = (t: Trabajador) => (!t.activo ? "INACTIVO" : t.fechaFinContrato && t.fechaFinContrato < hoy() ? "FINALIZADO" : "ACTIVO");
+const estadoDe = estadoContratista;
 
 /**
  * Contratistas del maestro de trabajadores (esContratista, cargo "Contratista" o pago POR CONTRATO).
@@ -70,7 +54,6 @@ const estadoDe = (t: Trabajador) => (!t.activo ? "INACTIVO" : t.fechaFinContrato
 export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadores: Trabajador[]; soloLectura: boolean }) {
   const [form, setForm] = useState<{ datos: DatosContratista; idOriginal?: string } | null>(null);
   const [verInactivos, setVerInactivos] = useState(false);
-  const [recibo, setRecibo] = useState<ReciboServicio | null>(null);
   const todos = useMemo(() => trabajadores.filter(esContratista), [trabajadores]);
   const lista = todos
     .filter((t) => verInactivos || t.activo)
@@ -87,11 +70,11 @@ export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadore
         subtitle={`${activos.length} activo(s) · contratado ${soles(r2(activos.reduce((s, t) => s + t.sueldo, 0)))} · no entran a la planilla del periodo`}
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-plomo-200 bg-surface px-3 py-2 text-sm font-medium text-slate-700">
+            <label className="flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg border border-plomo-200 bg-surface px-3 py-2 text-sm font-medium text-slate-700">
               <input type="checkbox" checked={verInactivos} onChange={(e) => setVerInactivos(e.target.checked)} className="h-4 w-4 accent-red-600" /> Mostrar inactivos
             </label>
             {!soloLectura && (
-              <Button variant="warning" onClick={() => setForm({ datos: vacio() })} className="px-5 py-2.5">
+              <Button variant="warning" onClick={() => setForm({ datos: vacio() })} className="whitespace-nowrap px-5 py-2.5">
                 <Plus size={18} /> Registrar contratista
               </Button>
             )}
@@ -103,17 +86,17 @@ export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadore
           <Empty icon={<Briefcase size={28} />} text={todos.length ? "No hay contratistas activos." : "Aún no hay contratistas. Use “Registrar contratista” o ponga cargo “Contratista” en la ficha de un trabajador."} />
         </div>
       ) : (
-        <Table head={["N°", "Nombre del contratista", "Empresa / Servicio", "Sede", "Monto contratado", "Inicio / Fin", "Estado", "Acciones"]}>
+        <Table compacto head={["N°", "Nombre del contratista", "Empresa / Servicio", "Sede", "Monto contratado", "Inicio / Fin", "Estado", "Acciones"]}>
           {lista.map((t) => {
             const estado = estadoDe(t);
             return (
               <tr key={t.id} className={cn("hover:bg-plomo-50", !t.activo && "bg-plomo-100 text-slate-400")}>
                 <Td className="font-mono">{t.id}</Td>
-                <Td>
+                <Td className="whitespace-normal">
                   <p className={cn("font-semibold", t.activo ? "text-fg" : "text-plomo-500")}>{t.nombre}</p>
                   <p className="text-xs text-plomo-500">{t.ruc ? `RUC ${t.ruc}` : t.dni ? `DNI ${t.dni}` : "Sin documento"}</p>
                 </Td>
-                <Td>
+                <Td className="whitespace-normal">
                   <p className="font-medium">{t.empresa || "-"}</p>
                   <p className="text-xs text-plomo-500">{t.tipoServicio ? SERVICIOS_CONTRATISTA[t.tipoServicio] : "Sin servicio"}</p>
                 </Td>
@@ -131,13 +114,15 @@ export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadore
                   <Badge estado={estado} />
                 </Td>
                 <Td>
-                  <div className="flex gap-1">
-                    <BotonImprimir onClick={() => setRecibo(reciboDe(t))} />
+                  <div className="flex flex-wrap items-center gap-1">
+                    {!soloLectura && (
+                      <Button size="sm" variant="secondary" onClick={() => setForm({ datos: desde(t), idOriginal: t.id })} title="Editar">
+                        <Pencil size={14} /> Editar
+                      </Button>
+                    )}
+                    <BotonPDF onClick={() => descargarRecibo(t, "CONTRATISTA")} />
                     {!soloLectura && (
                       <>
-                        <Button size="sm" variant="secondary" onClick={() => setForm({ datos: desde(t), idOriginal: t.id })} title="Editar">
-                          <Pencil size={14} /> Editar
-                        </Button>
                         {t.activo ? (
                           <Button
                             size="sm"
@@ -173,23 +158,21 @@ export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadore
         </Table>
       )}
 
-      {recibo && <PrintServicioModal recibo={recibo} onClose={() => setRecibo(null)} />}
       {form && <FormContratista datos={form.datos} editando={!!form.idOriginal} onChange={(datos) => setForm({ ...form, datos })} onCancel={() => setForm(null)} onSave={guardar} />}
     </Card>
   );
 }
 
-/** Botón azul de impresión / exportación del recibo de servicio. */
-export function BotonImprimir({ onClick }: { onClick: () => void }) {
+/** Botón rojo que descarga directo el recibo en PDF. */
+export function BotonPDF({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      title="Imprimir / exportar recibo"
-      aria-label="Imprimir / exportar recibo"
-      className="inline-flex items-center justify-center rounded-lg bg-[#3B82F6] px-2 py-1.5 text-white shadow-card transition hover:bg-[#2563EB]"
+      title="Descargar recibo PDF"
+      className="inline-flex items-center gap-1.5 rounded-lg bg-[#DC2626] px-2.5 py-1.5 text-xs font-semibold text-white shadow-card transition hover:bg-[#B91C1C]"
     >
-      <Printer size={14} />
+      <FileText size={14} /> PDF
     </button>
   );
 }
