@@ -69,16 +69,16 @@ export default function ProduccionPage() {
           <Table head={["OP", "Fecha", "Equipo", "Chasis", "Motor", "Almacén destino", "Estado", "QC / equipo", "Acciones"]}>
             {lista.map((o) => (
               <tr key={o.id} className="hover:bg-plomo-50">
-                <Td className="font-mono text-xs font-semibold text-fg">{o.id}</Td>
+                <Td className="text-xs font-semibold text-fg">{o.id}</Td>
                 <Td>{fechaPE(o.fecha)}</Td>
                 <Td>
                   <p className="font-semibold text-fg">{o.modelo}</p>
                   <p className="text-xs text-plomo-500">{o.tipo_equipo}</p>
                 </Td>
-                <Td className="font-mono text-xs">{o.codigo_chasis}</Td>
+                <Td className="text-xs">{o.codigo_chasis}</Td>
                 <Td className="text-xs">
                   {o.marca_motor}
-                  {o.serie_motor && <p className="font-mono text-plomo-500">{o.serie_motor}</p>}
+                  {o.serie_motor && <p className="text-plomo-500">{o.serie_motor}</p>}
                 </Td>
                 <Td>{o.ubicacion_sede}</Td>
                 <Td>
@@ -90,7 +90,7 @@ export default function ProduccionPage() {
                       <p>
                         {o.qc.supervisor} · {fechaPE(o.qc.fecha)}
                       </p>
-                      <Link href="/dashboard/almacen" className="font-mono font-semibold text-rojo hover:underline">
+                      <Link href="/dashboard/almacen" className="font-semibold text-rojo hover:underline">
                         {o.equipo_id}
                       </Link>
                     </>
@@ -156,10 +156,10 @@ function FormOP({ inicial, onClose }: { inicial: DatosOP; onClose: () => void })
           <Select value={d.marca_motor} onChange={(e) => set("marca_motor", e.target.value)} placeholder="Selecciona marca" options={MARCAS_MOTOR.map((t) => ({ value: t, label: t }))} />
         </Field>
         <Field label="Serie de motor">
-          <Input value={d.serie_motor} onChange={(e) => set("serie_motor", e.target.value.toUpperCase())} className="font-mono" />
+          <Input value={d.serie_motor} onChange={(e) => set("serie_motor", e.target.value.toUpperCase())} />
         </Field>
         <Field label="Código de chasis * (único)">
-          <Input value={d.codigo_chasis} onChange={(e) => set("codigo_chasis", e.target.value.toUpperCase())} placeholder="Ej: WH174MN-2 260380186" className="font-mono" />
+          <Input value={d.codigo_chasis} onChange={(e) => set("codigo_chasis", e.target.value.toUpperCase())} placeholder="Ej: WH174MN-2 260380186" />
         </Field>
         <Field label="Color">
           <Input value={d.color} onChange={(e) => set("color", e.target.value)} />
@@ -206,7 +206,7 @@ function ModalQC({ op, supervisores, onClose }: { op: OrdenProduccion; superviso
     <Modal open onClose={onClose} title={`Control de calidad · ${op.id}`} wide>
       <div className="space-y-4">
         <p className="text-sm text-plomo-600">
-          {op.tipo_equipo} {op.modelo} · chasis <b className="font-mono">{op.codigo_chasis}</b>. Al aprobar, el equipo ingresa automáticamente a Almacén como <b>DISPONIBLE</b>.
+          {op.tipo_equipo} {op.modelo} · chasis <b>{op.codigo_chasis}</b>. Al aprobar, el equipo ingresa automáticamente a Almacén como <b>DISPONIBLE</b>.
         </p>
         <div className="grid gap-3 md:grid-cols-3">
           <Field label="Supervisor QC *">

@@ -118,7 +118,7 @@ export function DetalleHistorial({ id }: { id: string }) {
         <Table head={["N°", "Trabajador", "F. ingreso", "Sueldo / Tipo", "Pensión", "Días", "Horas", "Tard.", "Bruto", "Dscto", "Neto", "Adelantos", "Total pagado", ""]} empty={detalle.length === 0}>
           {detalle.map((d) => (
             <tr key={d.id}>
-              <Td className="font-mono">{d.trabajador_id}</Td>
+              <Td>{d.trabajador_id}</Td>
               <Td>
                 <p className="font-semibold text-fg">{d.nombre}</p>
                 <p className="text-xs text-plomo-500">

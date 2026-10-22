@@ -4,8 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, ChevronRight, CloudUpload, Eye, Home, Loader2, LogOut, Search, ShieldAlert } from "lucide-react";
-import { EV_PESTANA, ID_BARRA_PESTANAS, Kbd, Toaster, cn, toast, type PestanaActiva } from "@/components/ui";
+import { AlertTriangle, CloudUpload, Eye, Loader2, Search, ShieldAlert } from "lucide-react";
+import { EV_PESTANA, ID_BARRA_PESTANAS, Kbd, Toaster, toast, type PestanaActiva } from "@/components/ui";
 import { DocViewerHost, abrirDoc, type DocRef } from "@/components/doc-viewer";
 import { ObservacionesGerencia } from "@/components/ObservacionesGerencia";
 import { Header } from "@/components/Header";
@@ -15,6 +15,7 @@ import { CommandPalette, IconoDoc, type Comando } from "@/components/shell/Comma
 import { useIr } from "@/components/shell/ir";
 import { accionesDe, hrefSub, moduloDe, navDe } from "@/components/shell/nav";
 import { FloatingDock } from "@/components/layout/FloatingDock";
+import { ModuleHeader } from "@/components/layout/ModuleHeader";
 import { inicioDe, logout, puedeVer, useSesion, veTesoreria } from "@/lib/auth";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
 import { useNotificaciones } from "@/lib/notificaciones";
@@ -52,6 +53,15 @@ const FLUJOS: [string, string][] = [
   ["/dashboard/contable", "Libro Diario → Mayor → Balance → Estados Financieros"],
   ["/dashboard/creador", "Asistencia → Edición manual → Planilla"],
   ["/dashboard", "Resumen → Compras → Almacén → Ventas → Contable"],
+];
+/** Título centrado del encabezado: MODULO <nombre> (Inventario = Almacén, Reportes = Contable). */
+const NOMBRE_MODULO: [string, string][] = [
+  ["/dashboard/compras", "TESORERIA"],
+  ["/dashboard/ventas", "VENTAS"],
+  ["/dashboard/almacen", "INVENTARIO"],
+  ["/dashboard/contable", "REPORTES"],
+  ["/dashboard/produccion", "PRODUCCION"],
+  ["/dashboard/creador", "CREADOR"],
 ];
 const flujoDe = (ruta: string) => FLUJOS.find(([r]) => ruta === r || ruta.startsWith(`${r}/`))?.[1] ?? "";
 
@@ -214,8 +224,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const permitido = path === "/dashboard/compras" ? veTesoreria(sesion) : puedeVer(sesion, path);
   const actual = moduloDe(path);
   const modulo = actual && actual.href !== "/dashboard" ? actual.href : undefined;
-  const subActual = actual?.subs.find((s) => (s.href ? s.href === path : tabActiva?.id === s.tab));
-  const migas = [actual?.label ?? "Inicio", subActual?.label ?? tabActiva?.label ?? (path === "/dashboard" ? "Resumen" : undefined)].filter(Boolean) as string[];
+  const enPlanilla = path.startsWith("/dashboard/planilla") || (path === "/dashboard/compras" && tabActiva?.id === "planilla");
+  const nombreModulo = enPlanilla ? "PLANILLA" : (NOMBRE_MODULO.find(([r]) => path === r || path.startsWith(`${r}/`))?.[1] ?? "DASHBOARD");
 
   return (
     // Tema azul oscuro COMBOY VID: siempre oscuro (.dark + .tema-azul, app/globals.css) sobre el mapa azul
@@ -226,70 +236,46 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <div className="absolute inset-0 bg-black/85" />
       </div>
 
-      {/* Barra superior: ruta, buscador global, campana y tema */}
-      <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-3 border-b border-[#1e2a45] bg-[#070b14]/70 px-4 backdrop-blur-xl lg:px-7">
-        <Link href={inicioDe(sesion)} className="shrink-0" aria-label="Inicio">
-          <Image src="/logo.png" alt="COMBOY VID" width={94} height={40} className="h-9 w-auto object-contain" />
-        </Link>
-        <nav aria-label="Ruta" className="flex min-w-0 items-center gap-1.5 text-[13px] text-plomo-500">
-          <Link href={inicioDe(sesion)} className="hidden rounded p-0.5 hover:text-fg sm:block" aria-label="Inicio">
-            <Home size={15} />
-          </Link>
-          {migas.map((m, i) => (
-            <span key={m + i} className="flex min-w-0 items-center gap-1.5">
-              <ChevronRight size={13} className={cn("shrink-0 text-plomo-200", i === 0 && "hidden sm:block")} />
-              {i === 0 && actual && migas.length > 1 ? (
-                <Link href={actual.href} className="truncate hover:text-fg">
-                  {m}
-                </Link>
-              ) : (
-                <span className={cn("truncate", i === migas.length - 1 && "font-medium text-fg")}>{m}</span>
-              )}
-            </span>
-          ))}
-        </nav>
-        <div className="ml-auto flex items-center gap-2">
-          <button
-            onClick={() => setPaleta(true)}
-            className="flex h-9 items-center gap-2.5 rounded-lg border border-plomo-200 bg-surface px-2.5 text-[13px] text-plomo-500 shadow-card transition hover:border-plomo-500/40 hover:text-fg sm:w-64 md:w-80"
-            aria-label="Abrir buscador global (Ctrl K)"
-          >
-            <Search size={15} className="shrink-0" />
-            <span className="hidden flex-1 truncate text-left sm:block">{buscador ? "Buscar REQ, OC, factura…" : "Buscar o ir a…"}</span>
-            <span className="hidden items-center gap-1 sm:flex">
-              <Kbd>Ctrl</Kbd>
-              <Kbd>K</Kbd>
-            </span>
-          </button>
-          <Campana notifs={notifs} vistas={prefs.notifVistas ?? []} />
-          {locales > 0 && (
+      {/* Encabezado: logo · MODULO X centrado · buscador, campana y usuario */}
+      <ModuleHeader
+        moduleName={nombreModulo}
+        inicio={inicioDe(sesion)}
+        usuario={sesion.usuario}
+        nombre={sesion.nombre}
+        onSalir={salir}
+        extra={
+          <>
             <button
-              onClick={subirLocales}
-              disabled={subiendo}
-              className="tip flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/10 hover:text-white disabled:opacity-60"
-              data-tip={`Subir datos de este navegador (${locales})`}
-              aria-label="Subir datos de este navegador"
+              onClick={() => setPaleta(true)}
+              className="flex h-9 items-center gap-2.5 rounded-lg border border-gray-700 bg-[#1e293b] px-2.5 text-[13px] text-gray-300 transition hover:text-white 2xl:w-72"
+              aria-label="Abrir buscador global (Ctrl K)"
+              title={buscador ? "Buscar REQ, OC, factura… (Ctrl K)" : "Buscar o ir a… (Ctrl K)"}
             >
-              {subiendo ? <Loader2 size={16} className="animate-spin" /> : <CloudUpload size={16} />}
+              <Search size={15} className="shrink-0" />
+              <span className="hidden flex-1 truncate text-left 2xl:block">{buscador ? "Buscar REQ, OC, factura…" : "Buscar o ir a…"}</span>
+              <span className="hidden items-center gap-1 lg:flex">
+                <Kbd>Ctrl</Kbd>
+                <Kbd>K</Kbd>
+              </span>
             </button>
-          )}
-          <span className="hidden h-9 items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] pl-1 pr-3 md:flex" title={sesion.nombre}>
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-[11px] font-semibold uppercase text-white">{sesion.usuario.slice(0, 2)}</span>
-            <span className="max-w-[140px] truncate text-[13px] font-medium text-white">{sesion.usuario}</span>
-          </span>
-          <button
-            onClick={salir}
-            className="tip flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-[#ff1a1a]/20 hover:text-[#ff3a3a]"
-            data-tip="Cerrar sesión"
-            aria-label="Cerrar sesión"
-          >
-            <LogOut size={16} />
-          </button>
-        </div>
-      </header>
+            <Campana notifs={notifs} vistas={prefs.notifVistas ?? []} />
+            {locales > 0 && (
+              <button
+                onClick={subirLocales}
+                disabled={subiendo}
+                className="tip flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/10 hover:text-white disabled:opacity-60"
+                data-tip={`Subir datos de este navegador (${locales})`}
+                aria-label="Subir datos de este navegador"
+              >
+                {subiendo ? <Loader2 size={16} className="animate-spin" /> : <CloudUpload size={16} />}
+              </button>
+            )}
+          </>
+        }
+      />
 
       <main className="w-full flex-1">
-        <div className="mx-auto w-full max-w-[1600px] px-4 pt-20 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-[1600px] px-4 pt-24 sm:px-6 lg:px-8">
           {sesion.modulos.length === 0 ? (
             <Aviso titulo="Sin módulos asignados">
               Su usuario ({sesion.usuario}, rol {sesion.rol}) inició sesión, pero todavía no tiene módulos habilitados. El administrador debe asignarlos en la tabla perfiles (columna modulos).
@@ -309,7 +295,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <div className="animate-velo space-y-5" key={path} /* solo opacidad: un transform rompería los modales fijos */>
               <Header sesion={sesion} flujo={flujoDe(path === "/dashboard/compras" && tabActiva?.id === "planilla" ? "/dashboard/planilla" : path)} />
               {/* Menú isla del módulo (components/ui Tabs dibuja aquí su IslandMenu): fijo al hacer scroll, sin barra de fondo */}
-              <div id={ID_BARRA_PESTANAS} className="sticky top-14 z-10 empty:hidden" />
+              <div id={ID_BARRA_PESTANAS} className="sticky top-16 z-10 empty:hidden" />
               {sesion.soloLectura && (
                 <div className="flex w-full items-center gap-2 rounded-xl border border-plomo-200 bg-surface px-4 py-2.5 text-sm text-fg-2 shadow-card">
                   <Eye size={16} className="shrink-0 text-plomo-500" /> Modo solo lectura: puede revisar todo y registrar observaciones, pero no guardar, editar ni eliminar.
@@ -329,7 +315,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <span>
           <span className="font-semibold text-fg">COMBOY</span> <span className="font-semibold text-rojo">VID</span> © 2025 · ERP COMBOYVID · Arequipa, Perú · Área Informática
         </span>
-        <span className="font-mono">v3.2.1</span>
+        <span>v3.2.1</span>
       </footer>
       <FloatingDock sesion={sesion} tab={tabActiva?.id} />
       <AccionRapida acciones={acciones} />

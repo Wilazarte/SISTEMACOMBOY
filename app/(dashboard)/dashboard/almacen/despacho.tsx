@@ -130,7 +130,7 @@ export function OrdenesDespacho({ vista = "almacen" }: { vista?: "almacen" | "ve
           contraparte: o.cliente,
           ref: (
             <>
-              <span className="font-mono font-semibold text-fg">{codigoOD(o)}</span>
+              <span className="font-semibold text-fg">{codigoOD(o)}</span>
                   {o.vistoAlmacen === false && <span className="ml-2 rounded-full bg-corp px-1.5 py-0.5 text-[10px] font-bold text-white">NUEVA</span>}
                   <span className="ml-1.5 text-xs text-plomo-500">{origenOD(o)}</span>
                   <span className="ml-2 inline-block align-middle"><Badge estado={estadoOD(o)} /></span>
@@ -311,7 +311,7 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
                 const falta = !!modo && disp !== null && (cant[l.id] ?? 0) > disp + 1e-9;
                 return (
                   <tr key={l.id} className={cn(falta && "bg-red-50")}>
-                    <td className="px-3 py-2 font-mono text-xs">{equipoDeLinea(l)?.id || l.codigo || "-"}</td>
+                    <td className="px-3 py-2 text-xs">{equipoDeLinea(l)?.id || l.codigo || "-"}</td>
                     <td className="px-3 py-2">
                       {l.descripcion}
                       {l.ancho > 0 && <span className="text-xs text-plomo-500"> · {l.ancho}×{l.alto} m × {l.cantidadPiezas}</span>}
@@ -322,7 +322,7 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
                     </td>
                     <td className="px-3 py-2 text-plomo-600">
                       {ubicacionLinea(l)}
-                      {equipoDeLinea(l) && <p className="font-mono text-[11px] text-plomo-500">Chasis {equipoDeLinea(l)!.codigo_chasis}</p>}
+                      {equipoDeLinea(l) && <p className="text-[11px] text-plomo-500">Chasis {equipoDeLinea(l)!.codigo_chasis}</p>}
                     </td>
                     {modo && (
                       <td className={cn("px-3 py-2 text-right", falta ? "font-bold text-red-600" : "text-plomo-600")}>

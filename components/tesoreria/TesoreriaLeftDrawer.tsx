@@ -35,7 +35,7 @@ export default function TesoreriaLeftDrawer({ open, onToggle, cantidad, acciones
 
       <aside
         className={cn(
-          "fixed left-0 top-14 z-30 flex h-[calc(100vh-56px)] flex-col border-r border-white/10 bg-[#0a101f] transition-all duration-300 print:hidden",
+          "fixed left-0 top-16 z-30 flex h-[calc(100vh-64px)] flex-col border-r border-white/10 bg-[#0a101f] transition-all duration-300 print:hidden",
           open ? "w-[min(320px,85vw)]" : "w-0 overflow-hidden border-r-0"
         )}
         aria-hidden={!open}

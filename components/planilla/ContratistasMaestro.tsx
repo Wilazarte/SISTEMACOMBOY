@@ -107,7 +107,7 @@ export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadore
             const estado = estadoDe(t);
             return (
               <tr key={t.id} className={cn("hover:bg-plomo-50", !t.activo && "bg-plomo-100 text-slate-400")}>
-                <Td className="font-mono">{t.id}</Td>
+                <Td>{t.id}</Td>
                 <Td className="whitespace-normal">
                   <p className={cn("font-semibold", t.activo ? "text-fg" : "text-plomo-500")}>{t.nombre}</p>
                   <p className="text-xs text-plomo-500">{t.ruc ? `RUC ${t.ruc}` : t.dni ? `DNI ${t.dni}` : "Sin documento"}</p>

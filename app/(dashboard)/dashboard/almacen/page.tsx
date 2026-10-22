@@ -137,7 +137,7 @@ function NuevoReq({ rol, onCreado, onCancelar }: { rol: Rol; onCreado: () => voi
     <Card>
       <CardHeader title="Nuevo requerimiento de almacén" subtitle="Al guardar se notifica automáticamente a Tesorería." action={
           <div className="flex items-center gap-2">
-            <span className="rounded-lg bg-plomo-100 px-3 py-1.5 font-mono text-sm font-bold text-slate-700" title="Número probable: el definitivo se asigna al guardar">{proximo}</span>
+            <span className="rounded-lg bg-plomo-100 px-3 py-1.5 text-sm font-bold text-slate-700" title="Número probable: el definitivo se asigna al guardar">{proximo}</span>
             <BotonNuevo abierto onClick={onCancelar} />
           </div>
         }

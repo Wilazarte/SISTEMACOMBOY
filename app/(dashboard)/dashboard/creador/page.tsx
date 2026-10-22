@@ -80,7 +80,7 @@ export default function CreadorPage() {
               const reg = porId.get(idAsistencia(periodo, t.id));
               return (
                 <tr key={t.id} className={cn(cambiado(t.id) && "bg-amber-50")}>
-                  <Td className="font-mono">{t.id}</Td>
+                  <Td>{t.id}</Td>
                   <Td className="font-semibold text-fg">{t.nombre}</Td>
                   {(["dias", "tardanzas"] as const).map((campo) => (
                     <Td key={campo}>

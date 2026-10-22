@@ -247,7 +247,7 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
                 />
               </Field>
               <Field label="Serie / número" hint="Correlativo automático al emitir">
-                <Input value={previewNumero(SERIE[form.tipo])} disabled className="font-mono" />
+                <Input value={previewNumero(SERIE[form.tipo])} disabled />
               </Field>
               <Field label="Fecha emisión">
                 <Input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />

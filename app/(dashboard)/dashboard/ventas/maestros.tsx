@@ -102,7 +102,7 @@ export function CondicionesPago() {
       <Table head={["Código", "Nombre", "Tipo", "Medio / Días", "% Inicial", "Contraentrega", "Estado", ""]} empty={condiciones.length === 0}>
         {condiciones.map((c) => (
           <tr key={c.id} className={cn("hover:bg-plomo-50", !c.activo && "opacity-50")}>
-            <Td className="font-mono font-semibold">{c.codigo}</Td>
+            <Td className="font-semibold">{c.codigo}</Td>
             <Td>{c.nombre}</Td>
             <Td>{TIPOS_CONDICION[c.tipo]}</Td>
             <Td>{c.tipo === "CONTADO" ? c.medio || "-" : `${c.dias} días`}</Td>
@@ -196,7 +196,7 @@ export function Clientes() {
           const saldo = saldoCliente(c.id);
           return (
             <tr key={c.id} className={cn("hover:bg-plomo-50", c.estado === "INACTIVO" && "opacity-50")}>
-              <Td className="font-mono">
+              <Td>
                 {c.tipoDoc} {c.numDoc}
               </Td>
               <Td>

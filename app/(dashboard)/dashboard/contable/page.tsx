@@ -191,7 +191,7 @@ function LibroDiario({ asientos, titulo }: { asientos: AsientoDiario[]; titulo: 
           {asientos.map((a, i) => (
             <Fragment key={a.id}>
               <tr className="border-t-2 border-t-plomo-200 bg-plomo-50">
-                <td className="px-4 py-2 font-mono text-xs text-plomo-500">{String(i + 1).padStart(4, "0")}</td>
+                <td className="px-4 py-2 text-xs text-plomo-500">{String(i + 1).padStart(4, "0")}</td>
                 <td className="whitespace-nowrap px-4 py-2 text-plomo-600">{fechaPE(a.fecha)}</td>
                 <td className="px-4 py-2" colSpan={4}>
                   <span className="mr-2 font-medium text-fg">{a.glosa}</span>
@@ -202,7 +202,7 @@ function LibroDiario({ asientos, titulo }: { asientos: AsientoDiario[]; titulo: 
                 <tr key={j}>
                   <td />
                   <td />
-                  <Td className={cn("font-mono", l.haber > 0 && "pl-10")}>{l.cuenta}</Td>
+                  <Td className={cn(l.haber > 0 && "pl-10")}>{l.cuenta}</Td>
                   <Td className={cn(l.haber > 0 && "pl-10")}>{l.nombre}</Td>
                   <Td className="text-right">{num(l.debe)}</Td>
                   <Td className="text-right">{num(l.haber)}</Td>
@@ -238,7 +238,7 @@ function Mayor({ asientos, titulo }: { asientos: AsientoDiario[]; titulo: string
           {cuentas.map((c) => (
             <Fragment key={c.cuenta}>
               <tr className="cursor-pointer hover:bg-plomo-50" onClick={() => setAbierta(abierta === c.cuenta ? null : c.cuenta)}>
-                <Td className="font-mono font-semibold text-fg">
+                <Td className="font-semibold text-fg">
                   <span className="inline-flex items-center gap-1">
                     {abierta === c.cuenta ? <ChevronDown size={14} /> : <ChevronRight size={14} />} {c.cuenta}
                   </span>
@@ -315,7 +315,7 @@ function Balance({
           <Table head={["Cuenta", "Denominación", "Sumas debe", "Sumas haber", "Saldo deudor", "Saldo acreedor"]}>
             {cuentas.map((c) => (
               <tr key={c.cuenta}>
-                <Td className="font-mono font-semibold text-fg">{c.cuenta}</Td>
+                <Td className="font-semibold text-fg">{c.cuenta}</Td>
                 <Td>{c.nombre}</Td>
                 <Td className="text-right">{num(c.debe)}</Td>
                 <Td className="text-right">{num(c.haber)}</Td>
@@ -362,7 +362,7 @@ function EEFF({ asientos, titulo }: { asientos: AsientoDiario[]; titulo: string 
   const Linea = ({ c, nombre, monto, fuerte }: { c?: string; nombre: string; monto: number; fuerte?: boolean }) => (
     <div className={cn("flex justify-between gap-3 border-b border-plomo-100 py-1.5 text-sm", fuerte && "border-t-2 border-t-azul-900 font-bold text-fg")}>
       <span>
-        {c && <span className="mr-2 font-mono text-xs text-plomo-500">{c}</span>}
+        {c && <span className="mr-2 text-xs text-plomo-500">{c}</span>}
         {nombre}
       </span>
       <span className={cn(monto < 0 && "text-vino")}>{soles(monto)}</span>
