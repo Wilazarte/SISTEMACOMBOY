@@ -174,9 +174,8 @@ grant select on public.v_sucursal_ventas, public.v_sucursal_traslados to authent
 -- 7. Realtime: los cambios de la sucursal llegan al instante a Taller y Tesorería
 do $$
 begin
-  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'sucursal') then
-    alter publication supabase_realtime add table public.sucursal;
-  end if;
+  alter publication supabase_realtime add table public.sucursal;
+exception when duplicate_object or undefined_object then null;
 end $$;
 
 commit;

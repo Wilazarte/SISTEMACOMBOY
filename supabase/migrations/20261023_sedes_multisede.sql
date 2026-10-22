@@ -181,27 +181,9 @@ end $$;
 -- 6. Vistas con sede_id (security_invoker: respetan sede_isolation)
 do $$
 begin
-  if to_regclass('public.v_stock_almacenes') is not null and to_regclass('public.sucursal') is not null then
-    execute $v$
-      create or replace view public.v_stock_almacenes with (security_invoker = true) as
-      select p.id as producto_id, p.sku, p.nombre_display, a.data->>'sede' as almacen_id,
-             coalesce((a.data->>'cantidad')::numeric, 0) as cantidad, 0::numeric as minimo, a.sede_id
-        from public.almacen a join public.productos_maestro p on p.id = public.producto_de_nombre(a.data->>'nombre')
-       where a.tipo = 'stock'
-      union all
-      select p.id, p.sku, p.nombre_display, 'SUCURSAL_' || upper(replace(coalesce(s.data->>'sucursalId', 'SUC'), '-', '_')),
-             coalesce((s.data->>'stock')::numeric, 0), coalesce((s.data->>'minimo')::numeric, 0), s.sede_id
-        from public.sucursal s join public.productos_maestro p on p.id = public.producto_de_nombre(s.data->>'producto')
-       where s.tipo = 'stock'
-    $v$;
-  elsif to_regclass('public.v_stock_almacenes') is not null then
-    execute $v$
-      create or replace view public.v_stock_almacenes with (security_invoker = true) as
-      select p.id as producto_id, p.sku, p.nombre_display, a.data->>'sede' as almacen_id,
-             coalesce((a.data->>'cantidad')::numeric, 0) as cantidad, 0::numeric as minimo, a.sede_id
-        from public.almacen a join public.productos_maestro p on p.id = public.producto_de_nombre(a.data->>'nombre')
-       where a.tipo = 'stock'
-    $v$;
+  -- v_stock_almacenes la arma 20261022_unificar_productos.sql (sirve para almacen relacional o de documentos)
+  if to_regprocedure('public.crear_vista_stock_almacenes()') is not null then
+    perform public.crear_vista_stock_almacenes();
   end if;
 
   if to_regclass('public.sucursal') is not null then
@@ -321,9 +303,10 @@ do $$
 declare t text;
 begin
   foreach t in array array['sedes', 'usuarios_sedes'] loop
-    if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
+    begin
       execute format('alter publication supabase_realtime add table public.%I', t);
-    end if;
+    exception when duplicate_object or undefined_object then null;
+    end;
   end loop;
 end $$;
 
