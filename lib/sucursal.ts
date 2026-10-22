@@ -59,6 +59,13 @@ const exigir = (ok: boolean, msg: string) => {
 
 type SerieSuc = "VTA" | "REQSUC" | "GE" | "CC" | "OT" | "GR";
 
+/** "Secocha" -> "SECOCHA" (sin tildes ni espacios) para el número del requerimiento. */
+const nombreSerie = (nombre: string): string =>
+  nombre.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "") || "SUC";
+
+/** Destino de los requerimientos de Secocha: el Almacén del Taller Principal (Arequipa). */
+export const DESTINO_REQ_SUCURSAL = "Almacén Taller Principal (Arequipa)";
+
 async function siguienteSuc(serie: SerieSuc): Promise<string> {
   // Cada sede numera aparte (la base fuerza la sede del usuario de sede); OT y guías: un solo correlativo del Taller
   const sede = getSedeActual();
@@ -73,7 +80,8 @@ async function siguienteSuc(serie: SerieSuc): Promise<string> {
   // Sedes que no son la central llevan su código: VTA-SEC-001-2026 (Arequipa sigue con VTA-001-2026)
   const cod = sede && !sede.es_central ? `${sede.codigo}-` : "";
   if (serie === "VTA") return `VTA-${cod}${String(n).padStart(3, "0")}-${anio}`;
-  if (serie === "REQSUC") return `REQ-SUC-${cod}${String(n).padStart(3, "0")}`;
+  // Requerimiento de la sucursal: REQ-SECOCHA-001 (nombre de la sede)
+  if (serie === "REQSUC") return `REQ-${sede && !sede.es_central ? nombreSerie(sede.nombre) : "SUC"}-${String(n).padStart(3, "0")}`;
   if (serie === "GE") return `GE-${cod}${String(n).padStart(4, "0")}-${anio}`;
   if (serie === "CC") return `CC-${cod}${String(n).padStart(3, "0")}-${anio}`;
   if (serie === "OT") return `OT-${String(n).padStart(5, "0")}`;
@@ -393,7 +401,7 @@ export function observarTraslado(id: string, tipo: "FALTANTE" | "DANADO", detall
 }
 
 // ---------------------------------------------------------------------
-// 4. Requerimientos REQ-SUC -> Tesorería Taller Principal
+// 4. Requerimientos REQ-SECOCHA -> Almacén del Taller Principal (Arequipa)
 // ---------------------------------------------------------------------
 
 export async function crearReqSucursal(items: ProductoTraslado[], motivo: string, automatico = false): Promise<ReqSucursal> {
@@ -408,17 +416,18 @@ export async function crearReqSucursal(items: ProductoTraslado[], motivo: string
   const id = uid();
   const fecha = hoy();
   const itemsReq: ItemReq[] = lista.map((i) => ({ id: uid(), nombre: i.producto, cantidad: i.cantidad, unidad: i.unidad || "UND", marca: "", caracteristica: "" }));
-  // Documento que revisa Tesorería (mismo flujo que los REQ de Almacén: Cotización -> OC)
+  // Mismo documento que los REQ de Almacén: llega al Almacén del Taller Principal (Arequipa) y sigue Cotización -> OC
   const req: Requerimiento = {
     id,
     numero,
     fecha,
-    sede: `Sucursal ${suc.nombre}`,
-    solicitante: sesion ? nombreDe(sesion) : `Sucursal ${suc.nombre}`,
+    sede: suc.nombre,
+    destino: DESTINO_REQ_SUCURSAL,
+    solicitante: sesion ? nombreDe(sesion) : suc.nombre,
     motivo: motivo.trim(),
     items: itemsReq,
     estado: "PENDIENTE",
-    historial: [ev(automatico ? "Reposición automática de stock local" : "Requerimiento de sucursal emitido", `${itemsReq.length} producto(s) · Sucursal ${suc.nombre}`)],
+    historial: [ev(automatico ? "Reposición automática de stock local" : `Requerimiento de ${suc.nombre} emitido`, `${itemsReq.length} producto(s) · ${suc.nombre} → ${DESTINO_REQ_SUCURSAL}`)],
     creadoPor: usuario(),
     origen: "SUCURSAL",
     sucursalId: suc.id,
@@ -430,11 +439,11 @@ export async function crearReqSucursal(items: ProductoTraslado[], motivo: string
   return local;
 }
 
-/** 7. Stock Local -> "Solicitar reposición": REQ-SUC automático con lo que está bajo el mínimo. */
+/** 7. Stock Local -> "Solicitar reposición": REQ-SECOCHA automático con lo que está bajo el mínimo. */
 export async function solicitarReposicion(): Promise<ReqSucursal> {
   const bajos = getStockLocal().filter(bajoMinimo);
   exigir(bajos.length > 0, "No hay productos bajo el stock mínimo.");
-  // Ya pedidos en un REQ-SUC abierto: no se piden dos veces
+  // Ya pedidos en un REQ-SECOCHA abierto: no se piden dos veces
   const abiertos = new Set(getReqsSuc().filter((r) => r.estado !== "cerrado").flatMap((r) => r.items.map((i) => i.productoId ?? norm(i.producto))));
   const items = bajos
     .filter((s) => !abiertos.has(s.id) && !abiertos.has(norm(s.producto)))

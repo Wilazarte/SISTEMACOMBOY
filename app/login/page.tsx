@@ -17,10 +17,10 @@ const DOCK: { id: ModuloLogin; slug: string; titulo: string; icon: LucideIcon }[
 ];
 
 /**
- * SUCURSAL SECOCHA: sistema aparte (no es un módulo del ERP). Abre su propio login (/sucursal/login);
+ * SECOCHA: sistema aparte (no es un módulo del ERP; Arequipa es la Planta Principal). Abre su propio login (/secocha/login);
  * ahí y en la base (RLS sede_isolation) se controla que solo entren usuarios de Secocha o del ERP central.
  */
-const SUCURSAL_SECOCHA = { titulo: "SUCURSAL SECOCHA", href: `${RUTA_LOGIN_SUCURSAL}?sede=SEC` };
+const SUCURSAL_SECOCHA = { titulo: "SECOCHA", href: RUTA_LOGIN_SUCURSAL };
 
 /** Alias de URL: "compras" = Tesorería, "inventario" = Producción. */
 function moduloPedido(v: string | null): ModuloLogin | "" {
@@ -61,7 +61,7 @@ function Login() {
 
   useEffect(() => setActivo(pedido), [pedido]);
 
-  // La Sucursal es un sistema aparte con su propio login
+  // Secocha (antes Sucursal) es un sistema aparte con su propio login
   useEffect(() => {
     if (pedido === "sucursal") router.replace(RUTA_LOGIN_SUCURSAL);
   }, [pedido, router]);

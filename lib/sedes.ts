@@ -1,10 +1,11 @@
 "use client";
 
 // =====================================================================
-// Sedes (multi-sede): Arequipa (central) y Secocha. La base aísla cada sede con RLS
-// (supabase/migrations/20261023_sedes_multisede.sql, política sede_isolation):
-// un usuario de sede (usuarios_sedes) solo recibe filas de su sede. Los usuarios del ERP
-// central (creador, Taller, Tesorería) reciben todas y eligen en pantalla con qué sede trabajan.
+// Sedes: Arequipa = Planta Principal / Taller Principal (el ERP) y Secocha = sucursal (módulo /secocha).
+// La base aísla cada sede con RLS (supabase/migrations/20261023_sedes_multisede.sql, política sede_isolation):
+// un usuario de sede (usuarios_sedes) solo recibe filas de su sede. El módulo Secocha trabaja siempre
+// con Secocha, también cuando entra el ERP central (Taller, Tesorería): ya no hay selector de sede.
+// (20261027_secocha_planta_principal.sql: sedes.tipo PLANTA_PRINCIPAL / SUCURSAL)
 // =====================================================================
 
 import { useEffect, useState } from "react";
@@ -15,6 +16,8 @@ export interface Sede {
   nombre: string;
   codigo: string;
   es_central: boolean;
+  /** PLANTA_PRINCIPAL (Arequipa) o SUCURSAL (Secocha); falta si no se corrió 20261027_secocha_planta_principal.sql. */
+  tipo?: string | null;
 }
 
 export type RolSede = "admin_sede" | "vendedor" | "cajero";
@@ -30,7 +33,6 @@ interface EstadoSedes {
 }
 
 const EVENTO = "erp:sede";
-const CLAVE = "sucursal-sede";
 let estado: EstadoSedes = { listo: false, error: "", sedes: [], asignada: null, actualId: "" };
 
 const avisar = () => window.dispatchEvent(new Event(EVENTO));
@@ -43,7 +45,7 @@ export async function cargarSedes(): Promise<void> {
   } = await sb.auth.getUser();
   if (!user) return;
   const [s, u] = await Promise.all([
-    sb.from("sedes").select("id,nombre,codigo,es_central").order("es_central", { ascending: false }).order("nombre"),
+    sb.from("sedes").select("*").order("es_central", { ascending: false }).order("nombre"),
     sb.from("usuarios_sedes").select("sede_id,rol").eq("user_id", user.id).maybeSingle(),
   ]);
   const err = s.error ?? u.error;
@@ -55,13 +57,8 @@ export async function cargarSedes(): Promise<void> {
   }
   const sedes = (s.data ?? []) as Sede[];
   const asignada = u.data ? { sedeId: u.data.sede_id as string, rol: u.data.rol as RolSede } : null;
-  let guardada = "";
-  try {
-    guardada = window.localStorage.getItem(CLAVE) ?? "";
-  } catch {
-    /* almacenamiento bloqueado */
-  }
-  const actualId = asignada?.sedeId ?? (sedes.some((x) => x.id === guardada) ? guardada : (sedes.find((x) => x.es_central) ?? sedes[0])?.id ?? "");
+  // Usuario de sede: la suya. ERP central (Taller, Tesorería): Secocha, la única sucursal
+  const actualId = asignada?.sedeId ?? sedeSucursal(sedes)?.id ?? "";
   estado = { listo: true, error: "", sedes, asignada, actualId };
   avisar();
 }
@@ -71,17 +68,9 @@ export function olvidarSedes(): void {
   avisar();
 }
 
-/** Solo el ERP central cambia de sede (un usuario de sede siempre trabaja en la suya). */
-export function elegirSede(id: string): void {
-  if (estado.asignada || !estado.sedes.some((s) => s.id === id)) return;
-  estado = { ...estado, actualId: id };
-  try {
-    window.localStorage.setItem(CLAVE, id);
-  } catch {
-    /* almacenamiento bloqueado */
-  }
-  avisar();
-}
+/** La sucursal (Secocha): tipo SUCURSAL o, sin la columna tipo, la sede que no es central. Nunca Arequipa. */
+export const sedeSucursal = (sedes: Sede[]): Sede | undefined =>
+  sedes.find((s) => s.tipo?.toUpperCase() === "SUCURSAL") ?? sedes.find((s) => !s.es_central && s.tipo?.toUpperCase() !== "PLANTA_PRINCIPAL");
 
 export const sedeActualId = (): string => estado.actualId;
 export const getSedeActual = (): Sede | undefined => estado.sedes.find((s) => s.id === estado.actualId);

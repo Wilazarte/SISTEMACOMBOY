@@ -12,7 +12,7 @@ import type { Requerimiento } from "@/lib/types";
 import { Acciones, EstadoSuc, LineasEditor, deLineas, lineaVacia, type LineaEdit } from "./comun";
 
 // =====================================================================
-// 4. REQUERIMIENTOS: REQ-SUC-001 -> Tesorería Taller Principal (Cotización -> OC) -> OT con guía -> Sucursal
+// 4. REQUERIMIENTOS: REQ-SECOCHA-001 -> Almacén del Taller Principal (Arequipa) (Cotización -> OC) -> OT con guía -> Secocha
 // =====================================================================
 export function Requerimientos({ reqs, enTesoreria, stock }: { reqs: ReqSucursal[]; enTesoreria: Requerimiento[]; stock: StockLocal[] }) {
   const { showForm, setShowForm } = useTogglePanel();
@@ -79,13 +79,13 @@ function FormReq({ stock, onListo }: { stock: StockLocal[]; onListo: () => void 
   const [enviando, setEnviando] = useState(false);
   const enviar = async () => {
     setEnviando(true);
-    const ok = await ejecutarAsync(() => crearReqSucursal(deLineas(lineas), motivo), "Requerimiento enviado a Tesorería Taller Principal");
+    const ok = await ejecutarAsync(() => crearReqSucursal(deLineas(lineas), motivo), "Requerimiento enviado al Almacén del Taller Principal (Arequipa)");
     setEnviando(false);
     if (ok) onListo();
   };
   return (
     <Card>
-      <CardHeader title="Nuevo requerimiento (REQ-SUC)" subtitle="Llega a Tesorería del Taller Principal para cotización y OC" />
+      <CardHeader title="Nuevo requerimiento (REQ-SECOCHA)" subtitle="Llega al Almacén del Taller Principal (Arequipa)" />
       <div className="space-y-4 p-5">
         <LineasEditor lineas={lineas} onChange={setLineas} stock={stock} conPrecio={false} />
         <Field label="Motivo *">
@@ -96,7 +96,7 @@ function FormReq({ stock, onListo }: { stock: StockLocal[]; onListo: () => void 
             Cancelar
           </Button>
           <Button onClick={enviar} disabled={enviando}>
-            <Send size={15} /> {enviando ? "Enviando…" : "Enviar a Tesorería"}
+            <Send size={15} /> {enviando ? "Enviando…" : "Enviar a Almacén"}
           </Button>
         </div>
       </div>
@@ -231,7 +231,7 @@ function ModalObservar({ traslado, onClose }: { traslado: Traslado; onClose: () 
   );
 }
 
-/** Taller: OT nueva hacia la sucursal (opcionalmente atiende un REQ-SUC). */
+/** Taller: OT nueva hacia la sucursal (opcionalmente atiende un REQ-SECOCHA). */
 function FormOT({ stock, reqs, onListo, req }: { stock: StockLocal[]; reqs: ReqSucursal[]; onListo: () => void; req?: ReqSucursal }) {
   const desdeReq = (r?: ReqSucursal): LineaEdit[] =>
     r ? r.items.map((i) => ({ ...lineaVacia(), productoId: i.productoId, producto: i.producto, unidad: i.unidad, cantidad: String(i.cantidad) })) : [lineaVacia()];

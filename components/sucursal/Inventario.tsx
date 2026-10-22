@@ -14,7 +14,7 @@ import { Acciones, EstadoSuc, Indicador } from "./comun";
 const contiene = (t: string, q: string) => t.toLowerCase().includes(q.trim().toLowerCase());
 
 // =====================================================================
-// 7. STOCK LOCAL: inventario físico, alerta bajo mínimo, reposición automática (REQ-SUC)
+// 7. STOCK LOCAL: inventario físico, alerta bajo mínimo, reposición automática (REQ-SECOCHA)
 // =====================================================================
 export function StockLocalTab({ stock }: { stock: StockLocal[] }) {
   const { showForm, setShowForm, showFiltros, setShowFiltros } = useTogglePanel();
@@ -57,8 +57,8 @@ export function StockLocalTab({ stock }: { stock: StockLocal[] }) {
                   size="sm"
                   variant="secondary"
                   disabled={bajos.length === 0}
-                  onClick={() => void ejecutarAsync(() => solicitarReposicion(), "Reposición solicitada: REQ-SUC enviado a Tesorería")}
-                  title="Crea un REQ-SUC con lo que está bajo el mínimo"
+                  onClick={() => void ejecutarAsync(() => solicitarReposicion(), "Reposición solicitada: REQ-SECOCHA enviado al Almacén del Taller Principal")}
+                  title="Crea un REQ-SECOCHA con lo que está bajo el mínimo"
                 >
                   <PackagePlus size={14} /> Solicitar reposición{bajos.length ? ` (${bajos.length})` : ""}
                 </Button>

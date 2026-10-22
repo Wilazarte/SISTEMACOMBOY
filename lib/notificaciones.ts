@@ -42,7 +42,7 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
   const ve = (ruta: string) => !!sesion && puedeVer(sesion, ruta);
   const veAlmacen = ve("/dashboard/almacen");
   const ods = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, [], veAlmacen && ["creador", "almacen"].includes(sesion?.rol ?? ""));
-  const reqs = useStore<Requerimiento[]>(KEYS.REQS_PENDIENTES, [], ve("/dashboard/compras"));
+  const reqs = useStore<Requerimiento[]>(KEYS.REQS_PENDIENTES, [], ve("/dashboard/compras") || ve("/dashboard/almacen"));
   const facturas = useStore<Factura[]>(KEYS.FACTURAS, [], ve("/dashboard/compras"));
   const stock = useStore<StockItem[]>(KEYS.STOCK, [], veAlmacen);
   const equiposRaw = useStore<unknown[]>(KEYS.EQUIPOS, [], veAlmacen || ve("/dashboard/ventas"));
@@ -67,6 +67,11 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
     if (ve("/dashboard/almacen") && ["creador", "almacen"].includes(sesion.rol))
       for (const o of odsNuevas(ods))
         out.push({ clave: `od:${o.id}`, tipo: "despacho", titulo: `Nueva orden de despacho ${o.numero}`, detalle: avisoOD(o), modulo: "Almacén", href: "/dashboard/almacen?tab=despacho", prioridad: 1 });
+
+    // Requerimientos de Secocha (REQ-SECOCHA) que llegan al Almacén del Taller Principal (Arequipa)
+    if (ve("/dashboard/almacen") && ["creador", "almacen"].includes(sesion.rol))
+      for (const r of reqs.filter((x) => x.origen === "SUCURSAL" && x.estado === "PENDIENTE"))
+        out.push({ clave: `reqsec:${r.id}`, tipo: "requerimiento", titulo: `${r.numero} de ${r.sede}`, detalle: `${r.items.length} producto(s) · ${r.solicitante}`, modulo: "Almacén Taller Principal", href: "/dashboard/almacen?tab=lista", prioridad: 2 });
 
     if (ve("/dashboard/compras")) {
       // Requerimientos de Almacén por revisar
@@ -127,16 +132,16 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
           out.push({ clave: `der:${d.id}`, tipo: "sucursal", titulo: `Derivación ${d.ventaNumero} de Sucursal ${d.sucursal}`, detalle: `${d.cliente} · ${d.estado === "pendiente" ? "por atender" : "en preparación"}`, modulo: "Taller Principal", href: `${S}?tab=derivar-taller`, prioridad: 1 });
       if (["creador", "sucursal"].includes(sesion.rol)) {
         for (const t of traslados.filter((x) => x.estado === "en-camino"))
-          out.push({ clave: `ot:${t.id}`, tipo: "sucursal", titulo: `${t.codigo} en camino`, detalle: `Guía ${t.guiaRemision} · ${t.productos.length} producto(s)`, modulo: "Sucursal", href: `${S}?tab=traslados`, prioridad: 2 });
+          out.push({ clave: `ot:${t.id}`, tipo: "sucursal", titulo: `${t.codigo} en camino`, detalle: `Guía ${t.guiaRemision} · ${t.productos.length} producto(s)`, modulo: "Secocha", href: `${S}?tab=traslados`, prioridad: 2 });
         for (const v of ventasSuc.filter((x) => x.estado === "registrada"))
-          out.push({ clave: `vta:${v.id}`, tipo: "sucursal", titulo: `${v.numero} por entregar`, detalle: `${v.cliente} · ${soles(v.total)}`, modulo: "Sucursal", href: `${S}?tab=entregar-producto`, prioridad: 3 });
+          out.push({ clave: `vta:${v.id}`, tipo: "sucursal", titulo: `${v.numero} por entregar`, detalle: `${v.cliente} · ${soles(v.total)}`, modulo: "Secocha", href: `${S}?tab=entregar-producto`, prioridad: 3 });
         const bajos = stockSuc.filter((s) => s.stock < s.minimo);
         if (bajos.length)
-          out.push({ clave: `stsuc:${bajos.map((s) => `${s.id}:${s.stock}`).join(",")}`, tipo: "sucursal", titulo: `${bajos.length} producto(s) bajo el mínimo`, detalle: bajos.slice(0, 3).map((s) => `${s.producto} (${s.stock})`).join(" · "), modulo: "Sucursal", href: `${S}?tab=stock-local`, prioridad: 5 });
+          out.push({ clave: `stsuc:${bajos.map((s) => `${s.id}:${s.stock}`).join(",")}`, tipo: "sucursal", titulo: `${bajos.length} producto(s) bajo el mínimo`, detalle: bajos.slice(0, 3).map((s) => `${s.producto} (${s.stock})`).join(" · "), modulo: "Secocha", href: `${S}?tab=stock-local`, prioridad: 5 });
       }
       if (["creador", "tesoreria"].includes(sesion.rol))
         for (const c of cierres.filter((x) => x.estado === "enviado"))
-          out.push({ clave: `cc:${c.id}`, tipo: "sucursal", titulo: `Cierre de caja ${c.numero} por recibir`, detalle: `Saldo ${soles(c.saldoFinal)} · ${fechaPE(c.fecha)}`, modulo: "Sucursal → Tesorería", href: `${S}?tab=caja-chica`, prioridad: 3 });
+          out.push({ clave: `cc:${c.id}`, tipo: "sucursal", titulo: `Cierre de caja ${c.numero} por recibir`, detalle: `Saldo ${soles(c.saldoFinal)} · ${fechaPE(c.fecha)}`, modulo: "Secocha → Tesorería", href: `${S}?tab=caja-chica`, prioridad: 3 });
     }
 
     // Catálogo maestro: solicitudes de producto nuevo (administrador) y respuesta a quien la pidió

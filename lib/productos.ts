@@ -227,6 +227,25 @@ export async function solicitarProducto(d: DatosProducto & { motivo?: string; mo
   await leerCatalogo();
 }
 
+/**
+ * Aprueba una solicitud (solo creador / admin): el RPC aprobar_solicitud_producto crea el producto con su SKU
+ * (o la enlaza al que ya existe) y la deja APROBADA. Se vuelve a leer el catálogo para que el producto salga
+ * al instante en los selectores (Requerimiento de Compra, etc.); las otras PCs lo reciben por Realtime.
+ */
+export async function aprobarSolicitud(id: string): Promise<ProductoMaestro> {
+  const { data, error } = await createClient().rpc("aprobar_solicitud_producto", { p_solicitud_id: id });
+  if (error)
+    throw new ProductoError(
+      error.code === "PGRST202" || /could not find the function/i.test(error.message)
+        ? "Falta la función en Supabase: ejecute supabase/migrations/20261026_aprobar_solicitud.sql."
+        : error.code === "42501"
+          ? "Solo el administrador (creador) aprueba productos nuevos."
+          : error.message
+    );
+  await leerCatalogo();
+  return data as ProductoMaestro;
+}
+
 export async function rechazarSolicitud(id: string, respuesta: string): Promise<void> {
   const { error } = await createClient().from("productos_solicitudes").update({ estado: "RECHAZADA", respuesta: respuesta.trim() || null, resuelto_at: new Date().toISOString() }).eq("id", id);
   if (error) throw new ProductoError(error.message);
