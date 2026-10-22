@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRightLeft, Ban, CheckCircle2, ClipboardCheck, FileText, HandCoins, PackageCheck, Truck, Wrench } from "lucide-react";
-import { Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, Textarea, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, Textarea, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { BotonNuevo } from "@/components/ui/BotonFiltros";
 import { FirmaPad } from "@/components/FirmaPad";
@@ -28,6 +28,7 @@ import {
   type StockLocal,
   type Sucursal,
   type TipoDocVenta,
+  type Traslado,
   type VentaSucursal,
 } from "@/lib/sucursal";
 import { Acciones, EstadoSuc, LineasEditor, deLineas, lineaVacia, type LineaEdit } from "./comun";
@@ -43,7 +44,9 @@ export function RegistrarVenta({
   abrirNueva,
   onDerivar,
   onEntregar,
+  derivaciones = [],
 }: {
+  derivaciones?: Derivacion[];
   ventas: VentaSucursal[];
   stock: StockLocal[];
   clientes: ClienteSuc[];
@@ -71,7 +74,8 @@ export function RegistrarVenta({
       <div className="flex flex-col gap-1">
         <span className="font-semibold text-fg">{v.docRef}</span>
         <span className="flex items-center gap-1">
-          <EstadoSuc estado={v.estado} />
+          {/* Venta derivada cuya Orden de Despacho ya salió de Arequipa (OT y guía emitidas) */}
+          {v.estado === "derivada" && derivaciones.some((d) => d.ventaId === v.id && d.estado === "convertida") ? <Badge estado="DESPACHADO_AREQUIPA" /> : <EstadoSuc estado={v.estado} />}
           {v.requiereTraslado && v.estado === "registrada" && <span className="text-[11px] text-amber-500">sin stock local</span>}
         </span>
       </div>
@@ -394,12 +398,18 @@ export function DerivarTaller({ ventas, derivaciones, preVenta }: { ventas: Vent
       )}
 
       <Card>
-        <CardHeader title="Derivaciones al Taller Principal" subtitle={taller ? "Taller: marque en preparación y convierta en OT (Orden de Traslado) con guía de remisión hacia la sucursal" : "Estado de lo que pidió al Taller"} />
+        <CardHeader
+          title="Órdenes de despacho en Arequipa"
+          subtitle={taller ? "Taller Principal: marque en preparación y emita la OT con guía de remisión hacia Secocha" : "Cada derivación es una Orden de Despacho en Arequipa (bandeja Despachos de Secocha)"}
+        />
         <Table head={["Fecha", "Venta", "Cliente", "¿Qué necesita?", "Estado", "Acciones"]} empty={orden.length === 0}>
           {orden.map((d) => (
             <tr key={d.id}>
               <Td>{fechaPE(d.fecha)}</Td>
-              <Td className="font-semibold text-fg">{d.ventaNumero}</Td>
+              <Td>
+                <span className="block font-semibold text-fg">{d.ventaNumero}</span>
+                {d.numero && <span className="block text-[11px] text-plomo-500">{d.numero}</span>}
+              </Td>
               <Td className="max-w-[200px] truncate">{d.cliente}</Td>
               <Td className="max-w-[280px]">
                 <span className="block">{MOTIVOS_DERIVACION[d.motivo]}</span>
@@ -421,7 +431,7 @@ export function DerivarTaller({ ventas, derivaciones, preVenta }: { ventas: Vent
                     </Button>
                   </Acciones>
                 ) : (
-                  <span className="text-xs text-plomo-500">{d.estado === "convertida" ? "OT emitida (ver Traslados)" : d.estado === "pendiente" ? "Esperando al Taller" : "En preparación"}</span>
+                  <span className="text-xs text-plomo-500">{d.estado === "convertida" ? "Despachado por Arequipa (ver Traslados)" : d.estado === "pendiente" ? "Pendiente de despacho en Arequipa" : "En preparación en Arequipa"}</span>
                 )}
               </Td>
             </tr>
@@ -442,7 +452,7 @@ function ModalDerivar({ venta, onClose }: { venta: VentaSucursal; onClose: () =>
   const derivar = async () => {
     if (!motivo) return;
     setEnviando(true);
-    const ok = await ejecutarAsync(() => derivarVenta(venta.id, motivo, detalle), `${venta.numero} derivada: el Taller Principal ya fue notificado`);
+    const ok = await ejecutarAsync(() => derivarVenta(venta.id, motivo, detalle), `${venta.numero} derivada: Orden de Despacho creada en Arequipa`);
     setEnviando(false);
     if (ok) onClose();
   };
@@ -487,21 +497,24 @@ function ModalDerivar({ venta, onClose }: { venta: VentaSucursal; onClose: () =>
 }
 
 /** Taller: derivación -> OT + guía de remisión (con los productos de la venta). */
-export function ModalOT({ derivacion, onClose }: { derivacion: Derivacion; onClose: () => void }) {
+export function ModalOT({ derivacion, onClose, onEmitido }: { derivacion: Derivacion; onClose: () => void; onEmitido?: (t: Traslado) => void }) {
   const [transportista, setTransportista] = useState("");
   const [placa, setPlaca] = useState("");
   const [guardando, setGuardando] = useState(false);
   const emitir = async () => {
     setGuardando(true);
-    const ok = await ejecutarAsync(
-      () => crearTraslado({ productos: derivacion.productos, motivoTraslado: "Traslado entre establecimientos de la misma empresa", transportista, placa, derivacionId: derivacion.id }),
-      "OT emitida con guía de remisión: ya aparece en Traslados de la sucursal"
-    );
+    let t: Traslado | undefined;
+    const ok = await ejecutarAsync(async () => {
+      t = await crearTraslado({ productos: derivacion.productos, motivoTraslado: "Traslado entre establecimientos de la misma empresa", transportista, placa, derivacionId: derivacion.id });
+    }, `${derivacion.numero ?? derivacion.ventaNumero} despachada: OT y guía de remisión emitidas hacia ${derivacion.sucursal}`);
     setGuardando(false);
-    if (ok) onClose();
+    if (ok) {
+      if (t) onEmitido?.(t);
+      onClose();
+    }
   };
   return (
-    <Modal open onClose={onClose} title={`OT para ${derivacion.ventaNumero}`}>
+    <Modal open onClose={onClose} title={`OT y guía para ${derivacion.numero ?? derivacion.ventaNumero}`}>
       <div className="space-y-4">
         <ul className="rounded-lg border border-plomo-200 p-3 text-sm text-fg-2">
           {derivacion.productos.map((p, i) => (

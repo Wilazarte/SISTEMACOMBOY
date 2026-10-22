@@ -27,7 +27,6 @@ import {
   type Traslado,
   type VentaSucursal,
 } from "@/lib/sucursal";
-import type { Requerimiento } from "@/lib/types";
 
 type TabSuc = "registrar-venta" | "entregar-producto" | "derivar-taller" | "requerimientos" | "traslados" | "caja-chica" | "stock-local" | "clientes" | "reportes";
 
@@ -56,10 +55,6 @@ function SucursalPage() {
   const cierres = deSede(useStore<CierreCaja[]>(KEYS.SUC_CIERRES, []));
   const stock = deSede(useStore<StockLocal[]>(KEYS.SUC_STOCK, []));
   const clientes = deSede(useStore<ClienteSuc[]>(KEYS.SUC_CLIENTES, []));
-  // Estado de cada REQ-SECOCHA en Almacén / Tesorería (la sucursal solo ve los suyos, RLS)
-  const pendientes = useStore<Requerimiento[]>(KEYS.REQS_PENDIENTES, []);
-  const procesados = useStore<Requerimiento[]>(KEYS.REQS_PROCESADOS, []);
-  const enTesoreria = deSede([...pendientes, ...procesados].filter((r) => r.origen === "SUCURSAL"));
   const sucursal = getSucursal();
 
   const sesion = getSesion();
@@ -139,11 +134,12 @@ function SucursalPage() {
           abrirNueva={pre.nueva}
           onDerivar={(id) => ir("derivar-taller", { venta: id })}
           onEntregar={(id) => ir("entregar-producto", { venta: id })}
+          derivaciones={derivaciones}
         />
       )}
       {tab === "entregar-producto" && <EntregarProducto ventas={ventas} stock={stock} sucursal={sucursal} preVenta={pre.venta} />}
       {tab === "derivar-taller" && <DerivarTaller ventas={ventas} derivaciones={derivaciones} preVenta={pre.venta} />}
-      {tab === "requerimientos" && <Requerimientos reqs={reqs} enTesoreria={enTesoreria} stock={stock} />}
+      {tab === "requerimientos" && <Requerimientos reqs={reqs} stock={stock} />}
       {tab === "traslados" && <Traslados traslados={traslados} stock={stock} reqs={reqs} />}
       {tab === "caja-chica" && <CajaChica movs={caja} cierres={cierres} />}
       {tab === "stock-local" && <StockLocalTab stock={stock} />}

@@ -10,7 +10,7 @@ import QRCode from "qrcode";
 import { EMPRESA } from "./empresa";
 import { CUENTAS_ORIGEN_PAGO, codigoContratista, codigoGasto, cuentaBancariaTxt, fechaPE, getTrabajadores, soles } from "./storage";
 import { codigoDesdeNumero, estadoDocumento } from "./utils/codigos";
-import { bloqueDocumento, sedeOrigenReq, type TipoDocumento } from "./plantillasDocumentos";
+import { SEDE_PLANTA_PRINCIPAL, bloqueDocumento, sedeOrigenReq, type DocUnificado, type TipoDocumento } from "./plantillasDocumentos";
 import { equipoDeLinea, sedeEquipo } from "./equipos";
 import { ESTADOS_OD, LUGARES_ENTREGA, estadoOD, origenOD, type EstadoAlmacen } from "./ventas";
 import { toast } from "@/components/ui";
@@ -612,7 +612,7 @@ export function pdfPlanillaHistorial(h: HistorialPlanilla, detalle: HistorialDet
 }
 
 /** PDF de cualquier sede con TEMPLATE_UNIFICADO (lib/plantillasDocumentos): mismo diseño, solo cambia la sede. */
-export function generarDocumento(tipo: TipoDocumento, sede: string, r: Requerimiento): jsPDF {
+export function generarDocumento(tipo: TipoDocumento, sede: string, r: DocUnificado): jsPDF {
   const doc = construir(bloqueDocumento(tipo, sede, r));
   doc.setProperties({ title: r.numero });
   return doc;
@@ -1258,6 +1258,22 @@ export function pdfGuiaEntrega(v: VentaSucursal, sucursal: string): void {
     }),
     e?.guia || v.numero
   );
+}
+
+/** Orden de Traslado Producción Arequipa -> Secocha (atiende un REQ-SECOCHA): TEMPLATE_UNIFICADO. */
+export function pdfOrdenTraslado(t: Traslado): void {
+  const doc = generarDocumento("OT", SEDE_PLANTA_PRINCIPAL, {
+    numero: t.codigo,
+    estado: t.estado === "en-camino" ? "EN CAMINO" : t.estado === "recibido" ? "RECIBIDO" : "OBSERVADO",
+    fecha: t.fechaEnvio,
+    solicitante: t.emitidoPor,
+    motivo: t.motivoTraslado,
+    destino: t.destino,
+    referencia: t.reqNumero,
+    guia: t.guiaRemision,
+    items: t.productos.map((p, k) => ({ id: String(k), nombre: p.producto, cantidad: p.cantidad, unidad: p.unidad, marca: p.marca ?? "", caracteristica: p.caracteristica ?? "", sku: p.sku })),
+  });
+  abrir(doc, t.codigo);
 }
 
 /** Guía de remisión remitente (formato tipo 09 SUNAT) de un traslado Taller Principal -> Sucursal. */
