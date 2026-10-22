@@ -220,6 +220,21 @@ create table if not exists public.productos_solicitudes (
   resuelto_at timestamptz
 );
 
+-- productos_solicitudes creada antes con otras columnas: se completan (solicitado_por puede ser text o uuid)
+alter table public.productos_solicitudes add column if not exists nombre text;
+alter table public.productos_solicitudes add column if not exists unidad text default 'UND';
+alter table public.productos_solicitudes add column if not exists marca text;
+alter table public.productos_solicitudes add column if not exists categoria text;
+alter table public.productos_solicitudes add column if not exists motivo text;
+alter table public.productos_solicitudes add column if not exists modulo text;
+alter table public.productos_solicitudes add column if not exists estado text not null default 'pendiente';
+alter table public.productos_solicitudes add column if not exists producto_id uuid;
+alter table public.productos_solicitudes add column if not exists respuesta text;
+alter table public.productos_solicitudes add column if not exists solicitado_por uuid default auth.uid();
+alter table public.productos_solicitudes add column if not exists solicitado_usuario text;
+alter table public.productos_solicitudes add column if not exists created_at timestamptz not null default now();
+alter table public.productos_solicitudes add column if not exists resuelto_at timestamptz;
+
 -- 3. Permisos: todos leen; solo el administrador (creador / admin) crea, edita y unifica (con las funciones de abajo)
 create or replace function public.es_admin_productos() returns boolean
 language sql stable security definer set search_path = public as $$
@@ -242,9 +257,9 @@ create policy productos_select on public.productos_maestro for select to authent
 create policy productos_admin on public.productos_maestro for all to authenticated using (public.es_admin_productos()) with check (public.es_admin_productos());
 create policy productos_alias_select on public.productos_alias for select to authenticated using (public.mi_rol() <> 'sin_rol');
 create policy productos_alias_admin on public.productos_alias for all to authenticated using (public.es_admin_productos()) with check (public.es_admin_productos());
-create policy productos_sol_select on public.productos_solicitudes for select to authenticated using (solicitado_por = auth.uid() or public.es_admin_productos());
+create policy productos_sol_select on public.productos_solicitudes for select to authenticated using (solicitado_por::text = auth.uid()::text or public.es_admin_productos());
 create policy productos_sol_insert on public.productos_solicitudes for insert to authenticated
-  with check (solicitado_por = auth.uid() and estado = 'pendiente' and public.mi_rol() <> 'sin_rol');
+  with check (solicitado_por::text = auth.uid()::text and estado = 'pendiente' and public.mi_rol() <> 'sin_rol');
 create policy productos_sol_admin on public.productos_solicitudes for update to authenticated using (public.es_admin_productos()) with check (public.es_admin_productos());
 
 grant select on public.productos_maestro, public.productos_alias to authenticated;
