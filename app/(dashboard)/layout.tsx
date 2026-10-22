@@ -20,7 +20,6 @@ import { NotificationSidebar } from "@/components/layout/NotificationSidebar";
 import { DatalistCatalogo } from "@/components/productos/ProductoInput";
 import { detenerCatalogo, iniciarCatalogo } from "@/lib/productos";
 import { RUTA_SUCURSAL, inicioDe, logout, puedeVer, useSesion, veTesoreria } from "@/lib/auth";
-import { JEFE_SUCURSAL } from "@/lib/sucursal-modelos";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
 import { useNotificaciones } from "@/lib/notificaciones";
 import { limpiarPrefs, usePrefs } from "@/lib/preferencias";
@@ -57,7 +56,6 @@ const FLUJOS: [string, string][] = [
   ["/dashboard/contable", "Libro Diario → Mayor → Balance → Estados Financieros"],
   ["/dashboard/creador", "Asistencia → Edición manual → Planilla"],
   ["/dashboard/productos", "Catálogo maestro → Solicitud → Aprobación → Mismo producto en todos los almacenes"],
-  ["/dashboard/sucursal", "Venta → Entrega / Derivación → Requerimiento → Cotización → OC → OT con Guía → Recepción"],
   ["/dashboard", "Resumen → Compras → Almacén → Ventas → Contable"],
 ];
 /** Título centrado del encabezado: MODULO <nombre> (Inventario = Almacén, Reportes = Contable). */
@@ -68,7 +66,6 @@ const NOMBRE_MODULO: [string, string][] = [
   ["/dashboard/contable", "REPORTES"],
   ["/dashboard/produccion", "PRODUCCION"],
   ["/dashboard/creador", "CREADOR"],
-  ["/dashboard/sucursal", "SUCURSAL BETA"],
   ["/dashboard/productos", "PRODUCTOS"],
 ];
 const flujoDe = (ruta: string) => FLUJOS.find(([r]) => ruta === r || ruta.startsWith(`${r}/`))?.[1] ?? "";
@@ -114,6 +111,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       void detenerDatos();
       router.replace("/login");
     }
+    // La sucursal es un sistema aparte: su usuario no usa el ERP
+    if (sesion?.rol === "sucursal") router.replace(RUTA_SUCURSAL);
   }, [listo, sesion, router]);
 
   // Almacén: aviso con detalle cuando Ventas genera una orden de despacho (en vivo)
@@ -332,8 +331,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <Header
                 sesion={sesion}
                 flujo={flujoDe(path === "/dashboard/compras" && tabActiva?.id === "planilla" ? "/dashboard/planilla" : path)}
-                // Sucursal Beta: siempre el Jefe de Sucursal y su sucursal, aunque la abra Taller o Tesorería
-                persona={path.startsWith(RUTA_SUCURSAL) ? JEFE_SUCURSAL : undefined}
               />
               {/* Menú isla del módulo (components/ui Tabs dibuja aquí su IslandMenu): fijo al hacer scroll, sin barra de fondo */}
               <div id={ID_BARRA_PESTANAS} className="sticky top-16 z-10 empty:hidden" />

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { PackagePlus } from "lucide-react";
 import { Button, Field, Input, Modal, Select, Textarea, cn, ejecutarAsync } from "@/components/ui";
 import { UNIDADES } from "@/lib/empresa";
-import { getSesion, puedeVer } from "@/lib/auth";
+import { RUTA_SUCURSAL, getSesion, puedeVer } from "@/lib/auth";
 import { KEYS, r2, useStore } from "@/lib/storage";
 import { buscarProducto, normalizarNombre, solicitarProducto, sugerencias, useCatalogo, type ProductoMaestro } from "@/lib/productos";
 import type { StockItem } from "@/lib/types";
@@ -21,7 +21,7 @@ export function DatalistCatalogo() {
   const { productos } = useCatalogo();
   const s = getSesion();
   const veAlmacen = !!s && (puedeVer(s, "/dashboard/almacen") || puedeVer(s, "/dashboard/compras") || puedeVer(s, "/dashboard/ventas"));
-  const veSuc = !!s && puedeVer(s, "/dashboard/sucursal");
+  const veSuc = !!s && puedeVer(s, RUTA_SUCURSAL);
   const stock = useStore<StockItem[]>(KEYS.STOCK, [], veAlmacen);
   const stockSuc = useStore<StockLocal[]>(KEYS.SUC_STOCK, [], veSuc);
   const totales = useMemo(() => {

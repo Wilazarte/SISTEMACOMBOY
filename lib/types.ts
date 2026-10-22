@@ -67,6 +67,8 @@ export interface Requerimiento {
   /** "SUCURSAL": lo emitió la Sucursal Beta (REQ-SUC-001); el resto viene de Almacén. */
   origen?: "SUCURSAL";
   sucursalId?: string;
+  /** Sede que lo emitió (multi-sede): la pone la base al guardar. */
+  sedeId?: string;
 }
 
 export interface ItemPrecio {

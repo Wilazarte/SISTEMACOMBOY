@@ -10,11 +10,11 @@
 import { getSesion, nombreDe, type Sesion } from "./auth";
 import { createClient } from "./supabase/client";
 import { canonizar } from "./productos";
+import { deSede, esDeSede, getSedeActual, sedeActualId } from "./sedes";
 import { ErpError, KEYS, escribir, getPendientes, hoy, leer, r2, uid } from "./storage";
 import type { EventoHistorial, ItemReq, Requerimiento, Rol } from "./types";
 import {
   SUCURSAL_DEFECTO,
-  JEFE_SUCURSAL,
   type CategoriaCaja,
   type CierreCaja,
   type ClienteSuc,
@@ -60,7 +60,9 @@ const exigir = (ok: boolean, msg: string) => {
 type SerieSuc = "VTA" | "REQSUC" | "GE" | "CC" | "OT" | "GR";
 
 async function siguienteSuc(serie: SerieSuc): Promise<string> {
-  const { data, error } = await createClient().rpc("siguiente_numero_sucursal", { serie });
+  // Cada sede numera aparte (la base fuerza la sede del usuario de sede); OT y guías: un solo correlativo del Taller
+  const sede = getSedeActual();
+  const { data, error } = await createClient().rpc("siguiente_numero_sucursal", { serie, p_sede: sede?.id ?? null });
   if (error) {
     if (error.code === "PGRST202" || /could not find the function/i.test(error.message))
       throw new ErpError("Falta el módulo Sucursal en Supabase: ejecute supabase/migrations/20261022_sucursal_beta.sql en el SQL Editor.");
@@ -68,10 +70,12 @@ async function siguienteSuc(serie: SerieSuc): Promise<string> {
   }
   const n = Number(data);
   const anio = new Date().getFullYear();
-  if (serie === "VTA") return `VTA-${String(n).padStart(3, "0")}-${anio}`;
-  if (serie === "REQSUC") return `REQ-SUC-${String(n).padStart(3, "0")}`;
-  if (serie === "GE") return `GE-${String(n).padStart(4, "0")}-${anio}`;
-  if (serie === "CC") return `CC-${String(n).padStart(3, "0")}-${anio}`;
+  // Sedes que no son la central llevan su código: VTA-SEC-001-2026 (Arequipa sigue con VTA-001-2026)
+  const cod = sede && !sede.es_central ? `${sede.codigo}-` : "";
+  if (serie === "VTA") return `VTA-${cod}${String(n).padStart(3, "0")}-${anio}`;
+  if (serie === "REQSUC") return `REQ-SUC-${cod}${String(n).padStart(3, "0")}`;
+  if (serie === "GE") return `GE-${cod}${String(n).padStart(4, "0")}-${anio}`;
+  if (serie === "CC") return `CC-${cod}${String(n).padStart(3, "0")}-${anio}`;
   if (serie === "OT") return `OT-${String(n).padStart(5, "0")}`;
   return `T001-${String(n).padStart(6, "0")}`; // guía de remisión remitente
 }
@@ -80,15 +84,37 @@ async function siguienteSuc(serie: SerieSuc): Promise<string> {
 // Lectores
 // ---------------------------------------------------------------------
 
-export const getSucursal = (): Sucursal => leer<Sucursal[]>(KEYS.SUC_SUCURSALES, [])[0] ?? SUCURSAL_DEFECTO;
-export const getVentasSuc = () => leer<VentaSucursal[]>(KEYS.SUC_VENTAS, []);
-export const getTraslados = () => leer<Traslado[]>(KEYS.SUC_TRASLADOS, []);
-export const getDerivaciones = () => leer<Derivacion[]>(KEYS.SUC_DERIVACIONES, []);
-export const getReqsSuc = () => leer<ReqSucursal[]>(KEYS.SUC_REQS, []);
-export const getCaja = () => leer<MovCaja[]>(KEYS.SUC_CAJA, []);
-export const getCierres = () => leer<CierreCaja[]>(KEYS.SUC_CIERRES, []);
-export const getStockLocal = () => leer<StockLocal[]>(KEYS.SUC_STOCK, []);
-export const getClientesSuc = () => leer<ClienteSuc[]>(KEYS.SUC_CLIENTES, []);
+// Todo se lee de la sede en pantalla (un usuario de sede solo recibe la suya; el ERP central elige la sede)
+
+/** Sucursal de la sede en pantalla (Arequipa: SUC-AQP-SUR · Secocha: SUC-SEC). */
+export function getSucursal(): Sucursal {
+  const fila = deSede(leer<Sucursal[]>(KEYS.SUC_SUCURSALES, []))[0];
+  if (fila) return fila;
+  const sede = getSedeActual();
+  if (!sede || sede.es_central) return SUCURSAL_DEFECTO;
+  return { id: `SUC-${sede.codigo}`, nombre: sede.nombre, sede: sede.nombre, direccion: "", jefeId: null, jefeNombre: "", cajaChicaActual: 0, sedeId: sede.id };
+}
+export const getVentasSuc = () => deSede(leer<VentaSucursal[]>(KEYS.SUC_VENTAS, []));
+export const getTraslados = () => deSede(leer<Traslado[]>(KEYS.SUC_TRASLADOS, []));
+export const getDerivaciones = () => deSede(leer<Derivacion[]>(KEYS.SUC_DERIVACIONES, []));
+export const getReqsSuc = () => deSede(leer<ReqSucursal[]>(KEYS.SUC_REQS, []));
+export const getCaja = () => deSede(leer<MovCaja[]>(KEYS.SUC_CAJA, []));
+export const getCierres = () => deSede(leer<CierreCaja[]>(KEYS.SUC_CIERRES, []));
+export const getStockLocal = () => deSede(leer<StockLocal[]>(KEYS.SUC_STOCK, []));
+export const getClientesSuc = () => deSede(leer<ClienteSuc[]>(KEYS.SUC_CLIENTES, []));
+
+type ClaveSuc = (typeof KEYS)[keyof typeof KEYS];
+
+/**
+ * Guarda la lista de la sede en pantalla sin tocar las filas de las otras sedes (el ERP central
+ * tiene todas en caché: escribir solo la sede actual las borraría). Lo nuevo lleva la sede actual.
+ */
+function escribirSede<T extends { id: string; sedeId?: string }>(key: ClaveSuc, lista: T[]): void {
+  const sede = sedeActualId();
+  const propias = lista.map((x) => (x.sedeId || !sede ? x : { ...x, sedeId: sede }));
+  const otras = leer<T[]>(key, []).filter((x) => !esDeSede(x));
+  escribir(key, [...propias, ...otras]);
+}
 
 export const saldoCaja = (movs: MovCaja[]): number => r2(movs.reduce((a, m) => a + (m.tipo === "INGRESO" ? m.monto : -m.monto), 0));
 export const valorizado = (s: StockLocal[]): number => r2(s.reduce((a, x) => a + x.stock * x.costo, 0));
@@ -108,9 +134,9 @@ export function guardarSucursal(d: Omit<Sucursal, "cajaChicaActual">): void {
   exigir(operaSucursal(), "Su usuario no puede editar la sucursal.");
   exigir(!!d.nombre.trim(), "Ingrese el nombre de la sucursal.");
   const actual = getSucursal();
-  const lista = leer<Sucursal[]>(KEYS.SUC_SUCURSALES, []);
+  const lista = deSede(leer<Sucursal[]>(KEYS.SUC_SUCURSALES, []));
   const nueva: Sucursal = { ...actual, ...d, nombre: d.nombre.trim() };
-  escribir(KEYS.SUC_SUCURSALES, lista.some((s) => s.id === nueva.id) ? lista.map((s) => (s.id === nueva.id ? nueva : s)) : [nueva, ...lista]);
+  escribirSede(KEYS.SUC_SUCURSALES, lista.some((s) => s.id === nueva.id) ? lista.map((s) => (s.id === nueva.id ? nueva : s)) : [nueva, ...lista]);
 }
 
 // ---------------------------------------------------------------------
@@ -193,8 +219,8 @@ export async function registrarVenta(d: DatosVenta): Promise<VentaSucursal> {
     creadoPor: usuario(),
     historial: [ev("Venta registrada", `${d.tipoDoc} · ${lineas.length} ítem(s)${d.entregaInmediata ? " · entregada en el acto" : " · por entregar"}`)],
   };
-  if (d.entregaInmediata) escribir(KEYS.SUC_STOCK, stockNuevo);
-  escribir(KEYS.SUC_VENTAS, [venta, ...getVentasSuc()]);
+  if (d.entregaInmediata) escribirSede(KEYS.SUC_STOCK, stockNuevo);
+  escribirSede(KEYS.SUC_VENTAS, [venta, ...getVentasSuc()]);
   if (venta.pagado) movimientoCaja({ tipo: "INGRESO", categoria: "VENTA", concepto: `${venta.docRef} · ${venta.cliente}`, monto: total, ventaId: venta.id });
   return venta;
 }
@@ -220,8 +246,8 @@ export async function entregarVenta(id: string, d: { recibidoPor: string; dni?: 
     entrega: { fecha, guia, recibidoPor: d.recibidoPor.trim(), dni: d.dni?.trim() || undefined, firma: d.firma },
     historial: [...v!.historial, ev("Producto entregado", `${guia} · recibió ${d.recibidoPor.trim()}`)],
   };
-  escribir(KEYS.SUC_STOCK, stockNuevo);
-  escribir(KEYS.SUC_VENTAS, getVentasSuc().map((x) => (x.id === id ? entregada : x)));
+  escribirSede(KEYS.SUC_STOCK, stockNuevo);
+  escribirSede(KEYS.SUC_VENTAS, getVentasSuc().map((x) => (x.id === id ? entregada : x)));
   return entregada;
 }
 
@@ -230,7 +256,7 @@ export function cobrarVenta(id: string): void {
   exigir(operaSucursal(), "Su usuario no puede cobrar ventas.");
   const v = getVentasSuc().find((x) => x.id === id);
   exigir(!!v && !v.pagado, "La venta ya está pagada.");
-  escribir(KEYS.SUC_VENTAS, getVentasSuc().map((x) => (x.id === id ? { ...x, pagado: true, historial: [...x.historial, ev("Cobrada")] } : x)));
+  escribirSede(KEYS.SUC_VENTAS, getVentasSuc().map((x) => (x.id === id ? { ...x, pagado: true, historial: [...x.historial, ev("Cobrada")] } : x)));
   movimientoCaja({ tipo: "INGRESO", categoria: "COBRO", concepto: `Cobro ${v!.docRef} · ${v!.cliente}`, monto: v!.total, ventaId: id });
 }
 
@@ -240,7 +266,7 @@ export function cerrarVenta(id: string): void {
   const v = getVentasSuc().find((x) => x.id === id);
   exigir(!!v && v.estado === "entregada", "Solo se cierran ventas entregadas.");
   exigir(v!.pagado, "La venta tiene saldo por cobrar.");
-  escribir(KEYS.SUC_VENTAS, getVentasSuc().map((x) => (x.id === id ? { ...x, estado: "cerrada" as const, historial: [...x.historial, ev("Venta cerrada")] } : x)));
+  escribirSede(KEYS.SUC_VENTAS, getVentasSuc().map((x) => (x.id === id ? { ...x, estado: "cerrada" as const, historial: [...x.historial, ev("Venta cerrada")] } : x)));
 }
 
 // ---------------------------------------------------------------------
@@ -273,7 +299,7 @@ export function prepararDerivacion(id: string): void {
   const lista = getDerivaciones();
   const d = lista.find((x) => x.id === id);
   exigir(!!d && d.estado === "pendiente", "La derivación ya fue atendida.");
-  escribir(KEYS.SUC_DERIVACIONES, lista.map((x) => (x.id === id ? { ...x, estado: "en-preparacion" as const } : x)));
+  escribirSede(KEYS.SUC_DERIVACIONES, lista.map((x) => (x.id === id ? { ...x, estado: "en-preparacion" as const } : x)));
 }
 
 // ---------------------------------------------------------------------
@@ -322,9 +348,9 @@ export async function crearTraslado(d: DatosTraslado): Promise<Traslado> {
     ventaNumero: der?.ventaNumero,
     emitidoPor: usuario(),
   };
-  escribir(KEYS.SUC_TRASLADOS, [t, ...getTraslados()]);
-  if (der) escribir(KEYS.SUC_DERIVACIONES, getDerivaciones().map((x) => (x.id === der.id ? { ...x, estado: "convertida" as const, trasladoId: t.id } : x)));
-  if (req) escribir(KEYS.SUC_REQS, getReqsSuc().map((x) => (x.id === req.id ? { ...x, estado: "en-traslado" as const, trasladoId: t.id } : x)));
+  escribirSede(KEYS.SUC_TRASLADOS, [t, ...getTraslados()]);
+  if (der) escribirSede(KEYS.SUC_DERIVACIONES, getDerivaciones().map((x) => (x.id === der.id ? { ...x, estado: "convertida" as const, trasladoId: t.id } : x)));
+  if (req) escribirSede(KEYS.SUC_REQS, getReqsSuc().map((x) => (x.id === req.id ? { ...x, estado: "en-traslado" as const, trasladoId: t.id } : x)));
   return t;
 }
 
@@ -343,12 +369,12 @@ export function confirmarRecepcion(id: string, recibidoPor: string): void {
     if (s) s.stock = r2(s.stock + p.cantidad);
     else stock.unshift({ id: uid(), producto: p.producto, productoMaestroId: p.productoMaestroId, sku: p.sku, unidad: p.unidad || "UND", stock: p.cantidad, minimo: 0, costo: p.costo ?? 0, precio: 0, sucursalId: suc.id });
   }
-  escribir(KEYS.SUC_STOCK, stock);
+  escribirSede(KEYS.SUC_STOCK, stock);
 
-  escribir(KEYS.SUC_TRASLADOS, getTraslados().map((x) => (x.id === id ? { ...x, estado: "recibido" as const, fechaRecepcion: hoy(), recibidoPor: recibidoPor.trim() } : x)));
-  if (t!.reqId) escribir(KEYS.SUC_REQS, getReqsSuc().map((x) => (x.id === t!.reqId ? { ...x, estado: "cerrado" as const } : x)));
+  escribirSede(KEYS.SUC_TRASLADOS, getTraslados().map((x) => (x.id === id ? { ...x, estado: "recibido" as const, fechaRecepcion: hoy(), recibidoPor: recibidoPor.trim() } : x)));
+  if (t!.reqId) escribirSede(KEYS.SUC_REQS, getReqsSuc().map((x) => (x.id === t!.reqId ? { ...x, estado: "cerrado" as const } : x)));
   if (t!.ventaId)
-    escribir(
+    escribirSede(
       KEYS.SUC_VENTAS,
       getVentasSuc().map((v) =>
         v.id === t!.ventaId && v.estado === "derivada"
@@ -363,7 +389,7 @@ export function observarTraslado(id: string, tipo: "FALTANTE" | "DANADO", detall
   exigir(!!detalle.trim(), "Describa el faltante o daño.");
   const t = getTraslados().find((x) => x.id === id);
   exigir(!!t && t.estado === "en-camino", "Solo se observan traslados en camino.");
-  escribir(KEYS.SUC_TRASLADOS, getTraslados().map((x) => (x.id === id ? { ...x, estado: "observado" as const, observacion: { tipo, detalle: detalle.trim(), fecha: hoy() } } : x)));
+  escribirSede(KEYS.SUC_TRASLADOS, getTraslados().map((x) => (x.id === id ? { ...x, estado: "observado" as const, observacion: { tipo, detalle: detalle.trim(), fecha: hoy() } } : x)));
 }
 
 // ---------------------------------------------------------------------
@@ -388,7 +414,7 @@ export async function crearReqSucursal(items: ProductoTraslado[], motivo: string
     numero,
     fecha,
     sede: `Sucursal ${suc.nombre}`,
-    solicitante: sesion ? nombreDe(sesion) : JEFE_SUCURSAL.nombre,
+    solicitante: sesion ? nombreDe(sesion) : `Sucursal ${suc.nombre}`,
     motivo: motivo.trim(),
     items: itemsReq,
     estado: "PENDIENTE",
@@ -396,10 +422,11 @@ export async function crearReqSucursal(items: ProductoTraslado[], motivo: string
     creadoPor: usuario(),
     origen: "SUCURSAL",
     sucursalId: suc.id,
+    sedeId: sedeActualId() || undefined,
   };
   escribir(KEYS.REQS_PENDIENTES, [req, ...getPendientes()]);
   const local: ReqSucursal = { id, numero, fecha, motivo: motivo.trim(), items: lista, estado: "enviado", automatico, sucursalId: suc.id, creadoPor: usuario() };
-  escribir(KEYS.SUC_REQS, [local, ...getReqsSuc()]);
+  escribirSede(KEYS.SUC_REQS, [local, ...getReqsSuc()]);
   return local;
 }
 
@@ -422,7 +449,7 @@ export async function solicitarReposicion(): Promise<ReqSucursal> {
 
 function movimientoCaja(m: Omit<MovCaja, "id" | "fecha" | "sucursalId" | "usuario">): void {
   const mov: MovCaja = { ...m, id: uid(), fecha: hoy(), sucursalId: getSucursal().id, usuario: usuario(), monto: r2(m.monto) };
-  escribir(KEYS.SUC_CAJA, [mov, ...getCaja()]);
+  escribirSede(KEYS.SUC_CAJA, [mov, ...getCaja()]);
 }
 
 export function registrarMovCaja(d: { tipo: "INGRESO" | "EGRESO"; categoria: CategoriaCaja; concepto: string; monto: number }): void {
@@ -457,17 +484,17 @@ export async function declararCierre(): Promise<CierreCaja> {
     declaradoPor: usuario(),
     sucursalId: suc.id,
   };
-  escribir(KEYS.SUC_CIERRES, [cierre, ...getCierres()]);
-  escribir(KEYS.SUC_CAJA, getCaja().map((m) => (m.cierreId ? m : { ...m, cierreId: cierre.id })));
-  const lista = leer<Sucursal[]>(KEYS.SUC_SUCURSALES, []);
+  escribirSede(KEYS.SUC_CIERRES, [cierre, ...getCierres()]);
+  escribirSede(KEYS.SUC_CAJA, getCaja().map((m) => (m.cierreId ? m : { ...m, cierreId: cierre.id })));
+  const lista = deSede(leer<Sucursal[]>(KEYS.SUC_SUCURSALES, []));
   const conSaldo = { ...suc, cajaChicaActual: saldoFinal };
-  escribir(KEYS.SUC_SUCURSALES, lista.some((s) => s.id === suc.id) ? lista.map((s) => (s.id === suc.id ? conSaldo : s)) : [conSaldo, ...lista]);
+  escribirSede(KEYS.SUC_SUCURSALES, lista.some((s) => s.id === suc.id) ? lista.map((s) => (s.id === suc.id ? conSaldo : s)) : [conSaldo, ...lista]);
   return cierre;
 }
 
 export function recibirCierre(id: string): void {
   exigir(esTesoreria(), "Solo Tesorería Principal recibe los cierres de caja.");
-  escribir(KEYS.SUC_CIERRES, getCierres().map((c) => (c.id === id ? { ...c, estado: "recibido" as const, recibidoPor: usuario() } : c)));
+  escribirSede(KEYS.SUC_CIERRES, getCierres().map((c) => (c.id === id ? { ...c, estado: "recibido" as const, recibidoPor: usuario() } : c)));
 }
 
 // ---------------------------------------------------------------------
@@ -482,12 +509,12 @@ export function guardarStock(d: Omit<StockLocal, "id" | "sucursalId"> & { id?: s
   const of = oficial(d.producto);
   exigir(!lista.some((s) => s.id !== d.id && norm(s.producto) === norm(of.producto)), "Ese producto ya está en el stock local.");
   const item: StockLocal = { ...d, ...of, id: d.id ?? uid(), sucursalId: getSucursal().id };
-  escribir(KEYS.SUC_STOCK, d.id ? lista.map((s) => (s.id === d.id ? item : s)) : [item, ...lista]);
+  escribirSede(KEYS.SUC_STOCK, d.id ? lista.map((s) => (s.id === d.id ? item : s)) : [item, ...lista]);
 }
 
 export function eliminarStock(id: string): void {
   exigir(operaSucursal(), "Su usuario no puede editar el stock local.");
-  escribir(KEYS.SUC_STOCK, getStockLocal().filter((s) => s.id !== id));
+  escribirSede(KEYS.SUC_STOCK, getStockLocal().filter((s) => s.id !== id));
 }
 
 export function guardarCliente(d: Omit<ClienteSuc, "id" | "sucursalId"> & { id?: string }): ClienteSuc {
@@ -498,14 +525,14 @@ export function guardarCliente(d: Omit<ClienteSuc, "id" | "sucursalId"> & { id?:
   const lista = getClientesSuc();
   exigir(!doc || !lista.some((c) => c.id !== d.id && c.doc === doc), "Ya existe un cliente con ese documento.");
   const c: ClienteSuc = { ...d, id: d.id ?? uid(), nombre: d.nombre.trim(), doc, sucursalId: getSucursal().id };
-  escribir(KEYS.SUC_CLIENTES, d.id ? lista.map((x) => (x.id === d.id ? c : x)) : [c, ...lista]);
+  escribirSede(KEYS.SUC_CLIENTES, d.id ? lista.map((x) => (x.id === d.id ? c : x)) : [c, ...lista]);
   return c;
 }
 
 export function eliminarCliente(id: string): void {
   exigir(operaSucursal(), "Su usuario no puede editar clientes.");
   exigir(!getVentasSuc().some((v) => v.clienteId === id && !v.pagado), "El cliente tiene deuda pendiente.");
-  escribir(KEYS.SUC_CLIENTES, getClientesSuc().filter((c) => c.id !== id));
+  escribirSede(KEYS.SUC_CLIENTES, getClientesSuc().filter((c) => c.id !== id));
 }
 
 /** Compras, deuda y frecuencia de un cliente (por id o, en ventas antiguas, por nombre). */

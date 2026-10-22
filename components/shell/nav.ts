@@ -1,4 +1,4 @@
-import { Calculator, ClipboardList, Factory, KeyRound, LayoutDashboard, Package, PackagePlus, Plus, Receipt, ShoppingCart, Store, Users, Warehouse, type LucideIcon } from "lucide-react";
+import { Calculator, ClipboardList, Factory, KeyRound, LayoutDashboard, Package, PackagePlus, Plus, Receipt, ShoppingCart, Users, Warehouse, type LucideIcon } from "lucide-react";
 import { puedeVer, veDashboard, type Sesion } from "@/lib/auth";
 
 /** Submenú: abre la pestaña `tab` del módulo (components/ui Tabs lee ?tab=) o una subpágina (`href`). */
@@ -58,22 +58,6 @@ export const NAV: ItemNav[] = [
     ],
   },
   {
-    href: "/dashboard/sucursal",
-    label: "Sucursal Beta",
-    icon: Store,
-    subs: [
-      { label: "Registrar venta", tab: "registrar-venta" },
-      { label: "Entregar producto", tab: "entregar-producto" },
-      { label: "Derivar a Taller", tab: "derivar-taller" },
-      { label: "Requerimientos", tab: "requerimientos" },
-      { label: "Traslados / Guía de remisión", tab: "traslados" },
-      { label: "Caja Chica", tab: "caja-chica" },
-      { label: "Stock Local", tab: "stock-local" },
-      { label: "Clientes", tab: "clientes" },
-      { label: "Reportes", tab: "reportes" },
-    ],
-  },
-  {
     href: "/dashboard/contable",
     label: "Contable",
     icon: Calculator,
@@ -124,7 +108,6 @@ export const ACCIONES: AccionRapida[] = [
   { id: "venta", label: "Nueva venta", detalle: "Ventas › Comprobantes", tecla: "N", icon: Plus, href: "/dashboard/ventas?tab=comprobantes" },
   { id: "pedido", label: "Nuevo pedido", detalle: "Ventas › Notas de pedido", tecla: "P", icon: ClipboardList, href: "/dashboard/ventas?tab=notas" },
   { id: "req", label: "Nuevo requerimiento", detalle: "Almacén", tecla: "R", icon: PackagePlus, href: "/dashboard/almacen?tab=nuevo" },
-  { id: "venta-sucursal", label: "Nueva venta / entrega (sucursal)", detalle: "Sucursal Beta › Registrar venta", tecla: "V", icon: Store, href: "/dashboard/sucursal?tab=registrar-venta&nueva=1" },
   { id: "gasto", label: "Registrar gasto / compra", detalle: "Tesorería / Compras", tecla: "G", icon: ShoppingCart, href: "/dashboard/compras?tab=registrar" },
 ];
 
@@ -133,4 +116,4 @@ export const accionesDe = (sesion: Sesion): AccionRapida[] =>
   sesion.soloLectura
     ? []
     : // Taller y Tesorería ven la Sucursal, pero no registran sus ventas
-      ACCIONES.filter((a) => puedeVer(sesion, a.href.split("?")[0]) && (a.id !== "venta-sucursal" || ["creador", "sucursal"].includes(sesion.rol)));
+      ACCIONES.filter((a) => puedeVer(sesion, a.href.split("?")[0]));
