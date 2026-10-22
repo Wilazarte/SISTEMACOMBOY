@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, ClipboardList, Contact, Receipt, Settings2, Truck, Wallet } from "lucide-react";
+import { AlertTriangle, ClipboardList, Contact, FilePlus2, History, Receipt, Search, Settings2, Truck, Wallet } from "lucide-react";
+import { abrirBuscadorDePagina } from "@/components/layout/IslandMenu";
 import { Button, Tabs } from "@/components/ui";
 import { KEYS, useStore } from "@/lib/storage";
 import { estadoCxC, estadoOD, npsSinDespacho } from "@/lib/ventas";
@@ -21,6 +22,8 @@ type Tab = "notas" | "comprobantes" | "despachos" | "condiciones" | "clientes" |
 export default function VentasPage() {
   const [tab, setTab] = useState<Tab>("notas");
   const [facturarNp, setFacturarNp] = useState<string | undefined>();
+  // "Emitir Nuevo" de la isla: abre Comprobantes con el formulario (0 = cerrado al entrar)
+  const [nuevoPedido, setNuevoPedido] = useState(0);
   useCargaCondiciones(); // condiciones_pago al día para notas, comprobantes y clientes
   const notas = useStore<NotaPedido[]>(KEYS.NOTAS_PEDIDO, []);
   const comprobantes = useStore<ComprobanteVenta[]>(KEYS.COMPROBANTES, []);
@@ -39,7 +42,28 @@ export default function VentasPage() {
         onChange={(t) => {
           setTab(t);
           setFacturarNp(undefined);
+          setNuevoPedido(0);
         }}
+        acciones={[
+          { label: "Buscar Documento", icon: <Search size={14} />, onClick: abrirBuscadorDePagina },
+          {
+            label: "Emitir Nuevo",
+            icon: <FilePlus2 size={14} />,
+            onClick: () => {
+              setFacturarNp(undefined);
+              setTab("comprobantes");
+              setNuevoPedido((n) => n + 1);
+            },
+          },
+          {
+            label: "Ver Historial",
+            icon: <History size={14} />,
+            onClick: () => {
+              setNuevoPedido(0);
+              setTab("comprobantes");
+            },
+          },
+        ]}
         tabs={[
           { id: "notas", label: "Notas de pedido", icon: <ClipboardList size={16} />, count: notas.filter((n) => n.estado === "APROBADA").length },
           { id: "comprobantes", label: "Comprobantes", icon: <Receipt size={16} />, count: comprobantes.filter((c) => c.estado === "BORRADOR").length },
@@ -62,7 +86,7 @@ export default function VentasPage() {
           }}
         />
       )}
-      {tab === "comprobantes" && <Comprobantes preNp={facturarNp} onListo={() => setFacturarNp(undefined)} />}
+      {tab === "comprobantes" && <Comprobantes preNp={facturarNp} onListo={() => setFacturarNp(undefined)} nuevoPedido={nuevoPedido} />}
       {tab === "despachos" && (
         <>
           {sinOD.length > 0 && (

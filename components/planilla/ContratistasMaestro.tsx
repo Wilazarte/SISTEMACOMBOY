@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Briefcase, FileText, Pencil, Power, Trash2, UserCheck } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, cn, ejecutar, toast } from "@/components/ui";
 import QuickActions, { QA_IDS } from "@/components/tesoreria/QuickActions";
@@ -54,7 +54,16 @@ const estadoDe = estadoContratista;
  * Contratistas del maestro de trabajadores (esContratista, cargo "Contratista" o pago POR CONTRATO).
  * No entran a la planilla del periodo.
  */
-export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadores: Trabajador[]; soloLectura: boolean }) {
+export function ContratistasMaestro({
+  trabajadores,
+  soloLectura,
+  pdfPedido = 0,
+}: {
+  trabajadores: Trabajador[];
+  soloLectura: boolean;
+  /** Cada vez que sube (botón "PDF Recibo" de la isla de Planilla) se descargan los recibos. */
+  pdfPedido?: number;
+}) {
   const [form, setForm] = useState<{ datos: DatosContratista; idOriginal?: string } | null>(null);
   const [verInactivos, setVerInactivos] = useState(false);
   const [buscar, setBuscar] = useState("");
@@ -76,6 +85,11 @@ export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadore
     if (sel.length > 1 && !confirm(`¿Descargar ${sel.length} recibos PDF (uno por contratista)?`)) return;
     for (const t of sel) await descargarRecibo(t, "CONTRATISTA");
   };
+  const pdfRef = useRef(descargarRecibos);
+  pdfRef.current = descargarRecibos;
+  useEffect(() => {
+    if (pdfPedido > 0) void pdfRef.current();
+  }, [pdfPedido]);
 
   return (
     <div>

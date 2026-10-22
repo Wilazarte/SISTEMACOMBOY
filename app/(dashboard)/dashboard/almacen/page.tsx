@@ -44,7 +44,8 @@ export default function AlmacenPage() {
   const guias = useStore<Guia[]>(KEYS.GUIAS, []);
   const stock = useStore<StockItem[]>(KEYS.STOCK, []);
   const despachos = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, []);
-  const [tab, setTab] = useState<Tab>(puede(rol, "req.crear") ? "nuevo" : "lista");
+  // Al entrar solo se ve la lista: el formulario se abre con "Nuevo requerimiento" en la isla
+  const [tab, setTab] = useState<Tab>("lista");
 
   // Campana "nueva orden de despacho": /dashboard/almacen?tab=despacho (o evento si ya está en la página)
   useEffect(() => {
@@ -81,14 +82,14 @@ export default function AlmacenPage() {
           { id: "stock", label: "Stock", icon: <Boxes size={16} /> },
           {
             id: "despacho",
-            label: "Órdenes de despacho",
+            label: "Órdenes despacho",
             icon: <Truck size={16} />,
             count: despachos.filter((o) => estadoOD(o) === "PENDIENTE" || estadoOD(o) === "PEDIDO_ALISTADO").length,
           },
         ]}
       />
 
-      {tab === "nuevo" && <NuevoReq rol={rol} onCreado={() => setTab("lista")} />}
+      {tab === "nuevo" && <NuevoReq rol={rol} onCreado={() => setTab("lista")} onCancelar={() => setTab("lista")} />}
       {tab === "lista" && <ListaReq reqs={todos} rol={rol} />}
       {tab === "ingresos" && (
         <div className="space-y-6">
@@ -105,7 +106,7 @@ export default function AlmacenPage() {
 // =====================================================================
 // NUEVO REQUERIMIENTO
 // =====================================================================
-function NuevoReq({ rol, onCreado }: { rol: Rol; onCreado: () => void }) {
+function NuevoReq({ rol, onCreado, onCancelar }: { rol: Rol; onCreado: () => void; onCancelar: () => void }) {
   const [sede, setSede] = useState("");
   const [solicitante, setSolicitante] = useState("");
   const [fecha, setFecha] = useState(hoy());
@@ -134,7 +135,13 @@ function NuevoReq({ rol, onCreado }: { rol: Rol; onCreado: () => void }) {
 
   return (
     <Card>
-      <CardHeader title="Nuevo requerimiento de almacén" subtitle="Al guardar se notifica automáticamente a Tesorería." action={<span className="rounded-lg bg-plomo-100 px-3 py-1.5 font-mono text-sm font-bold text-slate-700" title="Número probable: el definitivo se asigna al guardar">{proximo}</span>} />
+      <CardHeader title="Nuevo requerimiento de almacén" subtitle="Al guardar se notifica automáticamente a Tesorería." action={
+          <div className="flex items-center gap-2">
+            <span className="rounded-lg bg-plomo-100 px-3 py-1.5 font-mono text-sm font-bold text-slate-700" title="Número probable: el definitivo se asigna al guardar">{proximo}</span>
+            <BotonNuevo abierto onClick={onCancelar} />
+          </div>
+        }
+      />
       <div className="grid gap-4 p-5 md:grid-cols-4">
         <Field label="Sede *">
           <Select value={sede} onChange={(e) => setSede(e.target.value)} placeholder="Seleccione…" options={SEDES.map((s) => ({ value: s, label: s }))} />

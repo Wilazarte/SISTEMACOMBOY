@@ -236,6 +236,8 @@ export default function PlanillaTab() {
   const soloLectura = !!sesion?.soloLectura; // Gerencia: ver sin editar
   const puedeEditar = !soloLectura && ["creador", "planilla", "tesoreria", "admin"].includes(sesion?.rol ?? "");
   const [tab, setTab] = useState<Tab>("trabajadores");
+  // "PDF Recibo" de la isla: abre Contratistas y descarga los recibos
+  const [pdfPedido, setPdfPedido] = useState(0);
   const historial = useHistorialPlanilla();
   const adelantos = useAdelantosPendientes();
 
@@ -523,12 +525,25 @@ export default function PlanillaTab() {
       <Tabs<Tab>
         enLinea
         value={tab}
-        onChange={setTab}
+        onChange={(t) => {
+          setTab(t);
+          setPdfPedido(0);
+        }}
+        acciones={[
+          {
+            label: "PDF Recibo",
+            icon: <FileDown size={14} />,
+            onClick: () => {
+              setTab("contratistas");
+              setPdfPedido((n) => n + 1);
+            },
+          },
+        ]}
         tabs={[
+          { id: "planilla", label: "Planilla periodo", icon: <Calculator size={16} /> },
+          { id: "contratistas", label: "Contratistas", icon: <Building2 size={16} />, count: nContratistas },
           { id: "trabajadores", label: "Trabajadores", icon: <Users size={16} />, count: incompletos.length },
-          { id: "planilla", label: "Planilla del periodo", icon: <Calculator size={16} /> },
           { id: "historial", label: "Historial", icon: <Archive size={16} /> },
-          { id: "contratistas", label: "Contratistas / Concesiones", icon: <Building2 size={16} /> },
         ]}
       />
 
@@ -994,7 +1009,7 @@ export default function PlanillaTab() {
 
       {tab === "contratistas" && (
         <div className="space-y-6">
-          <ContratistasMaestro trabajadores={maestro} soloLectura={!puedeEditar} />
+          <ContratistasMaestro trabajadores={maestro} soloLectura={!puedeEditar} pdfPedido={pdfPedido} />
           <div>
             <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-fg">
               <Building2 size={18} className="text-rojo" /> Concesiones / servicios externos

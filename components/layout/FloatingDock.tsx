@@ -6,7 +6,7 @@ import { BarChart3, LayoutDashboard, Receipt, ShoppingCart, Warehouse, type Luci
 import { cn } from "@/components/ui";
 import { puedeVer, veDashboard, veTesoreria, type Sesion } from "@/lib/auth";
 
-/** Dock inferior de módulos. `corto` es la etiqueta en móvil. Planilla no va aquí: es una pestaña de Tesorería / Compras. */
+/** Módulos del dock. `corto` es la etiqueta en móvil. Planilla no va aquí: es una pestaña de Tesorería / Compras. */
 const ITEMS: { href: string; label: string; corto: string; icon: LucideIcon }[] = [
   { href: "/dashboard", label: "Dashboard", corto: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/compras", label: "Tesorería/Compras", corto: "Tesorería", icon: ShoppingCart },
@@ -22,8 +22,8 @@ const activoEn = (ruta: string, href: string) => {
   return href === "/dashboard" ? ruta === href : ruta === href || ruta.startsWith(`${href}/`);
 };
 
-/** Solo muestra los módulos que el usuario puede abrir (ver puedeVer en lib/auth.ts). */
-export function BottomNav({ sesion }: { sesion: Sesion }) {
+/** Dock flotante: cápsula centrada con los módulos. Solo muestra los que el usuario puede abrir (ver puedeVer en lib/auth.ts). */
+export function FloatingDock({ sesion }: { sesion: Sesion }) {
   const ruta = usePathname();
   const items = ITEMS.filter((i) => (i.href === "/dashboard" ? veDashboard(sesion) : i.href === "/dashboard/compras" ? veTesoreria(sesion) : puedeVer(sesion, i.href)));
   if (items.length === 0) return null;
@@ -31,7 +31,7 @@ export function BottomNav({ sesion }: { sesion: Sesion }) {
   return (
     <nav
       aria-label="Módulos"
-      className="fixed inset-x-0 bottom-0 z-[70] flex h-20 items-center gap-1 rounded-b-none rounded-t-[24px] border border-white/15 bg-black/60 px-2 shadow-[0_8px_40px_rgba(0,0,0,0.6)] backdrop-blur-2xl print:hidden lg:inset-x-auto lg:bottom-6 lg:left-1/2 lg:w-[680px] lg:max-w-[95vw] lg:-translate-x-1/2 lg:rounded-full lg:px-3"
+      className="fixed bottom-3 left-1/2 z-50 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 gap-1 rounded-full border border-slate-800 bg-[#0f172a] px-2 py-2 sm:gap-5 sm:px-4 print:hidden"
     >
       {items.map(({ href, label, corto, icon: Icon }) => {
         const activo = activoEn(ruta, href);
@@ -42,18 +42,18 @@ export function BottomNav({ sesion }: { sesion: Sesion }) {
             aria-current={activo ? "page" : undefined}
             title={label}
             className={cn(
-              "flex h-16 min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-full border text-[11px] font-semibold transition-all duration-200",
-              activo
-                ? "border-[#2a7bff] bg-[#2a7bff]/20 text-[#2a7bff] shadow-[0_0_20px_rgba(42,123,255,0.5)]"
-                : "border-transparent text-white/60 hover:bg-white/10 hover:text-white"
+              "flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors duration-200",
+              activo ? "bg-[#1e40af] text-white" : "text-slate-400 hover:bg-[#1e293b] hover:text-slate-200"
             )}
           >
-            <Icon size={22} strokeWidth={2} />
-            <span className="max-w-full truncate px-1 lg:hidden">{corto}</span>
-            <span className="hidden max-w-full truncate px-1 lg:block">{label}</span>
+            <Icon size={18} strokeWidth={2} />
+            <span className="max-w-full truncate lg:hidden">{corto}</span>
+            <span className="hidden max-w-full truncate lg:block">{label}</span>
           </Link>
         );
       })}
     </nav>
   );
 }
+
+export default FloatingDock;

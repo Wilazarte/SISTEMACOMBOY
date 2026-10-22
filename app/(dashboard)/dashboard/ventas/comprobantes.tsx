@@ -43,7 +43,7 @@ const datosVacios = (): DatosComprobante => ({
   despacho: despachoVacio(),
 });
 
-export function Comprobantes({ preNp, onListo }: { preNp?: string; onListo: () => void }) {
+export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: string; onListo: () => void; /** Sube con "Emitir Nuevo" de la isla: abre el formulario. */ nuevoPedido?: number }) {
   const [rol] = useRol();
   const comprobantes = useStore<ComprobanteVenta[]>(KEYS.COMPROBANTES, []);
   const notas = useStore<NotaPedido[]>(KEYS.NOTAS_PEDIDO, []);
@@ -89,6 +89,15 @@ export function Comprobantes({ preNp, onListo }: { preNp?: string; onListo: () =
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preNp]);
+
+  // "Emitir Nuevo" de la isla de Ventas
+  useEffect(() => {
+    if (nuevoPedido > 0 && habilitado) {
+      setBorradorId(undefined);
+      setForm(datosVacios());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nuevoPedido]);
 
   const npConOD = form?.npId ? notas.find((n) => n.id === form.npId && n.odId) : undefined;
   const t = form ? totalesVenta(form.items, form.tipo === "FACTURA" ? true : form.conIgv, form.descuento) : null;

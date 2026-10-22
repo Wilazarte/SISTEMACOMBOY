@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLA
 import { createPortal } from "react-dom";
 import { AlertCircle, CheckCircle2, Clock, X } from "lucide-react";
 import type { EventoHistorial } from "@/lib/types";
+import { IslandMenu, type AccionIsla } from "@/components/layout/IslandMenu";
 
 export const cn = (...c: (string | false | null | undefined)[]): string => c.filter(Boolean).join(" ");
 
@@ -209,12 +210,15 @@ export function Tabs<T extends string>({
   value,
   onChange,
   enLinea = false,
+  acciones,
 }: {
   tabs: { id: T; label: string; icon?: ReactNode; count?: number }[];
   value: T;
   onChange: (id: T) => void;
   /** Sub-pestañas dentro de otra pestaña: se dibujan en su lugar y no leen ni cambian ?tab=. */
   enLinea?: boolean;
+  /** Botones de la isla antes de las pestañas (Buscar, Nuevo, Historial…). */
+  acciones?: AccionIsla[];
 }) {
   // Las pestañas se dibujan en la barra fija del layout (si existe); si no, en su lugar.
   const [destino, setDestino] = useState<HTMLElement | null>(null);
@@ -249,31 +253,8 @@ export function Tabs<T extends string>({
     }
   };
 
-  const barra = (
-    <div className="flex max-w-full gap-1 overflow-x-auto rounded-xl border border-plomo-200 bg-plomo-50 p-1" role="tablist">
-      {tabs.map((t) => {
-        const activo = value === t.id;
-        return (
-          <button
-            key={t.id}
-            role="tab"
-            aria-selected={activo}
-            onClick={() => elegir(t.id)}
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] font-medium transition duration-150",
-              activo ? "border-[#2a7bff] bg-[#1e2a45] text-[#2a7bff] shadow-[0_0_14px_rgba(42,123,255,0.35)]" : "border-transparent text-plomo-500 hover:bg-plomo-100 hover:text-fg"
-            )}
-          >
-            <span className={cn("transition-colors", activo && "text-corp")}>{t.icon}</span>
-            {t.label}
-            {t.count !== undefined && t.count > 0 && (
-              <span className={cn("rounded-full px-1.5 text-[11px] font-semibold", activo ? "bg-corp text-white" : "bg-rojo-soft text-rojo")}>{t.count}</span>
-            )}
-          </button>
-        );
-      })}
-    </div>
-  );
+  // Menú isla flotante (components/layout/IslandMenu): una sola cápsula con acciones + pestañas
+  const barra = <IslandMenu items={tabs} activo={value} onElegir={(id) => elegir(id as T)} acciones={acciones} className={enLinea ? "mx-0 mt-0" : undefined} />;
   return destino ? createPortal(barra, destino) : barra;
 }
 

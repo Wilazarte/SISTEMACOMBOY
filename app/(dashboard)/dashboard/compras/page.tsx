@@ -212,7 +212,6 @@ export default function ComprasPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-serif tracking-tight text-2xl font-semibold leading-tight text-fg lg:text-[28px]">Tesorería / Compras</h1>
-          <p className="mt-1 text-[13px] text-plomo-600">Requerimiento → Cotización → Orden de Compra → Bancarización → Factura</p>
         </div>
         {!puede(rol, "req.revisar") && (
           <span className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-plomo-600">Modo lectura para su rol</span>
@@ -225,18 +224,23 @@ export default function ComprasPage() {
         value={tab}
         onChange={(t) => ir(t)}
         tabs={[
+          // Isla: Registrar gasto · Cotizaciones · Órdenes compra · Facturas · Planilla · Declaraciones (+ Antecedentes)
           ...(veCompras
             ? [
-                { id: "registrar" as const, label: "Registrar gasto / compra", icon: <PackagePlus size={16} /> },
-                { id: "antecedentes" as const, label: "Antecedentes", icon: <History size={16} /> },
+                { id: "registrar" as const, label: "Registrar gasto", icon: <PackagePlus size={16} /> },
                 { id: "cotizaciones" as const, label: "Cotizaciones", icon: <FileSpreadsheet size={16} />, count: cotizables.filter((r) => r.estado === "ACEPTADO").length },
-                { id: "ordenes" as const, label: "Órdenes de compra", icon: <ShoppingBag size={16} />, count: cotisSinOC.length },
+                { id: "ordenes" as const, label: "Órdenes compra", icon: <ShoppingBag size={16} />, count: cotisSinOC.length },
                 { id: "facturas" as const, label: "Facturas", icon: <Receipt size={16} />, count: ocsSinFactura.length },
                 // Guías de remisión: ya no son parte del flujo (pestaña oculta; las guías cargadas siguen guardadas)
               ]
             : []),
           ...(vePlanilla ? [{ id: "planilla" as const, label: "Planilla", icon: <Users size={16} />, count: activos }] : []),
-          ...(veCompras ? [{ id: "declaraciones" as const, label: "Declaraciones juradas", icon: <FileText size={16} />, count: facturas.filter(esDeclaracionJurada).length }] : []),
+          ...(veCompras
+            ? [
+                { id: "declaraciones" as const, label: "Declaraciones", icon: <FileText size={16} />, count: facturas.filter(esDeclaracionJurada).length },
+                { id: "antecedentes" as const, label: "Antecedentes", icon: <History size={16} /> },
+              ]
+            : []),
         ]}
       />
 

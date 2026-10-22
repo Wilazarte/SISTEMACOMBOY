@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState } from "react";
 import { EstadosCuenta } from "@/components/contable/EstadosCuenta";
-import { BookOpen, ChevronDown, ChevronRight, FileBarChart2, Landmark, Lock, LockOpen, Scale, Sparkles, Wallet } from "lucide-react";
+import { BookOpen, FilePlus2, History, Search, ChevronDown, ChevronRight, FileBarChart2, Landmark, Lock, LockOpen, Scale, Sparkles, Wallet } from "lucide-react";
 import { Button, Card, CardHeader, Empty, Field, Select, Table, Tabs, Td, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import {
@@ -21,6 +21,7 @@ import {
   type OrigenAsiento,
 } from "@/lib/contable";
 import { generarAsientosAutomaticos } from "@/lib/contable-auto";
+import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { KEYS, fechaPE, soles, tablaDisponible, useRol, useStore } from "@/lib/storage";
 
 type Tab = "diario" | "mayor" | "balance" | "eeff" | "estados";
@@ -48,6 +49,8 @@ export default function ContablePage() {
   const [tab, setTab] = useState<Tab>("diario");
   const [filtro, setFiltro] = useState<Filtro>({ anio: hoy.getFullYear(), mes: hoy.getMonth() + 1 });
   const [generando, setGenerando] = useState(false);
+  // Filtros de periodo (Año / Mes) ocultos por defecto: se abren con "Buscar Documento" de la isla
+  const { showFiltros, setShowFiltros } = useTogglePanel();
   const sesion = getSesion();
   const puedeGenerar = rol === "GERENCIA" && !sesion?.soloLectura;
 
@@ -82,10 +85,10 @@ export default function ContablePage() {
           <h1 className="font-serif tracking-tight text-2xl font-semibold leading-tight text-fg lg:text-[28px]">Contable</h1>
           <p className="mt-1 text-[13px] text-plomo-600">Libro Diario, Mayor, Balance de comprobación y Estados Financieros · asientos automáticos desde Ventas, Compras y Planilla</p>
         </div>
-        {puedeGenerar && (
-          <Button onClick={generar} disabled={generando}>
-            <Sparkles size={16} /> {generando ? "Generando…" : "Generar asientos automáticos desde Ventas / Compras / Planilla"}
-          </Button>
+        {generando && (
+          <span className="inline-flex items-center gap-1.5 text-[13px] text-slate-400">
+            <Sparkles size={14} /> Generando asientos desde Ventas / Compras / Planilla…
+          </span>
         )}
       </div>
 
@@ -95,7 +98,9 @@ export default function ContablePage() {
         </div>
       )}
 
-      <div className="grid gap-3 rounded-xl border border-plomo-200 bg-surface p-4 shadow-card sm:grid-cols-[160px_200px_1fr]">
+      <div className={cn("grid gap-3 rounded-xl border border-plomo-200 bg-surface p-4 shadow-card", showFiltros && "sm:grid-cols-[160px_200px_1fr]")}>
+        {showFiltros && (
+          <>
         <Field label="Año">
           <Select value={String(filtro.anio)} onChange={(e) => setFiltro({ ...filtro, anio: Number(e.target.value) })} options={anios.map((a) => ({ value: String(a), label: String(a) }))} />
         </Field>
@@ -107,7 +112,10 @@ export default function ContablePage() {
             options={MESES.map((m, i) => ({ value: String(i + 1), label: m }))}
           />
         </Field>
+          </>
+        )}
         <div className="flex flex-wrap items-end gap-3 text-sm">
+          <Stat label="Periodo" valor={nombrePeriodo} />
           <Stat label="Asientos del periodo" valor={String(delPeriodo.length)} />
           <Stat label="Debe" valor={soles(delPeriodo.reduce((a, x) => a + x.lineas.reduce((b, l) => b + l.debe, 0), 0))} />
           <Stat label="Haber" valor={soles(delPeriodo.reduce((a, x) => a + x.lineas.reduce((b, l) => b + l.haber, 0), 0))} />
@@ -122,6 +130,11 @@ export default function ContablePage() {
       <Tabs<Tab>
         value={tab}
         onChange={setTab}
+        acciones={[
+          { label: "Buscar Documento", icon: <Search size={14} />, onClick: () => setShowFiltros(!showFiltros) },
+          ...(puedeGenerar ? [{ label: "Emitir Nuevo", icon: <FilePlus2 size={14} />, onClick: () => void (generando || generar()) }] : []),
+          { label: "Ver Historial", icon: <History size={14} />, onClick: () => setTab("diario") },
+        ]}
         tabs={[
           { id: "diario", label: "Libro Diario", icon: <BookOpen size={16} />, count: delPeriodo.length },
           { id: "mayor", label: "Mayor", icon: <Landmark size={16} /> },

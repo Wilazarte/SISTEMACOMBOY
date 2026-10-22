@@ -28,7 +28,7 @@ function moduloDeRuta(ruta: string): ModuloLogin {
   return "gerencia";
 }
 
-/** Franja de contexto de cada módulo: usuario | cargo | empresa, encargado, sede y flujo de trabajo. */
+/** Franja de contexto de cada módulo: usuario | cargo | empresa, encargado, sede y flujo de trabajo (subtítulo). */
 export function Header({ sesion, flujo }: { sesion: Sesion; flujo?: string }) {
   const ruta = usePathname();
   const [moduloActual, setModuloActual] = useState<ModuloLogin>(() => moduloDeRuta(ruta));
@@ -55,16 +55,11 @@ export function Header({ sesion, flujo }: { sesion: Sesion; flujo?: string }) {
           </span>
         </div>
       </div>
+      {/* Flujo del módulo: subtítulo pequeño (ya no es una barra; el único menú es la isla) */}
       {pasos.length > 1 && (
-        <ol className="flex flex-wrap items-center gap-1.5 text-xs text-plomo-500" aria-label="Flujo del módulo">
-          <li className="mr-1 font-medium">Flujo</li>
-          {pasos.map((p, i) => (
-            <li key={p} className="flex items-center gap-1.5">
-              {i > 0 && <span aria-hidden>→</span>}
-              <span className="rounded-md border border-plomo-200 bg-surface px-2 py-0.5">{p}</span>
-            </li>
-          ))}
-        </ol>
+        <p className="text-[11px] text-slate-500" aria-label="Flujo del módulo">
+          {pasos.join(" → ")}
+        </p>
       )}
     </section>
   );

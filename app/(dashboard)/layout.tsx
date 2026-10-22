@@ -14,7 +14,7 @@ import { Campana } from "@/components/shell/Campana";
 import { CommandPalette, IconoDoc, type Comando } from "@/components/shell/CommandPalette";
 import { useIr } from "@/components/shell/ir";
 import { accionesDe, hrefSub, moduloDe, navDe } from "@/components/shell/nav";
-import { BottomNav } from "@/components/layout/BottomNav";
+import { FloatingDock } from "@/components/layout/FloatingDock";
 import { inicioDe, logout, puedeVer, useSesion, veTesoreria } from "@/lib/auth";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
 import { useNotificaciones } from "@/lib/notificaciones";
@@ -42,9 +42,9 @@ function buscar(q: string): Resultado[] {
   return out.filter((r) => `${r.numero} ${r.detalle}`.toUpperCase().includes(t)).slice(0, 12);
 }
 
-/** Flujo de trabajo de cada módulo (franja de contexto, para ubicarse rápido). */
+/** Flujo de trabajo de cada módulo: subtítulo pequeño del encabezado (ya no es barra). */
 const FLUJOS: [string, string][] = [
-  ["/dashboard/compras", "Requerimiento → Cotización → Orden de Compra → Bancarización → Factura"],
+  ["/dashboard/compras", "Requerimiento → Cotización → OC → Bancarización → Factura"],
   ["/dashboard/almacen", "Requerimiento → Ingreso a almacén → Stock → Orden de Despacho → Entrega"],
   ["/dashboard/produccion", "Orden de Producción → QC firmado → Ingreso a Almacén → Venta → Despacho"],
   ["/dashboard/ventas", "Nota de Pedido → Aprobación → Orden de Despacho → Factura / Boleta → Cobro"],
@@ -308,8 +308,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           ) : (
             <div className="animate-velo space-y-5" key={path} /* solo opacidad: un transform rompería los modales fijos */>
               <Header sesion={sesion} flujo={flujoDe(path)} />
-              {/* Pestañas del módulo (components/ui Tabs se dibuja aquí): fijas al hacer scroll */}
-              <div id={ID_BARRA_PESTANAS} className="sticky top-14 z-10 -mx-1 bg-[#070b14]/60 px-1 py-2 backdrop-blur-md empty:hidden" />
+              {/* Menú isla del módulo (components/ui Tabs dibuja aquí su IslandMenu): fijo al hacer scroll, sin barra de fondo */}
+              <div id={ID_BARRA_PESTANAS} className="sticky top-14 z-10 empty:hidden" />
               {sesion.soloLectura && (
                 <div className="flex w-full items-center gap-2 rounded-xl border border-plomo-200 bg-surface px-4 py-2.5 text-sm text-fg-2 shadow-card">
                   <Eye size={16} className="shrink-0 text-plomo-500" /> Modo solo lectura: puede revisar todo y registrar observaciones, pero no guardar, editar ni eliminar.
@@ -331,7 +331,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </span>
         <span className="font-mono">v3.2.1</span>
       </footer>
-      <BottomNav sesion={sesion} />
+      <FloatingDock sesion={sesion} />
       <AccionRapida acciones={acciones} />
       <CommandPalette abierto={paleta} onCerrar={() => setPaleta(false)} comandos={comandos} documentos={documentos} />
       <DocViewerHost />
