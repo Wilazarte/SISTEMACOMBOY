@@ -13,7 +13,7 @@ import { createClient } from "./supabase/client";
 import type { Rol } from "./types";
 
 /** Roles con permisos definidos en el ERP. Cualquier otro rol de la tabla perfiles se trata como solo lectura. */
-export type RolAuth = "creador" | "tesoreria" | "almacen" | "planilla" | "gerencia";
+export type RolAuth = "creador" | "tesoreria" | "almacen" | "planilla" | "gerencia" | "sucursal";
 
 /** Dominio de los correos de Supabase Auth: en el login basta con escribir "tesoreria". */
 export const DOMINIO = "comboyvid.local";
@@ -41,6 +41,7 @@ const ROL_NEGOCIO: Record<RolAuth, Rol> = {
   almacen: "ALMACEN",
   planilla: "CONTADOR",
   gerencia: "CONTADOR",
+  sucursal: "CONTADOR", // escribe solo en su módulo (lib/sucursal.ts) y sus REQ-SUC
 };
 
 const EVENTO = "erp:sesion";
@@ -152,10 +153,13 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
   if (ruta === RUTA_CREADOR || ruta.startsWith(`${RUTA_CREADOR}/`)) return puedeEditarAsistencia(sesion);
   // Producción: también Almacén (registra las órdenes de producción y el QC)
   if (ruta === RUTA_PRODUCCION || ruta.startsWith(`${RUTA_PRODUCCION}/`)) if (sesion.rol === "almacen") return true;
+  // Sucursal Beta: también el Taller Principal (almacén: derivaciones y OT) y Tesorería Principal (cierres de caja, REQ-SUC)
+  if (ruta === RUTA_SUCURSAL || ruta.startsWith(`${RUTA_SUCURSAL}/`)) if (["sucursal", "almacen", "tesoreria"].includes(sesion.rol)) return true;
   return sesion.modulos.some((m) => m === "*" || ruta === m || ruta.startsWith(`${m}/`));
 }
 
 export const RUTA_PRODUCCION = "/dashboard/produccion";
+export const RUTA_SUCURSAL = "/dashboard/sucursal";
 
 /** Tesorería / Compras: también entra quien solo tiene Planilla (ve solo esa pestaña). */
 export const veTesoreria = (sesion: Sesion | null): boolean => puedeVer(sesion, "/dashboard/compras") || puedeVer(sesion, "/dashboard/planilla");
@@ -178,7 +182,7 @@ export const rolNegocio = (sesion: Sesion | null): Rol => (sesion ? ROL_NEGOCIO[
  * ventas, contable, tesoreria, produccion y logistica: los 5 de /seleccionar-modulo.
  * almacen, planilla y gerencia: los anteriores, siguen válidos en /login?modulo= y en sesiones guardadas.
  */
-export type ModuloLogin = "ventas" | "contable" | "tesoreria" | "produccion" | "logistica" | "almacen" | "planilla" | "gerencia";
+export type ModuloLogin = "ventas" | "contable" | "tesoreria" | "produccion" | "logistica" | "sucursal" | "almacen" | "planilla" | "gerencia";
 
 /**
  * `ruta`: a dónde entra. `rutas`: rutas del módulo (basta tener asignada una en perfiles.modulos).
@@ -190,6 +194,7 @@ export const MODULOS_LOGIN: Record<ModuloLogin, { nombre: string; ruta: string; 
   tesoreria: { nombre: "Tesorería (Planilla - Compras)", ruta: "/dashboard/compras", rutas: ["/dashboard/compras", "/dashboard/planilla"], roles: ["planilla"] },
   produccion: { nombre: "Producción (Almacén)", ruta: "/dashboard/produccion", rutas: ["/dashboard/produccion", "/dashboard/almacen"], roles: ["almacen"] },
   logistica: { nombre: "Logística", ruta: "/dashboard/almacen?tab=despacho", rutas: ["/dashboard/almacen"], roles: ["almacen"] },
+  sucursal: { nombre: "Sucursal Beta", ruta: "/dashboard/sucursal", rutas: ["/dashboard/sucursal"] },
   almacen: { nombre: "Almacén", ruta: "/dashboard/almacen", rutas: ["/dashboard/almacen"] },
   planilla: { nombre: "Planilla", ruta: "/dashboard/planilla", rutas: ["/dashboard/planilla"] },
   gerencia: { nombre: "Gerencia", ruta: "/dashboard", rutas: [] },
@@ -228,6 +233,7 @@ const CARGOS: Record<RolAuth, string> = {
   almacen: "Jefe de Almacén",
   planilla: "Jefe de RRHH",
   gerencia: "Gerente General",
+  sucursal: "Jefe de Sucursal - Módulo de Sucursal Beta",
 };
 export const cargoDe = (s: Sesion): string => s.cargo?.trim() || CARGOS[s.rol] || s.rol;
 
@@ -235,5 +241,6 @@ export const cargoDe = (s: Sesion): string => s.cargo?.trim() || CARGOS[s.rol] |
 const NOMBRES: Partial<Record<RolAuth, string>> = {
   tesoreria: "LIZBETH CAHUANA APFATA",
   almacen: "JOSE MANUEL ORTIZ ARAPA",
+  sucursal: "LIZBETH CAHUANA APFATA",
 };
 export const nombreDe = (s: Sesion): string => s.nombreCompleto?.trim() || NOMBRES[s.rol] || s.nombre;

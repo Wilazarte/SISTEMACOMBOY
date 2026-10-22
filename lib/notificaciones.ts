@@ -9,11 +9,12 @@
 import { useMemo } from "react";
 import { puedeVer, type Sesion } from "./auth";
 import { getEquipos } from "./equipos";
-import { KEYS, hoy, soles, useStore } from "./storage";
+import { KEYS, fechaPE, hoy, soles, useStore } from "./storage";
 import type { Factura, OrdenDespacho, Requerimiento, StockItem } from "./types";
+import type { CierreCaja, Derivacion, StockLocal, Traslado, VentaSucursal } from "./sucursal-modelos";
 import { avisoOD, odsNuevas } from "./ventas";
 
-export type TipoNotif = "despacho" | "requerimiento" | "factura" | "qc" | "stock";
+export type TipoNotif = "despacho" | "requerimiento" | "factura" | "qc" | "stock" | "sucursal";
 
 export interface Notificacion {
   /** Identifica el aviso para marcarlo como visto; cambia si cambia su contenido. */
@@ -44,6 +45,15 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
   const facturas = useStore<Factura[]>(KEYS.FACTURAS, [], ve("/dashboard/compras"));
   const stock = useStore<StockItem[]>(KEYS.STOCK, [], veAlmacen);
   const equiposRaw = useStore<unknown[]>(KEYS.EQUIPOS, [], veAlmacen || ve("/dashboard/ventas"));
+  // Sucursal Beta: cada rol descarga solo lo que le avisa
+  const rol = sesion?.rol ?? "";
+  const veSuc = ve("/dashboard/sucursal");
+  const opera = veSuc && ["creador", "sucursal"].includes(rol);
+  const derivaciones = useStore<Derivacion[]>(KEYS.SUC_DERIVACIONES, [], veSuc && ["creador", "almacen"].includes(rol));
+  const traslados = useStore<Traslado[]>(KEYS.SUC_TRASLADOS, [], opera);
+  const ventasSuc = useStore<VentaSucursal[]>(KEYS.SUC_VENTAS, [], opera);
+  const stockSuc = useStore<StockLocal[]>(KEYS.SUC_STOCK, [], opera);
+  const cierres = useStore<CierreCaja[]>(KEYS.SUC_CIERRES, [], veSuc && ["creador", "tesoreria"].includes(rol));
 
   return useMemo(() => {
     if (!sesion) return [];
@@ -107,8 +117,28 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
         });
     }
 
+    // Sucursal Beta (cada derivación / OT / venta / cierre una sola vez: la clave es su id)
+    if (ve("/dashboard/sucursal")) {
+      const S = "/dashboard/sucursal";
+      if (["creador", "almacen"].includes(sesion.rol))
+        for (const d of derivaciones.filter((x) => x.estado === "pendiente" || x.estado === "en-preparacion"))
+          out.push({ clave: `der:${d.id}`, tipo: "sucursal", titulo: `Derivación ${d.ventaNumero} de Sucursal ${d.sucursal}`, detalle: `${d.cliente} · ${d.estado === "pendiente" ? "por atender" : "en preparación"}`, modulo: "Taller Principal", href: `${S}?tab=derivar-taller`, prioridad: 1 });
+      if (["creador", "sucursal"].includes(sesion.rol)) {
+        for (const t of traslados.filter((x) => x.estado === "en-camino"))
+          out.push({ clave: `ot:${t.id}`, tipo: "sucursal", titulo: `${t.codigo} en camino`, detalle: `Guía ${t.guiaRemision} · ${t.productos.length} producto(s)`, modulo: "Sucursal", href: `${S}?tab=traslados`, prioridad: 2 });
+        for (const v of ventasSuc.filter((x) => x.estado === "registrada"))
+          out.push({ clave: `vta:${v.id}`, tipo: "sucursal", titulo: `${v.numero} por entregar`, detalle: `${v.cliente} · ${soles(v.total)}`, modulo: "Sucursal", href: `${S}?tab=entregar-producto`, prioridad: 3 });
+        const bajos = stockSuc.filter((s) => s.stock < s.minimo);
+        if (bajos.length)
+          out.push({ clave: `stsuc:${bajos.map((s) => `${s.id}:${s.stock}`).join(",")}`, tipo: "sucursal", titulo: `${bajos.length} producto(s) bajo el mínimo`, detalle: bajos.slice(0, 3).map((s) => `${s.producto} (${s.stock})`).join(" · "), modulo: "Sucursal", href: `${S}?tab=stock-local`, prioridad: 5 });
+      }
+      if (["creador", "tesoreria"].includes(sesion.rol))
+        for (const c of cierres.filter((x) => x.estado === "enviado"))
+          out.push({ clave: `cc:${c.id}`, tipo: "sucursal", titulo: `Cierre de caja ${c.numero} por recibir`, detalle: `Saldo ${soles(c.saldoFinal)} · ${fechaPE(c.fecha)}`, modulo: "Sucursal → Tesorería", href: `${S}?tab=caja-chica`, prioridad: 3 });
+    }
+
     return out.sort((a, b) => a.prioridad - b.prioridad);
     // equiposRaw: getEquipos() lee la misma caché; se usa para recalcular cuando cambia
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sesion, ods, reqs, facturas, stock, equiposRaw]);
+  }, [sesion, ods, reqs, facturas, stock, equiposRaw, derivaciones, traslados, ventasSuc, stockSuc, cierres]);
 }

@@ -30,7 +30,7 @@ export interface FilaDoc {
   extra?: ReactNode;
 }
 
-export type TipoLista = "compras" | "cotizaciones" | "ordenes" | "facturas" | "planilla" | "ventas" | "inventario" | "requerimientos" | "declaraciones";
+export type TipoLista = "compras" | "cotizaciones" | "ordenes" | "facturas" | "planilla" | "ventas" | "inventario" | "requerimientos" | "declaraciones" | "sucursal" | "traslados" | "caja";
 
 const ETIQUETAS: Record<TipoLista, { contraparte: string; ref: string; total: string; buscar: string }> = {
   compras: { contraparte: "Proveedor", ref: "Doc. referencia", total: "Total", buscar: "Buscar comprobante, proveedor, RUC…" },
@@ -42,6 +42,9 @@ const ETIQUETAS: Record<TipoLista, { contraparte: string; ref: string; total: st
   inventario: { contraparte: "Producto", ref: "Sede / unidad", total: "Cantidad", buscar: "Buscar producto…" },
   requerimientos: { contraparte: "Solicitante", ref: "Doc. referencia", total: "Ítems", buscar: "Buscar REQ, OC, solicitante…" },
   declaraciones: { contraparte: "Proveedor", ref: "Doc. referencia", total: "Total", buscar: "Buscar DJ, GST, proveedor, concepto…" },
+  sucursal: { contraparte: "Cliente", ref: "Doc. referencia", total: "Total", buscar: "Buscar VTA, cliente, producto…" },
+  traslados: { contraparte: "Origen", ref: "OT / Guía remisión", total: "Productos", buscar: "Buscar OT, guía, REQ, producto…" },
+  caja: { contraparte: "Concepto", ref: "Tipo", total: "Monto", buscar: "Buscar concepto, VTA…" },
 };
 
 /** Página 1: los últimos 15; desde la 2: de 30 en 30. */

@@ -17,6 +17,7 @@ import type { Adelanto } from "./adelantos";
 import type { HistorialDetalle, HistorialPlanilla } from "./historial";
 import type { ConcesionContratista, LugarEntrega } from "./types";
 import type { ComprobanteVenta, Cotizacion, Factura, Guia, LineaVenta, NotaPedido, OrdenCompra, OrdenDespacho, Requerimiento } from "./types";
+import type { Traslado, VentaSucursal } from "./sucursal-modelos";
 
 type RGB = [number, number, number];
 // Plantilla corporativa COMBOY VID
@@ -1206,5 +1207,99 @@ export function pdfOrdenDespacho(o: OrdenDespacho): void {
       firmaImagen: o.firmaCliente ? { indice: 1, url: o.firmaCliente.url, nombre: o.recibidoPor } : undefined,
     }),
     codigo
+  );
+}
+
+// ---------------------------------------------------------------------
+// Sucursal Beta
+// ---------------------------------------------------------------------
+
+/** Precios de la sucursal incluyen IGV: se desglosa para el comprobante. */
+const desgloseIGV = (total: number): [string, string][] => {
+  const base = Math.round((total / 1.18) * 100) / 100;
+  return totales(base, Math.round((total - base) * 100) / 100, total);
+};
+
+export function pdfVentaSucursal(v: VentaSucursal, sucursal: string): void {
+  abrir(
+    construir({
+      titulo: v.tipoDoc === "FA" ? "VENTA SUCURSAL · FACTURA" : "VENTA SUCURSAL · BOLETA",
+      numero: v.numero,
+      estado: v.estado.toUpperCase(),
+      datos: [
+        ["Fecha", fechaPE(v.fecha)],
+        ["Cliente", v.cliente],
+        ["DNI / RUC", v.clienteDoc || "-"],
+        ["Sucursal", sucursal],
+        ["Forma de pago", v.formaPago === "CONTADO" ? "Contado" : `Crédito${v.pagado ? " (cobrado)" : " (por cobrar)"}`],
+        ["Doc. referencia", v.docRef],
+      ],
+      head: ["#", "Producto", "Cant.", "Und.", "P. Unit.", "Subtotal"],
+      body: v.lineas.map((l, k) => [k + 1, l.producto, l.cantidad, l.unidad, soles(l.precio), soles(l.subtotal)]),
+      alinearDerecha: [2, 4, 5],
+      totales: desgloseIGV(v.total),
+      notas: ["Documento interno de la sucursal. El comprobante electrónico (FA / BV) se emite en el módulo de Ventas."],
+      firmas: ["Jefe de Sucursal", "Cliente"],
+    }),
+    v.numero
+  );
+}
+
+export function pdfGuiaEntrega(v: VentaSucursal, sucursal: string): void {
+  const e = v.entrega;
+  abrir(
+    construir({
+      titulo: "GUÍA DE ENTREGA LOCAL",
+      numero: e?.guia || v.numero,
+      estado: "ENTREGADO",
+      datos: [
+        ["Fecha entrega", fechaPE(e?.fecha ?? v.fecha)],
+        ["Venta", v.docRef],
+        ["Cliente", v.cliente],
+        ["Recibió", e?.recibidoPor ?? v.cliente],
+        ["DNI", e?.dni || "-"],
+        ["Sucursal", sucursal],
+      ],
+      head: ["#", "Producto", "Cantidad", "Und."],
+      body: v.lineas.map((l, k) => [k + 1, l.producto, l.cantidad, l.unidad]),
+      alinearDerecha: [2],
+      firmas: ["Entregado por (Sucursal)", "Recibí conforme (Cliente)"],
+      firmaImagen: e?.firma ? { indice: 1, url: e.firma, nombre: e.recibidoPor } : undefined,
+    }),
+    e?.guia || v.numero
+  );
+}
+
+/** Guía de remisión remitente (formato tipo 09 SUNAT) de un traslado Taller Principal -> Sucursal. */
+export function pdfGuiaRemision(t: Traslado): void {
+  abrir(
+    construir({
+      titulo: "GUÍA DE REMISIÓN REMITENTE",
+      numero: t.guiaRemision,
+      estado: t.estado === "en-camino" ? "EN CAMINO" : t.estado === "recibido" ? "RECIBIDO" : "OBSERVADO",
+      datos: [
+        ["Tipo de documento", "09 - Guía de remisión remitente"],
+        ["Orden de traslado", t.codigo],
+        ["Fecha de traslado", fechaPE(t.fechaEnvio)],
+        ["Punto de partida", "Taller Principal Aqp"],
+        ["Punto de llegada", t.destino],
+        ["Motivo", t.motivoTraslado],
+        ["Transportista", t.transportista || "-"],
+        ["Placa", t.placa || "-"],
+        ["Referencia", [t.reqNumero, t.ventaNumero].filter(Boolean).join(" · ") || "-"],
+      ],
+      head: ["#", "Descripción", "Cantidad", "Und."],
+      body: t.productos.map((p, k) => [k + 1, p.producto, p.cantidad, p.unidad]),
+      alinearDerecha: [2],
+      notas: [
+        ...(t.observacion ? [`Observación de la sucursal (${t.observacion.tipo === "FALTANTE" ? "faltante" : "dañado"}): ${t.observacion.detalle}`] : []),
+        ...(t.recibidoPor ? [`Recibido por ${t.recibidoPor} el ${fechaPE(t.fechaRecepcion ?? "")}.`] : []),
+        "Representación impresa interna. La emisión electrónica ante SUNAT requiere el OSE / PSE de la empresa.",
+      ],
+      qr: `${EMPRESA.ruc}|09|${t.guiaRemision}|${t.fechaEnvio}`,
+      qrTexto: [`RUC ${EMPRESA.ruc}`, `Guía ${t.guiaRemision}`],
+      firmas: ["Almacén Taller Principal", "Transportista", "Recibí conforme (Sucursal)"],
+    }),
+    t.guiaRemision
   );
 }

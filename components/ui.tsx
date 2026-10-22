@@ -159,6 +159,20 @@ const TONO_ESTADO: Record<string, Tono> = {
   ANULADA: "neutro",
   ANULADO: "neutro",
   BORRADOR: "neutro",
+  // Sucursal Beta
+  POR_ENTREGAR: "ambar",
+  DERIVADA: "info",
+  ENTREGADA: "cerrado",
+  CERRADA: "neutro",
+  EN_CAMINO: "ambar",
+  RECIBIDO: "verde",
+  ENVIADO: "ambar",
+  EN_TRASLADO: "info",
+  CERRADO: "cerrado",
+  CONVERTIDA: "verde",
+  POR_COBRAR: "rojo",
+  BAJO_MINIMO: "rojo",
+  FRECUENTE: "verde",
 };
 
 const ETIQUETA: Record<string, string> = {
@@ -180,6 +194,13 @@ const ETIQUETA: Record<string, string> = {
   QC_APROBADO: "QC APROBADO",
   PEDIDO_ENTREGADO: "ENTREGADO",
   DEJADO_EN_AGENCIA: "EN AGENCIA",
+  POR_ENTREGAR: "POR ENTREGAR",
+  DERIVADA: "DERIVADA · EN PREPARACIÓN",
+  EN_CAMINO: "EN CAMINO",
+  EN_TRASLADO: "EN TRASLADO",
+  CONVERTIDA: "CON OT",
+  POR_COBRAR: "POR COBRAR",
+  BAJO_MINIMO: "BAJO MÍNIMO",
 };
 
 export function Badge({ estado }: { estado: string }) {

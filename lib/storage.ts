@@ -83,6 +83,16 @@ export const KEYS = {
   CONTABLE_PLAN: "contable_plan_cuentas",
   CONTABLE_CIERRES: "contable_cierres",
   MOV_CAJA: "contable_mov_caja", // movimientos manuales de caja (Estados de cuenta)
+  // Sucursal Beta (tabla sucursal, ver supabase/migrations/20261022_sucursal_beta.sql y lib/sucursal.ts)
+  SUC_SUCURSALES: "sucursal_sucursales",
+  SUC_VENTAS: "sucursal_ventas",
+  SUC_TRASLADOS: "sucursal_traslados",
+  SUC_DERIVACIONES: "sucursal_derivaciones",
+  SUC_REQS: "sucursal_reqs",
+  SUC_CAJA: "sucursal_caja",
+  SUC_CIERRES: "sucursal_cierres",
+  SUC_STOCK: "sucursal_stock",
+  SUC_CLIENTES: "sucursal_clientes",
 } as const;
 
 export type StoreKey = (typeof KEYS)[keyof typeof KEYS];
@@ -173,7 +183,7 @@ export class ErpError extends Error {}
 // hacen las otras PCs y refresca la pantalla al instante.
 // ---------------------------------------------------------------------
 
-type TablaDoc = "compras" | "almacen" | "planilla" | "ventas" | "contable";
+type TablaDoc = "compras" | "almacen" | "planilla" | "ventas" | "contable" | "sucursal";
 type Destino =
   | { tabla: TablaDoc; tipo: string; forma: "lista" | "objeto" }
   | { tabla: "observaciones"; forma: "observaciones" }
@@ -214,6 +224,15 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.CONTABLE_CIERRES]: { tabla: "contable", tipo: "CIERRE_MENSUAL", forma: "lista" },
   [KEYS.MOV_CAJA]: { tabla: "contable", tipo: "MOVIMIENTO_CAJA", forma: "lista" },
   [KEYS.OBSERVACIONES]: { tabla: "observaciones", forma: "observaciones" },
+  [KEYS.SUC_SUCURSALES]: { tabla: "sucursal", tipo: "sucursal", forma: "lista" },
+  [KEYS.SUC_VENTAS]: { tabla: "sucursal", tipo: "venta", forma: "lista" },
+  [KEYS.SUC_TRASLADOS]: { tabla: "sucursal", tipo: "traslado", forma: "lista" },
+  [KEYS.SUC_DERIVACIONES]: { tabla: "sucursal", tipo: "derivacion", forma: "lista" },
+  [KEYS.SUC_REQS]: { tabla: "sucursal", tipo: "req", forma: "lista" },
+  [KEYS.SUC_CAJA]: { tabla: "sucursal", tipo: "caja", forma: "lista" },
+  [KEYS.SUC_CIERRES]: { tabla: "sucursal", tipo: "cierre", forma: "lista" },
+  [KEYS.SUC_STOCK]: { tabla: "sucursal", tipo: "stock", forma: "lista" },
+  [KEYS.SUC_CLIENTES]: { tabla: "sucursal", tipo: "cliente", forma: "lista" },
 };
 const TABLAS = ["compras", "almacen", "planilla", "ventas", "observaciones", "condiciones_pago", "contable"] as const;
 /**
@@ -238,6 +257,7 @@ const pendientes = new Map<StoreKey, number>(); // escrituras en curso por clave
 const sucias = new Set<StoreKey>(); // recibieron Realtime mientras se escribía: recargar al terminar
 let cola: Promise<void> = Promise.resolve();
 let canal: RealtimeChannel | null = null;
+let canalSucursal: RealtimeChannel | null = null;
 let carga: Promise<void> | null = null;
 /** Claves ya descargadas del servidor (las del módulo al entrar; el resto, cuando una pantalla las pide). */
 const cargadas = new Set<StoreKey>();
@@ -480,7 +500,7 @@ export function cargarClave(key: StoreKey): Promise<void> {
 }
 
 /** Tablas de módulos nuevos: si aún no existen en Supabase, su módulo queda vacío en vez de bloquear todo. */
-const TABLAS_OPCIONALES: string[] = ["ventas", "condiciones_pago", "contable"];
+const TABLAS_OPCIONALES: string[] = ["ventas", "condiciones_pago", "contable", "sucursal"];
 
 /** Tablas opcionales que no existen en Supabase (p. ej. contable antes de correr contable_tables.sql). */
 const tablasFaltantes = new Set<string>();
@@ -539,6 +559,12 @@ export function iniciarDatos(modulos: string[] = getSesion()?.modulos ?? ["*"]):
       if (!primera) cargadas.forEach((k) => void recargar(k));
       primera = false;
     });
+    // Sucursal Beta en su propio canal: si la tabla aún no existe en Supabase, no corta el Realtime del resto
+    if (!faltantes.has("sucursal"))
+      canalSucursal = sb
+        .channel("erp-sucursal")
+        .on("postgres_changes", { event: "*", schema: "public", table: "sucursal" }, (p) => void aplicarCambio("sucursal", p as RealtimePostgresChangesPayload<Fila>))
+        .subscribe();
   })().catch((e) => {
     carga = null;
     const err = e as { code?: string; message?: string };
@@ -551,7 +577,9 @@ export function iniciarDatos(modulos: string[] = getSesion()?.modulos ?? ["*"]):
 /** Al cerrar sesión: corta Realtime y vacía la caché. */
 export async function detenerDatos(): Promise<void> {
   if (canal) await createClient().removeChannel(canal);
+  if (canalSucursal) await createClient().removeChannel(canalSucursal);
   canal = null;
+  canalSucursal = null;
   carga = null;
   cache.clear();
   servidor.clear();

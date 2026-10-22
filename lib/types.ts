@@ -61,6 +61,9 @@ export interface Requerimiento {
   creadoPor?: string;
   editadoPor?: string;
   editadoEn?: string;
+  /** "SUCURSAL": lo emitió la Sucursal Beta (REQ-SUC-001); el resto viene de Almacén. */
+  origen?: "SUCURSAL";
+  sucursalId?: string;
 }
 
 export interface ItemPrecio {
