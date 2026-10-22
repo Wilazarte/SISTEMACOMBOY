@@ -128,9 +128,6 @@ function CerrarForm({ onClick }: { onClick: () => void }) {
 const BTN_REQ =
   "inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-medium text-white transition duration-150 hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100";
 
-/** Barra izquierda de requerimientos abierta o cerrada (por navegador). */
-const CLAVE_BARRA = "tesoreria-barra-requerimientos";
-
 /** Última pestaña abierta de Tesorería / Compras (por navegador). */
 const CLAVE_TAB = "tesoreria-tab-activa";
 
@@ -151,23 +148,6 @@ export default function ComprasPage() {
   const veCompras = puedeVer(sesion, "/dashboard/compras");
   const vePlanilla = puedeVer(sesion, "/dashboard/planilla");
   const [tab, setTab] = useState<Tab>(!veCompras ? "planilla" : puede(rol, "compra.crear") ? "registrar" : "antecedentes");
-  // Barra izquierda: abierta por defecto en escritorio, cerrada en celular; se recuerda la última elección
-  const [barra, setBarra] = useState(false);
-  useEffect(() => {
-    try {
-      const g = window.localStorage.getItem(CLAVE_BARRA);
-      setBarra(g ? g === "1" : window.matchMedia("(min-width: 1024px)").matches);
-    } catch {
-      setBarra(window.matchMedia("(min-width: 1024px)").matches);
-    }
-  }, []);
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(CLAVE_BARRA, barra ? "1" : "0");
-    } catch {
-      /* almacenamiento bloqueado */
-    }
-  }, [barra]);
   // Contador de la pestaña Planilla (solo se descarga si el usuario ve planilla)
   const trabajadores = useStore<Trabajador[]>(KEYS.TRABAJADORES, [], vePlanilla);
   const activos = trabajadores.filter((t) => t.activo && !esContratista(t)).length;
@@ -210,8 +190,8 @@ export default function ComprasPage() {
   const enPlanilla = tab === "planilla";
 
   return (
-    // Con la barra de requerimientos abierta, en escritorio el contenido se corre a la derecha
-    <div className={cn("w-full space-y-6 transition-[margin] duration-300", veCompras && barra && "lg:ml-[320px] lg:w-[calc(100%-320px)]")}>
+    // Requerimientos por revisar: sección de la barra derecha de notificaciones (layout)
+    <div className="w-full space-y-6">
       {/* Planilla (botón propio del dock) muestra solo su título, isla y contenido */}
       {!enPlanilla && (
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -224,7 +204,7 @@ export default function ComprasPage() {
         </div>
       )}
 
-      {veCompras && <Notificaciones pendientes={pendientes} rol={rol} abierto={barra} onToggle={() => setBarra((b) => !b)} />}
+      {veCompras && <Notificaciones pendientes={pendientes} rol={rol} />}
 
       {/* Isla de Tesorería sin Planilla: Planilla abre desde su botón del dock y dibuja su propia isla */}
       <Tabs<Tab>
@@ -275,7 +255,7 @@ export default function ComprasPage() {
 // =====================================================================
 // NOTIFICACIONES (cards amarillas)
 // =====================================================================
-function Notificaciones({ pendientes, rol, abierto, onToggle }: { pendientes: Requerimiento[]; rol: Rol; abierto: boolean; onToggle: () => void }) {
+function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol: Rol }) {
   const [rechazo, setRechazo] = useState<Requerimiento | null>(null);
   const [obs, setObs] = useState<Requerimiento | null>(null);
   const [motivo, setMotivo] = useState("");
@@ -301,7 +281,7 @@ function Notificaciones({ pendientes, rol, abierto, onToggle }: { pendientes: Re
 
   if (pendientes.length === 0)
     return (
-      <TesoreriaLeftDrawer open={abierto} onToggle={onToggle} cantidad={0}>
+      <TesoreriaLeftDrawer cantidad={0}>
         <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-300">
           <Check size={16} /> No hay requerimientos pendientes de revisión.
         </div>
@@ -311,8 +291,6 @@ function Notificaciones({ pendientes, rol, abierto, onToggle }: { pendientes: Re
   return (
     <>
       <TesoreriaLeftDrawer
-        open={abierto}
-        onToggle={onToggle}
         cantidad={pendientes.length}
         acciones={
           habilitado && (

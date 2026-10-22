@@ -16,6 +16,7 @@ import { useIr } from "@/components/shell/ir";
 import { accionesDe, hrefSub, moduloDe, navDe } from "@/components/shell/nav";
 import { FloatingDock } from "@/components/layout/FloatingDock";
 import { ModuleHeader } from "@/components/layout/ModuleHeader";
+import { NotificationSidebar } from "@/components/layout/NotificationSidebar";
 import { inicioDe, logout, puedeVer, useSesion, veTesoreria } from "@/lib/auth";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
 import { useNotificaciones } from "@/lib/notificaciones";
@@ -65,6 +66,8 @@ const NOMBRE_MODULO: [string, string][] = [
 ];
 const flujoDe = (ruta: string) => FLUJOS.find(([r]) => ruta === r || ruta.startsWith(`${r}/`))?.[1] ?? "";
 
+const CLAVE_NOTIF = "erp-notificaciones-abierta";
+
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const path = usePathname();
   const router = useRouter();
@@ -79,6 +82,25 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [pestana, setPestana] = useState<PestanaActiva | null>(null);
   const [locales, setLocales] = useState(0);
   const [subiendo, setSubiendo] = useState(false);
+  // Barra derecha de notificaciones: abierta por defecto en escritorio, cerrada en celular; se recuerda (por navegador)
+  const [notifAbierta, setNotifAbierta] = useState(false);
+  useEffect(() => {
+    try {
+      const g = window.localStorage.getItem(CLAVE_NOTIF);
+      setNotifAbierta(g ? g === "1" : window.matchMedia("(min-width: 1024px)").matches);
+    } catch {
+      setNotifAbierta(window.matchMedia("(min-width: 1024px)").matches);
+    }
+  }, []);
+  const alternarNotif = () =>
+    setNotifAbierta((a) => {
+      try {
+        window.localStorage.setItem(CLAVE_NOTIF, a ? "0" : "1");
+      } catch {
+        /* almacenamiento bloqueado */
+      }
+      return !a;
+    });
 
   useEffect(() => {
     if (listo && !sesion) {
@@ -274,7 +296,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         }
       />
 
-      <main className="w-full flex-1">
+      {/* Con la barra de notificaciones abierta, en escritorio el contenido deja 320px a la derecha */}
+      <main className={`w-full flex-1 transition-[padding] duration-300 ${notifAbierta ? "lg:pr-[320px]" : ""}`}>
         <div className="mx-auto w-full max-w-[1600px] px-4 pt-24 sm:px-6 lg:px-8">
           {sesion.modulos.length === 0 ? (
             <Aviso titulo="Sin módulos asignados">
@@ -317,6 +340,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </span>
         <span>v3.2.1</span>
       </footer>
+      <NotificationSidebar notifs={notifs} vistas={prefs.notifVistas ?? []} abierta={notifAbierta} onToggle={alternarNotif} />
       <FloatingDock sesion={sesion} tab={tabActiva?.id} />
       <AccionRapida acciones={acciones} />
       <CommandPalette abierto={paleta} onCerrar={() => setPaleta(false)} comandos={comandos} documentos={documentos} />
