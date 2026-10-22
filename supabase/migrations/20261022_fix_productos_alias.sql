@@ -14,7 +14,7 @@ begin
   execute format($f$
     create or replace function public.normalizar_producto(%I text) returns text
     language sql immutable as $b$
-      select regexp_replace(regexp_replace(upper(btrim(coalesce($1, ''))), '\s+', ' ', 'g'), '\s*/\s*', '/', 'g')
+      select btrim(regexp_replace(regexp_replace(upper(coalesce($1, '')), '[\s\u00a0]+', ' ', 'g'), '\s*/\s*', '/', 'g'))
     $b$ $f$, coalesce(nullif(arg, ''), 'nombre'));
 end $$;
 
