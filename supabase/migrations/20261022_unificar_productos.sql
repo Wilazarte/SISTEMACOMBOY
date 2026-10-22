@@ -102,6 +102,8 @@ alter table public.productos_maestro add column if not exists created_at timesta
 alter table public.productos_maestro add column if not exists created_by uuid default auth.uid();
 create unique index if not exists productos_maestro_nombre_normalizado_uq on public.productos_maestro (nombre_normalizado);
 create unique index if not exists productos_maestro_sku_uq on public.productos_maestro (sku);
+-- Tabla creada antes sin default de SKU: un producto nuevo recibe el siguiente PROD-####
+alter table public.productos_maestro alter column sku set default ('PROD-' || lpad(nextval('public.productos_sku_seq')::text, 4, '0'));
 
 -- Filas antiguas sin nombre_normalizado / nombre_display: se completan una con la otra (o con "nombre").
 -- Si dos filas antiguas dan el mismo nombre normalizado, solo la más antigua lo recibe (unifique la otra en Catálogo).
@@ -211,7 +213,7 @@ create table if not exists public.productos_solicitudes (
   categoria text,
   motivo text,
   modulo text,
-  estado text not null default 'pendiente' check (estado in ('pendiente', 'aprobada', 'rechazada')),
+  estado text not null default 'PENDIENTE' check (upper(estado) in ('PENDIENTE', 'APROBADA', 'RECHAZADA')),
   producto_id uuid references public.productos_maestro(id) on delete set null,
   respuesta text,
   solicitado_por uuid not null default auth.uid(),
@@ -227,13 +229,19 @@ alter table public.productos_solicitudes add column if not exists marca text;
 alter table public.productos_solicitudes add column if not exists categoria text;
 alter table public.productos_solicitudes add column if not exists motivo text;
 alter table public.productos_solicitudes add column if not exists modulo text;
-alter table public.productos_solicitudes add column if not exists estado text not null default 'pendiente';
+alter table public.productos_solicitudes add column if not exists estado text not null default 'PENDIENTE';
 alter table public.productos_solicitudes add column if not exists producto_id uuid;
 alter table public.productos_solicitudes add column if not exists respuesta text;
 alter table public.productos_solicitudes add column if not exists solicitado_por uuid default auth.uid();
 alter table public.productos_solicitudes add column if not exists solicitado_usuario text;
 alter table public.productos_solicitudes add column if not exists created_at timestamptz not null default now();
 alter table public.productos_solicitudes add column if not exists resuelto_at timestamptz;
+-- Columnas de la tabla de producción (las escribe "Solicitar nuevo producto maestro")
+alter table public.productos_solicitudes add column if not exists nombre_solicitado text;
+alter table public.productos_solicitudes add column if not exists nombre_norm text;
+alter table public.productos_solicitudes add column if not exists categoria_sugerida text;
+alter table public.productos_solicitudes add column if not exists solicitante_id uuid default auth.uid();
+alter table public.productos_solicitudes alter column nombre drop not null;
 
 -- 3. Permisos: todos leen; solo el administrador (creador / admin) crea, edita y unifica (con las funciones de abajo)
 create or replace function public.es_admin_productos() returns boolean
@@ -257,9 +265,10 @@ create policy productos_select on public.productos_maestro for select to authent
 create policy productos_admin on public.productos_maestro for all to authenticated using (public.es_admin_productos()) with check (public.es_admin_productos());
 create policy productos_alias_select on public.productos_alias for select to authenticated using (public.mi_rol() <> 'sin_rol');
 create policy productos_alias_admin on public.productos_alias for all to authenticated using (public.es_admin_productos()) with check (public.es_admin_productos());
-create policy productos_sol_select on public.productos_solicitudes for select to authenticated using (solicitado_por::text = auth.uid()::text or public.es_admin_productos());
+create policy productos_sol_select on public.productos_solicitudes for select to authenticated
+  using (solicitado_por::text = auth.uid()::text or solicitante_id::text = auth.uid()::text or public.es_admin_productos());
 create policy productos_sol_insert on public.productos_solicitudes for insert to authenticated
-  with check (solicitado_por::text = auth.uid()::text and estado = 'pendiente' and public.mi_rol() <> 'sin_rol');
+  with check ((solicitado_por::text = auth.uid()::text or solicitante_id::text = auth.uid()::text) and upper(estado) = 'PENDIENTE' and public.mi_rol() <> 'sin_rol');
 create policy productos_sol_admin on public.productos_solicitudes for update to authenticated using (public.es_admin_productos()) with check (public.es_admin_productos());
 
 grant select on public.productos_maestro, public.productos_alias to authenticated;
@@ -507,7 +516,7 @@ begin
           nullif(btrim(p_marca), ''), nullif(btrim(p_categoria), ''), nullif(btrim(p_descripcion), ''))
   returning * into nuevo;
   if p_solicitud is not null then
-    update public.productos_solicitudes set estado = 'aprobada', producto_id = nuevo.id, resuelto_at = now() where id = p_solicitud;
+    update public.productos_solicitudes set estado = 'APROBADA', producto_id = nuevo.id, resuelto_at = now() where id = p_solicitud;
   end if;
   return nuevo;
 end $$;
