@@ -38,7 +38,7 @@ begin
 end $$;
 
 -- 1. Normalización única (la misma que lib/productos-modelos.ts normalizarNombre):
---    MAYÚSCULAS, sin espacios al inicio/fin, sin espacios dobles, "A / B" -> "A/B"
+--    MAYÚSCULAS, sin espacios al inicio/fin (también tabs y espacio duro), sin espacios dobles, "A / B" -> "A/B"
 --    Si la función ya existe con otro nombre de parámetro (p. ej. "t"), se conserva ese nombre:
 --    así no hace falta DROP ... CASCADE (que borraría el check de productos_maestro).
 do $$
@@ -48,7 +48,7 @@ begin
   execute format($f$
     create or replace function public.normalizar_producto(%I text) returns text
     language sql immutable as $b$
-      select regexp_replace(regexp_replace(upper(btrim(coalesce($1, ''))), '\s+', ' ', 'g'), '\s*/\s*', '/', 'g')
+      select btrim(regexp_replace(regexp_replace(upper(coalesce($1, '')), '[\s\u00a0]+', ' ', 'g'), '\s*/\s*', '/', 'g'))
     $b$ $f$, coalesce(nullif(arg, ''), 'nombre'));
 end $$;
 
