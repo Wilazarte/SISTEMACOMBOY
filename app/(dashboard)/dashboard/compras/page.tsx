@@ -89,7 +89,7 @@ import { DeclaracionesJuradas } from "@/components/tesoreria/DeclaracionesJurada
 import { pdfDeclaracionJurada } from "@/lib/pdf";
 import { EditarReq, permisoEditarReq } from "@/components/compras/EditarReq";
 import TesoreriaLeftDrawer from "@/components/tesoreria/TesoreriaLeftDrawer";
-import QuickActions, { QA_IDS, irAFormulario } from "@/components/tesoreria/QuickActions";
+import QuickActions, { QA_IDS } from "@/components/tesoreria/QuickActions";
 import { EditarGasto } from "@/components/compras/EditarGasto";
 import type { Trabajador } from "@/lib/types";
 import type { Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, Proveedor, Requerimiento, Rol, StockItem, TipoComprobanteCompra } from "@/lib/types";
@@ -111,6 +111,15 @@ const diasCredito = (forma?: string): number => {
   const n = /(\d+)\s*D[IÍ]AS?/i.exec(forma ?? "")?.[1];
   return n ? Number(n) : 0;
 };
+
+/** X / Cancelar arriba a la derecha de un formulario que se abrió con las acciones rápidas. */
+function CerrarForm({ onClick }: { onClick: () => void }) {
+  return (
+    <Button size="sm" variant="ghost" onClick={onClick} title="Cerrar formulario">
+      <X size={15} /> Cancelar
+    </Button>
+  );
+}
 
 // =====================================================================
 /** Botones de acción de la tarjeta REQ por revisar (tema azul): pill compacta con glow. */
@@ -954,22 +963,27 @@ function Cotizaciones({
     return m;
   }, [cotizaciones]);
 
-  // Acción rápida "Nueva COT": formulario en blanco
+  // Por defecto solo la lista; el formulario se abre con "Nueva COT" (o al venir de "Cotizar" con un REQ elegido)
+  const [showRegistrar, setShowRegistrar] = useState(!!preReq);
   const nuevaCoti = () => {
     setReqId("");
     setProveedor("");
     setRuc("");
     setNumero("");
     setFecha(hoy());
-    irAFormulario(QA_IDS.formCotizacion);
+    setShowRegistrar(true);
   };
 
   return (
     <div className="space-y-6">
-      <QuickActions tab="cotizacion" onIr={onIr} onNuevo={nuevaCoti} puedeCrear={habilitado} />
-      {habilitado && (
+      <QuickActions tab="cotizacion" onIr={onIr} onBuscar={() => setShowRegistrar(false)} onNuevo={nuevaCoti} puedeCrear={habilitado} />
+      {habilitado && showRegistrar && (
         <Card id={QA_IDS.formCotizacion}>
-          <CardHeader title="Registrar cotización" subtitle="Vinculada a un requerimiento ACEPTADO. Puede registrar varias cotizaciones por REQ para comparar." />
+          <CardHeader
+            title="Registrar cotización"
+            subtitle="Vinculada a un requerimiento ACEPTADO. Puede registrar varias cotizaciones por REQ para comparar."
+            action={<CerrarForm onClick={() => setShowRegistrar(false)} />}
+          />
           <div className="grid gap-4 p-5 md:grid-cols-3">
             <Field label="Requerimiento">
               <Select
@@ -1036,6 +1050,7 @@ function Cotizaciones({
         </Card>
       )}
 
+      {!showRegistrar && (
       <Card id={QA_IDS.listaCotizaciones}>
         <CardHeader title="Cotizaciones registradas" subtitle="★ = menor precio del requerimiento" />
         <ListaDocs
@@ -1082,6 +1097,7 @@ function Cotizaciones({
         })}
         />
       </Card>
+      )}
     </div>
   );
 }
@@ -1189,6 +1205,8 @@ function Ordenes({
   const competidoras = coti ? todasCotis.filter((c) => c.reqId === coti.reqId) : [];
   const minimo = competidoras.length ? Math.min(...competidoras.map((c) => c.total)) : 0;
 
+  // Por defecto solo la lista; el formulario se abre con "Emitir OC" (o al venir de "Generar OC" con una cotización)
+  const [showRegistrar, setShowRegistrar] = useState(!!preCoti);
   const [enviando, setEnviando] = useState(false);
   const guardar = async () => {
     setEnviando(true);
@@ -1205,6 +1223,7 @@ function Ordenes({
     }, "Orden de compra emitida · asiento contable generado");
     setEnviando(false);
     if (ok) {
+      setShowRegistrar(false);
       setCotiId("");
       setTiempo("");
       setCaja(CAJA_POR_DEFECTO);
@@ -1214,9 +1233,21 @@ function Ordenes({
 
   return (
     <div className="space-y-6">
-      <QuickActions tab="ordenes" onIr={onIr} puedeCrear={habilitado} onVerCoti={coti ? () => onVerCoti(coti.reqId) : undefined} />
+      <QuickActions
+        tab="ordenes"
+        onIr={onIr}
+        onBuscar={() => setShowRegistrar(false)}
+        onNuevo={() => setShowRegistrar(true)}
+        puedeCrear={habilitado}
+        onVerCoti={coti ? () => onVerCoti(coti.reqId) : undefined}
+      />
+      {showRegistrar && (
       <Card id={QA_IDS.formOrden}>
-        <CardHeader title="Emitir orden de compra" subtitle={habilitado ? "Se genera desde una COTIZACIÓN (no directamente desde el REQ)." : "Solo lectura: solo Tesorería y Creador pueden emitir órdenes de compra."} />
+        <CardHeader
+          title="Emitir orden de compra"
+          subtitle={habilitado ? "Se genera desde una COTIZACIÓN (no directamente desde el REQ)." : "Solo lectura: solo Tesorería y Creador pueden emitir órdenes de compra."}
+          action={<CerrarForm onClick={() => setShowRegistrar(false)} />}
+        />
         <fieldset disabled={!habilitado} className="min-w-0">
           <div className="grid gap-4 p-5 md:grid-cols-3">
             <Field label="Cotización" className="md:col-span-3">
@@ -1321,7 +1352,9 @@ function Ordenes({
           </Button>
         </div>
       </Card>
+      )}
 
+      {!showRegistrar && (
       <Card id={QA_IDS.listaOrdenes}>
         <CardHeader title="Órdenes de compra" />
         <ListaDocs
@@ -1390,6 +1423,7 @@ function Ordenes({
         })}
         />
       </Card>
+      )}
 
       <Modal open={!!editar} onClose={() => setEditar(null)} title={`Editar · ${editar?.numero ?? ""}`} wide>
         {editar && <EditarOC key={editar.id} oc={editar} rol={rol} cotizaciones={todasCotis} onClose={() => setEditar(null)} />}
@@ -1605,6 +1639,7 @@ function Facturas({
           );
     setEnviando(false);
     if (ok) {
+      setShowRegistrar(false);
       setOcId("");
       setNumero("");
       setDni("");
@@ -1613,6 +1648,8 @@ function Facturas({
     }
   };
 
+  // Por defecto solo la lista; el formulario se abre con "Nueva Factura" (o al venir de "Facturar" con una OC)
+  const [showRegistrar, setShowRegistrar] = useState(!!preOc);
   const ocsDJ = ocs.filter((o) => o.subtotal <= TOPE_DJ);
   const lista = facturas.filter((f) => !filtroPago || f.estadoPago === filtroPago);
   // Por pagar al proveedor: en gastos con detracción, el neto (la detracción va al Banco de la Nación)
@@ -1620,19 +1657,22 @@ function Facturas({
 
   return (
     <div className="space-y-6">
-      <QuickActions tab="factura" onIr={onIr} puedeCrear={puede(rol, "fac.crear")} />
-      {puede(rol, "fac.crear") && (
+      <QuickActions tab="factura" onIr={onIr} onBuscar={() => setShowRegistrar(false)} onNuevo={() => setShowRegistrar(true)} puedeCrear={puede(rol, "fac.crear")} />
+      {puede(rol, "fac.crear") && showRegistrar && (
         <Card id={QA_IDS.formFactura}>
           <CardHeader
             title={modo === "FACTURA" ? "Registrar factura" : "Declaración jurada de compra"}
             subtitle={modo === "FACTURA" ? "Vinculada a una Orden de Compra. IGV y total se calculan automáticamente." : `Excepción: compras sin comprobante, tope ${soles(TOPE_DJ)}, requiere aprobación de Gerencia.`}
             action={
-              <div className="flex rounded-lg bg-plomo-100 p-0.5 text-sm">
-                {(["FACTURA", "DJ"] as const).map((m) => (
-                  <button key={m} onClick={() => { setModo(m); setOcId(""); }} className={cn("rounded-md px-3 py-1.5 font-medium", modo === m ? "bg-surface shadow" : "text-plomo-500")}>
-                    {m === "FACTURA" ? "Factura" : "Decl. Jurada"}
-                  </button>
-                ))}
+              <div className="flex items-center gap-2">
+                <div className="flex rounded-lg bg-plomo-100 p-0.5 text-sm">
+                  {(["FACTURA", "DJ"] as const).map((m) => (
+                    <button key={m} onClick={() => { setModo(m); setOcId(""); }} className={cn("rounded-md px-3 py-1.5 font-medium", modo === m ? "bg-surface shadow" : "text-plomo-500")}>
+                      {m === "FACTURA" ? "Factura" : "Decl. Jurada"}
+                    </button>
+                  ))}
+                </div>
+                <CerrarForm onClick={() => setShowRegistrar(false)} />
               </div>
             }
           />
@@ -1709,6 +1749,7 @@ function Facturas({
         </Card>
       )}
 
+      {!showRegistrar && (
       <Card id={QA_IDS.listaFacturas}>
         <CardHeader
           title="Facturas y comprobantes"
@@ -1795,6 +1836,7 @@ function Facturas({
         })}
         />
       </Card>
+      )}
 
       {editGasto && <EditarGasto gasto={editGasto} rol={rol} onClose={() => setEditGasto(null)} />}
 
