@@ -210,6 +210,8 @@ export function Tabs<T extends string>({
   value,
   onChange,
   enLinea = false,
+  enBarra = false,
+  fueraDeIsla = [],
   acciones,
 }: {
   tabs: { id: T; label: string; icon?: ReactNode; count?: number }[];
@@ -217,13 +219,18 @@ export function Tabs<T extends string>({
   onChange: (id: T) => void;
   /** Sub-pestañas dentro de otra pestaña: se dibujan en su lugar y no leen ni cambian ?tab=. */
   enLinea?: boolean;
+  /** Con enLinea: igual se dibuja como la isla superior del layout (p. ej. Planilla dentro de Tesorería). */
+  enBarra?: boolean;
+  /** Pestañas válidas (?tab=, eventos) que no se dibujan en esta isla; si una está abierta, la isla no se muestra
+   *  y su contenido dibuja la suya (Planilla tiene su propio botón en el dock). */
+  fueraDeIsla?: T[];
   /** Botones de la isla antes de las pestañas (Buscar, Nuevo, Historial…). */
   acciones?: AccionIsla[];
 }) {
   // Las pestañas se dibujan en la barra fija del layout (si existe); si no, en su lugar.
   const [destino, setDestino] = useState<HTMLElement | null>(null);
-  useEffect(() => setDestino(enLinea ? null : document.getElementById(ID_BARRA_PESTANAS)), [enLinea]);
-  const principal = !!destino;
+  useEffect(() => setDestino(enLinea && !enBarra ? null : document.getElementById(ID_BARRA_PESTANAS)), [enLinea, enBarra]);
+  const principal = !!destino && !enLinea;
 
   // ?tab=<id> en la URL o un submenú del layout abren la pestaña (solo si existe en esta barra)
   const ref = useRef({ tabs, value, onChange });
@@ -254,7 +261,9 @@ export function Tabs<T extends string>({
   };
 
   // Menú isla flotante (components/layout/IslandMenu): una sola cápsula con acciones + pestañas
-  const barra = <IslandMenu items={tabs} activo={value} onElegir={(id) => elegir(id as T)} acciones={acciones} className={enLinea ? "mx-0 mt-0" : undefined} />;
+  if (fueraDeIsla.includes(value)) return null;
+  const items = tabs.filter((t) => !fueraDeIsla.includes(t.id));
+  const barra = <IslandMenu items={items} activo={value} onElegir={(id) => elegir(id as T)} acciones={acciones} className={enLinea && !enBarra ? "mx-0 mt-0" : undefined} />;
   return destino ? createPortal(barra, destino) : barra;
 }
 

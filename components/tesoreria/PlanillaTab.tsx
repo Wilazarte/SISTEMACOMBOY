@@ -236,8 +236,7 @@ export default function PlanillaTab() {
   const soloLectura = !!sesion?.soloLectura; // Gerencia: ver sin editar
   const puedeEditar = !soloLectura && ["creador", "planilla", "tesoreria", "admin"].includes(sesion?.rol ?? "");
   const [tab, setTab] = useState<Tab>("trabajadores");
-  // "PDF Recibo" de la isla: abre Contratistas y descarga los recibos
-  const [pdfPedido, setPdfPedido] = useState(0);
+
   const historial = useHistorialPlanilla();
   const adelantos = useAdelantosPendientes();
 
@@ -524,21 +523,10 @@ export default function PlanillaTab() {
 
       <Tabs<Tab>
         enLinea
+        // Isla superior propia de Planilla (Tesorería no dibuja la suya mientras Planilla está abierta)
+        enBarra
         value={tab}
-        onChange={(t) => {
-          setTab(t);
-          setPdfPedido(0);
-        }}
-        acciones={[
-          {
-            label: "PDF Recibo",
-            icon: <FileDown size={14} />,
-            onClick: () => {
-              setTab("contratistas");
-              setPdfPedido((n) => n + 1);
-            },
-          },
-        ]}
+        onChange={setTab}
         tabs={[
           { id: "planilla", label: "Planilla periodo", icon: <Calculator size={16} /> },
           { id: "contratistas", label: "Contratistas", icon: <Building2 size={16} />, count: nContratistas },
@@ -1009,7 +997,7 @@ export default function PlanillaTab() {
 
       {tab === "contratistas" && (
         <div className="space-y-6">
-          <ContratistasMaestro trabajadores={maestro} soloLectura={!puedeEditar} pdfPedido={pdfPedido} />
+          <ContratistasMaestro trabajadores={maestro} soloLectura={!puedeEditar} />
           <div>
             <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-fg">
               <Building2 size={18} className="text-rojo" /> Concesiones / servicios externos

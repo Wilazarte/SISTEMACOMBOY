@@ -176,7 +176,8 @@ export default function ComprasPage() {
   useEffect(() => {
     try {
       const guardada = window.localStorage.getItem(CLAVE_TAB) as Tab | null;
-      if (!new URLSearchParams(window.location.search).get("tab") && guardada && tabsPermitidas.includes(guardada)) setTab(guardada);
+      // Planilla tiene su propio botón en el dock: "Tesorería / Compras" nunca reabre en Planilla
+      if (!new URLSearchParams(window.location.search).get("tab") && guardada && guardada !== "planilla" && tabsPermitidas.includes(guardada)) setTab(guardada);
     } catch {
       /* almacenamiento bloqueado */
     }
@@ -184,7 +185,7 @@ export default function ComprasPage() {
   }, []);
   useEffect(() => {
     try {
-      window.localStorage.setItem(CLAVE_TAB, tab);
+      if (tab !== "planilla") window.localStorage.setItem(CLAVE_TAB, tab);
     } catch {
       /* almacenamiento bloqueado */
     }
@@ -206,25 +207,32 @@ export default function ComprasPage() {
   // Los gastos de Tesorería no llevan guía ni V°B° (no ingresan a almacén)
   const facturasSinGuia = facturas.filter((f) => f.tipo === "FACTURA" && !f.esGastoTesoreria && (!guias.some((g) => g.facturaId === f.id) || guias.some((g) => g.facturaId === f.id && g.estado === "OBSERVADA")));
 
+  const enPlanilla = tab === "planilla";
+
   return (
     // Con la barra de requerimientos abierta, en escritorio el contenido se corre a la derecha
     <div className={cn("w-full space-y-6 transition-[margin] duration-300", veCompras && barra && "lg:ml-[320px] lg:w-[calc(100%-320px)]")}>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-serif tracking-tight text-2xl font-semibold leading-tight text-fg lg:text-[28px]">Tesorería / Compras</h1>
+      {/* Planilla (botón propio del dock) muestra solo su título, isla y contenido */}
+      {!enPlanilla && (
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="font-serif tracking-tight text-2xl font-bold leading-tight text-fg lg:text-[28px]">Tesorería / Compras</h1>
+          </div>
+          {!puede(rol, "req.revisar") && (
+            <span className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-plomo-600">Modo lectura para su rol</span>
+          )}
         </div>
-        {!puede(rol, "req.revisar") && (
-          <span className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-plomo-600">Modo lectura para su rol</span>
-        )}
-      </div>
+      )}
 
       {veCompras && <Notificaciones pendientes={pendientes} rol={rol} abierto={barra} onToggle={() => setBarra((b) => !b)} />}
 
+      {/* Isla de Tesorería sin Planilla: Planilla abre desde su botón del dock y dibuja su propia isla */}
       <Tabs<Tab>
         value={tab}
         onChange={(t) => ir(t)}
+        fueraDeIsla={["planilla"]}
         tabs={[
-          // Isla: Registrar gasto · Cotizaciones · Órdenes compra · Facturas · Planilla · Declaraciones (+ Antecedentes)
+          // Isla: Registrar gasto · Cotizaciones · Órdenes compra · Facturas · Declaraciones · Antecedentes
           ...(veCompras
             ? [
                 { id: "registrar" as const, label: "Registrar gasto", icon: <PackagePlus size={16} /> },

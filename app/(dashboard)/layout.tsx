@@ -307,7 +307,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             </Aviso>
           ) : (
             <div className="animate-velo space-y-5" key={path} /* solo opacidad: un transform rompería los modales fijos */>
-              <Header sesion={sesion} flujo={flujoDe(path)} />
+              <Header sesion={sesion} flujo={flujoDe(path === "/dashboard/compras" && tabActiva?.id === "planilla" ? "/dashboard/planilla" : path)} />
               {/* Menú isla del módulo (components/ui Tabs dibuja aquí su IslandMenu): fijo al hacer scroll, sin barra de fondo */}
               <div id={ID_BARRA_PESTANAS} className="sticky top-14 z-10 empty:hidden" />
               {sesion.soloLectura && (
@@ -331,7 +331,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </span>
         <span className="font-mono">v3.2.1</span>
       </footer>
-      <FloatingDock sesion={sesion} />
+      <FloatingDock sesion={sesion} tab={tabActiva?.id} />
       <AccionRapida acciones={acciones} />
       <CommandPalette abierto={paleta} onCerrar={() => setPaleta(false)} comandos={comandos} documentos={documentos} />
       <DocViewerHost />
