@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, ArrowRightLeft, BarChart3, Boxes, ClipboardList, MapPin, PackageCheck, ShoppingCart, Truck, Users, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, BarChart3, Boxes, ClipboardList, PackageCheck, ShoppingCart, Truck, Users, Wallet } from "lucide-react";
 import { Tabs } from "@/components/ui";
 import { DerivarTaller, EntregarProducto, RegistrarVenta } from "@/components/sucursal/Ventas";
 import { Requerimientos, Traslados } from "@/components/sucursal/Traslados";
@@ -111,20 +111,18 @@ function SucursalPage() {
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-serif text-2xl font-bold leading-tight tracking-tight text-fg lg:text-[28px]">{sucursal.nombre}</h1>
-          <p className="mt-1 flex items-center gap-1 text-[13px] text-plomo-500">
-            <MapPin size={13} /> Sede {sucursal.sede}
-          </p>
+          <h1 className="font-serif tracking-tight text-2xl font-semibold leading-tight text-fg lg:text-[28px]">{sucursal.nombre}</h1>
+          <p className="mt-1 text-[13px] text-plomo-600">Ventas, requerimientos, traslados y caja de la sede</p>
         </div>
         {!operaSucursal(sesion) && (
-          <span className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-plomo-600">
+          <span className="rounded-lg bg-plomo-100 px-3 py-1.5 text-xs font-semibold text-plomo-600">
             {esTaller(sesion) ? "Taller Principal: derivaciones y OT" : esTesoreria(sesion) ? "Tesorería Principal: cierres de caja" : "Modo lectura para su rol"}
           </span>
         )}
       </div>
 
       {!tablaDisponible("sucursal") && (
-        <div className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-800">
+        <div className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-300">
           <AlertTriangle size={18} className="mt-0.5 shrink-0" />
           Falta la tabla de la sucursal en Supabase: ejecute supabase/migrations/20261022_sucursal_beta.sql en el SQL Editor. El resto del ERP funciona normal.
         </div>

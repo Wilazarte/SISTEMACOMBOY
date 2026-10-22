@@ -10,6 +10,7 @@ import QRCode from "qrcode";
 import { EMPRESA } from "./empresa";
 import { CUENTAS_ORIGEN_PAGO, codigoContratista, codigoGasto, cuentaBancariaTxt, fechaPE, getTrabajadores, soles } from "./storage";
 import { codigoDesdeNumero, estadoDocumento } from "./utils/codigos";
+import { bloqueDocumento, sedeOrigenReq, type TipoDocumento } from "./plantillasDocumentos";
 import { equipoDeLinea, sedeEquipo } from "./equipos";
 import { ESTADOS_OD, LUGARES_ENTREGA, estadoOD, origenOD, type EstadoAlmacen } from "./ventas";
 import { toast } from "@/components/ui";
@@ -610,27 +611,16 @@ export function pdfPlanillaHistorial(h: HistorialPlanilla, detalle: HistorialDet
   );
 }
 
+/** PDF de cualquier sede con TEMPLATE_UNIFICADO (lib/plantillasDocumentos): mismo diseño, solo cambia la sede. */
+export function generarDocumento(tipo: TipoDocumento, sede: string, r: Requerimiento): jsPDF {
+  const doc = construir(bloqueDocumento(tipo, sede, r));
+  doc.setProperties({ title: r.numero });
+  return doc;
+}
+
+/** REQ-ALM (Arequipa / Taller) y REQ-SECOCHA: el mismo documento. */
 export function pdfRequerimiento(r: Requerimiento): void {
-  abrir(
-    construir({
-      titulo: "REQUERIMIENTO DE ALMACÉN",
-      numero: r.numero,
-      estado: r.estado,
-      datos: [
-        ["Fecha", fechaPE(r.fecha)],
-        ["Sede", r.sede],
-        ["Solicitante", r.solicitante],
-        ["Items", String(r.items.length)],
-        ["Motivo", r.motivo],
-      ],
-      head: ["#", "Producto", "Cant.", "Und.", "Marca", "Característica"],
-      body: r.items.map((i, k) => [k + 1, i.nombre, i.cantidad, i.unidad, i.marca || "-", i.caracteristica || "-"]),
-      alinearDerecha: [2],
-      notas: r.observacion ? [`Observación de Tesorería: ${r.observacion}`] : undefined,
-      firmas: ["Solicitante", "Jefe de Almacén", "Tesorería"],
-    }),
-    r.numero
-  );
+  abrir(generarDocumento("REQ", sedeOrigenReq(r), r), r.numero);
 }
 
 export function pdfCotizacion(c: Cotizacion): void {

@@ -6,10 +6,22 @@ import { MapPin } from "lucide-react";
 import { cargoDe, nombreDe, type Sesion } from "@/lib/auth";
 
 const NOMBRE_EMPRESA = "COMBOY VID SOLUCIONES INDUSTRIALES";
-const SEDE = "Arequipa";
+const SEDE = "Arequipa - Planta Principal";
 
 /** Franja de contexto de cada módulo: usuario | cargo | empresa, sede y flujo de trabajo (subtítulo). Sin línea de encargada. */
-export function Header({ sesion, flujo, persona }: { sesion: Sesion; flujo?: string; /** Nombre y cargo fijos del módulo (Sucursal Beta). */ persona?: { nombre: string; cargo: string } }) {
+export function Header({
+  sesion,
+  flujo,
+  persona,
+  sede = SEDE,
+}: {
+  sesion: Sesion;
+  flujo?: string;
+  /** Nombre y cargo fijos del módulo. */
+  persona?: { nombre: string; cargo: string };
+  /** Sede del módulo (ERP: Arequipa - Planta Principal · Secocha: Secocha). */
+  sede?: string;
+}) {
   const ruta = usePathname();
   const [fecha, setFecha] = useState("");
 
@@ -26,7 +38,7 @@ export function Header({ sesion, flujo, persona }: { sesion: Sesion; flujo?: str
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1 rounded-full border border-plomo-200 bg-surface px-2.5 py-1 text-xs text-plomo-500">
-            <MapPin size={12} /> Sede {SEDE} · {fecha}
+            <MapPin size={12} /> Sede: {sede} · {fecha}
           </span>
         </div>
       </div>
