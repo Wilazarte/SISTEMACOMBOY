@@ -1,5 +1,6 @@
 "use client";
 
+import { FiltrosPlegables } from "@/components/ui/BotonFiltros";
 import { useState } from "react";
 import Link from "next/link";
 import { Ban, CheckCircle2, ClipboardCheck, Factory, Plus } from "lucide-react";
@@ -42,17 +43,21 @@ export default function ProduccionPage() {
           title="Órdenes de producción"
           subtitle={`${ops.length} orden(es) · ${enFab} en fabricación`}
           action={
-            <div className="w-48">
-              <Select
-                value={filtro}
-                onChange={(e) => setFiltro(e.target.value)}
-                placeholder="Todos los estados"
-                options={[
-                  { value: "EN_FABRICACION", label: "En fabricación" },
-                  { value: "QC_APROBADO", label: "QC aprobado" },
-                  { value: "ANULADA", label: "Anuladas" },
-                ]}
-              />
+            <div className="flex flex-wrap items-center gap-2">
+              <FiltrosPlegables activos={filtro ? 1 : 0}>
+                <div className="w-48">
+                  <Select
+                    value={filtro}
+                    onChange={(e) => setFiltro(e.target.value)}
+                    placeholder="Todos los estados"
+                    options={[
+                      { value: "EN_FABRICACION", label: "En fabricación" },
+                      { value: "QC_APROBADO", label: "QC aprobado" },
+                      { value: "ANULADA", label: "Anuladas" },
+                    ]}
+                  />
+                </div>
+              </FiltrosPlegables>
             </div>
           }
         />

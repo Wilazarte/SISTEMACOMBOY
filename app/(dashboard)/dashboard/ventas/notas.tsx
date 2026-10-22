@@ -1,5 +1,6 @@
 "use client";
 
+import { FiltrosPlegables } from "@/components/ui/BotonFiltros";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useState } from "react";
 import { Ban, CalendarClock, Check, Copy, FileText, Pencil, Plus, Receipt, Truck } from "lucide-react";
@@ -122,14 +123,16 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
         title="Notas de pedido"
         subtitle="Cotización al cliente. Al aprobarla se habilita Facturar."
         action={
-          <div className="flex flex-wrap gap-2">
-            <Select
-              value={filtro}
-              onChange={(e) => setFiltro(e.target.value)}
-              placeholder="Todos los estados"
-              options={["PENDIENTE", "APROBADA", "FACTURADA", "ANULADA"].map((s) => ({ value: s, label: s }))}
-              className="w-44"
-            />
+          <div className="flex flex-wrap items-center gap-2">
+            <FiltrosPlegables activos={filtro ? 1 : 0}>
+              <Select
+                value={filtro}
+                onChange={(e) => setFiltro(e.target.value)}
+                placeholder="Todos los estados"
+                options={["PENDIENTE", "APROBADA", "FACTURADA", "ANULADA"].map((s) => ({ value: s, label: s }))}
+                className="w-44"
+              />
+            </FiltrosPlegables>
             {habilitado && (
               <Button variant="warning" onClick={() => setForm(npVacia())}>
                 <Plus size={16} /> Nueva Nota Pedido

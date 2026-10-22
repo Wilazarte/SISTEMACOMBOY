@@ -1,5 +1,6 @@
 "use client";
 
+import { FiltrosPlegables } from "@/components/ui/BotonFiltros";
 import { useState } from "react";
 import { Wallet } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, cn, ejecutar } from "@/components/ui";
@@ -54,17 +55,21 @@ export function CuentasPorCobrar() {
           title="Cuentas por cobrar"
           subtitle="Comprobantes emitidos a crédito. Registre cobros parciales o totales por caja o banco."
           action={
-            <Select
-              value={filtro}
-              onChange={(e) => setFiltro(e.target.value as "" | EstadoCxC)}
-              placeholder="Todos"
-              options={[
-                { value: "PENDIENTE", label: "Pendiente" },
-                { value: "VENCIDO", label: "Vencido" },
-                { value: "PAGADO", label: "Pagado" },
-              ]}
-              className="w-40"
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <FiltrosPlegables activos={filtro ? 1 : 0}>
+                <Select
+                  value={filtro}
+                  onChange={(e) => setFiltro(e.target.value as "" | EstadoCxC)}
+                  placeholder="Todos"
+                  options={[
+                    { value: "PENDIENTE", label: "Pendiente" },
+                    { value: "VENCIDO", label: "Vencido" },
+                    { value: "PAGADO", label: "Pagado" },
+                  ]}
+                  className="w-40"
+                />
+              </FiltrosPlegables>
+            </div>
           }
         />
         <Table head={["Comprobante", "Cliente", "Emisión", "Vencimiento", "Total", "Pagado", "Saldo", "Días vencido", "Estado", ""]} empty={cxc.length === 0}>

@@ -260,7 +260,6 @@ export default function PlanillaTab() {
   const [boletaSel, setBoletaSel] = useState<TrabajadorCalc | null>(null);
   const [ficha, setFicha] = useState<{ form: Trabajador; idOriginal?: string } | null>(null);
   const [verInactivos, setVerInactivos] = useState(false);
-  const [buscar, setBuscar] = useState("");
   const [filtro, setFiltro] = useState<FiltroSueldo>("DIARIO");
   const [rango, setRango] = useState(semanaActual);
   const [adelantoDe, setAdelantoDe] = useState<TrabajadorCalc | null>(null);
@@ -319,10 +318,6 @@ export default function PlanillaTab() {
   const filtroPagado = periodoCerrado || gruposPagados.has("TODOS") || gruposPagados.has(filtroActual.grupo) || (filtro === "TODOS" && gruposPagados.size > 0 && filasFiltradas.length === 0);
   const listaMaestro = trabajadores
     .filter((t) => verInactivos || t.activo)
-    .filter((t) => {
-      const q = buscar.trim().toUpperCase();
-      return !q || t.nombre.includes(q) || t.dni.includes(q) || t.id === q || (t.cargo ?? "").toUpperCase().includes(q);
-    })
     .sort((a, b) => Number(b.activo) - Number(a.activo) || a.id.localeCompare(b.id, undefined, { numeric: true }));
   // Totales solo de los filtrados que están en la lista de pago
   const totales = {
@@ -545,23 +540,21 @@ export default function PlanillaTab() {
           <CardHeader
             title="Maestro de trabajadores"
             subtitle={`${trabajadores.filter((t) => t.activo).length} activo(s) · ${trabajadores.filter((t) => !t.activo).length} inactivo(s)${nContratistas ? ` · ${nContratistas} contratista(s) en la pestaña Contratistas / Concesiones` : ""}`}
-            action={
-              <div className="flex flex-wrap items-center gap-3">
-                <Input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar nombre, DNI, N°, cargo…" className="w-60" />
-                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-plomo-200 bg-surface px-3 py-2 text-sm font-medium text-slate-700">
-                  <input type="checkbox" checked={verInactivos} onChange={(e) => setVerInactivos(e.target.checked)} className="h-4 w-4 accent-red-600" /> Mostrar inactivos
-                </label>
-              </div>
-            }
           />
-          {listaMaestro.length === 0 ? (
+          {trabajadores.length === 0 ? (
             <div className="p-5">
-              <Empty icon={<Users size={28} />} text={trabajadores.length ? "Ningún trabajador coincide." : "Aún no hay trabajadores. Regístrelos o importe la asistencia del reloj."} />
+              <Empty icon={<Users size={28} />} text="Aún no hay trabajadores. Regístrelos o importe la asistencia del reloj." />
             </div>
           ) : (
             <ListaDocs
               tipo="planilla"
               conRef={false}
+              extraActivos={verInactivos ? 1 : 0}
+              filtrosExtra={
+                <label className="flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-plomo-200 bg-surface px-3 text-sm font-medium text-slate-700">
+                  <input type="checkbox" checked={verInactivos} onChange={(e) => setVerInactivos(e.target.checked)} className="h-4 w-4 accent-red-600" /> Mostrar inactivos
+                </label>
+              }
               filas={listaMaestro.map(
                 (t): FilaDoc => ({
                   id: t.id,

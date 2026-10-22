@@ -23,11 +23,20 @@ export const QA_IDS = {
   listaConcesiones: "lista-concesiones",
 } as const;
 
-/** Lleva a la lista y pone el cursor en su buscador (el de ListaDocs o el primer campo de texto). */
+/** Lleva a la lista, abre su panel de filtros si está cerrado y pone el cursor en el buscador. */
 export function irABuscador(id: string) {
   const el = document.getElementById(id);
   if (!el) return;
   el.scrollIntoView({ behavior: "smooth", block: "start" });
+  const toggle = el.querySelector<HTMLButtonElement>("[data-toggle-filtros]");
+  if (toggle?.getAttribute("aria-expanded") === "false") {
+    toggle.click();
+    return requestAnimationFrame(() => requestAnimationFrame(() => enfocarBuscador(el)));
+  }
+  enfocarBuscador(el);
+}
+
+function enfocarBuscador(el: HTMLElement) {
   const input =
     el.querySelector<HTMLInputElement>('input[aria-label="Buscar"]') ??
     el.querySelector<HTMLInputElement>('input:not([type="checkbox"]):not([type="date"]):not([type="hidden"])') ??

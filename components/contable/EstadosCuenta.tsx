@@ -1,5 +1,6 @@
 "use client";
 
+import { FiltrosPlegables } from "@/components/ui/BotonFiltros";
 import { useEffect, useMemo, useState } from "react";
 import { BookOpen, FileDown, FileSpreadsheet, Plus, Trash2, Wallet } from "lucide-react";
 import { Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, cn, ejecutar, toast } from "@/components/ui";
@@ -89,15 +90,17 @@ export function EstadosCuenta({ anio, mes, onVerDiario }: { anio: number; mes: n
           title={`Estado de cuenta · ${cuenta || "las 3 cajas"} · ${periodo}`}
           subtitle="Egresos automáticos desde gastos, facturas, compras y adelantos pagados con la caja. Saldo = saldo de la cuenta después de cada movimiento."
           action={
-            <div className="flex flex-wrap gap-2">
-              <Select
-                value={cuenta}
-                onChange={(e) => setCuenta(e.target.value as CuentaCaja | "")}
-                placeholder="Todas las cuentas"
-                options={CUENTAS_CAJA.map((c) => ({ value: c.nombre, label: c.titulo }))}
-                className="w-44"
-              />
-              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar concepto, doc., proveedor…" className="w-56" />
+            <div className="flex flex-wrap items-center gap-2">
+              <FiltrosPlegables activos={[cuenta, q].filter(Boolean).length}>
+                <Select
+                  value={cuenta}
+                  onChange={(e) => setCuenta(e.target.value as CuentaCaja | "")}
+                  placeholder="Todas las cuentas"
+                  options={CUENTAS_CAJA.map((c) => ({ value: c.nombre, label: c.titulo }))}
+                  className="w-44"
+                />
+                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar concepto, doc., proveedor…" className="w-56" aria-label="Buscar" />
+              </FiltrosPlegables>
               <Button variant="secondary" onClick={exportarPDF} title={cuenta ? "" : "Elija una cuenta"}>
                 <FileDown size={15} /> Generar PDF estado de cuenta
               </Button>

@@ -26,6 +26,8 @@ import { pdfContratoConcesion } from "@/lib/pdf";
 import { BotonPDF } from "@/components/planilla/ContratistasMaestro";
 import { descargarRecibo } from "@/components/planilla/generateReciboPDF";
 import QuickActions, { QA_IDS } from "@/components/tesoreria/QuickActions";
+import { BotonFiltros } from "@/components/ui/BotonFiltros";
+import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { KEYS, fechaPE, hoy, r2, rucValido, soles, useStore } from "@/lib/storage";
 import type { ComprobanteContratista, ConcesionContratista, PagoContratista, TipoServicioContratista } from "@/lib/types";
 
@@ -39,6 +41,7 @@ export function Contratistas({ soloLectura }: { soloLectura: boolean }) {
   const [filtroSede, setFiltroSede] = useState("");
   const [filtroEstado, setFiltroEstado] = useState("ACTIVO");
   const [buscar, setBuscar] = useState("");
+  const { showFiltros, setShowFiltros } = useTogglePanel();
   const [form, setForm] = useState<ConcesionContratista | null>(null);
   const [detalle, setDetalle] = useState<string | null>(null); // id de la concesión con pagos / comprobantes abiertos
 
@@ -92,6 +95,15 @@ export function Contratistas({ soloLectura }: { soloLectura: boolean }) {
             )
           }
         />
+        <div className="flex flex-wrap items-center gap-2 border-b border-plomo-100 px-4 py-2">
+          <BotonFiltros
+            abierto={showFiltros}
+            onClick={() => setShowFiltros(!showFiltros)}
+            activos={[buscar, filtroTipo, filtroSede, filtroEstado !== "ACTIVO" ? filtroEstado || "todos" : ""].filter(Boolean).length}
+          />
+          {!showFiltros && filtroEstado === "ACTIVO" && <span className="text-xs text-plomo-500">Mostrando concesiones activas</span>}
+        </div>
+        {showFiltros && (
         <div className="flex flex-wrap gap-2 border-b border-plomo-100 px-5 py-3">
           <Input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar razón social, RUC…" className="w-56" aria-label="Buscar" />
           <Select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)} placeholder="Todos los servicios" options={OPC_TIPO} className="w-56" />
@@ -104,6 +116,7 @@ export function Contratistas({ soloLectura }: { soloLectura: boolean }) {
             className="w-44"
           />
         </div>
+        )}
         {visibles.length === 0 ? (
           <div className="p-5">
             <Empty icon={<Building2 size={28} />} text={lista.length ? "Ninguna concesión coincide con los filtros." : "Aún no hay concesiones registradas."} />

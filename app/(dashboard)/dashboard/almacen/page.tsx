@@ -1,5 +1,7 @@
 "use client";
 
+import { BotonNuevo } from "@/components/ui/BotonFiltros";
+import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useCallback, useEffect, useState } from "react";
 import { Boxes, CheckCircle2, Factory, Truck, ClipboardList, Eye, FilePlus2, FileText, MessageSquareWarning, PackageCheck, Pencil, Plus, Send, Trash2 } from "lucide-react";
@@ -176,13 +178,12 @@ function BotonEditarReq({ req, onEditar }: { req: Requerimiento; onEditar: () =>
 }
 
 function ListaReq({ reqs, rol }: { reqs: Requerimiento[]; rol: Rol }) {
-  const [desde, setDesde] = useState("");
-  const [hasta, setHasta] = useState("");
   const [sede, setSede] = useState("");
   const [estado, setEstado] = useState("");
   const [editando, setEditando] = useState<Requerimiento | null>(null);
 
-  const lista = reqs.filter((r) => (!desde || r.fecha >= desde) && (!hasta || r.fecha <= hasta) && (!sede || r.sede === sede) && (!estado || r.estado === estado));
+  // Fechas y búsqueda: las del panel "Buscar / Filtrar" de la lista
+  const lista = reqs.filter((r) => (!sede || r.sede === sede) && (!estado || r.estado === estado));
   const conteo = ESTADOS.map((e) => ({ e, n: reqs.filter((r) => r.estado === e).length }));
 
   return (
@@ -199,17 +200,16 @@ function ListaReq({ reqs, rol }: { reqs: Requerimiento[]; rol: Rol }) {
         <CardHeader
           title="Requerimientos emitidos"
           subtitle="Los requerimientos rechazados por Tesorería se eliminan del sistema."
-          action={
-            <div className="flex flex-wrap gap-2">
-              <Input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="w-40" title="Desde" />
-              <Input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="w-40" title="Hasta" />
-              <Select value={sede} onChange={(e) => setSede(e.target.value)} placeholder="Todas las sedes" options={SEDES.map((s) => ({ value: s, label: s }))} className="w-44" />
-              <Select value={estado} onChange={(e) => setEstado(e.target.value)} placeholder="Todos los estados" options={ESTADOS.map((s) => ({ value: s, label: s }))} className="w-40" />
-            </div>
-          }
         />
         <ListaDocs
           tipo="requerimientos"
+          extraActivos={[sede, estado].filter(Boolean).length}
+          filtrosExtra={
+            <>
+              <Select value={sede} onChange={(e) => setSede(e.target.value)} placeholder="Todas las sedes" options={SEDES.map((s) => ({ value: s, label: s }))} className="w-44" />
+              <Select value={estado} onChange={(e) => setEstado(e.target.value)} placeholder="Todos los estados" options={ESTADOS.map((s) => ({ value: s, label: s }))} className="w-40" />
+            </>
+          }
           filas={lista.map((r): FilaDoc => {
           return {
           id: r.id,
@@ -452,6 +452,8 @@ function RegistrarIngreso({ rol, stock, ordenes }: { rol: Rol; stock: StockItem[
   const ocs = ordenes.filter((o) => !o.ingresadaAlmacen && o.estado !== "FINALIZADA");
   const productos = Array.from(new Set(stock.filter((s) => !sede || s.sede === sede).map((s) => s.nombre))).sort();
   const recientes = kardex.filter((m) => m.tipo_movimiento === "INGRESO").slice(0, 30);
+  // Formulario oculto por defecto: solo se ve la tabla hasta pulsar "Registrar ingreso"
+  const { showForm, setShowForm } = useTogglePanel();
 
   const set = (id: string, k: keyof FilaIngreso, v: string) =>
     setFilas((fs) =>
@@ -484,6 +486,7 @@ function RegistrarIngreso({ rol, stock, ordenes }: { rol: Rol; stock: StockItem[
       "Ingreso registrado en el stock",
     );
     if (n) {
+      setShowForm(false);
       setOcId("");
       setLote("");
       setObs("");
@@ -493,6 +496,12 @@ function RegistrarIngreso({ rol, stock, ordenes }: { rol: Rol; stock: StockItem[
 
   return (
     <div className="space-y-6">
+      {habilitado && (
+        <div className="mb-3 flex gap-2">
+          <BotonNuevo abierto={showForm} label="Registrar ingreso" onClick={() => setShowForm(!showForm)} />
+        </div>
+      )}
+      {habilitado && showForm && (
       <Card>
         <CardHeader title="Registrar ingreso" subtitle="Ingrese productos de la base de stock del almacén; las cantidades se suman al stock y quedan en el kardex" />
         <div className="space-y-4 p-5 pt-0">
@@ -545,6 +554,7 @@ function RegistrarIngreso({ rol, stock, ordenes }: { rol: Rol; stock: StockItem[
           </div>
         </div>
       </Card>
+      )}
 
       <Card>
         <CardHeader title="Últimos ingresos" subtitle="Movimientos de ingreso del kardex" />

@@ -1,5 +1,6 @@
 "use client";
 
+import { FiltrosPlegables } from "@/components/ui/BotonFiltros";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -192,9 +193,11 @@ export default function AdelantosPage() {
           title="Adelantos"
           subtitle={`${visibles.length} de ${lista.length}`}
           action={
-            <div className="flex flex-wrap gap-2">
-              <Input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar trabajador, DNI, motivo…" className="w-56" />
-              <Select value={filtro} onChange={(e) => setFiltro(e.target.value as "" | EstadoAdelanto)} placeholder="Todos los estados" options={ESTADOS_ADELANTO.map((s) => ({ value: s, label: s }))} className="w-44" />
+            <div className="flex flex-wrap items-center gap-2">
+              <FiltrosPlegables activos={[buscar, filtro].filter(Boolean).length}>
+                <Input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar trabajador, DNI, motivo…" className="w-56" aria-label="Buscar" autoFocus />
+                <Select value={filtro} onChange={(e) => setFiltro(e.target.value as "" | EstadoAdelanto)} placeholder="Todos los estados" options={ESTADOS_ADELANTO.map((s) => ({ value: s, label: s }))} className="w-44" />
+              </FiltrosPlegables>
             </div>
           }
         />

@@ -1,5 +1,6 @@
 "use client";
 
+import { FiltrosPlegables } from "@/components/ui/BotonFiltros";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
@@ -68,27 +69,29 @@ export function EquiposTerminados({ puedeRegistrar, nuevo, onNuevoCerrado }: { p
         title="Equipos terminados"
         subtitle={`${equipos.length} equipo(s) fabricados · ${disponibles} disponible(s) · ${equipos.length - disponibles - vendidos} en control de calidad · ${vendidos} vendido(s)`}
         action={
-          <div className="flex flex-wrap gap-2">
-            <div className="relative w-64">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-plomo-500" />
-              <Input placeholder="Buscar chasis, serie motor o modelo…" value={q} onChange={(e) => setQ(e.target.value)} className="pl-8" />
-            </div>
-            <div className="w-40">
-              <Select value={sedeF} onChange={(e) => setSedeF(e.target.value)} placeholder="Todas las sedes" options={SEDES_EQUIPO.map((x) => ({ value: x, label: x }))} aria-label="Sede" />
-            </div>
-            <div className="w-40">
-              <Select
-                value={estadoF}
-                onChange={(e) => setEstadoF(e.target.value as typeof estadoF)}
-                placeholder="Todos los estados"
-                options={[
-                  { value: "DISPONIBLE", label: "Disponibles (stock)" },
-                  { value: "EN_QC", label: "En QC" },
-                  { value: "VENDIDO", label: "Vendidos" },
-                ]}
-                aria-label="Estado"
-              />
-            </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <FiltrosPlegables activos={[q, sedeF, estadoF].filter(Boolean).length}>
+              <div className="relative w-64">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-plomo-500" />
+                <Input placeholder="Buscar chasis, serie motor o modelo…" value={q} onChange={(e) => setQ(e.target.value)} className="pl-8" />
+              </div>
+              <div className="w-40">
+                <Select value={sedeF} onChange={(e) => setSedeF(e.target.value)} placeholder="Todas las sedes" options={SEDES_EQUIPO.map((x) => ({ value: x, label: x }))} aria-label="Sede" />
+              </div>
+              <div className="w-40">
+                <Select
+                  value={estadoF}
+                  onChange={(e) => setEstadoF(e.target.value as typeof estadoF)}
+                  placeholder="Todos los estados"
+                  options={[
+                    { value: "DISPONIBLE", label: "Disponibles (stock)" },
+                    { value: "EN_QC", label: "En QC" },
+                    { value: "VENDIDO", label: "Vendidos" },
+                  ]}
+                  aria-label="Estado"
+                />
+              </div>
+            </FiltrosPlegables>
             <Link href="/dashboard/produccion" className="inline-flex items-center gap-1.5 rounded-lg border border-plomo-200 bg-surface px-4 py-2 text-sm font-medium text-fg hover:bg-plomo-50">
               <Factory size={16} /> Ingresan desde Producción
             </Link>
