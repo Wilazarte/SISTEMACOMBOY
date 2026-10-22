@@ -116,6 +116,14 @@ html, body, button, input, select, textarea, table, th, td, div, span, p, h1, h2
   --slate-100: 17 26 47; --slate-200: 30 42 69; --slate-300: 30 58 95;
   --sb-activo: 42 123 255;
 }
+/* COMBOY VID SUCURSAL (app/(sucursal)): siempre claro, header blanco, aunque el ERP esté en oscuro */
+.tema-claro {
+  color-scheme: light;
+  --canvas: 244 245 247;
+  --surface: 255 255 255;
+  --fg: 10 10 11;
+  --blue-50: 239 246 255; --blue-200: 191 219 254; --blue-600: 37 99 235; --blue-800: 30 64 175;
+}
 /* Inputs del tema azul (sin pisar los transparentes como el buscador de la paleta) */
 .tema-azul :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea):not(.bg-transparent) {
   background-color: #111a2f;

@@ -8,11 +8,13 @@ import { Requerimientos, Traslados } from "@/components/sucursal/Traslados";
 import { CajaChica } from "@/components/sucursal/Caja";
 import { ClientesTab, StockLocalTab } from "@/components/sucursal/Inventario";
 import { ReportesSucursal } from "@/components/sucursal/Reportes";
+import { SucursalShell } from "@/components/sucursal/Shell";
 import { getSesion } from "@/lib/auth";
+import { deSede, useSedes } from "@/lib/sedes";
 import { KEYS, tablaDisponible, useStore } from "@/lib/storage";
 import {
-  SUCURSAL_DEFECTO,
   esTaller,
+  getSucursal,
   esTesoreria,
   operaSucursal,
   type CierreCaja,
@@ -32,21 +34,33 @@ type TabSuc = "registrar-venta" | "entregar-producto" | "derivar-taller" | "requ
 /** Última pestaña abierta de la Sucursal (por navegador). */
 const CLAVE_TAB = "sucursal-tab-activa";
 
-export default function SucursalPage() {
-  const sucursales = useStore<Sucursal[]>(KEYS.SUC_SUCURSALES, []);
-  const ventas = useStore<VentaSucursal[]>(KEYS.SUC_VENTAS, []);
-  const traslados = useStore<Traslado[]>(KEYS.SUC_TRASLADOS, []);
-  const derivaciones = useStore<Derivacion[]>(KEYS.SUC_DERIVACIONES, []);
-  const reqs = useStore<ReqSucursal[]>(KEYS.SUC_REQS, []);
-  const caja = useStore<MovCaja[]>(KEYS.SUC_CAJA, []);
-  const cierres = useStore<CierreCaja[]>(KEYS.SUC_CIERRES, []);
-  const stock = useStore<StockLocal[]>(KEYS.SUC_STOCK, []);
-  const clientes = useStore<ClienteSuc[]>(KEYS.SUC_CLIENTES, []);
+/** COMBOY VID SUCURSAL (/sucursal): sistema aparte con su propio login (/sucursal/login). */
+export default function SucursalApp() {
+  return (
+    <SucursalShell>
+      <SucursalPage />
+    </SucursalShell>
+  );
+}
+
+function SucursalPage() {
+  // Solo la sede en pantalla: un usuario de sede ya recibe solo la suya (RLS sede_isolation);
+  // el ERP central (Taller, Tesorería) tiene todas y ve la que eligió en el header
+  useSedes();
+  useStore<Sucursal[]>(KEYS.SUC_SUCURSALES, []);
+  const ventas = deSede(useStore<VentaSucursal[]>(KEYS.SUC_VENTAS, []));
+  const traslados = deSede(useStore<Traslado[]>(KEYS.SUC_TRASLADOS, []));
+  const derivaciones = deSede(useStore<Derivacion[]>(KEYS.SUC_DERIVACIONES, []));
+  const reqs = deSede(useStore<ReqSucursal[]>(KEYS.SUC_REQS, []));
+  const caja = deSede(useStore<MovCaja[]>(KEYS.SUC_CAJA, []));
+  const cierres = deSede(useStore<CierreCaja[]>(KEYS.SUC_CIERRES, []));
+  const stock = deSede(useStore<StockLocal[]>(KEYS.SUC_STOCK, []));
+  const clientes = deSede(useStore<ClienteSuc[]>(KEYS.SUC_CLIENTES, []));
   // Estado de cada REQ-SUC en Tesorería (la sucursal solo ve los suyos, RLS)
   const pendientes = useStore<Requerimiento[]>(KEYS.REQS_PENDIENTES, []);
   const procesados = useStore<Requerimiento[]>(KEYS.REQS_PROCESADOS, []);
-  const enTesoreria = [...pendientes, ...procesados].filter((r) => r.origen === "SUCURSAL");
-  const sucursal = sucursales[0] ?? SUCURSAL_DEFECTO;
+  const enTesoreria = deSede([...pendientes, ...procesados].filter((r) => r.origen === "SUCURSAL"));
+  const sucursal = getSucursal();
 
   const sesion = getSesion();
   // Taller entra a sus derivaciones, Tesorería a los cierres de caja, la sucursal a sus ventas
@@ -97,7 +111,7 @@ export default function SucursalPage() {
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-serif text-2xl font-bold leading-tight tracking-tight text-fg lg:text-[28px]">Sucursal Beta</h1>
+          <h1 className="font-serif text-2xl font-bold leading-tight tracking-tight text-fg lg:text-[28px]">Sucursal {sucursal.nombre}</h1>
           <p className="mt-1 flex items-center gap-1 text-[13px] text-plomo-500">
             <MapPin size={13} /> Sucursal {sucursal.nombre} · Sede {sucursal.sede}
           </p>
@@ -110,7 +124,7 @@ export default function SucursalPage() {
       </div>
 
       {!tablaDisponible("sucursal") && (
-        <div className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200">
+        <div className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-800">
           <AlertTriangle size={18} className="mt-0.5 shrink-0" />
           Falta la tabla de la sucursal en Supabase: ejecute supabase/migrations/20261022_sucursal_beta.sql en el SQL Editor. El resto del ERP funciona normal.
         </div>

@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, BarChart3, Calculator, Eye, EyeOff, Factory, Landmark, Loader2, Lock, LogIn, Truck, User, X, type LucideIcon } from "lucide-react";
-import { CLAVE_MODULO, CLAVE_USUARIO, MODULOS_LOGIN, login, logout, moduloGuardado, perteneceAModulo, puedeVer, rutaDeModulo, useSesion, type ModuloLogin } from "@/lib/auth";
+import { CLAVE_MODULO, CLAVE_USUARIO, MODULOS_LOGIN, RUTA_LOGIN_SUCURSAL, login, logout, moduloGuardado, perteneceAModulo, puedeVer, rutaDeModulo, useSesion, type ModuloLogin } from "@/lib/auth";
 import { CLAVE_SELECCION, ENCARGADOS_LOGIN, tarjetaDe } from "@/components/modulos-login";
 
 /** Botones del dock: `slug` es la ruta /login/<slug> (app/login/[modulo] redirige a /login?modulo=). */
@@ -54,6 +54,11 @@ function Login() {
   const [enviando, setEnviando] = useState(false);
 
   useEffect(() => setActivo(pedido), [pedido]);
+
+  // La Sucursal es un sistema aparte con su propio login
+  useEffect(() => {
+    if (pedido === "sucursal") router.replace(RUTA_LOGIN_SUCURSAL);
+  }, [pedido, router]);
 
   // Sesión ya abierta con un módulo elegido: ir directo a ese módulo
   useEffect(() => {

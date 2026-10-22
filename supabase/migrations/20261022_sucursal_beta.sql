@@ -116,6 +116,13 @@ end $$;
 
 revoke all on function public.siguiente_numero_sucursal(text) from public, anon;
 grant execute on function public.siguiente_numero_sucursal(text) to authenticated;
+-- Con 20261023_sedes_multisede.sql la función recibe también la sede: no deben quedar dos versiones
+do $$
+begin
+  if to_regprocedure('public.siguiente_numero_sucursal(text,uuid)') is not null then
+    drop function if exists public.siguiente_numero_sucursal(text);
+  end if;
+end $$;
 
 -- 5. Sucursal inicial (editable desde el módulo)
 insert into public.sucursal (tipo, id, data)
@@ -131,7 +138,11 @@ values ('sucursal', 'SUC-AQP-SUR', jsonb_build_object(
 on conflict (tipo, id) do nothing;
 
 -- 6. Vistas de lectura (mismos campos que los modelos; respetan RLS)
-create or replace view public.v_sucursal_ventas with (security_invoker = true) as
+-- (si ya se ejecutó 20261023_sedes_multisede.sql, las vistas tienen sede_id y no se vuelven a crear)
+do $$
+begin
+  if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'v_sucursal_ventas' and column_name = 'sede_id') then
+    execute $v$create or replace view public.v_sucursal_ventas with (security_invoker = true) as
 select id,
        (data->>'fecha')::date              as fecha,
        data->>'cliente'                     as cliente,
@@ -140,9 +151,10 @@ select id,
        data->>'estado'                      as estado,
        data->>'sucursalId'                  as sucursal_id,
        coalesce((data->>'requiereTraslado')::boolean, false) as requiere_traslado
-  from public.sucursal where tipo = 'venta';
-
-create or replace view public.v_sucursal_traslados with (security_invoker = true) as
+  from public.sucursal where tipo = 'venta'$v$;
+  end if;
+  if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'v_sucursal_traslados' and column_name = 'sede_id') then
+    execute $v$create or replace view public.v_sucursal_traslados with (security_invoker = true) as
 select id,
        data->>'codigo'                      as codigo,
        data->>'origen'                      as origen,
@@ -153,7 +165,9 @@ select id,
        data->>'guiaRemisionUrl'             as guia_remision_url,
        (data->>'fechaEnvio')::date          as fecha_envio,
        nullif(data->>'fechaRecepcion', '')::date as fecha_recepcion
-  from public.sucursal where tipo = 'traslado';
+  from public.sucursal where tipo = 'traslado'$v$;
+  end if;
+end $$;
 
 grant select on public.v_sucursal_ventas, public.v_sucursal_traslados to authenticated;
 

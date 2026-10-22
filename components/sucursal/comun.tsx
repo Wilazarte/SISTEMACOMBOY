@@ -77,7 +77,7 @@ export function LineasEditor({ lineas, onChange, stock, conPrecio = true }: { li
         return (
           <div key={l.key} className="grid grid-cols-12 items-start gap-2">
             <div className="col-span-12 sm:col-span-5">
-              <ProductoInput value={l.producto} onChange={(nombre) => elegir(l.key, nombre)} placeholder={`Producto ${i + 1} (catálogo)`} ariaLabel={`Producto ${i + 1}`} modulo="Sucursal Beta" />
+              <ProductoInput value={l.producto} onChange={(nombre) => elegir(l.key, nombre)} placeholder={`Producto ${i + 1} (catálogo)`} ariaLabel={`Producto ${i + 1}`} modulo="Sucursal" />
               {l.producto.trim() && (
                 <p className={cn("mt-0.5 text-[11px]", falta ? "text-amber-500" : "text-plomo-500")}>
                   {s ? `Stock local: ${s.stock} ${s.unidad}${falta ? " · no alcanza" : ""}` : "Sin stock local (servicio o se pide al Taller)"}

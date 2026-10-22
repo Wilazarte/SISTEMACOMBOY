@@ -18,6 +18,7 @@ export interface Sucursal {
   jefeNombre?: string;
   /** Saldo de caja chica al último cierre (el saldo en vivo se calcula de los movimientos). */
   cajaChicaActual: number;
+  sedeId?: string;
 }
 
 export const SUCURSAL_DEFECTO: Sucursal = {
@@ -73,6 +74,8 @@ export interface VentaSucursal {
   total: number;
   estado: EstadoVenta;
   sucursalId: string;
+  /** Sede (tabla sedes): la pone la base al guardar (sede_isolation). */
+  sedeId?: string;
   requiereTraslado: boolean;
   formaPago: FormaPagoSuc;
   pagado: boolean;
@@ -113,6 +116,8 @@ export interface Derivacion {
   detalle: string;
   sucursal: string;
   sucursalId: string;
+  /** Sede (tabla sedes): la pone la base al guardar (sede_isolation). */
+  sedeId?: string;
   productos: ProductoTraslado[];
   estado: EstadoDerivacion;
   trasladoId?: string;
@@ -126,6 +131,8 @@ export interface Traslado {
   codigo: string; // OT-00091
   origen: "TALLER_PRINCIPAL";
   destinoSucursalId: string;
+  /** Sede destino (la del traslado): con ella la base la deja ver solo a esa sucursal. */
+  sedeId?: string;
   destino: string;
   productos: ProductoTraslado[];
   estado: EstadoTraslado;
@@ -161,6 +168,8 @@ export interface ReqSucursal {
   automatico: boolean;
   trasladoId?: string;
   sucursalId: string;
+  /** Sede (tabla sedes): la pone la base al guardar (sede_isolation). */
+  sedeId?: string;
   creadoPor: string;
 }
 
@@ -181,6 +190,8 @@ export interface MovCaja {
   ventaId?: string;
   cierreId?: string;
   sucursalId: string;
+  /** Sede (tabla sedes): la pone la base al guardar (sede_isolation). */
+  sedeId?: string;
   usuario: string;
 }
 
@@ -197,6 +208,8 @@ export interface CierreCaja {
   declaradoPor: string;
   recibidoPor?: string;
   sucursalId: string;
+  /** Sede (tabla sedes): la pone la base al guardar (sede_isolation). */
+  sedeId?: string;
 }
 
 export interface StockLocal {
@@ -211,6 +224,8 @@ export interface StockLocal {
   /** Precio de venta sugerido. */
   precio: number;
   sucursalId: string;
+  /** Sede (tabla sedes): la pone la base al guardar (sede_isolation). */
+  sedeId?: string;
   /** Producto del catálogo maestro (productos_maestro.id) y su SKU. */
   productoMaestroId?: string;
   sku?: string;
@@ -224,4 +239,6 @@ export interface ClienteSuc {
   direccion?: string;
   email?: string;
   sucursalId: string;
+  /** Sede (tabla sedes): la pone la base al guardar (sede_isolation). */
+  sedeId?: string;
 }

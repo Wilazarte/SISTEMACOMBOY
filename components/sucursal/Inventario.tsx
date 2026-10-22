@@ -149,7 +149,7 @@ function FormStock({ item, onListo }: { item?: StockLocal; onListo: () => void }
       <CardHeader title={item ? `Editar ${item.producto}` : "Nuevo producto en stock local"} />
       <div className="grid gap-4 p-5 md:grid-cols-7">
         <Field label="Producto *" className="md:col-span-2">
-          <ProductoInput value={f.producto} modulo="Sucursal Beta · Stock" onChange={(producto, p) => setF({ ...f, producto, ...(p ? { unidad: p.unidad } : {}) })} />
+          <ProductoInput value={f.producto} modulo="Sucursal · Stock" onChange={(producto, p) => setF({ ...f, producto, ...(p ? { unidad: p.unidad } : {}) })} />
         </Field>
         <Field label="Código">
           <Input value={f.codigo} onChange={set("codigo")} />

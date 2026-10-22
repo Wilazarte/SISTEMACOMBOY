@@ -49,6 +49,7 @@ export async function POST(req: Request) {
     detalle: txt(b.detalle),
     sucursal: txt(b.sucursal),
     sucursalId: venta.sucursalId,
+    sedeId: venta.sedeId,
     productos: venta.lineas.map((l) => ({ productoId: l.productoId, productoMaestroId: l.productoMaestroId, sku: l.sku, producto: l.producto, unidad: l.unidad, cantidad: l.cantidad })),
     estado: "pendiente",
     creadoPor: perfil?.usuario ?? user.email ?? "sucursal",

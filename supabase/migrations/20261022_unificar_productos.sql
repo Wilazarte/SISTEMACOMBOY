@@ -410,9 +410,12 @@ begin
 end $$;
 
 -- 10. Stock por almacén y producto_id (todos usan el mismo producto)
+--     Si ya se ejecutó 20261023_sedes_multisede.sql la vista tiene sede_id y se deja como está.
 do $$
 begin
-  if to_regclass('public.sucursal') is not null then
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'v_stock_almacenes' and column_name = 'sede_id') then
+    null;
+  elsif to_regclass('public.sucursal') is not null then
     execute $v$
       create or replace view public.v_stock_almacenes with (security_invoker = true) as
       select p.id as producto_id, p.sku, p.nombre_display, a.data->>'sede' as almacen_id,

@@ -73,7 +73,8 @@ export const CLAVES_POR_MODULO: Record<string, StoreKey[]> = {
   "/dashboard/planilla": PLANILLA,
   "/dashboard/contable": ["contable_asientos", "contable_plan_cuentas", "contable_cierres", "ventas_asientos", "contable_mov_caja"],
   "/dashboard/creador": ["CV_TRABAJADORES_V2", "planilla_asistencia", "planilla_huellas_alias"],
-  "/dashboard/sucursal": [
+  // Sucursal (app aparte /sucursal): la base solo entrega las filas de la sede del usuario
+  "/sucursal": [
     "sucursal_sucursales",
     "sucursal_ventas",
     "sucursal_traslados",
