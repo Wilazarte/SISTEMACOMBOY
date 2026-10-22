@@ -76,7 +76,7 @@ function dibujarLogo(doc: jsPDF, x: number, y: number, w: number, h: number): vo
   doc.text("VID", x + doc.getTextWidth("COMBOY "), y + h / 2 + 3);
 }
 
-interface Bloque {
+export interface Bloque {
   titulo: string;
   numero: string;
   estado?: string;
@@ -341,7 +341,8 @@ function pie(doc: jsPDF): void {
   }
 }
 
-function construir(b: Bloque): jsPDF {
+/** Documento con la plantilla corporativa (cabecera con logo y datos de empresa, tabla, totales, firmas y pie). */
+export function construir(b: Bloque): jsPDF {
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: b.horizontal ? "landscape" : "portrait" });
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
