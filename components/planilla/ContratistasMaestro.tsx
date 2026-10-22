@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Briefcase, Pencil, Plus, Power, Trash2, UserCheck } from "lucide-react";
+import { Briefcase, Pencil, Plus, Power, Printer, Trash2, UserCheck } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, cn, ejecutar } from "@/components/ui";
 import { SEDES } from "@/lib/empresa";
+import { PrintServicioModal, type ReciboServicio } from "@/components/planilla/PrintServicioModal";
 import {
   FORMAS_PAGO_CONTRATISTA,
   SERVICIOS_CONTRATISTA,
@@ -44,6 +45,21 @@ const desde = (t: Trabajador): DatosContratista => ({
   formaPago: t.formaPagoContrato ?? FORMAS_PAGO_CONTRATISTA[0],
 });
 
+const reciboDe = (t: Trabajador): ReciboServicio => ({
+  tipo: "CONTRATISTA",
+  numero: `REC-${t.id}`,
+  servicio: t.tipoServicio ? SERVICIOS_CONTRATISTA[t.tipoServicio] : "Sin servicio",
+  contratista: t.nombre,
+  documento: [t.dni && `DNI ${t.dni}`, t.ruc && `RUC ${t.ruc}`].filter(Boolean).join(" · "),
+  empresa: t.empresa ?? "",
+  sede: t.sede ?? "",
+  inicio: t.fechaIngreso,
+  fin: t.fechaFinContrato ?? "",
+  monto: t.sueldo,
+  modalidad: t.formaPagoContrato ?? "",
+  estado: estadoDe(t),
+});
+
 /** Estado mostrado: INACTIVO (dado de baja), FINALIZADO (pasó la fecha de fin) o ACTIVO. */
 const estadoDe = (t: Trabajador) => (!t.activo ? "INACTIVO" : t.fechaFinContrato && t.fechaFinContrato < hoy() ? "FINALIZADO" : "ACTIVO");
 
@@ -54,6 +70,7 @@ const estadoDe = (t: Trabajador) => (!t.activo ? "INACTIVO" : t.fechaFinContrato
 export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadores: Trabajador[]; soloLectura: boolean }) {
   const [form, setForm] = useState<{ datos: DatosContratista; idOriginal?: string } | null>(null);
   const [verInactivos, setVerInactivos] = useState(false);
+  const [recibo, setRecibo] = useState<ReciboServicio | null>(null);
   const todos = useMemo(() => trabajadores.filter(esContratista), [trabajadores]);
   const lista = todos
     .filter((t) => verInactivos || t.activo)
@@ -114,38 +131,41 @@ export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadore
                   <Badge estado={estado} />
                 </Td>
                 <Td>
-                  {!soloLectura && (
-                    <div className="flex gap-1">
-                      <Button size="sm" variant="secondary" onClick={() => setForm({ datos: desde(t), idOriginal: t.id })} title="Editar">
-                        <Pencil size={14} /> Editar
-                      </Button>
-                      {t.activo ? (
+                  <div className="flex gap-1">
+                    <BotonImprimir onClick={() => setRecibo(reciboDe(t))} />
+                    {!soloLectura && (
+                      <>
+                        <Button size="sm" variant="secondary" onClick={() => setForm({ datos: desde(t), idOriginal: t.id })} title="Editar">
+                          <Pencil size={14} /> Editar
+                        </Button>
+                        {t.activo ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Dar de baja"
+                            onClick={() => {
+                              const motivo = prompt(`Motivo de la baja de ${t.nombre}:`, "Fin del servicio");
+                              if (motivo !== null) ejecutar(() => cambiarEstadoTrabajador(t.id, false, { fecha: hoy(), motivo }), `${t.nombre} dado de baja`);
+                            }}
+                          >
+                            <Power size={14} className="text-red-600" />
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="ghost" title="Reactivar" onClick={() => ejecutar(() => cambiarEstadoTrabajador(t.id, true), `${t.nombre} reactivado`)}>
+                            <UserCheck size={14} className="text-emerald-600" />
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="ghost"
-                          title="Dar de baja"
-                          onClick={() => {
-                            const motivo = prompt(`Motivo de la baja de ${t.nombre}:`, "Fin del servicio");
-                            if (motivo !== null) ejecutar(() => cambiarEstadoTrabajador(t.id, false, { fecha: hoy(), motivo }), `${t.nombre} dado de baja`);
-                          }}
+                          title="Eliminar"
+                          onClick={() => confirm(`¿Eliminar al contratista ${t.nombre}? No se puede deshacer.`) && ejecutar(() => eliminarTrabajador(t.id), "Contratista eliminado")}
                         >
-                          <Power size={14} className="text-red-600" />
+                          <Trash2 size={14} className="text-red-600" />
                         </Button>
-                      ) : (
-                        <Button size="sm" variant="ghost" title="Reactivar" onClick={() => ejecutar(() => cambiarEstadoTrabajador(t.id, true), `${t.nombre} reactivado`)}>
-                          <UserCheck size={14} className="text-emerald-600" />
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        title="Eliminar"
-                        onClick={() => confirm(`¿Eliminar al contratista ${t.nombre}? No se puede deshacer.`) && ejecutar(() => eliminarTrabajador(t.id), "Contratista eliminado")}
-                      >
-                        <Trash2 size={14} className="text-red-600" />
-                      </Button>
-                    </div>
-                  )}
+                      </>
+                    )}
+                  </div>
                 </Td>
               </tr>
             );
@@ -153,8 +173,24 @@ export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadore
         </Table>
       )}
 
+      {recibo && <PrintServicioModal recibo={recibo} onClose={() => setRecibo(null)} />}
       {form && <FormContratista datos={form.datos} editando={!!form.idOriginal} onChange={(datos) => setForm({ ...form, datos })} onCancel={() => setForm(null)} onSave={guardar} />}
     </Card>
+  );
+}
+
+/** Botón azul de impresión / exportación del recibo de servicio. */
+export function BotonImprimir({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title="Imprimir / exportar recibo"
+      aria-label="Imprimir / exportar recibo"
+      className="inline-flex items-center justify-center rounded-lg bg-[#3B82F6] px-2 py-1.5 text-white shadow-card transition hover:bg-[#2563EB]"
+    >
+      <Printer size={14} />
+    </button>
   );
 }
 
