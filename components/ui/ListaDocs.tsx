@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from "lucide-react";
 import { Input, Select, Table, Td, cn } from "@/components/ui";
 import { fechaPE } from "@/lib/storage";
+import { useTogglePanel } from "@/hooks/useTogglePanel";
+import { BotonFiltros } from "@/components/ui/BotonFiltros";
 
 /** Una fila de la lista: lo que se ve (fecha, contraparte, documento, total, acciones) y lo que se filtra. */
 export interface FilaDoc {
@@ -58,6 +60,8 @@ export function ListaDocs({
   conAcciones = true,
   conRef = true,
   extra,
+  filtrosExtra,
+  extraActivos = 0,
 }: {
   filas: FilaDoc[];
   tipo: TipoLista;
@@ -65,7 +69,13 @@ export function ListaDocs({
   conRef?: boolean;
   /** Título de una columna extra entre Doc. referencia y Total. */
   extra?: string;
+  /** Filtros propios del módulo (sede, estado…): van dentro del mismo panel plegable. */
+  filtrosExtra?: ReactNode;
+  /** Cuántos de esos filtros propios están activos (para el contador del botón). */
+  extraActivos?: number;
 }) {
+  // Filtros ocultos por defecto: al entrar solo se ve la tabla
+  const { showFiltros, setShowFiltros } = useTogglePanel();
   const et = ETIQUETAS[tipo];
   const [q, setQ] = useState("");
   const [desde, setDesde] = useState("");
@@ -103,6 +113,7 @@ export function ListaDocs({
   const [ini, fin] = rango(pagina);
   const visibles = filtradas.slice(ini, fin);
   const hayFiltros = !!(q || desde || hasta || contraparte || tipoDoc || estado);
+  const activos = [q, desde, hasta, contraparte, tipoDoc, estado].filter(Boolean).length + extraActivos;
   const limpiar = () => {
     setQ("");
     setDesde("");
@@ -114,6 +125,20 @@ export function ListaDocs({
 
   return (
     <div>
+      <div className="flex flex-wrap items-center gap-2 border-b border-plomo-100 px-4 py-2">
+        <BotonFiltros abierto={showFiltros} onClick={() => setShowFiltros(!showFiltros)} activos={activos} />
+        {!showFiltros && activos > 0 && (
+          <span className="inline-flex items-center gap-1 text-xs text-plomo-500">
+            <SlidersHorizontal size={13} /> {activos} filtro{activos === 1 ? "" : "s"} activo{activos === 1 ? "" : "s"}
+          </span>
+        )}
+        {hayFiltros && (
+          <button type="button" onClick={limpiar} className="flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-medium text-plomo-500 hover:bg-plomo-100 hover:text-fg">
+            <X size={14} /> Limpiar
+          </button>
+        )}
+      </div>
+      {showFiltros && (
       <div className="flex flex-wrap items-end gap-2 border-b border-plomo-100 px-4 py-3">
         <label className="relative min-w-[220px] flex-1">
           <Search size={15} className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-plomo-500" />
@@ -128,12 +153,9 @@ export function ListaDocs({
         {opciones.estados.length > 1 && (
           <Select value={estado} onChange={(e) => setEstado(e.target.value)} placeholder="Estado" options={opciones.estados.map((x) => ({ value: x, label: x.replace(/_/g, " ") }))} className="w-40" />
         )}
-        {hayFiltros && (
-          <button type="button" onClick={limpiar} className="flex h-9 items-center gap-1 rounded-lg px-2 text-xs font-medium text-plomo-500 hover:bg-plomo-100 hover:text-fg">
-            <X size={14} /> Limpiar
-          </button>
-        )}
+        {filtrosExtra}
       </div>
+      )}
 
       <Table head={["Fecha", et.contraparte, ...(conRef ? [et.ref] : []), ...(extra ? [extra] : []), et.total, ...(conAcciones ? ["Acciones"] : [])]} empty={visibles.length === 0}>
         {visibles.map((f) => (

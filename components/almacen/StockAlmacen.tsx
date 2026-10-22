@@ -26,7 +26,6 @@ const FILTROS_SEDE = ["", SEDE_REPUESTOS, "Oficina Lima"];
  */
 export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: StockItem[]; puedeOperar: boolean; onIrDespacho: () => void }) {
   const [sede, setSede] = useState("");
-  const [q, setQ] = useState("");
   const [soloSinValor, setSoloSinValor] = useState(false);
   const [kardexDe_, setKardexDe] = useState<StockItem | null>(null);
   const [retiroDe, setRetiroDe] = useState<StockItem | null>(null);
@@ -36,7 +35,7 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
   const mismaSede = (a: string, b: string) => (agrupar ? sedeNormalizada(a) === sedeNormalizada(b) : a === b);
 
   const lista = stock
-    .filter((s) => (!sede || mismaSede(s.sede, sede)) && (!q || s.nombre.toLowerCase().includes(q.toLowerCase())) && (!soloSinValor || !(s.costoUnit > 0)))
+    .filter((s) => (!sede || mismaSede(s.sede, sede)) && (!soloSinValor || !(s.costoUnit > 0)))
     .sort((a, b) => a.sede.localeCompare(b.sede) || a.nombre.localeCompare(b.nombre));
   const filas = useMemo(() => {
     if (!agrupar) return lista.map((s) => ({ s, partes: [s], valor: s.cantidad * s.costoUnit, base: s }));
@@ -55,7 +54,7 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
       })
       .sort((a, b) => a.s.sede.localeCompare(b.s.sede) || a.s.nombre.localeCompare(b.s.nombre));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stock, sede, q, soloSinValor, agrupar]);
+  }, [stock, sede, soloSinValor, agrupar]);
   const valorizado = filas.reduce((a, f) => a + f.valor, 0);
   const sinValor = filas.filter((f) => !(f.s.costoUnit > 0)).length;
   const duplicados = filas.filter((f) => f.partes.length > 1).length;
@@ -67,12 +66,6 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
         subtitle={`${filas.length} producto(s)${agrupar && duplicados ? ` (${duplicados} agrupados)` : ""} · Valorizado ${soles(valorizado)}${sinValor ? ` · ${sinValor} sin valorizar` : ""} (último costo: sin IGV en factura/OC, con IGV en boleta)`}
         action={
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <div className="w-48">
-              <Input placeholder="Buscar producto…" value={q} onChange={(e) => setQ(e.target.value)} />
-            </div>
-            <div className="w-48">
-              <Select value={sede} onChange={(e) => setSede(e.target.value)} placeholder="Todas las sedes" options={SEDES_STOCK.map((s) => ({ value: s, label: s }))} />
-            </div>
             {puedeOperar && (
               <Button variant="secondary" onClick={() => setImportar(true)} title="Importar saldos desde Excel (Nombre Único | Ubicación | Ctd)">
                 <Upload size={16} /> Importar saldos
@@ -81,32 +74,37 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
           </div>
         }
       />
-      <div className="flex flex-wrap items-center gap-2 border-b border-plomo-100 px-5 py-3">
-        <span className="text-xs font-semibold uppercase tracking-wide text-plomo-500">Sede:</span>
-        {FILTROS_SEDE.map((s) => (
-          <button
-            key={s || "todas"}
-            type="button"
-            data-sede={s || "todas"}
-            onClick={() => setSede(s)}
-            className={cn(
-              "rounded-full border px-3.5 py-1.5 text-xs font-semibold transition",
-              sede === s ? "border-azul-900 bg-azul-900 text-white" : "border-plomo-200 bg-surface text-plomo-600 hover:border-azul-900"
-            )}
-          >
-            {s || "Todas"} <span className="opacity-70">{s ? stock.filter((x) => mismaSede(x.sede, s)).length : stock.length}</span>
-          </button>
-        ))}
-        <label className="ml-auto flex cursor-pointer items-center gap-2 text-xs font-semibold text-plomo-600" title="Suma el mismo producto de Taller Principal Aqp y Almacen Aqp (AQP Principal)">
-          <input type="checkbox" checked={agrupar} onChange={(e) => setAgrupar(e.target.checked)} className="h-4 w-4 accent-azul-900" /> Agrupar duplicados
-        </label>
-        <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-amber-800">
-          <input type="checkbox" checked={soloSinValor} onChange={(e) => setSoloSinValor(e.target.checked)} className="h-4 w-4 accent-amber-500" /> Solo sin valorizar
-        </label>
-      </div>
       {/* Actualizado | Producto | Sede y unidad | Cantidad | Acciones. Costo y valorizado: al pasar el mouse sobre la cantidad y en el Kardex. */}
+      {/* Búsqueda, sede y "sin valorizar": en el panel "Buscar / Filtrar" (oculto por defecto) */}
       <ListaDocs
         tipo="inventario"
+        extraActivos={(sede ? 1 : 0) + (soloSinValor ? 1 : 0)}
+        filtrosExtra={
+              <div className="flex w-full flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-plomo-500">Sede:</span>
+                {FILTROS_SEDE.map((s) => (
+                  <button
+                    key={s || "todas"}
+                    type="button"
+                    data-sede={s || "todas"}
+                    onClick={() => setSede(s)}
+                    className={cn(
+                      "rounded-full border px-3.5 py-1.5 text-xs font-semibold transition",
+                      sede === s ? "border-azul-900 bg-azul-900 text-white" : "border-plomo-200 bg-surface text-plomo-600 hover:border-azul-900"
+                    )}
+                  >
+                    {s || "Todas"} <span className="opacity-70">{s ? stock.filter((x) => mismaSede(x.sede, s)).length : stock.length}</span>
+                  </button>
+                ))}
+                <Select value={sede} onChange={(e) => setSede(e.target.value)} placeholder="Todas las sedes" options={SEDES_STOCK.map((s) => ({ value: s, label: s }))} className="w-48" />
+                <label className="ml-auto flex cursor-pointer items-center gap-2 text-xs font-semibold text-plomo-600" title="Suma el mismo producto de Taller Principal Aqp y Almacen Aqp (AQP Principal)">
+                  <input type="checkbox" checked={agrupar} onChange={(e) => setAgrupar(e.target.checked)} className="h-4 w-4 accent-azul-900" /> Agrupar duplicados
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-amber-800">
+                  <input type="checkbox" checked={soloSinValor} onChange={(e) => setSoloSinValor(e.target.checked)} className="h-4 w-4 accent-amber-500" /> Solo sin valorizar
+                </label>
+              </div>
+        }
         filas={filas.map(
           ({ s, partes, valor, base }): FilaDoc => ({
             id: s.id,

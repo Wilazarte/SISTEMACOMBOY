@@ -47,8 +47,6 @@ export function OrdenesDespacho({ vista = "almacen" }: { vista?: "almacen" | "ve
   const ods = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, []);
   useStore<StockItem[]>(KEYS.STOCK, []); // se re-renderiza cuando cambia el stock
   const [estado, setEstado] = useState<EstadoAlmacen | "">("");
-  const [desde, setDesde] = useState("");
-  const [hasta, setHasta] = useState("");
   const [lugar, setLugar] = useState<LugarEntrega | "">("");
   const [selId, setSelId] = useState<string | null>(null);
   const habilitado = puede(rol, "despacho.dar");
@@ -64,9 +62,8 @@ export function OrdenesDespacho({ vista = "almacen" }: { vista?: "almacen" | "ve
     }
   }, [vista, habilitado, rol, ods.length]);
 
-  const lista = ods.filter(
-    (o) => (!estado || estadoOD(o) === estado) && (!desde || o.fecha >= desde) && (!hasta || o.fecha <= hasta) && (!lugar || o.lugar === lugar)
-  );
+  // Fechas y búsqueda: las del panel "Buscar / Filtrar" de la lista
+  const lista = ods.filter((o) => (!estado || estadoOD(o) === estado) && (!lugar || o.lugar === lugar));
   const sel = ods.find((o) => o.id === selId) ?? null;
 
   return (
@@ -100,37 +97,32 @@ export function OrdenesDespacho({ vista = "almacen" }: { vista?: "almacen" | "ve
               : "Las genera Ventas al aprobar la nota de pedido. Almacén alista, entrega (con firma) o deja en agencia."
           }
         />
-        <div className="grid gap-3 border-b border-plomo-100 px-6 py-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="Estado">
-            <Select
-              value={estado}
-              onChange={(e) => setEstado(e.target.value as EstadoAlmacen | "")}
-              placeholder="Todos"
-              options={(Object.keys(ESTADOS_OD) as EstadoAlmacen[]).map((k) => ({ value: k, label: ESTADOS_OD[k] }))}
-            />
-          </Field>
-          <Field label="Desde">
-            <Input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
-          </Field>
-          <Field label="Hasta">
-            <Input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} />
-          </Field>
-          <Field label="Sede / lugar de entrega">
-            <Select
-              value={lugar}
-              onChange={(e) => setLugar(e.target.value as LugarEntrega | "")}
-              placeholder="Todas"
-              options={(Object.keys(LUGARES_ENTREGA) as LugarEntrega[]).map((k) => ({ value: k, label: LUGARES_ENTREGA[k] }))}
-            />
-          </Field>
-        </div>
-        {lista.length === 0 ? (
+        {ods.length === 0 ? (
           <div className="p-5">
             <Empty icon={<Truck size={28} />} text="No hay órdenes de despacho" />
           </div>
         ) : (
           <ListaDocs
           tipo="ventas"
+          extraActivos={[estado, lugar].filter(Boolean).length}
+          filtrosExtra={
+            <>
+              <Select
+                value={estado}
+                onChange={(e) => setEstado(e.target.value as EstadoAlmacen | "")}
+                placeholder="Estado: todos"
+                options={(Object.keys(ESTADOS_OD) as EstadoAlmacen[]).map((k) => ({ value: k, label: ESTADOS_OD[k] }))}
+                className="w-44"
+              />
+              <Select
+                value={lugar}
+                onChange={(e) => setLugar(e.target.value as LugarEntrega | "")}
+                placeholder="Sede / lugar: todas"
+                options={(Object.keys(LUGARES_ENTREGA) as LugarEntrega[]).map((k) => ({ value: k, label: LUGARES_ENTREGA[k] }))}
+                className="w-52"
+              />
+            </>
+          }
           filas={lista.map((o): FilaDoc => {
           return {
           id: o.id,

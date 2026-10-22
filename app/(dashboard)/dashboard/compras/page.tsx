@@ -90,6 +90,8 @@ import { pdfDeclaracionJurada } from "@/lib/pdf";
 import { EditarReq, permisoEditarReq } from "@/components/compras/EditarReq";
 import TesoreriaLeftDrawer from "@/components/tesoreria/TesoreriaLeftDrawer";
 import QuickActions, { QA_IDS } from "@/components/tesoreria/QuickActions";
+import { BotonNuevo } from "@/components/ui/BotonFiltros";
+import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { EditarGasto } from "@/components/compras/EditarGasto";
 import type { Trabajador } from "@/lib/types";
 import type { Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, Proveedor, Requerimiento, Rol, StockItem, TipoComprobanteCompra } from "@/lib/types";
@@ -529,9 +531,25 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
   ].sort((a, b) => b.fecha.localeCompare(a.fecha));
   const totalRegistros = r2(compras.reduce((a, c) => a + c.total, 0) + gastos.reduce((a, g) => a + g.total, 0));
 
+  // Formulario oculto por defecto: se abre con "Nuevo registro" (o al editar una compra de la lista)
+  const { showForm, setShowForm } = useTogglePanel();
+  const verForm = habilitado && (showForm || !!editando);
+
   return (
     <div className="space-y-6">
       {habilitado && (
+        <div className="mb-3 flex gap-2">
+          <BotonNuevo
+            abierto={verForm}
+            label="Nuevo gasto / compra"
+            onClick={() => {
+              if (verForm) cancelarEdicion();
+              setShowForm(!verForm);
+            }}
+          />
+        </div>
+      )}
+      {verForm && (
         <Card>
           <div className="flex flex-wrap items-end gap-4 p-5">
             <Field label="Tipo de registro" className="min-w-[320px]">
@@ -546,9 +564,9 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
         </Card>
       )}
 
-      {habilitado && modo === "GASTO" && <FormGasto rol={rol} proveedores={proveedores} stock={stock} />}
+      {verForm && modo === "GASTO" && <FormGasto rol={rol} proveedores={proveedores} stock={stock} />}
 
-      {habilitado && modo === "COMPRA" && (
+      {verForm && modo === "COMPRA" && (
         <Card>
           <CardHeader
             title={editando ? `Editar compra ${editando.numero}` : "Registrar compra"}
@@ -838,11 +856,8 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
 // ANTECEDENTES
 // =====================================================================
 function Antecedentes({ reqs, ordenes, rol, onCotizar, onIr }: { reqs: Requerimiento[]; ordenes: OrdenCompra[]; rol: Rol; onCotizar: (id: string) => void; onIr: (tab: string) => void }) {
-  const [estado, setEstado] = useState("");
-  const [q, setQ] = useState("");
-  const lista = reqs.filter(
-    (r) => (!estado || r.estado === estado) && (!q || `${r.numero} ${r.sede} ${r.solicitante} ${r.motivo}`.toLowerCase().includes(q.toLowerCase()))
-  );
+  // Búsqueda y estado: en el panel "Buscar / Filtrar" de la lista (oculto por defecto)
+  const lista = reqs;
   return (
     <div>
       <QuickActions tab="requerimiento" onIr={onIr} puedeCrear={puede(rol, "req.crear")} />
@@ -850,18 +865,6 @@ function Antecedentes({ reqs, ordenes, rol, onCotizar, onIr }: { reqs: Requerimi
       <CardHeader
         title="Antecedentes de requerimientos"
         subtitle="Histórico de REQ aceptados, observados y en proceso de compra"
-        action={
-          <div className="flex flex-wrap gap-2">
-            <Input placeholder="Buscar…" value={q} onChange={(e) => setQ(e.target.value)} className="w-48" />
-            <Select
-              value={estado}
-              onChange={(e) => setEstado(e.target.value)}
-              placeholder="Todos los estados"
-              options={["ACEPTADO", "OBSERVADO", "COTIZADO", "COMPRADO", "FINALIZADO"].map((s) => ({ value: s, label: s }))}
-              className="w-44"
-            />
-          </div>
-        }
       />
       <ListaDocs
           tipo="requerimientos"
@@ -1754,11 +1757,15 @@ function Facturas({
         <CardHeader
           title="Facturas y comprobantes"
           subtitle={`Total por pagar: ${soles(porPagar)}`}
-          action={
+        />
+        <ListaDocs
+          tipo="facturas"
+          extraActivos={filtroPago ? 1 : 0}
+          filtrosExtra={
             <Select
               value={filtroPago}
               onChange={(e) => setFiltroPago(e.target.value)}
-              placeholder="Todos"
+              placeholder="Pago: todos"
               options={[
                 { value: "POR_PAGAR", label: "Por pagar" },
                 { value: "PAGADA", label: "Pagadas" },
@@ -1766,9 +1773,6 @@ function Facturas({
               className="w-40"
             />
           }
-        />
-        <ListaDocs
-          tipo="facturas"
           filas={lista.map((f): FilaDoc => {
           const vencida = f.estadoPago === "POR_PAGAR" && f.fechaVencimiento < hoy();
           return {

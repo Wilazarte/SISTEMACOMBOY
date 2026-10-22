@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { Briefcase, FileText, Pencil, Power, Trash2, UserCheck } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, cn, ejecutar, toast } from "@/components/ui";
 import QuickActions, { QA_IDS } from "@/components/tesoreria/QuickActions";
+import { BotonFiltros } from "@/components/ui/BotonFiltros";
+import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { SEDES } from "@/lib/empresa";
 import { descargarRecibo, estadoContratista } from "@/components/planilla/generateReciboPDF";
 import {
@@ -56,6 +58,7 @@ export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadore
   const [form, setForm] = useState<{ datos: DatosContratista; idOriginal?: string } | null>(null);
   const [verInactivos, setVerInactivos] = useState(false);
   const [buscar, setBuscar] = useState("");
+  const { showFiltros, setShowFiltros } = useTogglePanel();
   const todos = useMemo(() => trabajadores.filter(esContratista), [trabajadores]);
   const lista = todos
     .filter((t) => verInactivos || t.activo)
@@ -81,16 +84,19 @@ export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadore
       <CardHeader
         title="Contratistas"
         subtitle={`${activos.length} activo(s) · contratado ${soles(r2(activos.reduce((s, t) => s + t.sueldo, 0)))} · no entran a la planilla del periodo`}
-        action={
-          <div className="flex flex-wrap items-center gap-2">
-            <Input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar nombre, DNI, RUC…" className="w-52" aria-label="Buscar" />
-            <label className="flex cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg border border-plomo-200 bg-surface px-3 py-2 text-sm font-medium text-slate-700">
-              <input type="checkbox" checked={verInactivos} onChange={(e) => setVerInactivos(e.target.checked)} className="h-4 w-4 accent-red-600" /> Mostrar inactivos
-            </label>
-            {/* Registrar: botón "Registrar Contratista" de las acciones rápidas (abre el formulario) */}
-          </div>
-        }
       />
+      {/* Filtros ocultos por defecto; Registrar: botón "Registrar Contratista" de las acciones rápidas */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-plomo-100 px-4 py-2">
+        <BotonFiltros abierto={showFiltros} onClick={() => setShowFiltros(!showFiltros)} activos={(buscar ? 1 : 0) + (verInactivos ? 1 : 0)} />
+      </div>
+      {showFiltros && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-plomo-100 px-4 py-3">
+          <Input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar nombre, DNI, RUC…" className="w-60" aria-label="Buscar" />
+          <label className="flex h-9 cursor-pointer items-center gap-2 whitespace-nowrap rounded-lg border border-plomo-200 bg-surface px-3 text-sm font-medium text-slate-700">
+            <input type="checkbox" checked={verInactivos} onChange={(e) => setVerInactivos(e.target.checked)} className="h-4 w-4 accent-red-600" /> Mostrar inactivos
+          </label>
+        </div>
+      )}
       {lista.length === 0 ? (
         <div className="p-5">
           <Empty icon={<Briefcase size={28} />} text={buscar ? "Ningún contratista coincide." : todos.length ? "No hay contratistas activos." : "Aún no hay contratistas. Use “Registrar contratista” o ponga cargo “Contratista” en la ficha de un trabajador."} />

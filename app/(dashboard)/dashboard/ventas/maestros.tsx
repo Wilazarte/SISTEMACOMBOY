@@ -1,5 +1,6 @@
 "use client";
 
+import { FiltrosPlegables } from "@/components/ui/BotonFiltros";
 import { useState } from "react";
 import { Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, cn, ejecutar, toast } from "@/components/ui";
@@ -173,7 +174,9 @@ export function Clientes() {
         subtitle="Columnas para importar: Tipo Doc, Numero, Razon Social, Direccion, Telefono, Email, Contacto, Linea Credito."
         action={
           <div className="flex flex-wrap gap-2">
-            <Input placeholder="Buscar…" value={q} onChange={(e) => setQ(e.target.value)} className="w-48" />
+            <FiltrosPlegables activos={q ? 1 : 0}>
+              <Input placeholder="Buscar…" value={q} onChange={(e) => setQ(e.target.value)} className="w-48" aria-label="Buscar" autoFocus />
+            </FiltrosPlegables>
             {habilitado && (
               <>
                 <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-plomo-200 bg-surface px-4 py-2 text-sm font-medium text-slate-700 hover:bg-plomo-50">
