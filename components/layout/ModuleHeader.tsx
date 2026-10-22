@@ -8,7 +8,7 @@ import { LogOut } from "lucide-react";
 const TIMES = '"Times New Roman", Times, serif';
 
 /**
- * Encabezado fijo de cada módulo: logo a la izquierda, "MODULO X" centrado absoluto (Times New Roman 800)
+ * Encabezado fijo de cada módulo: logo a la izquierda, "MODULO X" centrado absoluto (Times New Roman 800, 28px)
  * y a la derecha buscador / campana (`extra`) + cápsula del usuario con cerrar sesión. Sin línea de encargada.
  */
 export function ModuleHeader({
@@ -31,13 +31,13 @@ export function ModuleHeader({
     <header className="fixed inset-x-0 top-0 z-40 flex h-[64px] items-center justify-between gap-3 border-b border-gray-800/50 bg-[#0f172a] px-4 print:hidden lg:px-6">
       {/* Izquierda - Logo */}
       <Link href={inicio} className="z-10 flex shrink-0 items-center" aria-label="Inicio">
-        <Image src="/logo-comboy.png" alt="COMBOY VID" width={120} height={32} className="h-8 w-auto object-contain" />
+        <Image src="/comboy-logo.png" alt="COMBOY VID" width={110} height={36} priority className="h-9 w-auto bg-transparent object-contain" />
       </Link>
 
       {/* Centro - absolutamente centrado */}
       <h1
-        className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-[18px] font-extrabold uppercase tracking-wide text-white sm:text-[26px] lg:text-[36px]"
-        style={{ fontFamily: TIMES, fontWeight: 800, letterSpacing: "0.5px" }}
+        className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-[18px] font-extrabold uppercase text-white sm:text-[28px]"
+        style={{ fontFamily: TIMES }}
       >
         MODULO {moduleName}
       </h1>
