@@ -155,8 +155,8 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
   if (ruta === RUTA_CREADOR || ruta.startsWith(`${RUTA_CREADOR}/`)) return puedeEditarAsistencia(sesion);
   // Producción: también Almacén (registra las órdenes de producción y el QC)
   if (ruta === RUTA_PRODUCCION || ruta.startsWith(`${RUTA_PRODUCCION}/`)) if (sesion.rol === "almacen") return true;
-  // Secocha (sistema aparte, /secocha): también el Taller Principal (almacén: derivaciones, OT y REQ-SECOCHA) y Tesorería Principal (cierres de caja)
-  if (ruta === RUTA_SUCURSAL || ruta.startsWith(`${RUTA_SUCURSAL}/`)) if (["sucursal", "almacen", "tesoreria"].includes(sesion.rol)) return true;
+  // Secocha (sistema aparte, /secocha): solo quien tiene /secocha en perfiles.modulos (o "*", o es creador)
+  if (ruta === RUTA_SUCURSAL || ruta.startsWith(`${RUTA_SUCURSAL}/`)) return tieneSecocha(sesion);
   return sesion.modulos.some((m) => {
     const mod = m === RUTA_SUCURSAL_ANTIGUA ? RUTA_SUCURSAL : m; // perfiles con el módulo antiguo /sucursal
     return mod === "*" || ruta === mod || ruta.startsWith(`${mod}/`);
@@ -175,9 +175,23 @@ export const RUTA_PRODUCTOS = "/dashboard/productos";
 export const veTesoreria = (sesion: Sesion | null): boolean => puedeVer(sesion, "/dashboard/compras") || puedeVer(sesion, "/dashboard/planilla");
 
 /** Primer módulo al que entra el usuario tras el login. */
+/** Módulos del perfil con el antiguo /sucursal leído como /secocha. */
+const modulosDe = (sesion: Sesion): string[] => sesion.modulos.map((m) => (m === RUTA_SUCURSAL_ANTIGUA ? RUTA_SUCURSAL : m));
+
+/** Ve el módulo Secocha: tiene "/secocha" (o "*") en perfiles.modulos, o es creador. Sin eso no se muestra. */
+export const tieneSecocha = (sesion: Sesion | null): boolean =>
+  !!sesion && (sesion.rol === "creador" || modulosDe(sesion).some((m) => m === "*" || m === RUTA_SUCURSAL));
+
+/** Usuario solo de Secocha (modulos = ["/secocha"], ej. sucsecocha): entra directo a /secocha, nunca al ERP. */
+export const soloSecocha = (sesion: Sesion | null): boolean => {
+  if (!sesion || sesion.rol === "creador") return false;
+  const mods = modulosDe(sesion);
+  return (mods.length > 0 && mods.every((m) => m === RUTA_SUCURSAL)) || (sesion.rol === "sucursal" && !mods.includes("*"));
+};
+
 export function inicioDe(sesion: Sesion): string {
-  // El usuario de sucursal no entra al ERP: su sistema es /secocha
-  if (sesion.rol === "sucursal") return RUTA_SUCURSAL;
+  // El usuario solo de Secocha no entra al ERP: su sistema es /secocha
+  if (soloSecocha(sesion)) return RUTA_SUCURSAL;
   if (sesion.modulos.includes("*") || veDashboard(sesion)) return "/dashboard";
   // Sin módulos asignados se queda en /dashboard (el layout muestra el aviso; evita el bucle con /login)
   return sesion.modulos.find((m) => m.startsWith("/dashboard/")) ?? "/dashboard";
@@ -206,7 +220,7 @@ export const MODULOS_LOGIN: Record<ModuloLogin, { nombre: string; ruta: string; 
   tesoreria: { nombre: "Tesorería (Planilla - Compras)", ruta: "/dashboard/compras", rutas: ["/dashboard/compras", "/dashboard/planilla"], roles: ["planilla"] },
   produccion: { nombre: "Producción (Almacén)", ruta: "/dashboard/produccion", rutas: ["/dashboard/produccion", "/dashboard/almacen"], roles: ["almacen"] },
   logistica: { nombre: "Logística", ruta: "/dashboard/almacen?tab=despacho", rutas: ["/dashboard/almacen"], roles: ["almacen"] },
-  sucursal: { nombre: "Secocha", ruta: RUTA_SUCURSAL, rutas: [RUTA_SUCURSAL, RUTA_SUCURSAL_ANTIGUA], roles: ["almacen", "tesoreria"] },
+  sucursal: { nombre: "Secocha", ruta: RUTA_SUCURSAL, rutas: [RUTA_SUCURSAL, RUTA_SUCURSAL_ANTIGUA] },
   almacen: { nombre: "Almacén", ruta: "/dashboard/almacen", rutas: ["/dashboard/almacen"] },
   planilla: { nombre: "Planilla", ruta: "/dashboard/planilla", rutas: ["/dashboard/planilla"] },
   gerencia: { nombre: "Gerencia", ruta: "/dashboard", rutas: [] },
@@ -217,6 +231,8 @@ export const CLAVE_USUARIO = "erp_usuario";
 
 /** El usuario pertenece al módulo: es creador, su rol es ese módulo (o uno de sus roles), o tiene una de sus rutas en perfiles.modulos. */
 export function perteneceAModulo(sesion: Sesion, modulo: ModuloLogin): boolean {
+  // Secocha se decide solo por perfiles.modulos
+  if (modulo === "sucursal") return tieneSecocha(sesion);
   if (sesion.rol === "creador" || sesion.rol === modulo) return true;
   const { rutas, roles } = MODULOS_LOGIN[modulo];
   if (roles?.includes(sesion.rol)) return true;
