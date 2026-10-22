@@ -1,21 +1,19 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, CloudUpload, Eye, Loader2, Search, ShieldAlert } from "lucide-react";
-import { EV_PESTANA, ID_BARRA_PESTANAS, Kbd, Toaster, toast, type PestanaActiva } from "@/components/ui";
+import { EV_PESTANA, Kbd, Toaster, toast, type PestanaActiva } from "@/components/ui";
 import { DocViewerHost, abrirDoc, type DocRef } from "@/components/doc-viewer";
 import { ObservacionesGerencia } from "@/components/ObservacionesGerencia";
-import { Header } from "@/components/Header";
 import { AccionRapida } from "@/components/shell/AccionRapida";
 import { Campana } from "@/components/shell/Campana";
 import { CommandPalette, IconoDoc, type Comando } from "@/components/shell/CommandPalette";
 import { useIr } from "@/components/shell/ir";
 import { accionesDe, hrefSub, moduloDe, navDe } from "@/components/shell/nav";
 import { FloatingDock } from "@/components/layout/FloatingDock";
-import { ModuleHeader } from "@/components/layout/ModuleHeader";
+import { ModuloContenido, ModuloLayout, SEDE_PLANTA_PRINCIPAL } from "@/components/layout/ModuloLayout";
 import { NotificationSidebar } from "@/components/layout/NotificationSidebar";
 import { DatalistCatalogo } from "@/components/productos/ProductoInput";
 import { detenerCatalogo, iniciarCatalogo } from "@/lib/productos";
@@ -262,78 +260,78 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const nombreModulo = enPlanilla ? "PLANILLA" : (NOMBRE_MODULO.find(([r]) => path === r || path.startsWith(`${r}/`))?.[1] ?? "DASHBOARD");
 
   return (
-    // Tema azul oscuro COMBOY VID: siempre oscuro (.dark + .tema-azul, app/globals.css) sobre el mapa azul
-    <div className="dark tema-azul relative isolate flex min-h-screen flex-col pb-32 text-fg">
-      <div aria-hidden className="pointer-events-none fixed inset-0 z-[-1] bg-[#070b14]">
-        <Image src="/blue-globe.jpg" alt="" fill priority quality={90} sizes="100vw" className="object-cover object-center" />
-        <div className="absolute inset-0 bg-[#172554]/15" />
-        <div className="absolute inset-0 bg-black/85" />
-      </div>
-
-      {/* Encabezado: logo · MODULO X centrado · buscador, campana y usuario */}
-      <ModuleHeader
-        moduleName={nombreModulo}
-        inicio={inicioDe(sesion)}
-        usuario={sesion.usuario}
-        nombre={sesion.nombre}
-        onSalir={salir}
-        extra={
-          <>
+    <ModuloLayout
+      moduleName={nombreModulo}
+      sede={SEDE_PLANTA_PRINCIPAL}
+      inicio={inicioDe(sesion)}
+      sesion={sesion}
+      onSalir={salir}
+      // Con la barra de notificaciones abierta, en escritorio el contenido deja 320px a la derecha
+      mainClassName={notifAbierta ? "lg:pr-[320px]" : ""}
+      extra={
+        <>
+          <button
+            onClick={() => setPaleta(true)}
+            className="flex h-9 items-center gap-2.5 rounded-lg border border-gray-700 bg-[#1e293b] px-2.5 text-[13px] text-gray-300 transition hover:text-white 2xl:w-72"
+            aria-label="Abrir buscador global (Ctrl K)"
+            title={buscador ? "Buscar REQ, OC, factura… (Ctrl K)" : "Buscar o ir a… (Ctrl K)"}
+          >
+            <Search size={15} className="shrink-0" />
+            <span className="hidden flex-1 truncate text-left 2xl:block">{buscador ? "Buscar REQ, OC, factura…" : "Buscar o ir a…"}</span>
+            <span className="hidden items-center gap-1 lg:flex">
+              <Kbd>Ctrl</Kbd>
+              <Kbd>K</Kbd>
+            </span>
+          </button>
+          <Campana notifs={notifs} vistas={prefs.notifVistas ?? []} />
+          {locales > 0 && (
             <button
-              onClick={() => setPaleta(true)}
-              className="flex h-9 items-center gap-2.5 rounded-lg border border-gray-700 bg-[#1e293b] px-2.5 text-[13px] text-gray-300 transition hover:text-white 2xl:w-72"
-              aria-label="Abrir buscador global (Ctrl K)"
-              title={buscador ? "Buscar REQ, OC, factura… (Ctrl K)" : "Buscar o ir a… (Ctrl K)"}
+              onClick={subirLocales}
+              disabled={subiendo}
+              className="tip flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/10 hover:text-white disabled:opacity-60"
+              data-tip={`Subir datos de este navegador (${locales})`}
+              aria-label="Subir datos de este navegador"
             >
-              <Search size={15} className="shrink-0" />
-              <span className="hidden flex-1 truncate text-left 2xl:block">{buscador ? "Buscar REQ, OC, factura…" : "Buscar o ir a…"}</span>
-              <span className="hidden items-center gap-1 lg:flex">
-                <Kbd>Ctrl</Kbd>
-                <Kbd>K</Kbd>
-              </span>
+              {subiendo ? <Loader2 size={16} className="animate-spin" /> : <CloudUpload size={16} />}
             </button>
-            <Campana notifs={notifs} vistas={prefs.notifVistas ?? []} />
-            {locales > 0 && (
-              <button
-                onClick={subirLocales}
-                disabled={subiendo}
-                className="tip flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] text-white/80 transition hover:bg-white/10 hover:text-white disabled:opacity-60"
-                data-tip={`Subir datos de este navegador (${locales})`}
-                aria-label="Subir datos de este navegador"
-              >
-                {subiendo ? <Loader2 size={16} className="animate-spin" /> : <CloudUpload size={16} />}
-              </button>
-            )}
-          </>
-        }
-      />
-
-      {/* Con la barra de notificaciones abierta, en escritorio el contenido deja 320px a la derecha */}
-      <main className={`w-full flex-1 transition-[padding] duration-300 ${notifAbierta ? "lg:pr-[320px]" : ""}`}>
-        <div className="mx-auto w-full max-w-[1600px] px-4 pt-24 sm:px-6 lg:px-8">
-          {sesion.modulos.length === 0 ? (
-            <Aviso titulo="Sin módulos asignados">
-              Su usuario ({sesion.usuario}, rol {sesion.rol}) inició sesión, pero todavía no tiene módulos habilitados. El administrador debe asignarlos en la tabla perfiles (columna modulos).
-            </Aviso>
-          ) : !permitido ? (
-            <Aviso
-              titulo="Acceso denegado"
-              accion={
-                <Link href={inicioDe(sesion)} className="mt-5 inline-flex rounded-lg bg-corp px-5 py-2 text-[13px] font-medium text-white shadow-rojo hover:bg-vino-900">
-                  Ir a mi módulo
-                </Link>
-              }
-            >
-              Su usuario ({sesion.usuario}) no tiene permiso para ver este módulo.
-            </Aviso>
-          ) : (
-            <div className="animate-velo space-y-5" key={path} /* solo opacidad: un transform rompería los modales fijos */>
-              <Header
-                sesion={sesion}
-                flujo={flujoDe(path === "/dashboard/compras" && tabActiva?.id === "planilla" ? "/dashboard/planilla" : path)}
-              />
-              {/* Menú isla del módulo (components/ui Tabs dibuja aquí su IslandMenu): fijo al hacer scroll, sin barra de fondo */}
-              <div id={ID_BARRA_PESTANAS} className="sticky top-16 z-10 empty:hidden" />
+          )}
+        </>
+      }
+      overlays={
+        <>
+          <NotificationSidebar notifs={notifs} vistas={prefs.notifVistas ?? []} abierta={notifAbierta} onToggle={alternarNotif} enSeccion={path === "/dashboard/compras" && veCompras ? ["requerimiento"] : []} />
+          <FloatingDock sesion={sesion} tab={tabActiva?.id} />
+          <AccionRapida acciones={acciones} />
+          <CommandPalette abierto={paleta} onCerrar={() => setPaleta(false)} comandos={comandos} documentos={documentos} />
+          <DocViewerHost />
+          <DatalistCatalogo />
+          <Toaster />
+        </>
+      }
+    >
+      {sesion.modulos.length === 0 ? (
+        <Aviso titulo="Sin módulos asignados">
+          Su usuario ({sesion.usuario}, rol {sesion.rol}) inició sesión, pero todavía no tiene módulos habilitados. El administrador debe asignarlos en la tabla perfiles (columna modulos).
+        </Aviso>
+      ) : !permitido ? (
+        <Aviso
+          titulo="Acceso denegado"
+          accion={
+            <Link href={inicioDe(sesion)} className="mt-5 inline-flex rounded-lg bg-corp px-5 py-2 text-[13px] font-medium text-white shadow-rojo hover:bg-vino-900">
+              Ir a mi módulo
+            </Link>
+          }
+        >
+          Su usuario ({sesion.usuario}) no tiene permiso para ver este módulo.
+        </Aviso>
+      ) : (
+        <ModuloContenido
+          key={path}
+          sesion={sesion}
+          sede={SEDE_PLANTA_PRINCIPAL}
+          flujo={flujoDe(path === "/dashboard/compras" && tabActiva?.id === "planilla" ? "/dashboard/planilla" : path)}
+          avisos={
+            <>
               {sesion.soloLectura && (
                 <div className="flex w-full items-center gap-2 rounded-xl border border-plomo-200 bg-surface px-4 py-2.5 text-sm text-fg-2 shadow-card">
                   <Eye size={16} className="shrink-0 text-plomo-500" /> Modo solo lectura: puede revisar todo y registrar observaciones, pero no guardar, editar ni eliminar.
@@ -344,25 +342,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                   <ObservacionesGerencia modulo={modulo} sesion={sesion} />
                 </div>
               )}
-              {children}
-            </div>
-          )}
-        </div>
-      </main>
-      <footer className="mt-8 flex flex-wrap items-center justify-between gap-2 border-t border-white/10 px-4 py-4 text-xs text-plomo-500 sm:px-6 lg:px-8">
-        <span>
-          <span className="font-semibold text-fg">COMBOY</span> <span className="font-semibold text-rojo">VID</span> © 2025 · ERP COMBOYVID · Arequipa, Perú · Área Informática
-        </span>
-        <span>v3.2.1</span>
-      </footer>
-      <NotificationSidebar notifs={notifs} vistas={prefs.notifVistas ?? []} abierta={notifAbierta} onToggle={alternarNotif} enSeccion={path === "/dashboard/compras" && veCompras ? ["requerimiento"] : []} />
-      <FloatingDock sesion={sesion} tab={tabActiva?.id} />
-      <AccionRapida acciones={acciones} />
-      <CommandPalette abierto={paleta} onCerrar={() => setPaleta(false)} comandos={comandos} documentos={documentos} />
-      <DocViewerHost />
-      <DatalistCatalogo />
-      <Toaster />
-    </div>
+            </>
+          }
+        >
+          {children}
+        </ModuloContenido>
+      )}
+    </ModuloLayout>
   );
 }
 

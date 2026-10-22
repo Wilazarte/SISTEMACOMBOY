@@ -4,11 +4,13 @@ import { BotonNuevo } from "@/components/ui/BotonFiltros";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useCallback, useEffect, useState } from "react";
-import { Boxes, CheckCircle2, Factory, Truck, ClipboardList, Eye, FilePlus2, FileText, MessageSquareWarning, PackageCheck, Pencil, Plus, Send, Trash2 } from "lucide-react";
-import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar, ejecutarAsync } from "@/components/ui";
+import { Boxes, CheckCircle2, Factory, Truck, ClipboardList, Eye, FilePlus2, FileText, MessageSquareWarning, PackageCheck, Pencil, Plus, Trash2 } from "lucide-react";
+import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
-import { EditarReq, ItemsEditor, itemVacio, permisoEditarReq } from "@/components/compras/EditarReq";
+import { EditarReq, permisoEditarReq } from "@/components/compras/EditarReq";
 import { ProductoInput } from "@/components/productos/ProductoInput";
+import { RequerimientoForm } from "@/components/requerimientos/RequerimientoForm";
+import { SEDE_PLANTA_PRINCIPAL } from "@/components/layout/ModuloLayout";
 import { getSesion } from "@/lib/auth";
 import { SEDES, SEDES_STOCK, UNIDADES } from "@/lib/empresa";
 import {
@@ -16,7 +18,6 @@ import {
   crearRequerimiento,
   darVistoBueno,
   fechaPE,
-  hoy,
   observarIngreso,
   puede,
   registrarIngresoAlmacen,
@@ -27,7 +28,7 @@ import {
   useStore,
 } from "@/lib/storage";
 import { pdfActaIngreso, pdfRequerimiento } from "@/lib/pdf";
-import type { EstadoReq, Factura, Guia, ItemReq, MovimientoKardex, OrdenCompra, OrdenDespacho, Requerimiento, Rol, StockItem } from "@/lib/types";
+import type { EstadoReq, Factura, Guia, MovimientoKardex, OrdenCompra, OrdenDespacho, Requerimiento, Rol, StockItem } from "@/lib/types";
 import { OrdenesDespacho } from "./despacho";
 import { EquiposTerminados } from "@/components/almacen/EquiposTerminados";
 import { StockAlmacen } from "@/components/almacen/StockAlmacen";
@@ -107,63 +108,26 @@ export default function AlmacenPage() {
 // =====================================================================
 // NUEVO REQUERIMIENTO
 // =====================================================================
-function NuevoReq({ rol, onCreado, onCancelar }: { rol: Rol; onCreado: () => void; onCancelar: () => void }) {
-  const [sede, setSede] = useState("");
-  const [solicitante, setSolicitante] = useState("");
-  const [fecha, setFecha] = useState(hoy());
-  const [motivo, setMotivo] = useState("");
-  const [items, setItems] = useState<ItemReq[]>([itemVacio()]);
-  const [enviando, setEnviando] = useState(false);
-  const contadores = useStore<Record<string, number>>(KEYS.CONTADORES, {});
-  const proximo = `REQ-ALM-${String((contadores.REQ ?? 0) + 1).padStart(3, "0")}`;
+/** Áreas de la Planta Principal que emiten requerimientos (Secocha emite los suyos desde su módulo). */
+const AREAS_PLANTA = SEDES.filter((s) => !/secocha/i.test(s));
 
+function NuevoReq({ rol, onCreado, onCancelar }: { rol: Rol; onCreado: () => void; onCancelar: () => void }) {
+  const contadores = useStore<Record<string, number>>(KEYS.CONTADORES, {});
   if (!puede(rol, "req.crear"))
     return <Empty icon={<FilePlus2 size={28} />} text="Su rol no puede emitir requerimientos. Cambie a ALMACÉN o GERENCIA." />;
-
-  const guardar = async () => {
-    setEnviando(true);
-    let numero = "";
-    const ok = await ejecutarAsync(async () => {
-      numero = (await crearRequerimiento({ sede, solicitante, fecha, motivo, items }, rol)).numero;
-    }, "Requerimiento enviado a Tesorería");
-    setEnviando(false);
-    if (ok) {
-      setMotivo("");
-      setItems([itemVacio()]);
-      if (numero) onCreado();
-    }
-  };
-
   return (
-    <Card>
-      <CardHeader title="Nuevo requerimiento de almacén" subtitle="Al guardar se notifica automáticamente a Tesorería." action={
-          <div className="flex items-center gap-2">
-            <span className="rounded-lg bg-plomo-100 px-3 py-1.5 text-sm font-bold text-slate-700" title="Número probable: el definitivo se asigna al guardar">{proximo}</span>
-            <BotonNuevo abierto onClick={onCancelar} />
-          </div>
-        }
-      />
-      <div className="grid gap-4 p-5 md:grid-cols-4">
-        <Field label="Sede *">
-          <Select value={sede} onChange={(e) => setSede(e.target.value)} placeholder="Seleccione…" options={SEDES.map((s) => ({ value: s, label: s }))} />
-        </Field>
-        <Field label="Solicitante *">
-          <Input value={solicitante} onChange={(e) => setSolicitante(e.target.value)} placeholder="Nombre y cargo" />
-        </Field>
-        <Field label="Fecha">
-          <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
-        </Field>
-        <Field label="Motivo *" className="md:col-span-4">
-          <Textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej: Mantenimiento preventivo del remolcador U35 — cambio de rodamientos" />
-        </Field>
-      </div>
-      <ItemsEditor items={items} onChange={setItems} />
-      <div className="flex justify-end border-t border-plomo-100 px-5 py-4">
-        <Button onClick={guardar} disabled={enviando}>
-          <Send size={16} /> {enviando ? "Emitiendo…" : "Emitir y notificar a Tesorería"}
-        </Button>
-      </div>
-    </Card>
+    <RequerimientoForm
+      sedeOrigen={SEDE_PLANTA_PRINCIPAL}
+      areas={AREAS_PLANTA}
+      destino="Tesorería"
+      numeroProbable={`REQ-ALM-${String((contadores.REQ ?? 0) + 1).padStart(3, "0")}`}
+      modulo="Almacén · Requerimiento"
+      textoEnviar="Emitir y notificar a Tesorería"
+      mensajeOk="Requerimiento enviado a Tesorería"
+      onEnviar={(d) => crearRequerimiento(d, rol)}
+      onCreado={onCreado}
+      onCancelar={onCancelar}
+    />
   );
 }
 

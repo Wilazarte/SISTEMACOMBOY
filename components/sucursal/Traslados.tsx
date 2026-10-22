@@ -1,13 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, CheckCircle2, FileText, Send, Truck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, FileText, Truck } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Textarea, ejecutar, ejecutarAsync } from "@/components/ui";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { BotonNuevo } from "@/components/ui/BotonFiltros";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
-import { pdfGuiaRemision } from "@/lib/pdf";
-import { confirmarRecepcion, crearReqSucursal, crearTraslado, esTaller, observarTraslado, operaSucursal, type ReqSucursal, type StockLocal, type Traslado } from "@/lib/sucursal";
+import { RequerimientoForm } from "@/components/requerimientos/RequerimientoForm";
+import { getSesion, nombreDe } from "@/lib/auth";
+import { pdfGuiaRemision, pdfRequerimiento } from "@/lib/pdf";
+import {
+  DESTINO_REQ_SUCURSAL,
+  confirmarRecepcion,
+  crearReqSucursal,
+  crearTraslado,
+  esTaller,
+  getSucursal,
+  numeroProbableSuc,
+  observarTraslado,
+  operaSucursal,
+  type ReqSucursal,
+  type StockLocal,
+  type Traslado,
+} from "@/lib/sucursal";
 import type { Requerimiento } from "@/lib/types";
 import { Acciones, EstadoSuc, LineasEditor, deLineas, lineaVacia, type LineaEdit } from "./comun";
 
@@ -19,7 +34,8 @@ export function Requerimientos({ reqs, enTesoreria, stock }: { reqs: ReqSucursal
   const opera = operaSucursal();
   const taller = esTaller();
   const [ot, setOt] = useState<ReqSucursal | null>(null);
-  const estadoTes = (id: string) => enTesoreria.find((r) => r.id === id)?.estado;
+  const docDe = (id: string) => enTesoreria.find((r) => r.id === id);
+  const estadoTes = (id: string) => docDe(id)?.estado;
 
   const filas: FilaDoc[] = reqs.map((r) => {
     const tes = estadoTes(r.id);
@@ -46,20 +62,28 @@ export function Requerimientos({ reqs, enTesoreria, stock }: { reqs: ReqSucursal
         </div>
       ),
       total: `${r.items.length} ítem(s)`,
-      acciones:
-        taller && r.estado === "enviado" ? (
-          <Button size="sm" onClick={() => setOt(r)} title="Atender con una OT hacia la sucursal">
-            <Truck size={14} /> Crear OT
-          </Button>
-        ) : (
-          <span className="text-xs text-plomo-500">{r.estado === "cerrado" ? "Recibido en sucursal" : r.estado === "en-traslado" ? "Ver Traslados" : "En Tesorería"}</span>
-        ),
+      acciones: (
+        <Acciones>
+          {docDe(r.id) && (
+            <Button size="sm" variant="ghost" onClick={() => pdfRequerimiento(docDe(r.id)!)} title="PDF (mismo formato que Arequipa)">
+              <FileText size={14} /> PDF
+            </Button>
+          )}
+          {taller && r.estado === "enviado" ? (
+            <Button size="sm" onClick={() => setOt(r)} title="Atender con una OT hacia la sucursal">
+              <Truck size={14} /> Crear OT
+            </Button>
+          ) : (
+            <span className="text-xs text-plomo-500">{r.estado === "cerrado" ? "Recibido en sucursal" : r.estado === "en-traslado" ? "Ver Traslados" : "En Tesorería"}</span>
+          )}
+        </Acciones>
+      ),
     };
   });
 
   return (
     <div className="space-y-4">
-      {showForm && opera && <FormReq stock={stock} onListo={() => setShowForm(false)} />}
+      {showForm && opera && <FormReq numeroProbable={numeroProbableSuc(reqs)} onListo={() => setShowForm(false)} />}
       <Card>
         <CardHeader
           title="Requerimientos de la sucursal"
@@ -73,34 +97,29 @@ export function Requerimientos({ reqs, enTesoreria, stock }: { reqs: ReqSucursal
   );
 }
 
-function FormReq({ stock, onListo }: { stock: StockLocal[]; onListo: () => void }) {
-  const [lineas, setLineas] = useState<LineaEdit[]>([lineaVacia()]);
-  const [motivo, setMotivo] = useState("");
-  const [enviando, setEnviando] = useState(false);
-  const enviar = async () => {
-    setEnviando(true);
-    const ok = await ejecutarAsync(() => crearReqSucursal(deLineas(lineas), motivo), "Requerimiento enviado al Almacén del Taller Principal (Arequipa)");
-    setEnviando(false);
-    if (ok) onListo();
-  };
+/** Mismo formulario que Arequipa (RequerimientoForm): Secocha solo cambia la sede y el destino. */
+function FormReq({ numeroProbable, onListo }: { numeroProbable: string; onListo: () => void }) {
+  const sesion = getSesion();
   return (
-    <Card>
-      <CardHeader title="Nuevo requerimiento (REQ-SECOCHA)" subtitle="Llega al Almacén del Taller Principal (Arequipa)" />
-      <div className="space-y-4 p-5">
-        <LineasEditor lineas={lineas} onChange={setLineas} stock={stock} conPrecio={false} />
-        <Field label="Motivo *">
-          <Textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Para qué se necesita" />
-        </Field>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onListo}>
-            Cancelar
-          </Button>
-          <Button onClick={enviar} disabled={enviando}>
-            <Send size={15} /> {enviando ? "Enviando…" : "Enviar a Almacén"}
-          </Button>
-        </div>
-      </div>
-    </Card>
+    <RequerimientoForm
+      sedeOrigen={getSucursal().nombre}
+      destino={DESTINO_REQ_SUCURSAL}
+      numeroProbable={numeroProbable}
+      solicitanteInicial={sesion ? nombreDe(sesion) : ""}
+      modulo="Secocha · Requerimiento"
+      textoEnviar="Enviar a Almacén"
+      mensajeOk={`Requerimiento enviado al ${DESTINO_REQ_SUCURSAL}`}
+      onEnviar={(d) =>
+        crearReqSucursal(
+          d.items.map((i) => ({ producto: i.nombre, cantidad: i.cantidad, unidad: i.unidad, marca: i.marca, caracteristica: i.caracteristica })),
+          d.motivo,
+          false,
+          { solicitante: d.solicitante, fecha: d.fecha }
+        )
+      }
+      onCreado={onListo}
+      onCancelar={onListo}
+    />
   );
 }
 

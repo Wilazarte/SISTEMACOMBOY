@@ -404,7 +404,15 @@ export function observarTraslado(id: string, tipo: "FALTANTE" | "DANADO", detall
 // 4. Requerimientos REQ-SECOCHA -> Almacén del Taller Principal (Arequipa)
 // ---------------------------------------------------------------------
 
-export async function crearReqSucursal(items: ProductoTraslado[], motivo: string, automatico = false): Promise<ReqSucursal> {
+/** Producto del requerimiento (el formulario único RequerimientoForm también manda marca y característica). */
+type ItemReqSuc = ProductoTraslado & { marca?: string; caracteristica?: string };
+
+export async function crearReqSucursal(
+  items: ItemReqSuc[],
+  motivo: string,
+  automatico = false,
+  datos: { solicitante?: string; fecha?: string } = {}
+): Promise<ReqSucursal> {
   exigir(operaSucursal(), "Su usuario no puede emitir requerimientos de la sucursal.");
   exigir(!!motivo.trim(), "Ingrese el motivo del requerimiento.");
   const lista = items.filter((i) => i.producto.trim()).map((i) => ({ ...i, ...oficial(i.producto), cantidad: Number(i.cantidad) }));
@@ -414,8 +422,16 @@ export async function crearReqSucursal(items: ProductoTraslado[], motivo: string
   const suc = getSucursal();
   const numero = await siguienteSuc("REQSUC");
   const id = uid();
-  const fecha = hoy();
-  const itemsReq: ItemReq[] = lista.map((i) => ({ id: uid(), nombre: i.producto, cantidad: i.cantidad, unidad: i.unidad || "UND", marca: "", caracteristica: "" }));
+  const fecha = datos.fecha || hoy();
+  const itemsReq: ItemReq[] = lista.map((i) => ({
+    id: uid(),
+    nombre: i.producto,
+    cantidad: i.cantidad,
+    unidad: i.unidad || "UND",
+    marca: i.marca?.trim() ?? "",
+    caracteristica: i.caracteristica?.trim() ?? "",
+    ...(i.productoMaestroId ? { productoId: i.productoMaestroId, sku: i.sku } : {}),
+  }));
   // Mismo documento que los REQ de Almacén: llega al Almacén del Taller Principal (Arequipa) y sigue Cotización -> OC
   const req: Requerimiento = {
     id,
@@ -423,7 +439,7 @@ export async function crearReqSucursal(items: ProductoTraslado[], motivo: string
     fecha,
     sede: suc.nombre,
     destino: DESTINO_REQ_SUCURSAL,
-    solicitante: sesion ? nombreDe(sesion) : suc.nombre,
+    solicitante: datos.solicitante?.trim() || (sesion ? nombreDe(sesion) : suc.nombre),
     motivo: motivo.trim(),
     items: itemsReq,
     estado: "PENDIENTE",
@@ -437,6 +453,13 @@ export async function crearReqSucursal(items: ProductoTraslado[], motivo: string
   const local: ReqSucursal = { id, numero, fecha, motivo: motivo.trim(), items: lista, estado: "enviado", automatico, sucursalId: suc.id, creadoPor: usuario() };
   escribirSede(KEYS.SUC_REQS, [local, ...getReqsSuc()]);
   return local;
+}
+
+/** Número probable del próximo REQ-SECOCHA (el definitivo lo asigna Supabase al enviar). */
+export function numeroProbableSuc(reqs: ReqSucursal[]): string {
+  const sede = getSedeActual();
+  const ultimo = reqs.reduce((m, r) => Math.max(m, Number(/(\d+)$/.exec(r.numero)?.[1] ?? 0)), 0);
+  return `REQ-${sede && !sede.es_central ? nombreSerie(sede.nombre) : "SUC"}-${String(ultimo + 1).padStart(3, "0")}`;
 }
 
 /** 7. Stock Local -> "Solicitar reposición": REQ-SECOCHA automático con lo que está bajo el mínimo. */

@@ -27,7 +27,7 @@ export function permisoEditarReq(req: Requerimiento, sesion: Sesion | null): { o
 // =====================================================================
 // Editor de productos (nuevo requerimiento, edición y corrección)
 // =====================================================================
-export function ItemsEditor({ items, onChange }: { items: ItemReq[]; onChange: (i: ItemReq[]) => void }) {
+export function ItemsEditor({ items, onChange, modulo = "Almacén · Requerimiento" }: { items: ItemReq[]; onChange: (i: ItemReq[]) => void; modulo?: string }) {
   const set = (id: string, campo: keyof ItemReq, v: string | number) => onChange(items.map((i) => (i.id === id ? { ...i, [campo]: v } : i)));
   return (
     <div className="overflow-x-auto">
@@ -50,7 +50,7 @@ export function ItemsEditor({ items, onChange }: { items: ItemReq[]; onChange: (
               <td className="px-2 py-1.5">
                 <ProductoInput
                   value={i.nombre}
-                  modulo="Almacén · Requerimiento"
+                  modulo={modulo}
                   onChange={(nombre, p) => onChange(items.map((x) => (x.id === i.id ? { ...x, nombre, ...(p ? { unidad: p.unidad, marca: x.marca || p.marca || "", productoId: p.id, sku: p.sku } : {}) } : x)))}
                 />
               </td>
