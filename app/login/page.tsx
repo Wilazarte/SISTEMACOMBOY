@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, BarChart3, Calculator, Eye, EyeOff, Factory, Landmark, Loader2, Lock, LogIn, Store, Truck, User, X, type LucideIcon } from "lucide-react";
-import { CLAVE_MODULO, CLAVE_USUARIO, MODULOS_LOGIN, RUTA_LOGIN_SUCURSAL, login, logout, moduloGuardado, perteneceAModulo, puedeVer, rutaDeModulo, useSesion, type ModuloLogin } from "@/lib/auth";
+import { CLAVE_MODULO, CLAVE_USUARIO, MODULOS_LOGIN, RUTA_LOGIN_SUCURSAL, RUTA_SUCURSAL, soloSecocha, login, logout, moduloGuardado, perteneceAModulo, puedeVer, rutaDeModulo, useSesion, type ModuloLogin } from "@/lib/auth";
 import { CLAVE_SELECCION, ENCARGADOS_LOGIN, tarjetaDe } from "@/components/modulos-login";
 
 /** Botones del dock: `slug` es la ruta /login/<slug> (app/login/[modulo] redirige a /login?modulo=). */
@@ -69,7 +69,8 @@ function Login() {
   // Sesión ya abierta con un módulo elegido: ir directo a ese módulo
   useEffect(() => {
     const m = moduloGuardado();
-    if (sesion && m && !enviando) router.replace(rutaDeModulo(sesion, m));
+    if (sesion && !enviando && soloSecocha(sesion)) router.replace(RUTA_SUCURSAL);
+    else if (sesion && m && !enviando) router.replace(rutaDeModulo(sesion, m));
   }, [sesion, router, enviando]);
 
   const elegir = (id: ModuloLogin, slug: string) => {
@@ -98,6 +99,11 @@ function Login() {
       setEnviando(false);
       setPass("");
       setError(r.error ?? "Usuario o contraseña incorrectos.");
+      return;
+    }
+    // Usuario solo de Secocha (modulos = ["/secocha"]): directo a su módulo
+    if (soloSecocha(r.sesion)) {
+      router.replace(RUTA_SUCURSAL);
       return;
     }
     if (!perteneceAModulo(r.sesion, modulo)) {

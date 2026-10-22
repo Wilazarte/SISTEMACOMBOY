@@ -17,7 +17,7 @@ import { ModuloContenido, ModuloLayout, SEDE_PLANTA_PRINCIPAL } from "@/componen
 import { NotificationSidebar } from "@/components/layout/NotificationSidebar";
 import { DatalistCatalogo } from "@/components/productos/ProductoInput";
 import { detenerCatalogo, iniciarCatalogo } from "@/lib/productos";
-import { RUTA_SUCURSAL, inicioDe, logout, puedeVer, useSesion, veTesoreria } from "@/lib/auth";
+import { RUTA_SUCURSAL, inicioDe, soloSecocha, logout, puedeVer, useSesion, veTesoreria } from "@/lib/auth";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
 import { useNotificaciones } from "@/lib/notificaciones";
 import { limpiarPrefs, usePrefs } from "@/lib/preferencias";
@@ -109,8 +109,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       void detenerDatos();
       router.replace("/login");
     }
-    // La sucursal es un sistema aparte: su usuario no usa el ERP
-    if (sesion?.rol === "sucursal") router.replace(RUTA_SUCURSAL);
+    // Usuario solo de Secocha (modulos = ["/secocha"]): no usa el ERP
+    if (soloSecocha(sesion)) router.replace(RUTA_SUCURSAL);
   }, [listo, sesion, router]);
 
   // Almacén: aviso con detalle cuando Ventas genera una orden de despacho (en vivo)
