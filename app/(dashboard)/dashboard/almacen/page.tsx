@@ -8,6 +8,7 @@ import { Boxes, CheckCircle2, Factory, Truck, ClipboardList, Eye, FilePlus2, Fil
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar, ejecutarAsync } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
 import { EditarReq, ItemsEditor, itemVacio, permisoEditarReq } from "@/components/compras/EditarReq";
+import { ProductoInput } from "@/components/productos/ProductoInput";
 import { getSesion } from "@/lib/auth";
 import { SEDES, SEDES_STOCK, UNIDADES } from "@/lib/empresa";
 import {
@@ -533,7 +534,11 @@ function RegistrarIngreso({ rol, stock, ordenes }: { rol: Rol; stock: StockItem[
             {filas.map((f) => (
               <div key={f.id} className="grid grid-cols-[1fr_110px_110px_auto] items-end gap-2">
                 <Field label="Producto">
-                  <Input list="productos-ingreso" value={f.nombre} onChange={(e) => set(f.id, "nombre", e.target.value)} placeholder="Buscar en el stock…" />
+                  <ProductoInput
+                    value={f.nombre}
+                    modulo="Almacén · Ingreso"
+                    onChange={(nombre, p) => setFilas((fs) => fs.map((x) => (x.id === f.id ? { ...x, nombre, ...(p ? { unidad: p.unidad } : {}) } : x)))}
+                  />
                 </Field>
                 <Field label="Unidad">
                   <Select value={f.unidad} onChange={(e) => set(f.id, "unidad", e.target.value)} options={UNIDADES.map((u) => ({ value: u, label: u }))} />

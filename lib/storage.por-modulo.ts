@@ -73,6 +73,20 @@ export const CLAVES_POR_MODULO: Record<string, StoreKey[]> = {
   "/dashboard/planilla": PLANILLA,
   "/dashboard/contable": ["contable_asientos", "contable_plan_cuentas", "contable_cierres", "ventas_asientos", "contable_mov_caja"],
   "/dashboard/creador": ["CV_TRABAJADORES_V2", "planilla_asistencia", "planilla_huellas_alias"],
+  "/dashboard/sucursal": [
+    "sucursal_sucursales",
+    "sucursal_ventas",
+    "sucursal_traslados",
+    "sucursal_derivaciones",
+    "sucursal_reqs",
+    "sucursal_caja",
+    "sucursal_cierres",
+    "sucursal_stock",
+    "sucursal_clientes",
+    // Sus REQ-SUC en Tesorería (RLS: solo los de origen SUCURSAL)
+    "reqs_almacen_pendientes",
+    "reqs_procesados_compras",
+  ],
 };
 
 /** Claves a descargar al iniciar sesión. `"*"` (creador / gerencia) = todas. */

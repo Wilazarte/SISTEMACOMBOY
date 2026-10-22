@@ -49,7 +49,7 @@ export default function SeleccionarModulo() {
       <div className="relative z-10 mx-auto mt-3 h-1 w-12 rounded-full bg-[#E30613]" />
       <p className="relative z-10 mt-3 text-center text-xs uppercase tracking-[0.3em] text-gray-300 md:text-sm">Selecciona tu módulo</p>
 
-      <div className="relative z-10 mx-auto mt-10 grid w-full max-w-6xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 lg:gap-5" onMouseLeave={() => setActivo(null)}>
+      <div className="relative z-10 mx-auto mt-10 grid w-full max-w-6xl grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 lg:gap-5" onMouseLeave={() => setActivo(null)}>
         {MODULOS_SELECCION.map((m) => (
           <Tarjeta
             key={m.id}

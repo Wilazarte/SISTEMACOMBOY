@@ -28,6 +28,7 @@ import {
   subirBaucher,
 } from "@/lib/storage";
 import type { ArchivoGasto, Factura, Bancarizacion, ComprobanteGasto, Proveedor, Rol, StockItem, TipoGasto } from "@/lib/types";
+import { ProductoInput } from "@/components/productos/ProductoInput";
 
 type FilaOC = { id: string; nombre: string; unidad: string; cantidad: number; precioUnit: number };
 const filaOC = (): FilaOC => ({ id: Math.random().toString(36).slice(2), nombre: "", unidad: "UND", cantidad: 1, precioUnit: 0 });
@@ -82,7 +83,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
   const bancObligatoria = requiereBancarizacion(d.importe || 0, d.ruc);
   const setFila = (id: string, cambios: Partial<FilaOC>) => setFilas((p) => p.map((f) => (f.id === id ? { ...f, ...cambios } : f)));
   const elegirProducto = (id: string, nombre: string) => {
-    const p = productos.find((x) => x.nombre === nombre.toUpperCase());
+    const p = productos.find((x) => x.nombre === nombre);
     setFila(id, p ? { nombre: p.nombre, unidad: p.unidad, precioUnit: p.costoUnit || 0 } : { nombre });
   };
 
@@ -191,7 +192,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
                     {filas.map((f) => (
                       <tr key={f.id}>
                         <td className="px-2 py-1.5">
-                          <Input value={f.nombre} list="productos-oc-gasto" onChange={(e) => elegirProducto(f.id, e.target.value)} placeholder="Buscar producto del almacén…" />
+                          <ProductoInput value={f.nombre} modulo="Tesorería · Gasto con OC" onChange={(nombre) => elegirProducto(f.id, nombre)} />
                         </td>
                         <td className="px-2 py-1.5">
                           <Input type="number" min={0} step="any" value={f.cantidad || ""} onChange={(e) => setFila(f.id, { cantidad: parseFloat(e.target.value) || 0 })} />

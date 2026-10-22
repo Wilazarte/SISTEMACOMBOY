@@ -9,7 +9,7 @@ const NOMBRE_EMPRESA = "COMBOY VID SOLUCIONES INDUSTRIALES";
 const SEDE = "Arequipa";
 
 /** Franja de contexto de cada módulo: usuario | cargo | empresa, sede y flujo de trabajo (subtítulo). Sin línea de encargada. */
-export function Header({ sesion, flujo }: { sesion: Sesion; flujo?: string }) {
+export function Header({ sesion, flujo, persona }: { sesion: Sesion; flujo?: string; /** Nombre y cargo fijos del módulo (Sucursal Beta). */ persona?: { nombre: string; cargo: string } }) {
   const ruta = usePathname();
   const [fecha, setFecha] = useState("");
 
@@ -22,7 +22,7 @@ export function Header({ sesion, flujo }: { sesion: Sesion; flujo?: string }) {
     <section className="flex w-full flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="min-w-0 truncate text-[13px] text-plomo-500">
-          <span className="font-medium text-fg">{nombreDe(sesion)}</span> · {cargoDe(sesion)} · {NOMBRE_EMPRESA}
+          <span className="font-medium text-fg">{persona?.nombre ?? nombreDe(sesion)}</span> · {persona?.cargo ?? cargoDe(sesion)} · {NOMBRE_EMPRESA}
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1 rounded-full border border-plomo-200 bg-surface px-2.5 py-1 text-xs text-plomo-500">

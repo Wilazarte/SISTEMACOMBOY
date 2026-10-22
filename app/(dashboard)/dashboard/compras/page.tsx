@@ -1,6 +1,7 @@
 "use client";
 
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
+import { ProductoInput } from "@/components/productos/ProductoInput";
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   AlertTriangle,
@@ -622,7 +623,11 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
                   <tr key={i.id}>
                     <td className="px-3 py-1.5 text-slate-400">{k + 1}</td>
                     <td className="px-2 py-1.5">
-                      <Input value={i.nombre} list="productos-stock" onChange={(e) => set(i.id, "nombre", e.target.value)} placeholder="Ej: Rodamiento 6205" />
+                      <ProductoInput
+                        value={i.nombre}
+                        modulo="Tesorería · Registrar compra"
+                        onChange={(nombre, p) => setFilas((fs) => fs.map((x) => (x.id === i.id ? { ...x, nombre, ...(p ? { unidad: p.unidad } : {}) } : x)))}
+                      />
                     </td>
                     <td className="px-2 py-1.5">
                       <Select value={i.unidad} onChange={(e) => set(i.id, "unidad", e.target.value)} options={UNIDADES.map((u) => ({ value: u, label: u }))} />

@@ -26,6 +26,9 @@ export interface ItemReq {
   unidad: string;
   marca: string;
   caracteristica: string;
+  /** Producto del catálogo maestro (productos_maestro.id) y su SKU. */
+  productoId?: string;
+  sku?: string;
 }
 
 /**
@@ -61,6 +64,9 @@ export interface Requerimiento {
   creadoPor?: string;
   editadoPor?: string;
   editadoEn?: string;
+  /** "SUCURSAL": lo emitió la Sucursal Beta (REQ-SUC-001); el resto viene de Almacén. */
+  origen?: "SUCURSAL";
+  sucursalId?: string;
 }
 
 export interface ItemPrecio {
@@ -71,6 +77,9 @@ export interface ItemPrecio {
   marca: string;
   precioUnit: number; // valor unitario SIN IGV
   subtotal: number;
+  /** Producto del catálogo maestro (productos_maestro.id) y su SKU. */
+  productoId?: string;
+  sku?: string;
 }
 
 export interface Cotizacion {
@@ -399,6 +408,9 @@ export interface StockItem {
   cantidad: number;
   costoUnit: number; // último costo: sin IGV (factura / OC) o con IGV (boleta, sin crédito fiscal)
   actualizado: string; // ISO
+  /** Producto del catálogo maestro (productos_maestro.id) y su SKU. */
+  productoId?: string;
+  sku?: string;
 }
 
 /** Kardex de almacén: cada entrada / salida de un producto con su saldo. */
