@@ -55,6 +55,19 @@ function fijar(e: Estado): void {
   window.dispatchEvent(new Event(EVENTO));
 }
 
+/**
+ * Fila de productos_solicitudes -> modelo de la app. En producción la tabla usa nombre_solicitado,
+ * categoria_sugerida y estado en MAYÚSCULAS (PENDIENTE / APROBADA / RECHAZADA); filas antiguas usan nombre / categoria.
+ */
+function leerSolicitud(r: SolicitudProducto & { nombre_solicitado?: string | null; categoria_sugerida?: string | null }): SolicitudProducto {
+  return {
+    ...r,
+    nombre: r.nombre_solicitado || r.nombre || "",
+    categoria: r.categoria_sugerida ?? r.categoria ?? null,
+    estado: (String(r.estado ?? "pendiente").toLowerCase() as SolicitudProducto["estado"]),
+  };
+}
+
 async function leerCatalogo(): Promise<void> {
   const [p, a, s] = await Promise.all([
     todas<ProductoMaestro>("productos_maestro", "nombre_normalizado"),
@@ -66,7 +79,7 @@ async function leerCatalogo(): Promise<void> {
     console.warn("Catálogo de productos:", p.error.message);
     return fijar({ ...estado, listo: true });
   }
-  fijar({ productos: p.data, alias: a.data, solicitudes: [...s.data].reverse(), listo: true, disponible: true });
+  fijar({ productos: p.data, alias: a.data, solicitudes: [...s.data].reverse().map(leerSolicitud), listo: true, disponible: true });
 }
 
 /** Al iniciar sesión: descarga el catálogo y escucha los cambios de las otras PCs. */
@@ -192,15 +205,30 @@ export async function solicitarProducto(d: DatosProducto & { motivo?: string; mo
   const existe = buscarProducto(norm);
   if (existe) throw new ProductoError(`Ya existe como ${existe.nombre_normalizado} (${existe.sku}). Elíjalo del catálogo.`);
   if (estado.solicitudes.some((s) => s.estado === "pendiente" && normalizarNombre(s.nombre) === norm)) throw new ProductoError("Ese producto ya está solicitado y espera aprobación.");
-  const { error } = await createClient()
-    .from("productos_solicitudes")
-    .insert({ nombre: d.nombre.trim(), unidad: d.unidad || "UND", marca: d.marca?.trim() || null, categoria: d.categoria?.trim() || null, motivo: d.motivo?.trim() || null, modulo: d.modulo ?? null, solicitado_usuario: d.usuario ?? null });
+  const sb = createClient();
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) throw new ProductoError("Su sesión expiró. Vuelva a ingresar.");
+  // Columnas reales de productos_solicitudes (nombre_solicitado y nombre_norm son NOT NULL en producción)
+  const { error } = await sb.from("productos_solicitudes").insert({
+    nombre_solicitado: d.nombre.trim().replace(/\s+/g, " ").toUpperCase(),
+    nombre_norm: norm,
+    marca: d.marca?.trim() || null,
+    unidad: d.unidad || "UND",
+    categoria_sugerida: d.categoria?.trim() || null,
+    motivo: d.motivo?.trim() || null,
+    estado: "PENDIENTE",
+    solicitante_id: user.id,
+    modulo: d.modulo ?? null,
+    solicitado_usuario: d.usuario ?? null,
+  });
   if (error) throw new ProductoError(faltaTabla(error) ? "Falta el catálogo en Supabase: ejecute supabase/migrations/20261022_unificar_productos.sql." : `No se pudo enviar la solicitud: ${error.message}`);
   await leerCatalogo();
 }
 
 export async function rechazarSolicitud(id: string, respuesta: string): Promise<void> {
-  const { error } = await createClient().from("productos_solicitudes").update({ estado: "rechazada", respuesta: respuesta.trim() || null, resuelto_at: new Date().toISOString() }).eq("id", id);
+  const { error } = await createClient().from("productos_solicitudes").update({ estado: "RECHAZADA", respuesta: respuesta.trim() || null, resuelto_at: new Date().toISOString() }).eq("id", id);
   if (error) throw new ProductoError(error.message);
   await leerCatalogo();
 }
@@ -209,7 +237,7 @@ export async function rechazarSolicitud(id: string, respuesta: string): Promise<
 export async function resolverSolicitudCon(id: string, producto: ProductoMaestro): Promise<void> {
   const { error } = await createClient()
     .from("productos_solicitudes")
-    .update({ estado: "aprobada", producto_id: producto.id, respuesta: `Ya existe como ${producto.nombre_normalizado} (${producto.sku})`, resuelto_at: new Date().toISOString() })
+    .update({ estado: "APROBADA", producto_id: producto.id, respuesta: `Ya existe como ${producto.nombre_normalizado} (${producto.sku})`, resuelto_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw new ProductoError(error.message);
   await leerCatalogo();
