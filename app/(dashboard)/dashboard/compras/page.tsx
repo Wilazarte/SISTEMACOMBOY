@@ -89,6 +89,7 @@ import { DeclaracionesJuradas } from "@/components/tesoreria/DeclaracionesJurada
 import { pdfDeclaracionJurada } from "@/lib/pdf";
 import { EditarReq, permisoEditarReq } from "@/components/compras/EditarReq";
 import TesoreriaLeftDrawer from "@/components/tesoreria/TesoreriaLeftDrawer";
+import QuickActions, { QA_IDS, irAFormulario } from "@/components/tesoreria/QuickActions";
 import { EditarGasto } from "@/components/compras/EditarGasto";
 import type { Trabajador } from "@/lib/types";
 import type { Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, Proveedor, Requerimiento, Rol, StockItem, TipoComprobanteCompra } from "@/lib/types";
@@ -184,6 +185,8 @@ export default function ComprasPage() {
     setTab(t);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+  // Acciones rápidas: solo saltan a pestañas que este usuario ve
+  const irTab = (t: string) => tabsPermitidas.includes(t as Tab) && ir(t as Tab);
 
   const cotizables = procesados.filter((r) => r.estado === "ACEPTADO" || r.estado === "COTIZADO");
   const cotisSinOC = cotizaciones.filter((c) => c.estado === "REGISTRADA" && !ordenes.some((o) => o.reqId === c.reqId));
@@ -227,14 +230,14 @@ export default function ComprasPage() {
       />
 
       {tab === "registrar" && <RegistrarCompra rol={rol} proveedores={proveedores} compras={compras} gastos={facturas.filter((f) => f.esGastoTesoreria)} stock={stock} />}
-      {tab === "antecedentes" && <Antecedentes reqs={procesados} ordenes={ordenes} rol={rol} onCotizar={(id) => ir("cotizaciones", { req: id })} />}
+      {tab === "antecedentes" && <Antecedentes reqs={procesados} ordenes={ordenes} rol={rol} onCotizar={(id) => ir("cotizaciones", { req: id })} onIr={irTab} />}
       {tab === "cotizaciones" && (
-        <Cotizaciones key={pre.req ?? "c"} rol={rol} reqs={cotizables} cotizaciones={cotizaciones} preReq={pre.req} onOC={(id) => ir("ordenes", { coti: id })} />
+        <Cotizaciones key={pre.req ?? "c"} rol={rol} reqs={cotizables} cotizaciones={cotizaciones} preReq={pre.req} onOC={(id) => ir("ordenes", { coti: id })} onIr={irTab} />
       )}
       {tab === "ordenes" && (
-        <Ordenes key={pre.coti ?? "o"} rol={rol} cotis={cotisSinOC} todasCotis={cotizaciones} ordenes={ordenes} reqs={procesados} preCoti={pre.coti} onFacturar={(id) => ir("facturas", { oc: id })} />
+        <Ordenes key={pre.coti ?? "o"} rol={rol} cotis={cotisSinOC} todasCotis={cotizaciones} ordenes={ordenes} reqs={procesados} preCoti={pre.coti} onFacturar={(id) => ir("facturas", { oc: id })} onIr={irTab} onVerCoti={(reqId) => ir("cotizaciones", { req: reqId })} />
       )}
-      {tab === "facturas" && <Facturas key={pre.oc ?? "f"} rol={rol} ocs={ocsSinFactura} ordenes={ordenes} facturas={facturas} preOc={pre.oc} />}
+      {tab === "facturas" && <Facturas key={pre.oc ?? "f"} rol={rol} ocs={ocsSinFactura} ordenes={ordenes} facturas={facturas} preOc={pre.oc} onIr={irTab} />}
       {tab === "declaraciones" && veCompras && <DeclaracionesJuradas facturas={facturas} rol={rol} />}
       {tab === "planilla" && vePlanilla && (
         <div>
@@ -825,14 +828,16 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
 // =====================================================================
 // ANTECEDENTES
 // =====================================================================
-function Antecedentes({ reqs, ordenes, rol, onCotizar }: { reqs: Requerimiento[]; ordenes: OrdenCompra[]; rol: Rol; onCotizar: (id: string) => void }) {
+function Antecedentes({ reqs, ordenes, rol, onCotizar, onIr }: { reqs: Requerimiento[]; ordenes: OrdenCompra[]; rol: Rol; onCotizar: (id: string) => void; onIr: (tab: string) => void }) {
   const [estado, setEstado] = useState("");
   const [q, setQ] = useState("");
   const lista = reqs.filter(
     (r) => (!estado || r.estado === estado) && (!q || `${r.numero} ${r.sede} ${r.solicitante} ${r.motivo}`.toLowerCase().includes(q.toLowerCase()))
   );
   return (
-    <Card>
+    <div>
+      <QuickActions tab="requerimiento" onIr={onIr} puedeCrear={puede(rol, "req.crear")} />
+      <Card id={QA_IDS.listaRequerimientos}>
       <CardHeader
         title="Antecedentes de requerimientos"
         subtitle="Histórico de REQ aceptados, observados y en proceso de compra"
@@ -888,7 +893,8 @@ function Antecedentes({ reqs, ordenes, rol, onCotizar }: { reqs: Requerimiento[]
           };
         })}
         />
-    </Card>
+      </Card>
+    </div>
   );
 }
 
@@ -901,12 +907,14 @@ function Cotizaciones({
   cotizaciones,
   preReq,
   onOC,
+  onIr,
 }: {
   rol: Rol;
   reqs: Requerimiento[];
   cotizaciones: Cotizacion[];
   preReq?: string;
   onOC: (id: string) => void;
+  onIr: (tab: string) => void;
 }) {
   const [reqId, setReqId] = useState(preReq ?? "");
   const [proveedor, setProveedor] = useState("");
@@ -946,10 +954,21 @@ function Cotizaciones({
     return m;
   }, [cotizaciones]);
 
+  // Acción rápida "Nueva COT": formulario en blanco
+  const nuevaCoti = () => {
+    setReqId("");
+    setProveedor("");
+    setRuc("");
+    setNumero("");
+    setFecha(hoy());
+    irAFormulario(QA_IDS.formCotizacion);
+  };
+
   return (
     <div className="space-y-6">
+      <QuickActions tab="cotizacion" onIr={onIr} onNuevo={nuevaCoti} puedeCrear={habilitado} />
       {habilitado && (
-        <Card>
+        <Card id={QA_IDS.formCotizacion}>
           <CardHeader title="Registrar cotización" subtitle="Vinculada a un requerimiento ACEPTADO. Puede registrar varias cotizaciones por REQ para comparar." />
           <div className="grid gap-4 p-5 md:grid-cols-3">
             <Field label="Requerimiento">
@@ -1017,7 +1036,7 @@ function Cotizaciones({
         </Card>
       )}
 
-      <Card>
+      <Card id={QA_IDS.listaCotizaciones}>
         <CardHeader title="Cotizaciones registradas" subtitle="★ = menor precio del requerimiento" />
         <ListaDocs
           tipo="cotizaciones"
@@ -1099,6 +1118,8 @@ function Ordenes({
   reqs,
   preCoti,
   onFacturar,
+  onIr,
+  onVerCoti,
 }: {
   rol: Rol;
   cotis: Cotizacion[];
@@ -1107,6 +1128,9 @@ function Ordenes({
   reqs: Requerimiento[];
   preCoti?: string;
   onFacturar: (id: string) => void;
+  onIr: (tab: string) => void;
+  /** Abre Cotizaciones con el REQ de la cotización elegida. */
+  onVerCoti: (reqId: string) => void;
 }) {
   const [bancarizar, setBancarizar] = useState<OrdenCompra | null>(null);
   const [editar, setEditar] = useState<OrdenCompra | null>(null);
@@ -1190,7 +1214,8 @@ function Ordenes({
 
   return (
     <div className="space-y-6">
-      <Card>
+      <QuickActions tab="ordenes" onIr={onIr} puedeCrear={habilitado} onVerCoti={coti ? () => onVerCoti(coti.reqId) : undefined} />
+      <Card id={QA_IDS.formOrden}>
         <CardHeader title="Emitir orden de compra" subtitle={habilitado ? "Se genera desde una COTIZACIÓN (no directamente desde el REQ)." : "Solo lectura: solo Tesorería y Creador pueden emitir órdenes de compra."} />
         <fieldset disabled={!habilitado} className="min-w-0">
           <div className="grid gap-4 p-5 md:grid-cols-3">
@@ -1297,7 +1322,7 @@ function Ordenes({
         </div>
       </Card>
 
-      <Card>
+      <Card id={QA_IDS.listaOrdenes}>
         <CardHeader title="Órdenes de compra" />
         <ListaDocs
           tipo="ordenes"
@@ -1525,12 +1550,14 @@ function Facturas({
   ordenes,
   facturas,
   preOc,
+  onIr,
 }: {
   rol: Rol;
   ocs: OrdenCompra[];
   ordenes: OrdenCompra[];
   facturas: Factura[];
   preOc?: string;
+  onIr: (tab: string) => void;
 }) {
   const [editGasto, setEditGasto] = useState<Factura | null>(null);
   const sesion = getSesion();
@@ -1593,8 +1620,9 @@ function Facturas({
 
   return (
     <div className="space-y-6">
+      <QuickActions tab="factura" onIr={onIr} puedeCrear={puede(rol, "fac.crear")} />
       {puede(rol, "fac.crear") && (
-        <Card>
+        <Card id={QA_IDS.formFactura}>
           <CardHeader
             title={modo === "FACTURA" ? "Registrar factura" : "Declaración jurada de compra"}
             subtitle={modo === "FACTURA" ? "Vinculada a una Orden de Compra. IGV y total se calculan automáticamente." : `Excepción: compras sin comprobante, tope ${soles(TOPE_DJ)}, requiere aprobación de Gerencia.`}
@@ -1681,7 +1709,7 @@ function Facturas({
         </Card>
       )}
 
-      <Card>
+      <Card id={QA_IDS.listaFacturas}>
         <CardHeader
           title="Facturas y comprobantes"
           subtitle={`Total por pagar: ${soles(porPagar)}`}
