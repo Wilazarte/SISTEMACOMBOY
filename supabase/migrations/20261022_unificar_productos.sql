@@ -1,6 +1,8 @@
 -- =====================================================================
 -- CATÁLOGO MAESTRO ÚNICO DE PRODUCTOS · ERP COMBOY VID
--- Ejecutar en Supabase › SQL Editor (se puede repetir sin duplicar nada).
+-- Ejecutar en Supabase › SQL Editor (se puede repetir sin duplicar nada). Sin BEGIN/COMMIT: el SQL Editor
+-- ya corre el script completo y CREATE EXTENSION falla dentro de un bloque de transacción explícito.
+-- pg_trgm vive en el schema public (no extensions): public.similarity, public.gin_trgm_ops, operator(public.%).
 -- Si usa la Sucursal Beta, ejecute antes supabase/migrations/20261022_sucursal_beta.sql.
 --
 -- Problema: cada almacén escribía el producto a mano ("TEMPLE BLANCO PATO 25KG",
@@ -17,9 +19,7 @@
 -- una segunda tabla de cantidades que pueda descuadrarse. v_stock_almacenes lo muestra por producto_id.
 -- =====================================================================
 
-begin;
-
-create extension if not exists pg_trgm with schema extensions;
+create extension if not exists pg_trgm with schema public;
 
 -- 1. Normalización única (la misma que lib/productos-modelos.ts normalizarNombre):
 --    MAYÚSCULAS, sin espacios al inicio/fin, sin espacios dobles, "A / B" -> "A/B"
@@ -46,7 +46,38 @@ create table if not exists public.productos_maestro (
   constraint productos_nombre_norm_chk check (nombre_normalizado = public.normalizar_producto(nombre_normalizado) and nombre_normalizado <> '')
 );
 create index if not exists idx_productos_busqueda on public.productos_maestro using gin (to_tsvector('spanish', nombre_display));
-create index if not exists idx_productos_trgm on public.productos_maestro using gin (nombre_normalizado extensions.gin_trgm_ops);
+-- Si productos_maestro ya existía con otras columnas, se completan (no se borra nada)
+alter table public.productos_maestro add column if not exists sku text default ('PROD-' || lpad(nextval('public.productos_sku_seq')::text, 4, '0'));
+alter table public.productos_maestro add column if not exists nombre_normalizado text;
+alter table public.productos_maestro add column if not exists nombre_display text;
+alter table public.productos_maestro add column if not exists descripcion text;
+alter table public.productos_maestro add column if not exists marca text;
+alter table public.productos_maestro add column if not exists unidad text not null default 'UND';
+alter table public.productos_maestro add column if not exists categoria text;
+alter table public.productos_maestro add column if not exists activo boolean not null default true;
+alter table public.productos_maestro add column if not exists created_at timestamptz not null default now();
+alter table public.productos_maestro add column if not exists created_by uuid default auth.uid();
+create unique index if not exists productos_maestro_nombre_normalizado_uq on public.productos_maestro (nombre_normalizado);
+create unique index if not exists productos_maestro_sku_uq on public.productos_maestro (sku);
+
+-- Filas antiguas sin nombre_normalizado / nombre_display: se completan una con la otra (o con "nombre").
+-- Si dos filas antiguas dan el mismo nombre normalizado, solo la más antigua lo recibe (unifique la otra en Catálogo).
+do $$
+begin
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'productos_maestro' and column_name = 'nombre') then
+    execute 'update public.productos_maestro set nombre_display = btrim(nombre) where coalesce(nombre_display, '''') = '''' and coalesce(btrim(nombre), '''') <> ''''';
+  end if;
+  update public.productos_maestro set nombre_display = nombre_normalizado where coalesce(nombre_display, '') = '' and coalesce(nombre_normalizado, '') <> '';
+  update public.productos_maestro m set nombre_normalizado = x.norm
+    from (select distinct on (public.normalizar_producto(nombre_display)) id, public.normalizar_producto(nombre_display) norm
+            from public.productos_maestro
+           where coalesce(nombre_normalizado, '') = '' and public.normalizar_producto(nombre_display) <> ''
+           order by public.normalizar_producto(nombre_display), created_at, id) x
+   where m.id = x.id
+     and not exists (select 1 from public.productos_maestro o where o.nombre_normalizado = x.norm);
+end $$;
+
+create index if not exists idx_productos_trgm on public.productos_maestro using gin (nombre_normalizado public.gin_trgm_ops);
 
 -- Variantes que ya existían con otro nombre (o que se unificaron): apuntan al producto oficial
 create table if not exists public.productos_alias (
@@ -54,6 +85,52 @@ create table if not exists public.productos_alias (
   producto_id uuid not null references public.productos_maestro(id) on delete cascade,
   created_at timestamptz not null default now()
 );
+
+-- productos_alias de producción (id, producto_id, nombre_alias, nombre_alias_norm, created_at)
+-- -> alias_normalizado text primary key. Ver 20261022_fix_productos_alias.sql (mismo bloque; se puede repetir).
+do $$
+declare
+  pk text;
+  pk_cols text[];
+begin
+  if to_regclass('public.productos_alias') is null then return; end if;
+
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'productos_alias' and column_name = 'nombre_alias_norm')
+     and not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'productos_alias' and column_name = 'alias_normalizado') then
+    alter table public.productos_alias rename column nombre_alias_norm to alias_normalizado;
+  end if;
+  alter table public.productos_alias add column if not exists alias_normalizado text;
+  alter table public.productos_alias add column if not exists created_at timestamptz not null default now();
+
+  -- Alias vacío: se toma del nombre original; todos quedan normalizados igual que normalizar_producto()
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'productos_alias' and column_name = 'nombre_alias') then
+    execute 'update public.productos_alias set alias_normalizado = nombre_alias where coalesce(alias_normalizado, '''') = ''''';
+    execute 'alter table public.productos_alias alter column nombre_alias drop not null';
+  end if;
+  update public.productos_alias set alias_normalizado = public.normalizar_producto(alias_normalizado)
+   where alias_normalizado is distinct from public.normalizar_producto(alias_normalizado);
+  delete from public.productos_alias where coalesce(alias_normalizado, '') = '';
+
+  -- Un alias, un producto: se queda el más antiguo
+  delete from public.productos_alias where ctid in (
+    select ctid from (select ctid, row_number() over (partition by alias_normalizado order by created_at, ctid) rn from public.productos_alias) x where rn > 1);
+
+  -- Clave primaria = alias_normalizado (la antigua sobre id deja de serlo; id queda como columna opcional)
+  select c.conname, array(select a.attname::text from unnest(c.conkey) k join pg_attribute a on a.attrelid = c.conrelid and a.attnum = k)
+    into pk, pk_cols
+    from pg_constraint c where c.conrelid = 'public.productos_alias'::regclass and c.contype = 'p';
+  if pk is not null and pk_cols <> array['alias_normalizado'] then
+    execute format('alter table public.productos_alias drop constraint %I', pk);
+    pk := null;
+  end if;
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'productos_alias' and column_name = 'id') then
+    execute 'alter table public.productos_alias alter column id drop not null';
+  end if;
+  if pk is null then
+    alter table public.productos_alias add constraint productos_alias_pkey primary key (alias_normalizado);
+  end if;
+end $$;
+
 create index if not exists idx_productos_alias_producto on public.productos_alias (producto_id);
 
 -- Pedidos de producto nuevo: cualquier usuario los pide, solo el administrador los aprueba
@@ -110,14 +187,14 @@ revoke all on public.productos_maestro, public.productos_alias, public.productos
 -- 4. Búsqueda y similitud (pg_trgm): "¿Quisiste decir TEMPLE BLANCO PATO 25KG?"
 create or replace function public.productos_similares(nombre text, umbral real default 0.8)
 returns table (id uuid, sku text, nombre_display text, nombre_normalizado text, unidad text, similitud real)
-language sql stable security definer set search_path = public, extensions as $$
+language sql stable security definer set search_path = public as $$
   select p.id, p.sku, p.nombre_display, p.nombre_normalizado, p.unidad,
-         greatest(similarity(p.nombre_normalizado, public.normalizar_producto(nombre)),
-                  coalesce((select max(similarity(a.alias_normalizado, public.normalizar_producto(nombre))) from public.productos_alias a where a.producto_id = p.id), 0))::real as similitud
+         greatest(public.similarity(p.nombre_normalizado, public.normalizar_producto(nombre)),
+                  coalesce((select max(public.similarity(a.alias_normalizado, public.normalizar_producto(nombre))) from public.productos_alias a where a.producto_id = p.id), 0))::real as similitud
     from public.productos_maestro p
    where p.activo
-     and (p.nombre_normalizado % public.normalizar_producto(nombre)
-          or exists (select 1 from public.productos_alias a where a.producto_id = p.id and a.alias_normalizado % public.normalizar_producto(nombre))
+     and (p.nombre_normalizado operator(public.%) public.normalizar_producto(nombre)
+          or exists (select 1 from public.productos_alias a where a.producto_id = p.id and a.alias_normalizado operator(public.%) public.normalizar_producto(nombre))
           or p.nombre_normalizado = public.normalizar_producto(nombre))
    order by 6 desc
    limit 5
@@ -235,7 +312,8 @@ grant execute on function public.unificar_productos(uuid, uuid) to authenticated
 
 -- 7. Carga inicial: todos los nombres que ya usa el ERP, agrupados por nombre normalizado
 --    (stock de almacén, REQ, cotizaciones, OC, compras directas y stock de la sucursal)
-create temporary table tmp_nombres (nombre text, unidad text, marca text) on commit drop;
+drop table if exists pg_temp.tmp_nombres;
+create temporary table tmp_nombres (nombre text, unidad text, marca text);
 
 insert into tmp_nombres
 select data->>'nombre', data->>'unidad', null from public.almacen where tipo = 'stock' and coalesce(data->>'nombre', '') <> '';
@@ -370,9 +448,9 @@ begin
   end loop;
 end $$;
 
-commit;
+drop table if exists pg_temp.tmp_nombres;
 
 -- 12. Revisión después de correr: posibles duplicados con distinto nombre (para "Unificar" en Catálogo de productos)
--- select a.sku, a.nombre_normalizado, b.sku, b.nombre_normalizado, round(extensions.similarity(a.nombre_normalizado, b.nombre_normalizado)::numeric, 2) sim
---   from public.productos_maestro a join public.productos_maestro b on a.id < b.id and a.nombre_normalizado operator(extensions.%) b.nombre_normalizado
+-- select a.sku, a.nombre_normalizado, b.sku, b.nombre_normalizado, round(public.similarity(a.nombre_normalizado, b.nombre_normalizado)::numeric, 2) sim
+--   from public.productos_maestro a join public.productos_maestro b on a.id < b.id and a.nombre_normalizado operator(public.%) b.nombre_normalizado
 --  order by sim desc limit 100;
