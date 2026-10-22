@@ -18,11 +18,31 @@ const VISIBLES = 5;
  * Barra lateral derecha fija de notificaciones (todos los módulos), bajo el encabezado.
  * Se abre / cierra con "Notificaciones (n)"; los avisos son los de la campana (lib/notificaciones.ts).
  */
-export function NotificationSidebar({ notifs, vistas, abierta, onToggle }: { notifs: Notificacion[]; vistas: string[]; abierta: boolean; onToggle: () => void }) {
+export function NotificationSidebar({
+  notifs,
+  vistas,
+  abierta,
+  onToggle,
+  enSeccion = [],
+}: {
+  notifs: Notificacion[];
+  vistas: string[];
+  abierta: boolean;
+  onToggle: () => void;
+  /** Tipos que el módulo abierto ya muestra como tarjetas en su sección (Tesorería: requerimientos): no se repiten arriba. */
+  enSeccion?: Notificacion["tipo"][];
+}) {
   const ir = useIr();
   const [todas, setTodas] = useState(false);
   const visto = new Set(vistas);
-  const lista = todas ? notifs : notifs.slice(0, VISIBLES);
+  // Cada aviso una sola vez: sin claves repetidas y sin los que ya tienen su tarjeta abajo
+  const vistos = new Set<string>();
+  const unicas = notifs.filter((n) => {
+    if (vistos.has(n.clave) || enSeccion.includes(n.tipo)) return false;
+    vistos.add(n.clave);
+    return true;
+  });
+  const lista = todas ? unicas : unicas.slice(0, VISIBLES);
 
   const marcar = (clave: string) => {
     const activas = new Set(notifs.map((n) => n.clave));
@@ -56,9 +76,9 @@ export function NotificationSidebar({ notifs, vistas, abierta, onToggle }: { not
           <ChevronsRight className="h-5 w-5 text-gray-400" />
         </button>
 
-        {notifs.length === 0 ? (
+        {unicas.length === 0 ? (
           <p className="flex items-center gap-2 text-[14px] text-gray-400">
-            <BellOff size={16} /> Todo al día
+            <BellOff size={16} /> {notifs.length ? "Los avisos de este módulo están abajo" : "Todo al día"}
           </p>
         ) : (
           <div className="space-y-5">
@@ -84,7 +104,7 @@ export function NotificationSidebar({ notifs, vistas, abierta, onToggle }: { not
           </div>
         )}
 
-        {notifs.length > VISIBLES && (
+        {unicas.length > VISIBLES && (
           <button type="button" onClick={() => setTodas(!todas)} className="mt-8 text-sm text-blue-400 hover:text-blue-300">
             {todas ? "Ver menos" : "Ver todas las notificaciones →"}
           </button>

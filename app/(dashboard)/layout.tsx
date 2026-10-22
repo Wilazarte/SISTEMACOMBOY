@@ -340,7 +340,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </span>
         <span>v3.2.1</span>
       </footer>
-      <NotificationSidebar notifs={notifs} vistas={prefs.notifVistas ?? []} abierta={notifAbierta} onToggle={alternarNotif} />
+      <NotificationSidebar notifs={notifs} vistas={prefs.notifVistas ?? []} abierta={notifAbierta} onToggle={alternarNotif} enSeccion={path === "/dashboard/compras" && veCompras ? ["requerimiento"] : []} />
       <FloatingDock sesion={sesion} tab={tabActiva?.id} />
       <AccionRapida acciones={acciones} />
       <CommandPalette abierto={paleta} onCerrar={() => setPaleta(false)} comandos={comandos} documentos={documentos} />

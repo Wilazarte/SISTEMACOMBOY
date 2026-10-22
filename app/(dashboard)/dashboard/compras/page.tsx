@@ -255,7 +255,9 @@ export default function ComprasPage() {
 // =====================================================================
 // NOTIFICACIONES (cards amarillas)
 // =====================================================================
-function Notificaciones({ pendientes, rol }: { pendientes: Requerimiento[]; rol: Rol }) {
+function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requerimiento[]; rol: Rol }) {
+  // Cada REQ una sola vez (por número), aunque llegue repetido de la caché
+  const pendientes = todosPendientes.filter((r, i, arr) => i === arr.findIndex((x) => x.id === r.id || (!!x.numero && x.numero === r.numero)));
   const [rechazo, setRechazo] = useState<Requerimiento | null>(null);
   const [obs, setObs] = useState<Requerimiento | null>(null);
   const [motivo, setMotivo] = useState("");
