@@ -13,13 +13,10 @@ import {
   MOTIVOS_DERIVACION,
   cerrarVenta,
   cobrarVenta,
-  crearTraslado,
   derivarVenta,
   entregarVenta,
-  esTaller,
   faltantes,
   operaSucursal,
-  prepararDerivacion,
   registrarVenta,
   type ClienteSuc,
   type Derivacion,
@@ -28,7 +25,6 @@ import {
   type StockLocal,
   type Sucursal,
   type TipoDocVenta,
-  type Traslado,
   type VentaSucursal,
 } from "@/lib/sucursal";
 import { Acciones, EstadoSuc, LineasEditor, deLineas, lineaVacia, type LineaEdit } from "./comun";
@@ -75,7 +71,11 @@ export function RegistrarVenta({
         <span className="font-semibold text-fg">{v.docRef}</span>
         <span className="flex items-center gap-1">
           {/* Venta derivada cuya Orden de Despacho ya salió de Arequipa (OT y guía emitidas) */}
-          {v.estado === "derivada" && derivaciones.some((d) => d.ventaId === v.id && d.estado === "convertida") ? <Badge estado="DESPACHADO_AREQUIPA" /> : <EstadoSuc estado={v.estado} />}
+          {(() => {
+            // Venta derivada: muestra cómo va en Arequipa (ENVIADO A VENTAS → EN PRODUCCIÓN NP-0001 → DESPACHADO)
+            const d = v.estado === "derivada" ? derivaciones.find((x) => x.ventaId === v.id && x.estado !== "anulada") : undefined;
+            return d ? <EstadoSuc estado={d.estado} np={d.npNumero} /> : <EstadoSuc estado={v.estado} />;
+          })()}
           {v.requiereTraslado && v.estado === "registrada" && <span className="text-[11px] text-amber-500">sin stock local</span>}
         </span>
       </div>
@@ -362,10 +362,8 @@ const ICONO_MOTIVO: Record<MotivoDerivacion, typeof Wrench> = { PRODUCTO_NO_DISP
 
 export function DerivarTaller({ ventas, derivaciones, preVenta }: { ventas: VentaSucursal[]; derivaciones: Derivacion[]; preVenta?: string }) {
   const opera = operaSucursal();
-  const taller = esTaller();
   const derivables = ventas.filter((v) => v.estado === "registrada");
   const [sel, setSel] = useState<VentaSucursal | null>(null);
-  const [ot, setOt] = useState<Derivacion | null>(null);
   useEffect(() => {
     const v = preVenta ? ventas.find((x) => x.id === preVenta && x.estado === "registrada") : undefined;
     if (v && opera) setSel(v);
@@ -400,7 +398,7 @@ export function DerivarTaller({ ventas, derivaciones, preVenta }: { ventas: Vent
       <Card>
         <CardHeader
           title="Órdenes de despacho en Arequipa"
-          subtitle={taller ? "Taller Principal: marque en preparación y emita la OT con guía de remisión hacia Secocha" : "Cada derivación es una Orden de Despacho en Arequipa (bandeja Despachos de Secocha)"}
+          subtitle="Cada derivación llega a Ventas Arequipa: al aceptarla crea la Nota de Pedido (EN PRODUCCIÓN) y al emitir el traslado pasa a DESPACHADO"
         />
         <Table head={["Fecha", "Venta", "Cliente", "¿Qué necesita?", "Estado", "Acciones"]} empty={orden.length === 0}>
           {orden.map((d) => (
@@ -416,23 +414,10 @@ export function DerivarTaller({ ventas, derivaciones, preVenta }: { ventas: Vent
                 <span className="block truncate text-xs text-plomo-500">{d.detalle || d.productos.map((p) => `${p.cantidad} ${p.producto}`).join(" · ")}</span>
               </Td>
               <Td>
-                <EstadoSuc estado={d.estado} />
+                <EstadoSuc estado={d.estado} np={d.npNumero} />
               </Td>
               <Td>
-                {taller && (d.estado === "pendiente" || d.estado === "en-preparacion") ? (
-                  <Acciones>
-                    {d.estado === "pendiente" && (
-                      <Button size="sm" variant="secondary" onClick={() => ejecutar(() => prepararDerivacion(d.id), `${d.ventaNumero} en preparación`)}>
-                        <Wrench size={14} /> En preparación
-                      </Button>
-                    )}
-                    <Button size="sm" onClick={() => setOt(d)}>
-                      <Truck size={14} /> Convertir en OT
-                    </Button>
-                  </Acciones>
-                ) : (
-                  <span className="text-xs text-plomo-500">{d.estado === "convertida" ? "Despachado por Arequipa (ver Traslados)" : d.estado === "pendiente" ? "Pendiente de despacho en Arequipa" : "En preparación en Arequipa"}</span>
-                )}
+                <span className="text-xs text-plomo-500">{textoDerivacion(d)}</span>
               </Td>
             </tr>
           ))}
@@ -440,10 +425,19 @@ export function DerivarTaller({ ventas, derivaciones, preVenta }: { ventas: Vent
       </Card>
 
       {sel && <ModalDerivar venta={sel} onClose={() => setSel(null)} />}
-      {ot && <ModalOT derivacion={ot} onClose={() => setOt(null)} />}
     </div>
   );
 }
+
+/** Estado de la derivación visto desde Secocha (Ventas Arequipa la acepta como Nota de Pedido). */
+const textoDerivacion = (d: Derivacion): string =>
+  d.estado === "convertida"
+    ? "Despachado por Arequipa (ver Traslados)"
+    : d.estado === "en-produccion"
+      ? `En producción en Arequipa${d.npNumero ? ` · ${d.npNumero}` : ""}`
+      : d.estado === "anulada"
+        ? "Anulada"
+        : "Enviada a Ventas Arequipa (por aceptar)";
 
 function ModalDerivar({ venta, onClose }: { venta: VentaSucursal; onClose: () => void }) {
   const [motivo, setMotivo] = useState<MotivoDerivacion | null>(null);
@@ -452,7 +446,7 @@ function ModalDerivar({ venta, onClose }: { venta: VentaSucursal; onClose: () =>
   const derivar = async () => {
     if (!motivo) return;
     setEnviando(true);
-    const ok = await ejecutarAsync(() => derivarVenta(venta.id, motivo, detalle), `${venta.numero} derivada: Orden de Despacho creada en Arequipa`);
+    const ok = await ejecutarAsync(() => derivarVenta(venta.id, motivo, detalle), `${venta.numero} derivada a Ventas Arequipa`);
     setEnviando(false);
     if (ok) onClose();
   };
@@ -489,54 +483,6 @@ function ModalDerivar({ venta, onClose }: { venta: VentaSucursal; onClose: () =>
           </Button>
           <Button onClick={derivar} disabled={!motivo || enviando}>
             <ArrowRightLeft size={15} /> {enviando ? "Derivando…" : "Derivar"}
-          </Button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
-/** Taller: derivación -> OT + guía de remisión (con los productos de la venta). */
-export function ModalOT({ derivacion, onClose, onEmitido }: { derivacion: Derivacion; onClose: () => void; onEmitido?: (t: Traslado) => void }) {
-  const [transportista, setTransportista] = useState("");
-  const [placa, setPlaca] = useState("");
-  const [guardando, setGuardando] = useState(false);
-  const emitir = async () => {
-    setGuardando(true);
-    let t: Traslado | undefined;
-    const ok = await ejecutarAsync(async () => {
-      t = await crearTraslado({ productos: derivacion.productos, motivoTraslado: "Traslado entre establecimientos de la misma empresa", transportista, placa, derivacionId: derivacion.id });
-    }, `${derivacion.numero ?? derivacion.ventaNumero} despachada: OT y guía de remisión emitidas hacia ${derivacion.sucursal}`);
-    setGuardando(false);
-    if (ok) {
-      if (t) onEmitido?.(t);
-      onClose();
-    }
-  };
-  return (
-    <Modal open onClose={onClose} title={`OT y guía para ${derivacion.numero ?? derivacion.ventaNumero}`}>
-      <div className="space-y-4">
-        <ul className="rounded-lg border border-plomo-200 p-3 text-sm text-fg-2">
-          {derivacion.productos.map((p, i) => (
-            <li key={i}>
-              {p.cantidad} {p.unidad} · {p.producto}
-            </li>
-          ))}
-        </ul>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Transportista">
-            <Input value={transportista} onChange={(e) => setTransportista(e.target.value)} placeholder="Nombre / empresa" />
-          </Field>
-          <Field label="Placa">
-            <Input value={placa} onChange={(e) => setPlaca(e.target.value)} placeholder="ABC-123" />
-          </Field>
-        </div>
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button onClick={emitir} disabled={guardando}>
-            <Truck size={15} /> {guardando ? "Emitiendo…" : "Emitir OT y guía"}
           </Button>
         </div>
       </div>

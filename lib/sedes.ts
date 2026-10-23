@@ -22,7 +22,7 @@ export interface Sede {
 
 export type RolSede = "admin_sede" | "vendedor" | "cajero";
 
-interface EstadoSedes {
+export interface EstadoSedes {
   listo: boolean;
   error: string;
   sedes: Sede[];

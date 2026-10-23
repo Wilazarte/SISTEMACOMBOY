@@ -529,7 +529,26 @@ export interface LineaVenta {
   total: number; // sin IGV
 }
 
-export type EstadoNP = "PENDIENTE" | "APROBADA" | "FACTURADA" | "ANULADA";
+/** PENDIENTE_COSTEO: NP creada al aceptar un requerimiento / derivación de Secocha; Ventas pone los costos y pasa a PENDIENTE. */
+export type EstadoNP = "PENDIENTE_COSTEO" | "PENDIENTE" | "APROBADA" | "FACTURADA" | "ANULADA";
+
+/** Documento de Secocha que originó la NP (y su OD): REQ-SECOCHA o venta derivada. */
+export interface OrigenSecocha {
+  tipo: "REQ" | "DERIVACION";
+  /** id de la fila en la tabla sucursal (req / derivacion). */
+  id: string;
+  /** REQ-SECOCHA-001 · OD-VTA-SEC-001-2026 */
+  numero: string;
+  sede: string;
+}
+
+/** Costeo de la NP de Secocha: la suma es el subtotal (sin IGV) que se reparte entre las líneas. */
+export interface CostosNP {
+  produccion: number;
+  materiales: number;
+  manoObra: number;
+  utilidad: number;
+}
 
 export interface NotaPedido {
   id: string;
@@ -560,6 +579,11 @@ export interface NotaPedido {
   odId?: string;
   odNumero?: string;
   despacho?: DatosDespacho;
+  /** Secocha: origen=SECOCHA, origenId = número del documento (REQ-SECOCHA-001) y sus costos. */
+  origen?: "SECOCHA";
+  origenId?: string;
+  origenSecocha?: OrigenSecocha;
+  costos?: CostosNP;
   historial: EventoHistorial[];
   editadoPor?: string;
   editadoEn?: string;
@@ -741,6 +765,10 @@ export interface OrdenDespacho {
   fotoGuia?: ArchivoAdjunto;
   /** false hasta que Almacén abre la pestaña: campana "nueva orden". */
   vistoAlmacen?: boolean;
+  /** OD de una NP de Secocha: se atiende con OT + guía de remisión (traslado a Secocha). */
+  origenSecocha?: OrigenSecocha;
+  trasladoId?: string;
+  trasladoCodigo?: string;
   postVentaStatus?: string | null; // reservado
   actualizado?: string;
 }

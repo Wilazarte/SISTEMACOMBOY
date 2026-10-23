@@ -31,12 +31,10 @@ import { pdfActaIngreso, pdfRequerimiento } from "@/lib/pdf";
 import type { EstadoReq, Factura, Guia, MovimientoKardex, OrdenCompra, OrdenDespacho, Requerimiento, Rol, StockItem } from "@/lib/types";
 import { OrdenesDespacho } from "./despacho";
 import { EquiposTerminados } from "@/components/almacen/EquiposTerminados";
-import { DespachosSecocha } from "@/components/almacen/DespachosSecocha";
-import type { Derivacion } from "@/lib/sucursal-modelos";
 import { StockAlmacen } from "@/components/almacen/StockAlmacen";
 import { estadoOD } from "@/lib/ventas";
 
-type Tab = "nuevo" | "lista" | "ingresos" | "stock" | "despacho" | "despachos-secocha";
+type Tab = "nuevo" | "lista" | "ingresos" | "stock" | "despacho";
 
 
 export default function AlmacenPage() {
@@ -48,14 +46,12 @@ export default function AlmacenPage() {
   const guias = useStore<Guia[]>(KEYS.GUIAS, []);
   const stock = useStore<StockItem[]>(KEYS.STOCK, []);
   const despachos = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, []);
-  const despachosSecocha = useStore<Derivacion[]>(KEYS.SUC_DERIVACIONES, []).filter((d) => d.estado === "pendiente" || d.estado === "en-preparacion").length;
   // Al entrar solo se ve la lista: el formulario se abre con "Nuevo requerimiento" en la isla
   const [tab, setTab] = useState<Tab>("lista");
 
   // Campana "nueva orden de despacho": /dashboard/almacen?tab=despacho (o evento si ya está en la página)
   useEffect(() => {
-    const pedida = new URLSearchParams(window.location.search).get("tab");
-    if (pedida === "despacho" || pedida === "despachos-secocha") setTab(pedida);
+    if (new URLSearchParams(window.location.search).get("tab") === "despacho") setTab("despacho");
     const ir = () => setTab("despacho");
     window.addEventListener("erp:ir-despacho", ir);
     return () => window.removeEventListener("erp:ir-despacho", ir);
@@ -92,8 +88,6 @@ export default function AlmacenPage() {
             icon: <Truck size={16} />,
             count: despachos.filter((o) => estadoOD(o) === "PENDIENTE" || estadoOD(o) === "PEDIDO_ALISTADO").length,
           },
-          // Ventas derivadas desde Secocha: Orden de Despacho directa (OT + guía de remisión)
-          { id: "despachos-secocha", label: "Despachos de Secocha", icon: <Truck size={16} />, count: despachosSecocha },
         ]}
       />
 
@@ -107,7 +101,6 @@ export default function AlmacenPage() {
       )}
       {tab === "stock" && <Stock stock={stock} rol={rol} onIrDespacho={() => setTab("despacho")} />}
       {tab === "despacho" && <OrdenesDespacho />}
-      {tab === "despachos-secocha" && <DespachosSecocha />}
     </div>
   );
 }

@@ -45,7 +45,7 @@ export function Requerimientos({ reqs, stock }: { reqs: ReqSucursal[]; stock: St
       <div className="flex flex-col gap-1">
         <span className="font-semibold text-fg">{r.numero}</span>
         <span>
-          <EstadoSuc estado={r.estado} />
+          <EstadoSuc estado={r.estado} np={r.npNumero} />
         </span>
         <span className="max-w-[320px] truncate text-[11px] text-plomo-500" title={r.motivo}>
           {r.motivo}
@@ -64,7 +64,15 @@ export function Requerimientos({ reqs, stock }: { reqs: ReqSucursal[]; stock: St
           </Button>
         ) : (
           <span className="text-xs text-plomo-500">
-            {r.estado === "cerrado" ? "Recibido en Secocha" : r.estado === "en-traslado" ? "Ver Traslados" : r.estado === "aprobado" ? "Aprobado por Producción" : "En Producción Arequipa"}
+            {r.estado === "cerrado"
+              ? "Recibido en Secocha"
+              : r.estado === "en-traslado"
+                ? "Ver Traslados"
+                : r.estado === "aceptado"
+                  ? `En producción en Arequipa${r.npNumero ? ` · ${r.npNumero}` : ""}`
+                  : r.estado === "aprobado"
+                    ? "Aprobado por Producción"
+                    : "Enviado a Ventas Arequipa (por aceptar)"}
           </span>
         )}
       </Acciones>
@@ -77,7 +85,7 @@ export function Requerimientos({ reqs, stock }: { reqs: ReqSucursal[]; stock: St
       <Card>
         <CardHeader
           title="Requerimientos de la sucursal"
-          subtitle={`${reqs.filter((r) => r.estado !== "cerrado").length} en curso · Requerimiento → Producción Arequipa (aprobar) → Orden de Traslado con guía → Secocha`}
+          subtitle={`${reqs.filter((r) => r.estado !== "cerrado").length} en curso · Requerimiento → Ventas Arequipa (Nota de Pedido) → Orden de Traslado con guía → Secocha`}
           action={opera ? <BotonNuevo abierto={showForm} onClick={() => setShowForm(!showForm)} label="Nuevo requerimiento" /> : undefined}
         />
         <ListaDocs filas={filas} tipo="requerimientos" />
@@ -97,8 +105,8 @@ function FormReq({ numeroProbable, onListo }: { numeroProbable: string; onListo:
       numeroProbable={numeroProbable}
       solicitanteInicial={sesion ? nombreDe(sesion) : ""}
       modulo="Secocha · Requerimiento"
-      textoEnviar="Enviar a Producción Arequipa"
-      mensajeOk={`Requerimiento enviado al ${DESTINO_REQ_SUCURSAL}`}
+      textoEnviar="Enviar a Ventas Arequipa"
+      mensajeOk={`Requerimiento enviado a ${DESTINO_REQ_SUCURSAL}`}
       onEnviar={(d) =>
         crearReqSucursal(
           d.items.map((i) => ({ producto: i.nombre, cantidad: i.cantidad, unidad: i.unidad, marca: i.marca, caracteristica: i.caracteristica })),

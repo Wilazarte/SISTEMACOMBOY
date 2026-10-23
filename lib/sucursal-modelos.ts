@@ -107,12 +107,15 @@ export interface ProductoTraslado {
   caracteristica?: string;
 }
 
-/** pendiente = PENDIENTE_DESPACHO en Arequipa · convertida = DESPACHADO POR AREQUIPA (OT y guía emitidas). */
-export type EstadoDerivacion = "pendiente" | "en-preparacion" | "convertida" | "anulada";
+/**
+ * pendiente / en-preparacion = en la bandeja "Requerimientos de Secocha" de Ventas Arequipa · en-produccion = aceptada
+ * (Nota de Pedido NP-0001) · convertida = DESPACHADO (Arequipa emitió la OT y guía de traslado).
+ */
+export type EstadoDerivacion = "pendiente" | "en-preparacion" | "en-produccion" | "convertida" | "anulada";
 
 /**
- * Derivación de una venta de Secocha = Orden de Despacho directa en Arequipa (bandeja "Despachos de Secocha"
- * del Almacén / Taller Principal). Se crea al derivar, sin pasos intermedios.
+ * Derivación de una venta de Secocha: llega a Ventas Arequipa (bandeja "Requerimientos de Secocha"); al aceptarla se
+ * crea la Nota de Pedido (PENDIENTE_COSTEO) y sigue el flujo NP → Orden de Despacho → OT + guía → Secocha.
  */
 export interface Derivacion {
   id: string;
@@ -132,6 +135,9 @@ export interface Derivacion {
   sedeId?: string;
   productos: ProductoTraslado[];
   estado: EstadoDerivacion;
+  /** Nota de pedido de Ventas Arequipa al aceptarla (EN PRODUCCIÓN NP-0001). */
+  npId?: string;
+  npNumero?: string;
   trasladoId?: string;
   creadoPor: string;
 }
@@ -167,12 +173,15 @@ export interface Traslado {
   emitidoPor: string;
 }
 
-/** enviado = en Producción Arequipa · aprobado = APROBADO_PRODUCCION · en-traslado = Orden de Traslado emitida. */
-export type EstadoReqSuc = "enviado" | "aprobado" | "en-traslado" | "cerrado";
+/**
+ * enviado = en Ventas Arequipa · aceptado = EN PRODUCCIÓN (Nota de Pedido NP-0001) · en-traslado = OT emitida ·
+ * cerrado = recibido en Secocha. aprobado: REQ antiguos (aprobados por Producción).
+ */
+export type EstadoReqSuc = "enviado" | "aprobado" | "aceptado" | "en-traslado" | "cerrado";
 
 /**
- * REQ-SECOCHA: lo atiende solo Producción Arequipa (Aprobar → Emitir Orden de Traslado). Ya no pasa por
- * Almacén ni Tesorería (los REQ antiguos siguen en compras con origen SUCURSAL).
+ * REQ-SECOCHA: llega como notificación a Ventas Arequipa ([Aceptar] → Nota de Pedido con costos). No pasa por
+ * Producción ni Tesorería (los REQ antiguos siguen en compras con origen SUCURSAL).
  */
 export interface ReqSucursal {
   id: string;
@@ -184,6 +193,10 @@ export interface ReqSucursal {
   fechaAprobacion?: string;
   items: ProductoTraslado[];
   estado: EstadoReqSuc;
+  /** Nota de pedido de Ventas Arequipa al aceptarlo (EN PRODUCCIÓN NP-0001). */
+  npId?: string;
+  npNumero?: string;
+  aceptadoPor?: string;
   automatico: boolean;
   trasladoId?: string;
   sucursalId: string;

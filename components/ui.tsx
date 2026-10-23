@@ -174,6 +174,8 @@ const TONO_ESTADO: Record<string, Tono> = {
   DESPACHADO_AREQUIPA: "verde",
   EN_PRODUCCION: "ambar",
   APROBADO_PRODUCCION: "info",
+  ENVIADO_VENTAS: "info",
+  PENDIENTE_COSTEO: "ambar",
   POR_COBRAR: "rojo",
   BAJO_MINIMO: "rojo",
   FRECUENTE: "verde",
@@ -204,9 +206,11 @@ const ETIQUETA: Record<string, string> = {
   EN_TRASLADO: "EN TRASLADO",
   CONVERTIDA: "CON OT",
   PENDIENTE_DESPACHO: "PENDIENTE DESPACHO",
-  DESPACHADO_AREQUIPA: "DESPACHADO POR AREQUIPA",
-  EN_PRODUCCION: "EN PRODUCCIÓN AREQUIPA",
+  DESPACHADO_AREQUIPA: "DESPACHADO",
+  EN_PRODUCCION: "EN PRODUCCIÓN",
   APROBADO_PRODUCCION: "APROBADO PRODUCCIÓN",
+  ENVIADO_VENTAS: "ENVIADO A VENTAS AREQUIPA",
+  PENDIENTE_COSTEO: "PENDIENTE COSTEO",
   POR_COBRAR: "POR COBRAR",
   BAJO_MINIMO: "BAJO MÍNIMO",
 };
@@ -305,7 +309,7 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
     return () => window.removeEventListener("keydown", esc);
   }, [open, onClose]);
   if (!open) return null;
-  return (
+  const modal = (
     <div className="fixed inset-0 z-50 flex animate-velo items-start justify-center overflow-y-auto bg-black/50 p-4 pt-[6vh] backdrop-blur-[2px]" onMouseDown={onClose}>
       <div
         role="dialog"
@@ -324,6 +328,10 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
       </div>
     </div>
   );
+  // Fuera de las tarjetas: su backdrop-blur hace de contenedor del "fixed" y recortaba el modal. Se monta en la
+  // raíz del tema (ModuloLayout, .tema-azul) para conservar sus colores; sin ella, en el body.
+  const raiz = typeof document === "undefined" ? null : (document.querySelector(".tema-azul") ?? document.body);
+  return raiz ? createPortal(modal, raiz) : modal;
 }
 
 // ---------------------------------------------------------------- Table

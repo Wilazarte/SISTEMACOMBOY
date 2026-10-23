@@ -18,18 +18,26 @@ const BADGE: Record<EstadoVenta | EstadoTraslado | EstadoDerivacion | EstadoReqS
   "en-camino": "EN_CAMINO",
   recibido: "RECIBIDO",
   observado: "OBSERVADO",
-  // Derivación = Orden de Despacho en Arequipa
-  pendiente: "PENDIENTE_DESPACHO",
+  // Derivación: Ventas Arequipa la acepta (Nota de Pedido) y la despacha con OT + guía
+  pendiente: "ENVIADO_VENTAS",
   "en-preparacion": "EN_PREPARACION",
+  "en-produccion": "EN_PRODUCCION",
   convertida: "DESPACHADO_AREQUIPA",
   anulada: "ANULADA",
-  // REQ-SECOCHA en Producción Arequipa
-  enviado: "EN_PRODUCCION",
+  // REQ-SECOCHA: Ventas Arequipa -> Nota de Pedido -> Orden de Traslado
+  enviado: "ENVIADO_VENTAS",
   aprobado: "APROBADO_PRODUCCION",
+  aceptado: "EN_PRODUCCION",
   "en-traslado": "EN_TRASLADO",
   cerrado: "CERRADO",
 };
-export const EstadoSuc = ({ estado }: { estado: keyof typeof BADGE }) => <Badge estado={BADGE[estado] ?? estado.toUpperCase()} />;
+/** Estado de Secocha; con np se muestra al lado: EN PRODUCCIÓN · NP-0001. */
+export const EstadoSuc = ({ estado, np }: { estado: keyof typeof BADGE; np?: string }) => (
+  <span className="inline-flex flex-wrap items-center gap-1.5">
+    <Badge estado={BADGE[estado] ?? estado.toUpperCase()} />
+    {np && <span className="text-[11px] font-semibold text-plomo-500">{np}</span>}
+  </span>
+);
 
 /** Tarjeta de indicador (Caja Chica, Stock, Reportes). */
 export function Indicador({ label, valor, detalle, alerta, icon }: { label: string; valor: string; detalle?: string; alerta?: boolean; icon?: ReactNode }) {

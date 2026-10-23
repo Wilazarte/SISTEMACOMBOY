@@ -26,6 +26,7 @@ import {
   uid,
 } from "./storage";
 import { disponibleEquipo, equipoDeLinea, marcarEquiposVendidos, sedeEquipo } from "./equipos";
+import { getDerivaciones, getReqsSuc, getSucursal, marcarAceptadoVentas, type ProductoTraslado, type Traslado } from "./sucursal";
 import { asientoAjusteVenta, asientoDe, asientoNotaPedido, esAsientoContable, revertirAsiento, revertirAsientoId } from "./contable";
 import type {
   AsientoContable,
@@ -33,6 +34,7 @@ import type {
   CobroVenta,
   ComprobanteVenta,
   CondicionPago,
+  CostosNP,
   Cuota,
   DatosDespacho,
   LugarEntrega,
@@ -43,6 +45,7 @@ import type {
   MovimientoDespacho,
   NotaPedido,
   OrdenDespacho,
+  OrigenSecocha,
   Rol,
   TipoComprobanteVenta,
   TipoDocCliente,
@@ -309,6 +312,7 @@ export async function crearNotaPedido(data: DatosNP, vendedor: string, rol: Rol)
  */
 export function permisoEditarNP(n: NotaPedido, sesion: { usuario: string; rol: string; soloLectura: boolean } | null): { ok: boolean; motivo: string } {
   if (n.estado === "ANULADA") return { ok: false, motivo: "Documento anulado: solo ver" };
+  if (n.origen === "SECOCHA") return { ok: false, motivo: "Nota de pedido de Secocha: se modifica con Costear" };
   if (n.estado !== "PENDIENTE") return { ok: false, motivo: "Documento ya procesado (tiene orden de despacho y asiento): anule y duplique" };
   if (!sesion || sesion.soloLectura) return { ok: false, motivo: "Su usuario es de solo lectura" };
   if (sesion.rol === "creador" || n.vendedor === sesion.usuario) return { ok: true, motivo: "" };
@@ -418,6 +422,7 @@ async function crearODdeNP(np: NotaPedido, datos: DatosDespacho, usuario: string
     npNumero: np.numero,
     comprobanteId: comp?.id,
     comprobanteNumero: comp?.numero,
+    origenSecocha: np.origenSecocha,
     evento: nuevoEvento(rol, "Orden de despacho generada", `${estado === "Aprobada" ? "Al aprobar" : "Desde"} ${np.numero} · ${resumenDespacho(despacho)}`),
   });
   await esperarGuardado(); // descarta errores anteriores
@@ -442,8 +447,9 @@ async function crearODdeNP(np: NotaPedido, datos: DatosDespacho, usuario: string
     historial: [...n.historial, nuevoEvento(rol, estado === "Aprobada" ? "Aprobada" : "Orden de despacho generada", `Orden de despacho ${od.numero} enviada a Almacén`)],
   }));
   if (comp) escribir(KEYS.COMPROBANTES, getComprobantes().map((c) => (c.id === comp.id ? { ...c, odId: od.id, odNumero: od.numero, despacho } : c)));
-  // Contable: venta aprobada -> DEBE 1212 Clientes / HABER 70 Ventas + 40 IGV (si aún no tiene asiento de venta)
-  if (estado === "Aprobada") asientoNotaPedido(np, usuario);
+  // Contable: venta aprobada -> DEBE 1212 Clientes / HABER 70 Ventas + 40 IGV (si aún no tiene asiento de venta).
+  // Secocha no: es un traslado entre sedes (la venta, si la hay, ya se registró en Secocha).
+  if (estado === "Aprobada" && np.origen !== "SECOCHA") asientoNotaPedido(np, usuario);
   return od;
 }
 
@@ -463,6 +469,7 @@ function armarOD(d: {
   npNumero?: string;
   comprobanteId?: string;
   comprobanteNumero?: string;
+  origenSecocha?: OrigenSecocha;
 }): OrdenDespacho {
   return {
     id: uid(),
@@ -492,6 +499,7 @@ function armarOD(d: {
     encargadoTelefono: d.despacho.encargadoTelefono || undefined,
     creadoPor: d.creadoPor,
     vistoAlmacen: false, // campana de Almacén: "1 nueva orden"
+    origenSecocha: d.origenSecocha,
     postVentaStatus: null,
     actualizado: new Date().toISOString(),
   };
@@ -499,6 +507,144 @@ function armarOD(d: {
 
 /** Venta de origen de la OD: NP y/o comprobante. */
 export const origenOD = (o: OrdenDespacho): string => [o.npNumero, o.comprobanteNumero].filter(Boolean).join(" · ") || "-";
+
+// ---------------------------------------------------------------------
+// Secocha -> Ventas Arequipa: REQ-SECOCHA y ventas derivadas se aceptan como Nota de Pedido
+// [Aceptar] -> NP PENDIENTE_COSTEO -> costos -> PENDIENTE -> Aprobar (OD a Secocha) -> OT + guía -> traslado
+// ---------------------------------------------------------------------
+
+/** Línea de la NP desde un producto de Secocha (sin precio: se pone al costear). */
+const lineaDeSecocha = (p: ProductoTraslado & { marca?: string; caracteristica?: string }): LineaVenta => ({
+  ...lineaVacia(),
+  productoNombre: p.producto,
+  descripcion: [p.producto, p.marca, p.caracteristica].filter(Boolean).join(" · "),
+  unidad: p.unidad || "UND",
+  cantidad: Number(p.cantidad) || 0,
+});
+
+export const costosVacios = (): CostosNP => ({ produccion: 0, materiales: 0, manoObra: 0, utilidad: 0 });
+export const totalCostos = (c: CostosNP): number => r2((Number(c.produccion) || 0) + (Number(c.materiales) || 0) + (Number(c.manoObra) || 0) + (Number(c.utilidad) || 0));
+
+/**
+ * [Aceptar] en "Requerimientos de Secocha": crea la Nota de Pedido (origen=SECOCHA, origenId=REQ-SECOCHA-001,
+ * estado PENDIENTE_COSTEO, lugar de entrega Secocha) y el REQ / derivación pasa a EN PRODUCCIÓN con el N° de NP.
+ */
+export async function aceptarSecocha(tipo: OrigenSecocha["tipo"], id: string, vendedor: string, rol: Rol): Promise<NotaPedido> {
+  if (!puede(rol, "venta.gestionar")) throw new ErpError("Su usuario no puede aceptar requerimientos de Secocha.");
+  const req = tipo === "REQ" ? getReqsSuc().find((x) => x.id === id) : undefined;
+  const der = tipo === "DERIVACION" ? getDerivaciones().find((x) => x.id === id) : undefined;
+  if (!req && !der) throw new ErpError("Requerimiento de Secocha no encontrado.");
+  if (req && req.estado !== "enviado" && req.estado !== "aprobado") throw new ErpError(`El ${req.numero} ya fue aceptado${req.npNumero ? ` (${req.npNumero})` : ""}.`);
+  if (der && der.estado !== "pendiente" && der.estado !== "en-preparacion") throw new ErpError(`La ${der.numero ?? der.ventaNumero} ya fue aceptada${der.npNumero ? ` (${der.npNumero})` : ""}.`);
+  const sede = der?.sucursal || getSucursal().nombre;
+  const origen: OrigenSecocha = req
+    ? { tipo, id, numero: req.numero, sede }
+    : { tipo, id, numero: der!.numero ?? `OD-${der!.ventaNumero}`, sede };
+  const items = (req ? req.items : der!.productos).map(lineaDeSecocha).filter((l) => l.cantidad > 0);
+  if (items.length === 0) throw new ErpError(`${origen.numero} no tiene productos.`);
+  const numero = await siguienteNumero("NP");
+  const np: NotaPedido = {
+    id: uid(),
+    numero,
+    fecha: hoy(),
+    clienteId: "",
+    // REQ: el solicitante de Secocha (VTA-SEC-001-2026 WILLIAMS LAZARTE) · derivación: el cliente de la venta
+    cliente: (req ? req.solicitante || req.creadoPor : der!.cliente) || sede,
+    clienteDoc: "",
+    condPagoId: "",
+    condPagoNombre: "Traslado interno",
+    validezDias: 15,
+    fechaEntrega: "",
+    lugarObra: sede,
+    vendedor,
+    items,
+    conIgv: false,
+    descuento: 0,
+    subtotal: 0,
+    igv: 0,
+    total: 0,
+    estado: "PENDIENTE_COSTEO",
+    observaciones: req ? `${req.numero}: ${req.motivo}` : `${origen.numero} · venta ${der!.ventaNumero}${der!.detalle ? ` · ${der!.detalle}` : ""}`,
+    despacho: { ...despachoVacio(), lugar: "SECOCHA", direccionDestino: sede },
+    origen: "SECOCHA",
+    origenId: origen.numero,
+    origenSecocha: origen,
+    costos: costosVacios(),
+    historial: [nuevoEvento(rol, "Aceptada de Secocha", `${origen.numero} · ${vendedor} · pendiente de costeo`)],
+  };
+  escribir(KEYS.NOTAS_PEDIDO, [np, ...getNotasPedido()]);
+  marcarAceptadoVentas(tipo, id, { id: np.id, numero });
+  return np;
+}
+
+/**
+ * Costeo de la NP de Secocha: producción + materiales + mano de obra + utilidad = subtotal (sin IGV), repartido
+ * entre las líneas según su cantidad. Queda PENDIENTE para Aprobar (Orden de Despacho a Secocha).
+ */
+export function guardarCostosNP(id: string, costos: CostosNP, rol: Rol): NotaPedido {
+  if (!puede(rol, "venta.gestionar")) throw new ErpError("Su usuario no puede costear notas de pedido.");
+  const c: CostosNP = { produccion: r2(Number(costos.produccion) || 0), materiales: r2(Number(costos.materiales) || 0), manoObra: r2(Number(costos.manoObra) || 0), utilidad: r2(Number(costos.utilidad) || 0) };
+  if (Object.values(c).some((v) => v < 0)) throw new ErpError("Los costos no pueden ser negativos.");
+  const base = totalCostos(c);
+  if (!(base > 0)) throw new ErpError("Ingrese los costos: el total debe ser mayor a 0.");
+  let editada!: NotaPedido;
+  actualizarNP(id, (n) => {
+    if (n.origen !== "SECOCHA") throw new ErpError(`La ${n.numero} no viene de Secocha.`);
+    if (n.estado !== "PENDIENTE_COSTEO" && n.estado !== "PENDIENTE") throw new ErpError(`La ${n.numero} está ${n.estado}: ya no se puede costear.`);
+    const unidades = n.items.reduce((a, l) => a + (l.m2 > 0 ? l.m2 : l.cantidad), 0) || 1;
+    let resto = base;
+    const items = n.items.map((l, i) => {
+      const q = l.m2 > 0 ? l.m2 : l.cantidad;
+      const totalLinea = i === n.items.length - 1 ? r2(resto) : r2((base * q) / unidades);
+      resto = r2(resto - totalLinea);
+      return calcularLinea({ ...l, precio: q > 0 ? totalLinea / q : 0 });
+    });
+    const t = totalesVenta(items, n.conIgv, n.descuento);
+    editada = {
+      ...n,
+      items,
+      costos: c,
+      subtotal: t.base,
+      igv: t.igv,
+      total: t.total,
+      estado: "PENDIENTE",
+      historial: [...n.historial, nuevoEvento(rol, "Costeo", `Producción ${c.produccion.toFixed(2)} · Materiales ${c.materiales.toFixed(2)} · Mano de obra ${c.manoObra.toFixed(2)} · Utilidad ${c.utilidad.toFixed(2)} = ${base.toFixed(2)}`)],
+    };
+    return editada;
+  });
+  return editada;
+}
+
+/**
+ * Almacén emitió la OT + guía de remisión de una OD de Secocha: descuenta el stock de la sede de salida y la deja
+ * PEDIDO_ENTREGADO (trasladada a Secocha, sin firma: la recepción la confirma Secocha en Traslados).
+ */
+export function cerrarODSecocha(id: string, mov: Omit<MovimientoDespacho, "fecha">, traslado: Traslado, rol: Rol): OrdenDespacho {
+  soloAlmacen(rol);
+  const od = getDespachos().find((o) => o.id === id);
+  if (!od) throw new ErpError("Orden de despacho no encontrada.");
+  if (!od.origenSecocha) throw new ErpError(`La ${od.numero} no es de Secocha.`);
+  let o = od;
+  if (od.items.some((l) => pendienteLinea(l) > 0) && mov.lineas.some((l) => l.cantidad > 0)) o = registrarDespacho(id, { ...mov, guiaRemision: traslado.guiaRemision }, rol);
+  const total = o.items.every((l) => pendienteLinea(l) <= 0);
+  let actualizada!: OrdenDespacho;
+  actualizarOD(id, (x) => {
+    actualizada = {
+      ...x,
+      estado: total ? "PEDIDO_ENTREGADO" : "PEDIDO_ALISTADO",
+      vistoAlmacen: true,
+      atendidoPor: mov.responsable.trim() || x.atendidoPor,
+      guiaNro: traslado.guiaRemision,
+      recibidoPor: `Traslado ${traslado.codigo} a ${od.origenSecocha!.sede}`,
+      trasladoId: traslado.id,
+      trasladoCodigo: traslado.codigo,
+      actualizado: new Date().toISOString(),
+      historial: [...x.historial, nuevoEvento(rol, "Trasladado a Secocha", `${traslado.codigo} · guía ${traslado.guiaRemision}${total ? "" : " · parcial"}`)],
+    };
+    return actualizada;
+  });
+  return actualizada;
+}
 
 export function anularNP(id: string, motivo: string, rol: Rol): void {
   if (!motivo.trim()) throw new ErpError("Indique el motivo de la anulación.");

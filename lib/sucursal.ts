@@ -63,8 +63,8 @@ type SerieSuc = "VTA" | "REQSUC" | "GE" | "CC" | "OT" | "GR";
 const nombreSerie = (nombre: string): string =>
   nombre.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "") || "SUC";
 
-/** Destino de los requerimientos de Secocha: solo Producción Arequipa (Planta Principal). */
-export const DESTINO_REQ_SUCURSAL = "Producción Arequipa (Planta Principal)";
+/** Destino de los requerimientos de Secocha: Ventas Arequipa (Planta Principal), que los acepta como Nota de Pedido. */
+export const DESTINO_REQ_SUCURSAL = "Ventas Arequipa (Planta Principal)";
 
 async function siguienteSuc(serie: SerieSuc): Promise<string> {
   // Cada sede numera aparte (la base fuerza la sede del usuario de sede); OT y guías: un solo correlativo del Taller
@@ -302,12 +302,20 @@ function aplicarLocal<T extends { id: string }>(key: (typeof KEYS)[keyof typeof 
   escribir(key, lista.some((x) => x.id === fila.id) ? lista.map((x) => (x.id === fila.id ? fila : x)) : [fila, ...lista]);
 }
 
-export function prepararDerivacion(id: string): void {
-  exigir(esTaller(), "Solo el Taller Principal prepara derivaciones.");
-  const lista = getDerivaciones();
-  const d = lista.find((x) => x.id === id);
-  exigir(!!d && d.estado === "pendiente", "La derivación ya fue atendida.");
-  escribirSede(KEYS.SUC_DERIVACIONES, lista.map((x) => (x.id === id ? { ...x, estado: "en-preparacion" as const } : x)));
+/**
+ * Ventas Arequipa aceptó el REQ-SECOCHA o la derivación: queda EN PRODUCCIÓN con su Nota de Pedido
+ * (la NP la crea lib/ventas.ts › aceptarSecocha).
+ */
+export function marcarAceptadoVentas(tipo: "REQ" | "DERIVACION", id: string, np: { id: string; numero: string }): void {
+  if (tipo === "REQ") {
+    const r = getReqsSuc().find((x) => x.id === id);
+    exigir(!!r && (r.estado === "enviado" || r.estado === "aprobado"), "El requerimiento ya fue aceptado.");
+    escribirSede(KEYS.SUC_REQS, getReqsSuc().map((x) => (x.id === id ? { ...x, estado: "aceptado" as const, npId: np.id, npNumero: np.numero, aceptadoPor: usuario() } : x)));
+    return;
+  }
+  const d = getDerivaciones().find((x) => x.id === id);
+  exigir(!!d && (d.estado === "pendiente" || d.estado === "en-preparacion"), "La derivación ya fue aceptada.");
+  escribirSede(KEYS.SUC_DERIVACIONES, getDerivaciones().map((x) => (x.id === id ? { ...x, estado: "en-produccion" as const, npId: np.id, npNumero: np.numero } : x)));
 }
 
 // ---------------------------------------------------------------------
@@ -331,7 +339,7 @@ export async function crearTraslado(d: DatosTraslado): Promise<Traslado> {
   const der = d.derivacionId ? getDerivaciones().find((x) => x.id === d.derivacionId) : undefined;
   if (d.derivacionId) exigir(!!der && der.estado !== "convertida" && der.estado !== "anulada", "La derivación ya tiene OT.");
   const req = d.reqId ? getReqsSuc().find((x) => x.id === d.reqId) : undefined;
-  if (d.reqId) exigir(!!req && (req.estado === "enviado" || req.estado === "aprobado"), "El requerimiento ya tiene traslado.");
+  if (d.reqId) exigir(!!req && (req.estado === "enviado" || req.estado === "aprobado" || req.estado === "aceptado"), "El requerimiento ya tiene traslado.");
 
   const suc = getSucursal();
   const codigo = await siguienteSuc("OT");
@@ -401,7 +409,7 @@ export function observarTraslado(id: string, tipo: "FALTANTE" | "DANADO", detall
 }
 
 // ---------------------------------------------------------------------
-// 4. Requerimientos REQ-SECOCHA -> Almacén del Taller Principal (Arequipa)
+// 4. Requerimientos REQ-SECOCHA -> Ventas Arequipa (Nota de Pedido)
 // ---------------------------------------------------------------------
 
 /** Producto del requerimiento (el formulario único RequerimientoForm también manda marca y característica). */
@@ -421,7 +429,7 @@ export async function crearReqSucursal(
   const sesion = getSesion();
   const suc = getSucursal();
   const numero = await siguienteSuc("REQSUC");
-  // Solo a Producción Arequipa: ya no se escribe en compras (Almacén / Tesorería no lo reciben ni se les notifica)
+  // Solo a Ventas Arequipa (notificación + bandeja): ya no se escribe en compras ni llega a Producción / Tesorería
   const local: ReqSucursal = {
     id: uid(),
     numero,
@@ -436,14 +444,6 @@ export async function crearReqSucursal(
   };
   escribirSede(KEYS.SUC_REQS, [local, ...getReqsSuc()]);
   return local;
-}
-
-/** Producción Arequipa aprueba el REQ-SECOCHA (APROBADO_PRODUCCION): luego emite la Orden de Traslado. */
-export function aprobarReqSucursal(id: string): void {
-  exigir(esTaller(), "Solo Producción Arequipa aprueba los requerimientos de Secocha.");
-  const r = getReqsSuc().find((x) => x.id === id);
-  exigir(!!r && r.estado === "enviado", "El requerimiento ya fue atendido.");
-  escribirSede(KEYS.SUC_REQS, getReqsSuc().map((x) => (x.id === id ? { ...x, estado: "aprobado" as const, aprobadoPor: usuario(), fechaAprobacion: hoy() } : x)));
 }
 
 /** REQ-SECOCHA como Requerimiento: el PDF sale con el mismo TEMPLATE_UNIFICADO que los REQ de Arequipa. */
@@ -466,7 +466,7 @@ export function reqDeSucursal(r: ReqSucursal, sede = getSucursal().nombre): Requ
       productoId: i.productoMaestroId,
       sku: i.sku,
     })),
-    estado: ({ enviado: "PENDIENTE", aprobado: "APROBADO_PRODUCCION", "en-traslado": "EN_TRASLADO", cerrado: "FINALIZADO" } as const)[r.estado] as Requerimiento["estado"],
+    estado: ({ enviado: "PENDIENTE", aprobado: "APROBADO_PRODUCCION", aceptado: "EN_PRODUCCION", "en-traslado": "EN_TRASLADO", cerrado: "FINALIZADO" } as const)[r.estado] as Requerimiento["estado"],
     historial: [],
     origen: "SUCURSAL",
     sucursalId: r.sucursalId,
