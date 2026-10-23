@@ -1,4 +1,4 @@
-import { Calculator, ClipboardList, Factory, KeyRound, LayoutDashboard, Package, PackagePlus, Plus, Receipt, ShoppingCart, Users, Warehouse, type LucideIcon } from "lucide-react";
+import { Calculator, ClipboardList, Factory, KeyRound, LayoutDashboard, PackagePlus, Plus, Receipt, ShoppingCart, Users, Warehouse, type LucideIcon } from "lucide-react";
 import { puedeVer, veDashboard, type Sesion } from "@/lib/auth";
 
 /** Submenú: abre la pestaña `tab` del módulo (components/ui Tabs lee ?tab=) o una subpágina (`href`). */
@@ -39,6 +39,7 @@ export const NAV: ItemNav[] = [
       { label: "Notas de pedido", tab: "notas" },
       { label: "Comprobantes", tab: "comprobantes" },
       { label: "Despachos", tab: "despachos" },
+      { label: "Catálogo de Productos", tab: "productos" },
       { label: "Clientes", tab: "clientes" },
       { label: "Cuentas por cobrar", tab: "cobrar" },
       { label: "Configuración", tab: "condiciones" },
@@ -81,7 +82,6 @@ export const NAV: ItemNav[] = [
       { label: "Adelantos", href: "/dashboard/planilla/adelantos" },
     ],
   },
-  { href: "/dashboard/productos", label: "Catálogo de productos", icon: Package, seccion: "Administración", subs: [] },
   // Solo creador / admin (ver puedeVer en lib/auth.ts)
   { href: "/dashboard/creador", label: "Módulo Creador", icon: KeyRound, subs: [] },
 ];

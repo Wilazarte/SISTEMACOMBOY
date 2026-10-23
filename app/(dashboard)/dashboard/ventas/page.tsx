@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, ClipboardList, Inbox, Contact, FilePlus2, History, Receipt, Search, Settings2, Truck, Wallet } from "lucide-react";
+import { AlertTriangle, ClipboardList, Inbox, Contact, FilePlus2, History, Package, Receipt, Search, Settings2, Truck, Wallet } from "lucide-react";
 import { abrirBuscadorDePagina } from "@/components/layout/IslandMenu";
+import { CatalogoProductos } from "@/components/productos/CatalogoProductos";
 import { Button, Tabs } from "@/components/ui";
 import { KEYS, useStore } from "@/lib/storage";
 import { estadoCxC, estadoOD, npsSinDespacho } from "@/lib/ventas";
@@ -15,11 +16,12 @@ import { Clientes, CondicionesPago } from "./maestros";
 import { NotasPedido } from "./notas";
 import { RequerimientosSecocha, useSecocha } from "./secocha";
 
-type Tab = "secocha" | "notas" | "comprobantes" | "despachos" | "condiciones" | "clientes" | "cobrar";
+type Tab = "secocha" | "notas" | "comprobantes" | "despachos" | "productos" | "condiciones" | "clientes" | "cobrar";
 
 /**
  * VENTAS — Nota de Pedido -> Aprobada -> Factura/Boleta -> Orden de Despacho (Almacén) -> Cobro.
  * Secocha: sus requerimientos y ventas derivadas llegan a "Requerimientos de Secocha" y se aceptan como NP.
+ * Catálogo de Productos (antes /dashboard/productos): catálogo maestro, solicitudes y duplicados.
  */
 export default function VentasPage() {
   const [tab, setTab] = useState<Tab>("notas");
@@ -92,6 +94,7 @@ export default function VentasPage() {
             icon: <Truck size={16} />,
             count: despachos.filter((o) => estadoOD(o) === "PENDIENTE" || estadoOD(o) === "PEDIDO_ALISTADO").length,
           },
+          { id: "productos", label: "Catálogo de Productos", icon: <Package size={16} /> },
           { id: "condiciones", label: "Configuración", icon: <Settings2 size={16} /> },
           { id: "clientes", label: "Clientes", icon: <Contact size={16} /> },
           { id: "cobrar", label: "Cuentas por cobrar", icon: <Wallet size={16} />, count: vencidos },
@@ -124,6 +127,7 @@ export default function VentasPage() {
           <OrdenesDespacho vista="ventas" />
         </>
       )}
+      {tab === "productos" && <CatalogoProductos />}
       {tab === "condiciones" && <CondicionesPago />}
       {tab === "clientes" && <Clientes />}
       {tab === "cobrar" && <CuentasPorCobrar />}

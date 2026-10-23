@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AlertTriangle, Check, Combine, Inbox, Package, PackagePlus, Pencil, Search, X } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutarAsync, toast } from "@/components/ui";
 import { BotonFiltros, BotonNuevo } from "@/components/ui/BotonFiltros";
@@ -30,21 +30,30 @@ import type { StockLocal } from "@/lib/sucursal-modelos";
 
 type Tab = "catalogo" | "solicitudes" | "duplicados";
 
-export default function ProductosPage() {
+/**
+ * Catálogo de Productos (pestaña de VENTAS, ?tab=productos): contadores + sub-pestañas Catálogo | Solicitudes | Posibles duplicados.
+ * Antes era la página /dashboard/productos (ahora redirige aquí). Solo el administrador crea, aprueba o unifica.
+ */
+export function CatalogoProductos() {
   const { productos, solicitudes, disponible, listo } = useCatalogo();
   const admin = esAdminProductos(getSesion()?.rol) && !getSesion()?.soloLectura;
   const [tab, setTab] = useState<Tab>("catalogo");
   const pendientes = solicitudes.filter((s) => s.estado === "pendiente");
   const duplicados = useMemo(() => posiblesDuplicados(productos), [productos]);
+  // Campana "Producto nuevo solicitado": /dashboard/ventas?tab=productos&sub=solicitudes
+  useEffect(() => {
+    const sub = new URLSearchParams(window.location.search).get("sub");
+    if (sub === "solicitudes" || sub === "duplicados") setTab(sub);
+  }, []);
 
   return (
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-serif text-2xl font-bold leading-tight tracking-tight text-fg lg:text-[28px]">Catálogo maestro de productos</h1>
+          <h2 className="font-serif text-xl font-bold leading-tight tracking-tight text-fg">Catálogo de Productos</h2>
           <p className="mt-1 text-[13px] text-plomo-500">Un producto físico = un solo nombre y SKU en Taller, sedes y sucursal. Solo el administrador crea o unifica.</p>
         </div>
-        {!admin && <span className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-plomo-600">Consulta · para un producto nuevo use “Solicitar”</span>}
+        {!admin && <span className="rounded-lg bg-plomo-100 px-3 py-1.5 text-xs font-semibold text-plomo-600">Consulta · para un producto nuevo use “Solicitar”</span>}
       </div>
 
       {listo && !disponible && (
@@ -54,7 +63,14 @@ export default function ProductosPage() {
         </div>
       )}
 
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Contador label="Total en catálogo" valor={productos.length} icon={<Package size={18} />} onClick={() => setTab("catalogo")} />
+        <Contador label="Solicitudes pendientes" valor={pendientes.length} icon={<Inbox size={18} />} alerta={pendientes.length > 0} onClick={() => setTab("solicitudes")} />
+        <Contador label="Posibles duplicados" valor={duplicados.length} icon={<Combine size={18} />} alerta={duplicados.length > 0} onClick={() => setTab("duplicados")} />
+      </div>
+
       <Tabs<Tab>
+        enLinea
         value={tab}
         onChange={setTab}
         tabs={[
@@ -68,6 +84,18 @@ export default function ProductosPage() {
       {tab === "solicitudes" && <Solicitudes solicitudes={solicitudes} productos={productos} admin={admin} />}
       {tab === "duplicados" && <Duplicados pares={duplicados} admin={admin} />}
     </div>
+  );
+}
+
+function Contador({ label, valor, icon, alerta, onClick }: { label: string; valor: number; icon: ReactNode; alerta?: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="flex items-center gap-3 rounded-xl border border-plomo-200 bg-surface p-4 text-left shadow-sm transition hover:border-blue-600">
+      <span className={cn("rounded-lg p-2", alerta ? "bg-amber-500/15 text-amber-400" : "bg-blue-600/15 text-blue-400")}>{icon}</span>
+      <span>
+        <span className="block text-xs font-semibold uppercase tracking-wide text-plomo-500">{label}</span>
+        <span className="block text-2xl font-bold text-fg">{valor}</span>
+      </span>
+    </button>
   );
 }
 
