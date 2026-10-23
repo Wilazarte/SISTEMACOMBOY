@@ -542,12 +542,22 @@ export interface OrigenSecocha {
   sede: string;
 }
 
-/** Costeo de la NP de Secocha: la suma es el subtotal (sin IGV) que se reparte entre las líneas. */
+/** Material del REQ-SECOCHA con su precio unitario (ya incluye todo: sin utilidad ni mano de obra aparte). */
+export interface ItemCosteoNP {
+  lineaId: string;
+  descripcion: string;
+  cantidad: number;
+  unidad: string;
+  precio_unitario: number;
+}
+
+/** Costeo de la NP de Secocha: suma de cantidad × precio unitario = subtotal (sin IGV, traslado interno). */
 export interface CostosNP {
-  produccion: number;
-  materiales: number;
-  manoObra: number;
-  utilidad: number;
+  req_id: string; // REQ-SECOCHA-002
+  np_id: string; // NP-0014
+  cliente: string;
+  items: ItemCosteoNP[];
+  total: number;
 }
 
 export interface NotaPedido {
