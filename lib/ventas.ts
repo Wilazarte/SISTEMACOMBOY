@@ -522,8 +522,21 @@ const lineaDeSecocha = (p: ProductoTraslado & { marca?: string; caracteristica?:
   cantidad: Number(p.cantidad) || 0,
 });
 
-export const costosVacios = (): CostosNP => ({ produccion: 0, materiales: 0, manoObra: 0, utilidad: 0 });
-export const totalCostos = (c: CostosNP): number => r2((Number(c.produccion) || 0) + (Number(c.materiales) || 0) + (Number(c.manoObra) || 0) + (Number(c.utilidad) || 0));
+/** Costeo vacío / precargado: un material por línea de la NP con su precio unitario actual. */
+export const costosDeNP = (n: NotaPedido): CostosNP => {
+  const previos = new Map((n.costos?.items ?? []).map((i) => [i.lineaId, i.precio_unitario]));
+  const items = n.items.map((l) => ({
+    lineaId: l.id,
+    descripcion: l.descripcion || l.productoNombre,
+    cantidad: Number(l.cantidad) || 0,
+    unidad: l.unidad || "UND",
+    precio_unitario: previos.get(l.id) ?? (Number(l.precio) || 0),
+  }));
+  return { req_id: n.origenId ?? "", np_id: n.numero, cliente: n.cliente, items, total: totalCostos({ items } as CostosNP) };
+};
+/** Total de la nota = Σ cantidad × precio unitario. */
+export const totalCostos = (c: Pick<CostosNP, "items">): number =>
+  r2((c.items ?? []).reduce((a, i) => a + r2((Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0)), 0));
 
 /**
  * [Aceptar] en "Requerimientos de Secocha": crea la Nota de Pedido (origen=SECOCHA, origenId=REQ-SECOCHA-001,
@@ -569,7 +582,6 @@ export async function aceptarSecocha(tipo: OrigenSecocha["tipo"], id: string, ve
     origen: "SECOCHA",
     origenId: origen.numero,
     origenSecocha: origen,
-    costos: costosVacios(),
     historial: [nuevoEvento(rol, "Aceptada de Secocha", `${origen.numero} · ${vendedor} · pendiente de costeo`)],
   };
   escribir(KEYS.NOTAS_PEDIDO, [np, ...getNotasPedido()]);
@@ -578,37 +590,39 @@ export async function aceptarSecocha(tipo: OrigenSecocha["tipo"], id: string, ve
 }
 
 /**
- * Costeo de la NP de Secocha: producción + materiales + mano de obra + utilidad = subtotal (sin IGV), repartido
- * entre las líneas según su cantidad. Queda PENDIENTE para Aprobar (Orden de Despacho a Secocha).
+ * Costeo de la NP de Secocha: cada material del REQ-SECOCHA lleva su precio unitario (ya incluye todo). La suma de
+ * cantidad × precio unitario es el subtotal (sin IGV, traslado interno). Queda PENDIENTE para Aprobar (OD a Secocha).
  */
-export function guardarCostosNP(id: string, costos: CostosNP, rol: Rol): NotaPedido {
+export function guardarCostosNP(id: string, precios: Record<string, number>, rol: Rol): NotaPedido {
   if (!puede(rol, "venta.gestionar")) throw new ErpError("Su usuario no puede costear notas de pedido.");
-  const c: CostosNP = { produccion: r2(Number(costos.produccion) || 0), materiales: r2(Number(costos.materiales) || 0), manoObra: r2(Number(costos.manoObra) || 0), utilidad: r2(Number(costos.utilidad) || 0) };
-  if (Object.values(c).some((v) => v < 0)) throw new ErpError("Los costos no pueden ser negativos.");
-  const base = totalCostos(c);
-  if (!(base > 0)) throw new ErpError("Ingrese los costos: el total debe ser mayor a 0.");
+  if (Object.values(precios).some((v) => (Number(v) || 0) < 0)) throw new ErpError("Los precios no pueden ser negativos.");
   let editada!: NotaPedido;
   actualizarNP(id, (n) => {
     if (n.origen !== "SECOCHA") throw new ErpError(`La ${n.numero} no viene de Secocha.`);
     if (n.estado !== "PENDIENTE_COSTEO" && n.estado !== "PENDIENTE") throw new ErpError(`La ${n.numero} está ${n.estado}: ya no se puede costear.`);
-    const unidades = n.items.reduce((a, l) => a + (l.m2 > 0 ? l.m2 : l.cantidad), 0) || 1;
-    let resto = base;
-    const items = n.items.map((l, i) => {
-      const q = l.m2 > 0 ? l.m2 : l.cantidad;
-      const totalLinea = i === n.items.length - 1 ? r2(resto) : r2((base * q) / unidades);
-      resto = r2(resto - totalLinea);
-      return calcularLinea({ ...l, precio: q > 0 ? totalLinea / q : 0 });
-    });
+    const sinPrecio = n.items.filter((l) => !((Number(precios[l.id]) || 0) > 0));
+    if (sinPrecio.length > 0) throw new ErpError(`Ponga el precio unitario de: ${sinPrecio.map((l) => l.descripcion || l.productoNombre).join(", ")}.`);
+    const items = n.items.map((l) => calcularLinea({ ...l, ancho: 0, alto: 0, precio: r2(Number(precios[l.id])) }));
     const t = totalesVenta(items, n.conIgv, n.descuento);
+    const costos: CostosNP = {
+      req_id: n.origenId ?? "",
+      np_id: n.numero,
+      cliente: n.cliente,
+      items: items.map((l) => ({ lineaId: l.id, descripcion: l.descripcion || l.productoNombre, cantidad: l.cantidad, unidad: l.unidad, precio_unitario: l.precio })),
+      total: t.base,
+    };
     editada = {
       ...n,
       items,
-      costos: c,
+      costos,
       subtotal: t.base,
       igv: t.igv,
       total: t.total,
       estado: "PENDIENTE",
-      historial: [...n.historial, nuevoEvento(rol, "Costeo", `Producción ${c.produccion.toFixed(2)} · Materiales ${c.materiales.toFixed(2)} · Mano de obra ${c.manoObra.toFixed(2)} · Utilidad ${c.utilidad.toFixed(2)} = ${base.toFixed(2)}`)],
+      historial: [
+        ...n.historial,
+        nuevoEvento(rol, "Costeo", `${costos.items.map((i) => `${i.cantidad} ${i.unidad} ${i.descripcion} × ${i.precio_unitario.toFixed(2)}`).join(" · ")} = ${t.base.toFixed(2)}`),
+      ],
     };
     return editada;
   });

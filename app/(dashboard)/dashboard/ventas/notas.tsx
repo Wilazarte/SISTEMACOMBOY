@@ -9,7 +9,7 @@ import { getSesion } from "@/lib/auth";
 import { pdfNotaPedido } from "@/lib/pdf";
 import { codigoDesdeNumero } from "@/lib/utils/codigos";
 import { KEYS, fechaPE, hoy, puede, soles, useRol, useStore } from "@/lib/storage";
-import { costosVacios, guardarCostosNP, totalCostos, anularNP, aprobarNP, despachoVacio, faltaDespacho, estadoOD, generarDespachoNP, odDeNP, clienteVacio, clonarNP, crearNotaPedido, editarNotaPedido, permisoEditarNP, getCondicionesPago, guardarCliente, guardarCondicion, lineaVacia, pideDias, sumarDias, type DatosNP } from "@/lib/ventas";
+import { costosDeNP, guardarCostosNP, totalCostos, anularNP, aprobarNP, despachoVacio, faltaDespacho, estadoOD, generarDespachoNP, odDeNP, clienteVacio, clonarNP, crearNotaPedido, editarNotaPedido, permisoEditarNP, getCondicionesPago, guardarCliente, guardarCondicion, lineaVacia, pideDias, sumarDias, type DatosNP } from "@/lib/ventas";
 import type { Cliente, CondicionPago, CostosNP, DatosDespacho, NotaPedido, OrdenDespacho } from "@/lib/types";
 import { AvisoCondiciones, DatosDespachoForm, FormCliente, LineasEditor, SelectorCliente, TotalesVenta, useCargaCondiciones, useVentas } from "./comun";
 import { FormCondicion, condVacia } from "./maestros";
@@ -187,7 +187,7 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
                   <FileText size={14} /> PDF
                 </Button>
                 {habilitado && n.origen === "SECOCHA" && (n.estado === "PENDIENTE_COSTEO" || n.estado === "PENDIENTE") && (
-                  <Button size="sm" variant={n.estado === "PENDIENTE_COSTEO" ? "warning" : "ghost"} onClick={() => setCostear({ np: n, costos: { ...costosVacios(), ...n.costos } })}>
+                  <Button size="sm" variant={n.estado === "PENDIENTE_COSTEO" ? "warning" : "ghost"} onClick={() => setCostear({ np: n, costos: costosDeNP(n) })}>
                     <Calculator size={14} /> {n.estado === "PENDIENTE_COSTEO" ? "Poner costos" : "Costos"}
                   </Button>
                 )}
@@ -397,36 +397,36 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
         {costear && (
           <div className="space-y-4">
             <p className="text-sm text-plomo-600">
-              Nota de pedido de <b>Secocha</b> ({costear.np.origenId}). La suma de los costos es el subtotal de la nota (sin IGV, traslado interno) y se reparte entre
-              los productos. Luego apruébela para generar la Orden de Despacho a Secocha.
+              Nota de pedido jalada del requerimiento <b>{costear.costos.req_id}</b> de Secocha (no es una cotización). Ponga el precio unitario de cada
+              material: ya incluye todo (sin utilidad ni mano de obra aparte). La suma es el subtotal de la nota, sin IGV por ser traslado interno. Luego
+              apruébela para generar la Orden de Despacho a Secocha.
             </p>
-            <ul className="rounded-lg border border-plomo-200 p-3 text-sm text-fg-2">
-              {costear.np.items.map((l) => (
-                <li key={l.id}>
-                  {l.cantidad} {l.unidad} · {l.descripcion}
-                </li>
+            <Table head={["Cant.", "Unidad", "Material", "Precio unitario S/", "Total S/"]} empty={costear.costos.items.length === 0}>
+              {costear.costos.items.map((i, idx) => (
+                <tr key={i.lineaId}>
+                  <Td className="text-right">{i.cantidad}</Td>
+                  <Td>{i.unidad}</Td>
+                  <Td className="text-fg">{i.descripcion}</Td>
+                  <Td className="w-40">
+                    <Input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={i.precio_unitario || ""}
+                      aria-label={`Precio unitario ${i.descripcion}`}
+                      autoFocus={idx === 0}
+                      onChange={(e) =>
+                        setCostear({
+                          ...costear,
+                          costos: { ...costear.costos, items: costear.costos.items.map((x) => (x.lineaId === i.lineaId ? { ...x, precio_unitario: parseFloat(e.target.value) || 0 } : x)) },
+                        })
+                      }
+                    />
+                  </Td>
+                  <Td className="text-right">{soles(i.cantidad * (i.precio_unitario || 0))}</Td>
+                </tr>
               ))}
-            </ul>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {(
-                [
-                  ["produccion", "Costos de producción S/"],
-                  ["materiales", "Costo de materiales S/"],
-                  ["manoObra", "Mano de obra S/"],
-                  ["utilidad", "Utilidad S/"],
-                ] as [keyof CostosNP, string][]
-              ).map(([k, label]) => (
-                <Field key={k} label={label}>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    value={costear.costos[k] || ""}
-                    onChange={(e) => setCostear({ ...costear, costos: { ...costear.costos, [k]: parseFloat(e.target.value) || 0 } })}
-                  />
-                </Field>
-              ))}
-            </div>
+            </Table>
             <div className="flex flex-wrap items-center justify-end gap-3 border-t border-plomo-100 pt-4">
               <span className="mr-auto text-sm text-plomo-600">
                 Total de la nota: <b className="text-lg text-fg">{soles(totalCostos(costear.costos))}</b>
@@ -436,8 +436,8 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
               </Button>
               <Button
                 variant="warning"
-                disabled={!(totalCostos(costear.costos) > 0)}
-                onClick={() => ejecutar(() => void guardarCostosNP(costear.np.id, costear.costos, rol), `${costear.np.numero}: costos guardados, lista para aprobar`) && setCostear(null)}
+                disabled={costear.costos.items.some((i) => !(i.precio_unitario > 0))}
+                onClick={() => ejecutar(() => void guardarCostosNP(costear.np.id, Object.fromEntries(costear.costos.items.map((i) => [i.lineaId, i.precio_unitario])), rol), `${costear.np.numero}: costos guardados, lista para aprobar`) && setCostear(null)}
               >
                 <Calculator size={16} /> Guardar costos
               </Button>
