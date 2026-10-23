@@ -102,12 +102,24 @@ export interface ProductoTraslado {
   /** Producto del catálogo maestro (productos_maestro.id) y su SKU. */
   productoMaestroId?: string;
   sku?: string;
+  /** Requerimientos (formulario único): marca y característica del producto. */
+  marca?: string;
+  caracteristica?: string;
 }
 
+/** pendiente = PENDIENTE_DESPACHO en Arequipa · convertida = DESPACHADO POR AREQUIPA (OT y guía emitidas). */
 export type EstadoDerivacion = "pendiente" | "en-preparacion" | "convertida" | "anulada";
 
+/**
+ * Derivación de una venta de Secocha = Orden de Despacho directa en Arequipa (bandeja "Despachos de Secocha"
+ * del Almacén / Taller Principal). Se crea al derivar, sin pasos intermedios.
+ */
 export interface Derivacion {
   id: string;
+  /** Orden de despacho: OD-VTA-SEC-001-2026 (las antiguas no lo tienen: se usa el de la venta). */
+  numero?: string;
+  /** Sede que deriva: "SECOCHA". */
+  origen?: string;
   fecha: string;
   ventaId: string;
   ventaNumero: string;
@@ -155,14 +167,21 @@ export interface Traslado {
   emitidoPor: string;
 }
 
-export type EstadoReqSuc = "enviado" | "en-traslado" | "cerrado";
+/** enviado = en Producción Arequipa · aprobado = APROBADO_PRODUCCION · en-traslado = Orden de Traslado emitida. */
+export type EstadoReqSuc = "enviado" | "aprobado" | "en-traslado" | "cerrado";
 
-/** Seguimiento local de un REQ-SUC (el documento que revisa Tesorería está en compras, mismo id). */
+/**
+ * REQ-SECOCHA: lo atiende solo Producción Arequipa (Aprobar → Emitir Orden de Traslado). Ya no pasa por
+ * Almacén ni Tesorería (los REQ antiguos siguen en compras con origen SUCURSAL).
+ */
 export interface ReqSucursal {
   id: string;
-  numero: string; // REQ-SUC-001
+  numero: string; // REQ-SECOCHA-001
   fecha: string;
   motivo: string;
+  solicitante?: string;
+  aprobadoPor?: string;
+  fechaAprobacion?: string;
   items: ProductoTraslado[];
   estado: EstadoReqSuc;
   automatico: boolean;

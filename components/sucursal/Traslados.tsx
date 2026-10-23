@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AlertTriangle, CheckCircle2, FileText, Truck } from "lucide-react";
-import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Textarea, ejecutar, ejecutarAsync } from "@/components/ui";
+import { Button, Card, CardHeader, Field, Input, Modal, Select, Textarea, ejecutar, ejecutarAsync } from "@/components/ui";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { BotonNuevo } from "@/components/ui/BotonFiltros";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
@@ -17,69 +17,59 @@ import {
   esTaller,
   getSucursal,
   numeroProbableSuc,
+  reqDeSucursal,
   observarTraslado,
   operaSucursal,
   type ReqSucursal,
   type StockLocal,
   type Traslado,
 } from "@/lib/sucursal";
-import type { Requerimiento } from "@/lib/types";
 import { Acciones, EstadoSuc, LineasEditor, deLineas, lineaVacia, type LineaEdit } from "./comun";
 
 // =====================================================================
 // 4. REQUERIMIENTOS: REQ-SECOCHA-001 -> Almacén del Taller Principal (Arequipa) (Cotización -> OC) -> OT con guía -> Secocha
 // =====================================================================
-export function Requerimientos({ reqs, enTesoreria, stock }: { reqs: ReqSucursal[]; enTesoreria: Requerimiento[]; stock: StockLocal[] }) {
+export function Requerimientos({ reqs, stock }: { reqs: ReqSucursal[]; stock: StockLocal[] }) {
   const { showForm, setShowForm } = useTogglePanel();
   const opera = operaSucursal();
   const taller = esTaller();
   const [ot, setOt] = useState<ReqSucursal | null>(null);
-  const docDe = (id: string) => enTesoreria.find((r) => r.id === id);
-  const estadoTes = (id: string) => docDe(id)?.estado;
 
-  const filas: FilaDoc[] = reqs.map((r) => {
-    const tes = estadoTes(r.id);
-    return {
-      id: r.id,
-      fecha: r.fecha,
-      contraparte: r.automatico ? "Reposición automática" : r.creadoPor,
-      buscar: `${r.numero} ${r.motivo} ${r.items.map((i) => i.producto).join(" ")}`,
-      estado: r.estado,
-      ref: (
-        <div className="flex flex-col gap-1">
-          <span className="font-semibold text-fg">{r.numero}</span>
-          <span className="flex flex-wrap items-center gap-1">
-            <EstadoSuc estado={r.estado} />
-            {tes && r.estado === "enviado" && (
-              <span className="inline-flex items-center gap-1 text-[11px] text-plomo-500">
-                Tesorería: <Badge estado={tes} />
-              </span>
-            )}
+  const filas: FilaDoc[] = reqs.map((r) => ({
+    id: r.id,
+    fecha: r.fecha,
+    contraparte: r.automatico ? "Reposición automática" : r.solicitante || r.creadoPor,
+    buscar: `${r.numero} ${r.motivo} ${r.items.map((i) => i.producto).join(" ")}`,
+    estado: r.estado,
+    ref: (
+      <div className="flex flex-col gap-1">
+        <span className="font-semibold text-fg">{r.numero}</span>
+        <span>
+          <EstadoSuc estado={r.estado} />
+        </span>
+        <span className="max-w-[320px] truncate text-[11px] text-plomo-500" title={r.motivo}>
+          {r.motivo}
+        </span>
+      </div>
+    ),
+    total: `${r.items.length} ítem(s)`,
+    acciones: (
+      <Acciones>
+        <Button size="sm" variant="ghost" onClick={() => pdfRequerimiento(reqDeSucursal(r))} title="PDF (mismo formato que Arequipa)">
+          <FileText size={14} /> PDF
+        </Button>
+        {taller && (r.estado === "enviado" || r.estado === "aprobado") ? (
+          <Button size="sm" onClick={() => setOt(r)} title="Emitir la Orden de Traslado hacia Secocha">
+            <Truck size={14} /> Crear OT
+          </Button>
+        ) : (
+          <span className="text-xs text-plomo-500">
+            {r.estado === "cerrado" ? "Recibido en Secocha" : r.estado === "en-traslado" ? "Ver Traslados" : r.estado === "aprobado" ? "Aprobado por Producción" : "En Producción Arequipa"}
           </span>
-          <span className="max-w-[320px] truncate text-[11px] text-plomo-500" title={r.motivo}>
-            {r.motivo}
-          </span>
-        </div>
-      ),
-      total: `${r.items.length} ítem(s)`,
-      acciones: (
-        <Acciones>
-          {docDe(r.id) && (
-            <Button size="sm" variant="ghost" onClick={() => pdfRequerimiento(docDe(r.id)!)} title="PDF (mismo formato que Arequipa)">
-              <FileText size={14} /> PDF
-            </Button>
-          )}
-          {taller && r.estado === "enviado" ? (
-            <Button size="sm" onClick={() => setOt(r)} title="Atender con una OT hacia la sucursal">
-              <Truck size={14} /> Crear OT
-            </Button>
-          ) : (
-            <span className="text-xs text-plomo-500">{r.estado === "cerrado" ? "Recibido en sucursal" : r.estado === "en-traslado" ? "Ver Traslados" : "En Tesorería"}</span>
-          )}
-        </Acciones>
-      ),
-    };
-  });
+        )}
+      </Acciones>
+    ),
+  }));
 
   return (
     <div className="space-y-4">
@@ -87,7 +77,7 @@ export function Requerimientos({ reqs, enTesoreria, stock }: { reqs: ReqSucursal
       <Card>
         <CardHeader
           title="Requerimientos de la sucursal"
-          subtitle={`${reqs.filter((r) => r.estado !== "cerrado").length} en curso · Requerimiento → Cotización (Taller) → OC → OT con Guía → Sucursal`}
+          subtitle={`${reqs.filter((r) => r.estado !== "cerrado").length} en curso · Requerimiento → Producción Arequipa (aprobar) → Orden de Traslado con guía → Secocha`}
           action={opera ? <BotonNuevo abierto={showForm} onClick={() => setShowForm(!showForm)} label="Nuevo requerimiento" /> : undefined}
         />
         <ListaDocs filas={filas} tipo="requerimientos" />
@@ -107,7 +97,7 @@ function FormReq({ numeroProbable, onListo }: { numeroProbable: string; onListo:
       numeroProbable={numeroProbable}
       solicitanteInicial={sesion ? nombreDe(sesion) : ""}
       modulo="Secocha · Requerimiento"
-      textoEnviar="Enviar a Almacén"
+      textoEnviar="Enviar a Producción Arequipa"
       mensajeOk={`Requerimiento enviado al ${DESTINO_REQ_SUCURSAL}`}
       onEnviar={(d) =>
         crearReqSucursal(
@@ -259,7 +249,7 @@ function FormOT({ stock, reqs, onListo, req }: { stock: StockLocal[]; reqs: ReqS
   const [transportista, setTransportista] = useState("");
   const [placa, setPlaca] = useState("");
   const [guardando, setGuardando] = useState(false);
-  const abiertos = reqs.filter((r) => r.estado === "enviado");
+  const abiertos = reqs.filter((r) => r.estado === "enviado" || r.estado === "aprobado");
   const emitir = async () => {
     setGuardando(true);
     const ok = await ejecutarAsync(

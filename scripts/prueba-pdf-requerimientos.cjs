@@ -1,4 +1,5 @@
-// Prueba de TEMPLATE_UNIFICADO: genera REQ-AQP, REQ-SECOCHA y REQ-TALLER con LIMA PLANA 1" TRUPER.
+// Prueba de TEMPLATE_UNIFICADO: genera REQ-AQP, REQ-SECOCHA y REQ-TALLER con LIMA PLANA 1" TRUPER,
+// y la Orden de Traslado (OT) que Producción Arequipa emite para el REQ-SECOCHA.
 // Los PDF deben ser idénticos salvo Sede Origen y Número.
 //   node scripts/prueba-pdf-requerimientos.cjs [carpeta]   (por defecto: ./pdf-prueba)
 //   pdftotext -layout de cada PDF y diff para comparar.
@@ -36,4 +37,11 @@ for (const [n, r] of Object.entries(reqs)) {
   fs.writeFileSync(path.join(salida, n + ".pdf"), Buffer.from(doc.output("arraybuffer")));
   console.log(`${n}.pdf · Sede Origen: ${sedeOrigenReq(r)}`);
 }
+// Orden de Traslado Producción Arequipa -> Secocha (atiende el REQ-SECOCHA): misma plantilla
+const ot = generarDocumento("OT", "Arequipa - Planta Principal", {
+  ...base, numero: "OT-00001", estado: "EN CAMINO", solicitante: "produccion", motivo: "Traslado entre establecimientos de la misma empresa",
+  destino: "Sucursal Secocha", referencia: "REQ-SECOCHA-2026-01", guia: "T001-000001",
+});
+fs.writeFileSync(path.join(salida, "OT-00001.pdf"), Buffer.from(ot.output("arraybuffer")));
+console.log("OT-00001.pdf · Orden de Traslado Arequipa -> Secocha");
 })();

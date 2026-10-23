@@ -89,3 +89,15 @@ export function useSedes(): EstadoSedes {
   }, []);
   return e;
 }
+
+/**
+ * ERP de Arequipa (bandejas Despachos de Secocha y Requerimientos Secocha): carga las sedes si aún no están,
+ * así la sede en pantalla es Secocha y las funciones de lib/sucursal trabajan sobre ella.
+ */
+export function useSedeSecocha(): EstadoSedes {
+  const e = useSedes();
+  useEffect(() => {
+    if (!estado.listo) void cargarSedes();
+  }, []);
+  return e;
+}

@@ -17,6 +17,7 @@ import { ModuloContenido, ModuloLayout, SEDE_PLANTA_PRINCIPAL } from "@/componen
 import { NotificationSidebar } from "@/components/layout/NotificationSidebar";
 import { DatalistCatalogo } from "@/components/productos/ProductoInput";
 import { detenerCatalogo, iniciarCatalogo } from "@/lib/productos";
+import { olvidarSedes } from "@/lib/sedes";
 import { RUTA_SUCURSAL, inicioDe, soloSecocha, logout, puedeVer, useSesion, veTesoreria } from "@/lib/auth";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
 import { useNotificaciones } from "@/lib/notificaciones";
@@ -203,6 +204,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const salir = async () => {
     await detenerDatos();
     await detenerCatalogo();
+    olvidarSedes();
     await logout();
     limpiarPrefs();
     router.replace("/login");

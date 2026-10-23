@@ -12,7 +12,7 @@ import { getEquipos } from "./equipos";
 import { KEYS, fechaPE, hoy, soles, useStore } from "./storage";
 import type { Factura, OrdenDespacho, Requerimiento, StockItem } from "./types";
 import { esAdminProductos, useCatalogo } from "./productos";
-import type { CierreCaja, Derivacion, StockLocal, Traslado, VentaSucursal } from "./sucursal-modelos";
+import type { CierreCaja, Derivacion, ReqSucursal, StockLocal, Traslado, VentaSucursal } from "./sucursal-modelos";
 import { avisoOD, odsNuevas } from "./ventas";
 
 export type TipoNotif = "despacho" | "requerimiento" | "factura" | "qc" | "stock" | "sucursal" | "producto";
@@ -50,7 +50,11 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
   const rol = sesion?.rol ?? "";
   const veSuc = ve(RUTA_SUCURSAL);
   const opera = veSuc && ["creador", "sucursal"].includes(rol);
-  const derivaciones = useStore<Derivacion[]>(KEYS.SUC_DERIVACIONES, [], veSuc && ["creador", "almacen"].includes(rol));
+  // Despachos de Secocha (Almacén Arequipa) y REQ-SECOCHA (solo Producción Arequipa)
+  const veDespSec = ve("/dashboard/almacen") && ["creador", "almacen"].includes(rol);
+  const veReqSec = ve("/dashboard/produccion") && ["creador", "almacen"].includes(rol);
+  const derivaciones = useStore<Derivacion[]>(KEYS.SUC_DERIVACIONES, [], veDespSec);
+  const reqsSec = useStore<ReqSucursal[]>(KEYS.SUC_REQS, [], veReqSec);
   const traslados = useStore<Traslado[]>(KEYS.SUC_TRASLADOS, [], opera);
   const ventasSuc = useStore<VentaSucursal[]>(KEYS.SUC_VENTAS, [], opera);
   const stockSuc = useStore<StockLocal[]>(KEYS.SUC_STOCK, [], opera);
@@ -68,14 +72,35 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
       for (const o of odsNuevas(ods))
         out.push({ clave: `od:${o.id}`, tipo: "despacho", titulo: `Nueva orden de despacho ${o.numero}`, detalle: avisoOD(o), modulo: "Almacén", href: "/dashboard/almacen?tab=despacho", prioridad: 1 });
 
-    // Requerimientos de Secocha (REQ-SECOCHA) que llegan al Almacén del Taller Principal (Arequipa)
-    if (ve("/dashboard/almacen") && ["creador", "almacen"].includes(sesion.rol))
-      for (const r of reqs.filter((x) => x.origen === "SUCURSAL" && x.estado === "PENDIENTE"))
-        out.push({ clave: `reqsec:${r.id}`, tipo: "requerimiento", titulo: `${r.numero} de ${r.sede}`, detalle: `${r.items.length} producto(s) · ${r.solicitante}`, modulo: "Almacén Taller Principal", href: "/dashboard/almacen?tab=lista", prioridad: 2 });
+    // Ventas derivadas desde Secocha = Orden de Despacho en Arequipa (bandeja Despachos de Secocha)
+    if (veDespSec)
+      for (const d of derivaciones.filter((x) => x.estado === "pendiente" || x.estado === "en-preparacion"))
+        out.push({
+          clave: `der:${d.id}`,
+          tipo: "despacho",
+          titulo: `Orden de despacho ${d.numero ?? d.ventaNumero} de ${d.sucursal}`,
+          detalle: `${d.cliente} · ${d.estado === "pendiente" ? "pendiente de despacho" : "en preparación"}`,
+          modulo: "Almacén · Despachos de Secocha",
+          href: "/dashboard/almacen?tab=despachos-secocha",
+          prioridad: 1,
+        });
+
+    // REQ-SECOCHA: solo a Producción Arequipa (Almacén y Tesorería ya no los reciben)
+    if (veReqSec)
+      for (const r of reqsSec.filter((x) => x.estado === "enviado" || x.estado === "aprobado"))
+        out.push({
+          clave: `reqsec:${r.id}:${r.estado}`,
+          tipo: "requerimiento",
+          titulo: `${r.numero} ${r.estado === "aprobado" ? "aprobado: emitir Orden de Traslado" : "por aprobar"}`,
+          detalle: `${r.items.length} producto(s) · ${r.solicitante || r.creadoPor}`,
+          modulo: "Producción Arequipa",
+          href: "/dashboard/produccion",
+          prioridad: 2,
+        });
 
     if (ve("/dashboard/compras")) {
       // Requerimientos de Almacén por revisar
-      for (const r of reqs)
+      for (const r of reqs.filter((x) => x.origen !== "SUCURSAL"))
         out.push({ clave: `req:${r.id}`, tipo: "requerimiento", titulo: `${r.numero} espera revisión`, detalle: `${r.sede} · ${r.solicitante}`, modulo: "Tesorería / Compras", href: "/dashboard/compras?tab=cotizaciones", prioridad: 2 });
       // Facturas por pagar que vencen en los próximos días
       for (const f of facturas) {
@@ -127,9 +152,6 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
     // Sucursal Beta (cada derivación / OT / venta / cierre una sola vez: la clave es su id)
     if (veSuc) {
       const S = RUTA_SUCURSAL; // sistema aparte: el aviso abre /sucursal
-      if (["creador", "almacen"].includes(sesion.rol))
-        for (const d of derivaciones.filter((x) => x.estado === "pendiente" || x.estado === "en-preparacion"))
-          out.push({ clave: `der:${d.id}`, tipo: "sucursal", titulo: `Derivación ${d.ventaNumero} de Sucursal ${d.sucursal}`, detalle: `${d.cliente} · ${d.estado === "pendiente" ? "por atender" : "en preparación"}`, modulo: "Taller Principal", href: `${S}?tab=derivar-taller`, prioridad: 1 });
       if (["creador", "sucursal"].includes(sesion.rol)) {
         for (const t of traslados.filter((x) => x.estado === "en-camino"))
           out.push({ clave: `ot:${t.id}`, tipo: "sucursal", titulo: `${t.codigo} en camino`, detalle: `Guía ${t.guiaRemision} · ${t.productos.length} producto(s)`, modulo: "Secocha", href: `${S}?tab=traslados`, prioridad: 2 });
@@ -155,5 +177,5 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
     return out.sort((a, b) => a.prioridad - b.prioridad);
     // equiposRaw: getEquipos() lee la misma caché; se usa para recalcular cuando cambia
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sesion, ods, reqs, facturas, stock, equiposRaw, derivaciones, traslados, ventasSuc, stockSuc, cierres, solicitudes]);
+  }, [sesion, ods, reqs, facturas, stock, equiposRaw, derivaciones, reqsSec, traslados, ventasSuc, stockSuc, cierres, solicitudes]);
 }

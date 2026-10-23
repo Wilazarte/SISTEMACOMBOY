@@ -18,11 +18,14 @@ const BADGE: Record<EstadoVenta | EstadoTraslado | EstadoDerivacion | EstadoReqS
   "en-camino": "EN_CAMINO",
   recibido: "RECIBIDO",
   observado: "OBSERVADO",
-  pendiente: "PENDIENTE",
+  // Derivación = Orden de Despacho en Arequipa
+  pendiente: "PENDIENTE_DESPACHO",
   "en-preparacion": "EN_PREPARACION",
-  convertida: "CONVERTIDA",
+  convertida: "DESPACHADO_AREQUIPA",
   anulada: "ANULADA",
-  enviado: "ENVIADO",
+  // REQ-SECOCHA en Producción Arequipa
+  enviado: "EN_PRODUCCION",
+  aprobado: "APROBADO_PRODUCCION",
   "en-traslado": "EN_TRASLADO",
   cerrado: "CERRADO",
 };

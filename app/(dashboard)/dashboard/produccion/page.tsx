@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Ban, CheckCircle2, ClipboardCheck, Factory, Plus } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, Textarea, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { FirmaPad } from "@/components/FirmaPad";
+import { RequerimientosSecocha } from "@/components/produccion/RequerimientosSecocha";
 import { getSesion } from "@/lib/auth";
 import { ALMACENES, ALMACEN_DEFECTO } from "@/lib/empresa";
 import { MARCAS_MOTOR, TIPOS_EQUIPO } from "@/lib/equipos";
@@ -37,6 +38,9 @@ export default function ProduccionPage() {
           </Button>
         )}
       </div>
+
+      {/* REQ-SECOCHA: solo llegan a Producción Arequipa */}
+      <RequerimientosSecocha />
 
       <Card>
         <CardHeader

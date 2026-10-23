@@ -12,7 +12,22 @@ import type { Requerimiento } from "./types";
 /** Sede del ERP: Planta Principal (Arequipa). */
 export const SEDE_PLANTA_PRINCIPAL = "Arequipa - Planta Principal";
 
-export type TipoDocumento = "REQ";
+export type TipoDocumento = "REQ" | "OT";
+
+/** Datos que llena la plantilla (un Requerimiento ya los tiene; la Orden de Traslado los arma igual). */
+export interface DocUnificado {
+  numero: string;
+  estado: string;
+  fecha: string;
+  solicitante: string;
+  motivo: string;
+  items: Requerimiento["items"];
+  observacion?: string;
+  destino?: string;
+  /** Documento que atiende (REQ-SECOCHA-001) y guía de remisión (Orden de Traslado). */
+  referencia?: string;
+  guia?: string;
+}
 
 interface Plantilla {
   titulo: string;
@@ -36,6 +51,22 @@ export const TEMPLATE_UNIFICADO: Record<TipoDocumento, Plantilla> = {
     head: ["SKU", "Producto", "Unidad", "Cantidad", "Motivo"],
     firmas: ["Solicitante", "Jefe de Almacén", "Tesorería"],
   },
+  // Producción Arequipa -> Secocha: misma plantilla, otro título y destino
+  OT: {
+    titulo: "ORDEN DE TRASLADO",
+    datos: [
+      ["Sede Origen", "{{SEDE_ORIGEN}}"],
+      ["Destino", "{{DESTINO}}"],
+      ["Fecha", "{{FECHA}}"],
+      ["Requerimiento", "{{REFERENCIA}}"],
+      ["Guía de remisión", "{{GUIA}}"],
+      ["Emitido por", "{{SOLICITANTE}}"],
+      ["Ítems", "{{ITEMS}}"],
+      ["Motivo", "{{MOTIVO}}"],
+    ],
+    head: ["SKU", "Producto", "Unidad", "Cantidad", "Motivo"],
+    firmas: ["Producción Arequipa", "Transportista", "Recibí conforme (Secocha)"],
+  },
 };
 
 const rellenar = (t: string, v: Record<string, string>): string => t.replace(/\{\{(\w+)\}\}/g, (_, k: string) => v[k] ?? "");
@@ -50,7 +81,7 @@ export function sedeOrigenReq(r: Requerimiento): string {
 }
 
 /** Bloque del PDF con TEMPLATE_UNIFICADO (mismo diseño para cualquier sede). */
-export function bloqueDocumento(tipo: TipoDocumento, sede: string, r: Requerimiento): Bloque {
+export function bloqueDocumento(tipo: TipoDocumento, sede: string, r: DocUnificado): Bloque {
   const p = TEMPLATE_UNIFICADO[tipo];
   const v: Record<string, string> = {
     SEDE_ORIGEN: sede,
@@ -58,6 +89,9 @@ export function bloqueDocumento(tipo: TipoDocumento, sede: string, r: Requerimie
     SOLICITANTE: r.solicitante,
     ITEMS: String(r.items.length),
     MOTIVO: r.motivo,
+    DESTINO: r.destino || "-",
+    REFERENCIA: r.referencia || "-",
+    GUIA: r.guia || "-",
   };
   return {
     titulo: p.titulo,

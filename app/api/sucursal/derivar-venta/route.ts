@@ -5,7 +5,8 @@ import { MOTIVOS_DERIVACION, type Derivacion, type MotivoDerivacion, type VentaS
 /**
  * POST /api/sucursal/derivar-venta
  * Body: { ventaId, motivo: PRODUCTO_NO_DISPONIBLE | SERVICIO_ESPECIALIZADO | EQUIPO, detalle?, sucursal: "Arequipa Sur" }
- * Marca la venta como "derivada" y crea la derivación que ve el Taller Principal (notificación + OT pendiente).
+ * Marca la venta como "derivada" y crea la Orden de Despacho en Arequipa (derivación PENDIENTE_DESPACHO):
+ * el Almacén / Taller Principal la ve al instante en "Despachos de Secocha" (Realtime) y emite OT + guía.
  * Usa la sesión del usuario (RLS de la tabla sucursal: solo creador / sucursal escriben ventas).
  */
 export async function POST(req: Request) {
@@ -39,8 +40,11 @@ export async function POST(req: Request) {
   const { data: perfil } = await sb.from("perfiles").select("usuario").eq("id", user.id).maybeSingle();
   const ahora = new Date().toISOString();
   const fecha = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  // Orden de Despacho directa en Arequipa (bandeja "Despachos de Secocha"): OD-VTA-SEC-001-2026
   const derivacion: Derivacion = {
     id: crypto.randomUUID(),
+    numero: `OD-${venta.numero}`,
+    origen: txt(b.sucursal).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase(),
     fecha,
     ventaId,
     ventaNumero: venta.numero,
@@ -61,7 +65,7 @@ export async function POST(req: Request) {
     derivacionId: derivacion.id,
     historial: [
       ...(venta.historial ?? []),
-      { fecha: ahora, usuario: derivacion.creadoPor as "CONTADOR", accion: "Derivada a Taller Principal", detalle: `${MOTIVOS_DERIVACION[motivo]} · En preparación${derivacion.detalle ? ` · ${derivacion.detalle}` : ""}` },
+      { fecha: ahora, usuario: derivacion.creadoPor as "CONTADOR", accion: "Derivada a Arequipa", detalle: `${derivacion.numero} · ${MOTIVOS_DERIVACION[motivo]} · Pendiente de despacho${derivacion.detalle ? ` · ${derivacion.detalle}` : ""}` },
     ],
   };
 
