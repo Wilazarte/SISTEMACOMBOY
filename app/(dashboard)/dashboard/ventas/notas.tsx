@@ -3,14 +3,14 @@
 import { FiltrosPlegables } from "@/components/ui/BotonFiltros";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useState } from "react";
-import { Ban, CalendarClock, Check, Copy, FileText, Pencil, Plus, Receipt, Truck } from "lucide-react";
+import { Ban, Calculator, CalendarClock, Check, Copy, FileText, Pencil, Plus, Receipt, Truck } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, Textarea, ejecutar, ejecutarAsync } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { pdfNotaPedido } from "@/lib/pdf";
 import { codigoDesdeNumero } from "@/lib/utils/codigos";
 import { KEYS, fechaPE, hoy, puede, soles, useRol, useStore } from "@/lib/storage";
-import { anularNP, aprobarNP, despachoVacio, faltaDespacho, estadoOD, generarDespachoNP, odDeNP, clienteVacio, clonarNP, crearNotaPedido, editarNotaPedido, permisoEditarNP, getCondicionesPago, guardarCliente, guardarCondicion, lineaVacia, pideDias, sumarDias, type DatosNP } from "@/lib/ventas";
-import type { Cliente, CondicionPago, DatosDespacho, NotaPedido, OrdenDespacho } from "@/lib/types";
+import { costosVacios, guardarCostosNP, totalCostos, anularNP, aprobarNP, despachoVacio, faltaDespacho, estadoOD, generarDespachoNP, odDeNP, clienteVacio, clonarNP, crearNotaPedido, editarNotaPedido, permisoEditarNP, getCondicionesPago, guardarCliente, guardarCondicion, lineaVacia, pideDias, sumarDias, type DatosNP } from "@/lib/ventas";
+import type { Cliente, CondicionPago, CostosNP, DatosDespacho, NotaPedido, OrdenDespacho } from "@/lib/types";
 import { AvisoCondiciones, DatosDespachoForm, FormCliente, LineasEditor, SelectorCliente, TotalesVenta, useCargaCondiciones, useVentas } from "./comun";
 import { FormCondicion, condVacia } from "./maestros";
 
@@ -44,6 +44,8 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
   const [enviando, setEnviando] = useState(false);
   const [filtro, setFiltro] = useState("");
   const [aprobar, setAprobar] = useState<{ np: NotaPedido; despacho: DatosDespacho } | null>(null);
+  // Costeo de las NP que vienen de Secocha (PENDIENTE_COSTEO)
+  const [costear, setCostear] = useState<{ np: NotaPedido; costos: CostosNP } | null>(null);
   const habilitado = puede(rol, "venta.gestionar");
   const sesion = getSesion();
   const vendedor = sesion?.usuario ?? "";
@@ -129,7 +131,7 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
                 value={filtro}
                 onChange={(e) => setFiltro(e.target.value)}
                 placeholder="Todos los estados"
-                options={["PENDIENTE", "APROBADA", "FACTURADA", "ANULADA"].map((s) => ({ value: s, label: s }))}
+                options={["PENDIENTE_COSTEO", "PENDIENTE", "APROBADA", "FACTURADA", "ANULADA"].map((s) => ({ value: s, label: s.replace("_", " ") }))}
                 className="w-44"
               />
             </FiltrosPlegables>
@@ -156,6 +158,11 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
                 return od ? <span className="ml-1.5 text-xs text-plomo-500">{codigoDesdeNumero("OD", od.numero, od.fecha)}</span> : null;
               })()}
               <span className="ml-2 inline-block align-middle"><Badge estado={n.estado} /></span>
+              {n.origen === "SECOCHA" && (
+                <span className="ml-1.5 inline-block align-middle text-[11px] font-semibold text-amber-400" title="Origen Secocha">
+                  SECOCHA · {n.origenId}
+                </span>
+              )}
             </>
           ),
           total: (
@@ -179,6 +186,11 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
                 <Button size="sm" variant="secondary" onClick={() => pdfNotaPedido(n)} title="Ver / PDF cotización">
                   <FileText size={14} /> PDF
                 </Button>
+                {habilitado && n.origen === "SECOCHA" && (n.estado === "PENDIENTE_COSTEO" || n.estado === "PENDIENTE") && (
+                  <Button size="sm" variant={n.estado === "PENDIENTE_COSTEO" ? "warning" : "ghost"} onClick={() => setCostear({ np: n, costos: { ...costosVacios(), ...n.costos } })}>
+                    <Calculator size={14} /> {n.estado === "PENDIENTE_COSTEO" ? "Poner costos" : "Costos"}
+                  </Button>
+                )}
                 {habilitado && n.estado === "PENDIENTE" && (
                   <Button size="sm" variant="success" onClick={() => setAprobar({ np: n, despacho: n.despacho ?? { ...despachoVacio(), direccionDestino: n.lugarObra } })}>
                     <Check size={14} /> Aprobar
@@ -189,17 +201,17 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
                     <Truck size={14} /> Generar despacho
                   </Button>
                 )}
-                {habilitado && n.estado === "APROBADA" && (
+                {habilitado && n.estado === "APROBADA" && n.origen !== "SECOCHA" && (
                   <Button size="sm" variant="warning" onClick={() => onFacturar(n.id)}>
                     <Receipt size={14} /> Facturar
                   </Button>
                 )}
-                {habilitado && (
+                {habilitado && n.origen !== "SECOCHA" && (
                   <Button size="sm" variant="ghost" title="Duplicar" onClick={() => ejecutarAsync(() => clonarNP(n.id, vendedor, rol), "Nota de pedido duplicada")}>
                     <Copy size={14} />
                   </Button>
                 )}
-                {habilitado && (n.estado === "PENDIENTE" || n.estado === "APROBADA") && (
+                {habilitado && (n.estado === "PENDIENTE_COSTEO" || n.estado === "PENDIENTE" || n.estado === "APROBADA") && (
                   <Button size="sm" variant="ghost" title="Anular" onClick={() => { setMotivo(""); setAnular(n); }}>
                     <Ban size={14} className="text-red-600" />
                   </Button>
@@ -375,6 +387,59 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
                 }}
               >
                 <Check size={16} /> {aprobar.np.estado === "PENDIENTE" ? "Aprobar y generar orden de despacho" : "Generar orden de despacho"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal open={!!costear} onClose={() => setCostear(null)} title={`Costos ${costear?.np.numero ?? ""} · ${costear?.np.origenId ?? ""} · ${costear?.np.cliente ?? ""}`} wide>
+        {costear && (
+          <div className="space-y-4">
+            <p className="text-sm text-plomo-600">
+              Nota de pedido de <b>Secocha</b> ({costear.np.origenId}). La suma de los costos es el subtotal de la nota (sin IGV, traslado interno) y se reparte entre
+              los productos. Luego apruébela para generar la Orden de Despacho a Secocha.
+            </p>
+            <ul className="rounded-lg border border-plomo-200 p-3 text-sm text-fg-2">
+              {costear.np.items.map((l) => (
+                <li key={l.id}>
+                  {l.cantidad} {l.unidad} · {l.descripcion}
+                </li>
+              ))}
+            </ul>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {(
+                [
+                  ["produccion", "Costos de producción S/"],
+                  ["materiales", "Costo de materiales S/"],
+                  ["manoObra", "Mano de obra S/"],
+                  ["utilidad", "Utilidad S/"],
+                ] as [keyof CostosNP, string][]
+              ).map(([k, label]) => (
+                <Field key={k} label={label}>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={costear.costos[k] || ""}
+                    onChange={(e) => setCostear({ ...costear, costos: { ...costear.costos, [k]: parseFloat(e.target.value) || 0 } })}
+                  />
+                </Field>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center justify-end gap-3 border-t border-plomo-100 pt-4">
+              <span className="mr-auto text-sm text-plomo-600">
+                Total de la nota: <b className="text-lg text-fg">{soles(totalCostos(costear.costos))}</b>
+              </span>
+              <Button variant="secondary" onClick={() => setCostear(null)}>
+                Cancelar
+              </Button>
+              <Button
+                variant="warning"
+                disabled={!(totalCostos(costear.costos) > 0)}
+                onClick={() => ejecutar(() => void guardarCostosNP(costear.np.id, costear.costos, rol), `${costear.np.numero}: costos guardados, lista para aprobar`) && setCostear(null)}
+              >
+                <Calculator size={16} /> Guardar costos
               </Button>
             </div>
           </div>

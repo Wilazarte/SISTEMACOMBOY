@@ -3,13 +3,15 @@
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, ArrowRightLeft, Pencil, Building2, Camera, CheckCircle2, ClipboardCheck, FileText, MapPin, PackageCheck, Save, Truck } from "lucide-react";
-import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, Textarea, Timeline, cn, ejecutar, toast } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, Textarea, Timeline, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { FirmaPad } from "@/components/FirmaPad";
 import { ArchivoImg } from "@/components/ArchivoRef";
 import { useEditar } from "@/lib/hooks/useEditar";
 import { SEDES_STOCK as SEDES } from "@/lib/empresa";
-import { pdfOrdenDespacho } from "@/lib/pdf";
+import { pdfGuiaRemision, pdfOrdenDespacho, pdfOrdenTraslado } from "@/lib/pdf";
+import { useSedeSecocha } from "@/lib/sedes";
+import { crearTraslado, type Traslado } from "@/lib/sucursal";
 import { KEYS, MAX_ARCHIVO, abrirArchivo, subirBaucher, fechaPE, puede, r2, soles, stockDisponible, transferirStock, useRol, useStore } from "@/lib/storage";
 import { disponibleEquipo, equipoDeLinea, registrarMovimiento, sedeEquipo, transferirEquipo, type EquipoTerminado } from "@/lib/equipos";
 import { codigoDesdeNumero } from "@/lib/utils/codigos";
@@ -17,6 +19,7 @@ import {
   ESTADOS_OD,
   LUGARES_ENTREGA,
   cerrarDespacho,
+  cerrarODSecocha,
   estadoOD,
   guardarObservacionOD,
   marcarAlistado,
@@ -163,7 +166,7 @@ export function OrdenesDespacho({ vista = "almacen" }: { vista?: "almacen" | "ve
   );
 }
 
-type Modo = null | "ENTREGADO" | "AGENCIA";
+type Modo = null | "ENTREGADO" | "AGENCIA" | "SECOCHA";
 
 function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado: boolean; onClose: () => void }) {
   const [rol] = useRol();
@@ -233,6 +236,14 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
   const [guia, setGuia] = useState(od.guiaNro ?? "");
   const [foto, setFoto] = useState<ArchivoAdjunto | undefined>();
   const fotoRef = useRef<HTMLInputElement>(null);
+  // OD de Secocha: se atiende con OT + guía de remisión (traslado a Secocha)
+  const secocha = od.origenSecocha;
+  const sedesSec = useSedeSecocha();
+  const traslados = useStore<Traslado[]>(KEYS.SUC_TRASLADOS, [], !!secocha && sedesSec.listo);
+  const traslado = od.trasladoId ? traslados.find((t) => t.id === od.trasladoId) : undefined;
+  const [transportista, setTransportista] = useState("");
+  const [placa, setPlaca] = useState("");
+  const [trasladando, setTrasladando] = useState(false);
 
   const conPendiente = od.items.some((l) => pendienteLinea(l) > 0);
   const faltantes = modo
@@ -278,6 +289,32 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
     }
   };
 
+  const trasladar = async () => {
+    if (!secocha) return;
+    const lineas = od.items.map((l) => ({ lineaId: l.id, cantidad: r2(cant[l.id] ?? 0) }));
+    const productos = od.items
+      .filter((l) => (cant[l.id] ?? 0) > 0)
+      .map((l) => ({ producto: l.productoNombre || l.descripcion, unidad: l.unidad, cantidad: r2(cant[l.id] ?? 0) }));
+    setTrasladando(true);
+    let t: Traslado | undefined;
+    const ok = await ejecutarAsync(async () => {
+      t = await crearTraslado({
+        productos,
+        motivoTraslado: "Traslado entre establecimientos de la misma empresa",
+        transportista,
+        placa,
+        reqId: secocha.tipo === "REQ" ? secocha.id : undefined,
+        derivacionId: secocha.tipo === "DERIVACION" ? secocha.id : undefined,
+      });
+      cerrarODSecocha(od.id, { responsable: usuario, sede, guiaRemision: t.guiaRemision, observacion: obs.trim(), lineas }, t, rol);
+    }, `${codigoOD(od)}: OT y guía de remisión emitidas a ${secocha.sede}`);
+    setTrasladando(false);
+    if (ok && t) {
+      pdfOrdenTraslado(t);
+      setModo(null);
+    }
+  };
+
   return (
     <Modal open onClose={onClose} title={`${codigoOD(od)} · ${od.cliente}`} wide>
       <div className="space-y-4">
@@ -288,9 +325,22 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
             {od.vendedor ? ` · Vendedor ${od.vendedor}` : ""}
             {od.atendidoPor ? ` · Atendido por ${od.atendidoPor}` : ""}
           </span>
-          <Button size="sm" variant="secondary" onClick={() => pdfOrdenDespacho(od)} className="ml-auto">
-            <FileText size={14} /> PDF
-          </Button>
+          {secocha && <span className="text-xs font-semibold text-amber-400">SECOCHA · {secocha.numero}</span>}
+          <span className="ml-auto flex flex-wrap gap-2">
+            {traslado && (
+              <>
+                <Button size="sm" variant="ghost" onClick={() => pdfOrdenTraslado(traslado)}>
+                  <FileText size={14} /> {traslado.codigo}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => pdfGuiaRemision(traslado)}>
+                  <FileText size={14} /> Guía {traslado.guiaRemision}
+                </Button>
+              </>
+            )}
+            <Button size="sm" variant="secondary" onClick={() => pdfOrdenDespacho(od)}>
+              <FileText size={14} /> PDF
+            </Button>
+          </span>
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-plomo-200">
@@ -406,13 +456,26 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
         {modo && (
           <div className="space-y-3 rounded-xl border-2 border-azul-900 p-4">
             <p className="text-[12px] font-semibold uppercase tracking-wider text-fg">
-              {modo === "ENTREGADO" ? "Marcar entregado: salida de almacén y firma del cliente" : "Dejado en agencia: salida de almacén y guía"}
+              {modo === "SECOCHA"
+                ? `Traslado a ${secocha?.sede ?? "Secocha"}: salida de almacén, OT y guía de remisión`
+                : modo === "ENTREGADO"
+                  ? "Marcar entregado: salida de almacén y firma del cliente"
+                  : "Dejado en agencia: salida de almacén y guía"}
             </p>
             <div className="grid gap-3 md:grid-cols-3">
               <Field label="Almacén (sede) de salida">
                 <Select value={sede} onChange={(ev) => setSede(ev.target.value)} options={Array.from(new Set([...SEDES, sede])).map((x) => ({ value: x, label: x }))} />
               </Field>
-              {modo === "ENTREGADO" ? (
+              {modo === "SECOCHA" ? (
+                <>
+                  <Field label="Transportista">
+                    <Input value={transportista} onChange={(ev) => setTransportista(ev.target.value)} placeholder="Nombre / empresa" />
+                  </Field>
+                  <Field label="Placa">
+                    <Input value={placa} onChange={(ev) => setPlaca(ev.target.value.toUpperCase())} placeholder="ABC-123" />
+                  </Field>
+                </>
+              ) : modo === "ENTREGADO" ? (
                 <Field label="Recibido por (cliente) *" className="md:col-span-2">
                   <Input value={recibidoPor} onChange={(ev) => setRecibidoPor(ev.target.value)} placeholder="Nombre y DNI de quien recibe" />
                 </Field>
@@ -445,9 +508,15 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
               <Button variant="secondary" onClick={() => setModo(null)}>
                 Cancelar
               </Button>
-              <Button onClick={cerrar} disabled={faltantes.length > 0}>
-                <CheckCircle2 size={16} /> Confirmar {modo === "ENTREGADO" ? "entrega" : "dejado en agencia"}
-              </Button>
+              {modo === "SECOCHA" ? (
+                <Button onClick={trasladar} disabled={faltantes.length > 0 || trasladando || !sedesSec.listo}>
+                  <Truck size={16} /> {trasladando ? "Emitiendo…" : "Emitir OT y guía de remisión"}
+                </Button>
+              ) : (
+                <Button onClick={cerrar} disabled={faltantes.length > 0}>
+                  <CheckCircle2 size={16} /> Confirmar {modo === "ENTREGADO" ? "entrega" : "dejado en agencia"}
+                </Button>
+              )}
             </div>
           </div>
         )}
@@ -462,7 +531,12 @@ function DetalleOD({ od, habilitado, onClose }: { od: OrdenDespacho; habilitado:
                 <PackageCheck size={16} /> Marcar pedido alistado
               </Button>
             )}
-            {abierta && (
+            {abierta && secocha && (
+              <Button onClick={() => setModo("SECOCHA")}>
+                <Truck size={16} /> Emitir OT y guía a {secocha.sede}
+              </Button>
+            )}
+            {abierta && !secocha && (
               <>
                 <Button onClick={() => setModo("ENTREGADO")}>
                   <CheckCircle2 size={16} /> Marcar entregado

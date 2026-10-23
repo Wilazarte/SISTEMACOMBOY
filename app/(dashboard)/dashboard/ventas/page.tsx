@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { AlertTriangle, ClipboardList, Contact, FilePlus2, History, Receipt, Search, Settings2, Truck, Wallet } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertTriangle, ClipboardList, Inbox, Contact, FilePlus2, History, Receipt, Search, Settings2, Truck, Wallet } from "lucide-react";
 import { abrirBuscadorDePagina } from "@/components/layout/IslandMenu";
 import { Button, Tabs } from "@/components/ui";
 import { KEYS, useStore } from "@/lib/storage";
@@ -13,11 +13,13 @@ import { useCargaCondiciones } from "./comun";
 import { Comprobantes } from "./comprobantes";
 import { Clientes, CondicionesPago } from "./maestros";
 import { NotasPedido } from "./notas";
+import { RequerimientosSecocha, useSecocha } from "./secocha";
 
-type Tab = "notas" | "comprobantes" | "despachos" | "condiciones" | "clientes" | "cobrar";
+type Tab = "secocha" | "notas" | "comprobantes" | "despachos" | "condiciones" | "clientes" | "cobrar";
 
 /**
  * VENTAS — Nota de Pedido -> Aprobada -> Factura/Boleta -> Orden de Despacho (Almacén) -> Cobro.
+ * Secocha: sus requerimientos y ventas derivadas llegan a "Requerimientos de Secocha" y se aceptan como NP.
  */
 export default function VentasPage() {
   const [tab, setTab] = useState<Tab>("notas");
@@ -30,12 +32,28 @@ export default function VentasPage() {
   const despachos = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, []);
   const sinOD = npsSinDespacho(notas, despachos);
   const vencidos = comprobantes.filter((c) => c.estado === "EMITIDO" && estadoCxC(c).estado === "VENCIDO").length;
+  const secocha = useSecocha();
+  // Campana "Requerimiento de Secocha": /dashboard/ventas?tab=secocha
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "secocha") setTab("secocha");
+  }, []);
 
   return (
     <div className="w-full space-y-6">
-      <div>
-        <h1 className="font-serif tracking-tight text-2xl font-semibold leading-tight text-fg lg:text-[28px]">Ventas</h1>
-        <p className="mt-1 text-[13px] text-plomo-600">Nota de pedido → Aprobada (orden de despacho a Almacén) → Factura / Boleta → Cobro · seguimiento del despacho</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-serif tracking-tight text-2xl font-semibold leading-tight text-fg lg:text-[28px]">Ventas</h1>
+          <p className="mt-1 text-[13px] text-plomo-600">Nota de pedido → Aprobada (orden de despacho a Almacén) → Factura / Boleta → Cobro · seguimiento del despacho</p>
+        </div>
+        {secocha.pendientes > 0 && (
+          <button
+            type="button"
+            onClick={() => setTab("secocha")}
+            className="inline-flex items-center gap-2 rounded-full border border-amber-400/60 bg-amber-500/15 px-4 py-1.5 text-sm font-semibold text-amber-300 transition hover:bg-amber-500/25"
+          >
+            <Inbox size={15} /> Requerimientos Secocha ({secocha.pendientes})
+          </button>
+        )}
       </div>
       <Tabs<Tab>
         value={tab}
@@ -65,6 +83,7 @@ export default function VentasPage() {
           },
         ]}
         tabs={[
+          { id: "secocha", label: "Requerimientos de Secocha", icon: <Inbox size={16} />, count: secocha.pendientes },
           { id: "notas", label: "Notas de pedido", icon: <ClipboardList size={16} />, count: notas.filter((n) => n.estado === "APROBADA").length },
           { id: "comprobantes", label: "Comprobantes", icon: <Receipt size={16} />, count: comprobantes.filter((c) => c.estado === "BORRADOR").length },
           {
@@ -78,6 +97,7 @@ export default function VentasPage() {
           { id: "cobrar", label: "Cuentas por cobrar", icon: <Wallet size={16} />, count: vencidos },
         ]}
       />
+      {tab === "secocha" && <RequerimientosSecocha datos={secocha} onIrNotas={() => setTab("notas")} />}
       {tab === "notas" && (
         <NotasPedido
           onFacturar={(npId) => {

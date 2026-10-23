@@ -50,11 +50,10 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
   const rol = sesion?.rol ?? "";
   const veSuc = ve(RUTA_SUCURSAL);
   const opera = veSuc && ["creador", "sucursal"].includes(rol);
-  // Despachos de Secocha (Almacén Arequipa) y REQ-SECOCHA (solo Producción Arequipa)
-  const veDespSec = ve("/dashboard/almacen") && ["creador", "almacen"].includes(rol);
-  const veReqSec = ve("/dashboard/produccion") && ["creador", "almacen"].includes(rol);
-  const derivaciones = useStore<Derivacion[]>(KEYS.SUC_DERIVACIONES, [], veDespSec);
-  const reqsSec = useStore<ReqSucursal[]>(KEYS.SUC_REQS, [], veReqSec);
+  // REQ-SECOCHA y ventas derivadas de Secocha: solo a Ventas Arequipa (bandeja "Requerimientos de Secocha")
+  const veSecVentas = ve("/dashboard/ventas");
+  const derivaciones = useStore<Derivacion[]>(KEYS.SUC_DERIVACIONES, [], veSecVentas);
+  const reqsSec = useStore<ReqSucursal[]>(KEYS.SUC_REQS, [], veSecVentas);
   const traslados = useStore<Traslado[]>(KEYS.SUC_TRASLADOS, [], opera);
   const ventasSuc = useStore<VentaSucursal[]>(KEYS.SUC_VENTAS, [], opera);
   const stockSuc = useStore<StockLocal[]>(KEYS.SUC_STOCK, [], opera);
@@ -72,31 +71,29 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
       for (const o of odsNuevas(ods))
         out.push({ clave: `od:${o.id}`, tipo: "despacho", titulo: `Nueva orden de despacho ${o.numero}`, detalle: avisoOD(o), modulo: "Almacén", href: "/dashboard/almacen?tab=despacho", prioridad: 1 });
 
-    // Ventas derivadas desde Secocha = Orden de Despacho en Arequipa (bandeja Despachos de Secocha)
-    if (veDespSec)
+    // Secocha -> Ventas Arequipa: REQ-SECOCHA y ventas derivadas por aceptar (crean la Nota de Pedido)
+    if (veSecVentas) {
+      for (const r of reqsSec.filter((x) => x.estado === "enviado" || x.estado === "aprobado"))
+        out.push({
+          clave: `reqsec:${r.id}`,
+          tipo: "requerimiento",
+          titulo: `Requerimiento ${r.numero} de Secocha`,
+          detalle: `${r.solicitante || r.creadoPor} · ${r.items.length} producto(s) · aceptar para crear la nota de pedido`,
+          modulo: "Ventas · Requerimientos de Secocha",
+          href: "/dashboard/ventas?tab=secocha",
+          prioridad: 1,
+        });
       for (const d of derivaciones.filter((x) => x.estado === "pendiente" || x.estado === "en-preparacion"))
         out.push({
           clave: `der:${d.id}`,
           tipo: "despacho",
-          titulo: `Orden de despacho ${d.numero ?? d.ventaNumero} de ${d.sucursal}`,
-          detalle: `${d.cliente} · ${d.estado === "pendiente" ? "pendiente de despacho" : "en preparación"}`,
-          modulo: "Almacén · Despachos de Secocha",
-          href: "/dashboard/almacen?tab=despachos-secocha",
+          titulo: `Venta ${d.ventaNumero} derivada de ${d.sucursal}`,
+          detalle: `${d.cliente} · aceptar para crear la nota de pedido`,
+          modulo: "Ventas · Requerimientos de Secocha",
+          href: "/dashboard/ventas?tab=secocha",
           prioridad: 1,
         });
-
-    // REQ-SECOCHA: solo a Producción Arequipa (Almacén y Tesorería ya no los reciben)
-    if (veReqSec)
-      for (const r of reqsSec.filter((x) => x.estado === "enviado" || x.estado === "aprobado"))
-        out.push({
-          clave: `reqsec:${r.id}:${r.estado}`,
-          tipo: "requerimiento",
-          titulo: `${r.numero} ${r.estado === "aprobado" ? "aprobado: emitir Orden de Traslado" : "por aprobar"}`,
-          detalle: `${r.items.length} producto(s) · ${r.solicitante || r.creadoPor}`,
-          modulo: "Producción Arequipa",
-          href: "/dashboard/produccion",
-          prioridad: 2,
-        });
+    }
 
     if (ve("/dashboard/compras")) {
       // Requerimientos de Almacén por revisar
