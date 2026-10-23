@@ -54,7 +54,6 @@ const FLUJOS: [string, string][] = [
   ["/dashboard/planilla", "Trabajadores → Planilla del periodo → Historial → Contratistas"],
   ["/dashboard/contable", "Libro Diario → Mayor → Balance → Estados Financieros"],
   ["/dashboard/creador", "Asistencia → Edición manual → Planilla"],
-  ["/dashboard/productos", "Catálogo maestro → Solicitud → Aprobación → Mismo producto en todos los almacenes"],
   ["/dashboard", "Resumen → Compras → Almacén → Ventas → Contable"],
 ];
 /** Título centrado del encabezado: MODULO <nombre> (Inventario = Almacén, Reportes = Contable). */
@@ -65,7 +64,6 @@ const NOMBRE_MODULO: [string, string][] = [
   ["/dashboard/contable", "REPORTES"],
   ["/dashboard/produccion", "PRODUCCION"],
   ["/dashboard/creador", "CREADOR"],
-  ["/dashboard/productos", "PRODUCTOS"],
 ];
 const flujoDe = (ruta: string) => FLUJOS.find(([r]) => ruta === r || ruta.startsWith(`${r}/`))?.[1] ?? "";
 

@@ -166,9 +166,9 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
     // Catálogo maestro: solicitudes de producto nuevo (administrador) y respuesta a quien la pidió
     for (const s of solicitudes) {
       if (s.estado === "pendiente" && esAdminProductos(sesion.rol))
-        out.push({ clave: `sol:${s.id}`, tipo: "producto", titulo: `Producto nuevo solicitado: ${s.nombre}`, detalle: `${s.unidad}${s.modulo ? ` · ${s.modulo}` : ""}${s.solicitado_usuario ? ` · ${s.solicitado_usuario}` : ""}`, modulo: "Catálogo de productos", href: "/dashboard/productos?tab=solicitudes", prioridad: 2 });
+        out.push({ clave: `sol:${s.id}`, tipo: "producto", titulo: `Producto nuevo solicitado: ${s.nombre}`, detalle: `${s.unidad}${s.modulo ? ` · ${s.modulo}` : ""}${s.solicitado_usuario ? ` · ${s.solicitado_usuario}` : ""}`, modulo: "Catálogo de productos", href: "/dashboard/ventas?tab=productos&sub=solicitudes", prioridad: 2 });
       else if (s.estado !== "pendiente" && !esAdminProductos(sesion.rol) && s.solicitado_usuario === sesion.usuario)
-        out.push({ clave: `solr:${s.id}:${s.estado}`, tipo: "producto", titulo: `Solicitud ${s.estado}: ${s.nombre}`, detalle: s.respuesta ?? (s.estado === "aprobada" ? "Ya está en el catálogo" : "Revise con el administrador"), modulo: "Catálogo de productos", href: "/dashboard/productos?tab=solicitudes", prioridad: 6 });
+        out.push({ clave: `solr:${s.id}:${s.estado}`, tipo: "producto", titulo: `Solicitud ${s.estado}: ${s.nombre}`, detalle: s.respuesta ?? (s.estado === "aprobada" ? "Ya está en el catálogo" : "Revise con el administrador"), modulo: "Catálogo de productos", href: puedeVer(sesion, "/dashboard/ventas") ? "/dashboard/ventas?tab=productos&sub=solicitudes" : "/dashboard", prioridad: 6 });
     }
 
     return out.sort((a, b) => a.prioridad - b.prioridad);

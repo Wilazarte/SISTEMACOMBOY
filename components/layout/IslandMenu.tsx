@@ -38,19 +38,19 @@ export function IslandMenu({
   className?: string;
 }) {
   return (
-    <div className={cn("mx-4 mt-3 flex gap-1 overflow-x-auto rounded-full border border-slate-800 bg-[#0f172a]/90 px-2 py-1.5 backdrop-blur", className)}>
+    <div className={cn("mx-4 mt-3 flex gap-1 overflow-x-auto rounded-full border border-[#1e293b] bg-[#0f172a]/90 px-2 py-1.5 backdrop-blur", className)}>
       {acciones.map((a) => (
         <button
           key={a.label}
           type="button"
           onClick={a.onClick}
-          className="flex shrink-0 items-center gap-1.5 rounded-full border border-slate-800 bg-[#1e293b] px-3 py-1.5 text-[13px] font-medium text-slate-200 transition hover:border-slate-600"
+          className="flex shrink-0 items-center gap-1.5 rounded-full border border-[#334155] bg-[#1e293b] px-3 py-1.5 text-[13px] font-medium text-[#e2e8f0] transition hover:border-[#475569] hover:text-white"
         >
           {a.icon}
           {a.label}
         </button>
       ))}
-      {acciones.length > 0 && items.length > 0 && <span aria-hidden className="mx-1 my-1.5 w-px shrink-0 bg-slate-800" />}
+      {acciones.length > 0 && items.length > 0 && <span aria-hidden className="mx-1 my-1.5 w-px shrink-0 bg-[#334155]" />}
       <div role="tablist" className="flex gap-1">
         {items.map((t) => {
           const on = activo === t.id;
@@ -63,13 +63,13 @@ export function IslandMenu({
               onClick={() => onElegir(t.id)}
               className={cn(
                 "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium transition duration-150",
-                on ? "bg-[#1e40af] text-white" : "text-slate-400 hover:bg-[#1e293b] hover:text-slate-200"
+                on ? "bg-[#1e40af] text-white" : "text-[#94a3b8] hover:bg-[#1e293b] hover:text-[#e2e8f0]"
               )}
             >
               {t.icon}
               {t.label}
               {t.count !== undefined && t.count > 0 && (
-                <span className={cn("rounded-full px-1.5 text-[11px] font-semibold", on ? "bg-white/20 text-white" : "bg-[#1e293b] text-slate-200")}>{t.count}</span>
+                <span className={cn("rounded-full px-1.5 text-[11px] font-semibold", on ? "bg-white/20 text-white" : "bg-[#1e293b] text-[#e2e8f0]")}>{t.count}</span>
               )}
             </button>
           );

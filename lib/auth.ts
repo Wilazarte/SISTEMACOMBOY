@@ -149,8 +149,6 @@ export const veDashboard = (sesion: Sesion | null): boolean => !!sesion && ROLES
 export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
   if (!sesion) return false;
   if (ruta === "/dashboard") return true; // solo redirige al primer módulo permitido
-  // Catálogo maestro de productos: lo consultan todos (solo el administrador lo edita)
-  if (ruta === RUTA_PRODUCTOS) return true;
   // Módulo Creador: por rol, no por módulos (gerencia tiene "*" pero no debe entrar)
   if (ruta === RUTA_CREADOR || ruta.startsWith(`${RUTA_CREADOR}/`)) return puedeEditarAsistencia(sesion);
   // Producción: también Almacén (registra las órdenes de producción y el QC)
@@ -169,7 +167,6 @@ export const RUTA_SUCURSAL = "/secocha";
 export const RUTA_LOGIN_SUCURSAL = "/secocha/login";
 /** Dirección anterior: redirige a /secocha (next.config.mjs). */
 export const RUTA_SUCURSAL_ANTIGUA = "/sucursal";
-export const RUTA_PRODUCTOS = "/dashboard/productos";
 
 /** Tesorería / Compras: también entra quien solo tiene Planilla (ve solo esa pestaña). */
 export const veTesoreria = (sesion: Sesion | null): boolean => puedeVer(sesion, "/dashboard/compras") || puedeVer(sesion, "/dashboard/planilla");
