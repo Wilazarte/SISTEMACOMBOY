@@ -112,7 +112,7 @@ export type FormaPago = "CONTADO" | "CREDITO 15 DIAS" | "CREDITO 30 DIAS" | "CRE
  * Flujo de compras: EMITIDA -> BANCARIZADA -> FACTURADA (fin).
  * EN_GUIA / FINALIZADA quedan solo para OC antiguas (guía y V°B° de almacén ya no son parte del flujo).
  */
-export type EstadoOC = "EMITIDA" | "BANCARIZADA" | "FACTURADA" | "EN_GUIA" | "FINALIZADA";
+export type EstadoOC = "EMITIDA" | "BANCARIZADA" | "FACTURADA" | "EN_GUIA" | "FINALIZADA" | "APROBADA";
 
 export type TipoBancarizacion = "EFECTIVO" | "TRANSFERENCIA BCP" | "YAPE" | "BBVA" | "INTERBANK" | "DETRACCIÓN";
 
@@ -152,6 +152,8 @@ export interface OrdenCompra {
   bancarizacion?: Bancarizacion;
   /** OC emitida desde "Registrar gasto / compra" (sin cotización): id del gasto en Facturas. */
   gastoId?: string;
+  /** OC generada desde una "Compra con ingreso a stock" (nace APROBADA y ya ingresada a almacén). */
+  compraId?: string;
   /** Almacén ya registró el ingreso de esta OC (Almacén › Ingresos). */
   ingresadaAlmacen?: boolean;
   voucherUrl?: string; // ruta en Supabase Storage: bucket "tesoreria", carpeta vouchers/
@@ -437,6 +439,16 @@ export interface ItemCompra {
   subtotal: number; // cantidad × precioUnit (mismo criterio que precioUnit)
 }
 
+/** Pago de una compra con ingreso a stock: la cuenta de origen va en `Compra.caja`. */
+export interface PagoCompra {
+  formaPago: "CONTADO" | "CREDITO";
+  estado: "PAGADO" | "PENDIENTE";
+  fechaVencimiento: string; // YYYY-MM-DD
+  /** Tipo, N° de operación y fecha de pago: solo si está PAGADO. */
+  bancarizacion?: Bancarizacion;
+  observaciones?: string;
+}
+
 export interface Compra {
   id: string;
   fecha: string; // YYYY-MM-DD (se muestra DD/MM/YYYY)
@@ -447,6 +459,11 @@ export interface Compra {
   numero: string; // F001-00001234 / B001-00000456
   sede: string; // almacén donde ingresa
   caja?: string; // de qué cuenta se pagó ("CAJA GENERAL"…)
+  /** Comprobante de pago y origen (las compras antiguas solo tienen `caja`). */
+  pago?: PagoCompra;
+  /** OC generada al registrar la compra ("Generar Orden de Compra OC"). */
+  ordenCompraId?: string;
+  ordenCompraNumero?: string;
   items: ItemCompra[];
   subtotal: number;
   igv: number;

@@ -31,6 +31,7 @@ import type {
   Guia,
   ItemCompra,
   OrdenCompra,
+  PagoCompra,
   OrdenServicio,
   ItemServicio,
   Proveedor,
@@ -2682,31 +2683,126 @@ const NUM_COMPROBANTE: Record<Compra["tipoComprobante"], RegExp> = {
 };
 
 /** Registra la compra y suma las cantidades al stock de la sede. Valida todo antes de escribir. */
-export type DatosCompra = Pick<Compra, "fecha" | "proveedorId" | "tipoComprobante" | "numero" | "sede"> & Partial<Pick<Compra, "caja">> & { items: Omit<ItemCompra, "subtotal">[] };
+export type DatosCompra = Pick<Compra, "fecha" | "proveedorId" | "tipoComprobante" | "numero" | "sede"> &
+  Partial<Pick<Compra, "caja" | "pago">> & { items: Omit<ItemCompra, "subtotal">[]; /** "Generar Orden de Compra OC" */ generarOC?: boolean };
 
-export function registrarCompra(data: DatosCompra, rol: Rol): Compra {
+const docCompra = (c: Pick<Compra, "tipoComprobante" | "numero">) => `${c.tipoComprobante === "BOLETA" ? "Boleta" : "Factura"} ${c.numero}`;
+
+/**
+ * OC de una compra con ingreso a stock: nace APROBADA (ya tiene comprobante y la mercadería ya entró),
+ * marcada como ingresada para que Almacén no la vuelva a ingresar. `previa`: la OC ya vinculada (al editar).
+ */
+function ocDeCompra(c: Compra, numero: string, rol: Rol, previa?: OrdenCompra): OrdenCompra {
+  const items: ItemPrecio[] = (c.items as (ItemCompra & { productoId?: string; sku?: string })[]).map((i) => ({
+    itemReqId: i.id,
+    nombre: i.nombre,
+    ...(i.productoId ? { productoId: i.productoId, sku: i.sku } : {}),
+    cantidad: i.cantidad,
+    unidad: i.unidad || "UND",
+    marca: "",
+    precioUnit: i.precioUnit,
+    subtotal: i.subtotal,
+  }));
+  const b = c.pago?.bancarizacion;
+  const base: OrdenCompra = previa ?? {
+    id: uid(),
+    numero,
+    fecha: c.fecha,
+    cotizacionId: "",
+    cotizacionNumero: "-",
+    reqId: "",
+    reqNumero: "-",
+    proveedor: c.proveedor,
+    ruc: c.ruc,
+    formaPago: "CONTADO",
+    tiempoEntrega: "Inmediato",
+    lugarEntrega: c.sede,
+    items: [],
+    subtotal: 0,
+    igv: 0,
+    total: 0,
+    estado: "APROBADA",
+    historial: [evento(rol, "Orden de compra generada desde Compra con ingreso a stock", docCompra(c))],
+  };
+  const caja = b?.caja ?? c.caja;
+  return {
+    ...base,
+    fecha: c.fecha,
+    proveedor: c.proveedor,
+    ruc: c.ruc,
+    formaPago: c.pago?.formaPago === "CREDITO" ? "CREDITO 30 DIAS" : "CONTADO",
+    almacenIngreso: c.sede,
+    lugarEntrega: c.sede,
+    items,
+    subtotal: c.subtotal,
+    igv: c.igv,
+    total: c.total,
+    compraId: c.id,
+    ingresadaAlmacen: true,
+    // Pago pendiente: sin bancarización (se quita la de antes si la compra pasó a PENDIENTE)
+    bancarizacion: b,
+    caja,
+    cuentaOrigenPago: caja ? cuentaOrigenDeCaja(caja) : undefined,
+    historial: previa ? [...previa.historial, evento(rol, "Actualizada por edición de la compra", `${docCompra(c)} · ${soles(c.total)}`)] : base.historial,
+  };
+}
+
+/** Reserva el N° de la OC (si se pidió y la compra aún no tiene una). Va después de validar la compra. */
+async function numeroOCCompra(generar: boolean | undefined, previa?: OrdenCompra): Promise<string | undefined> {
+  if (!generar || previa) return undefined;
+  return formatear("OC", await siguiente("OC"));
+}
+
+export async function registrarCompra(data: DatosCompra, rol: Rol): Promise<{ compra: Compra; oc?: OrdenCompra }> {
   const compra: Compra = { ...prepararCompra(data), id: uid(), creadoPor: usuarioActual(), historial: [] };
-  compra.historial = [evento(rol, "Compra registrada", `${compra.numero} · ${compra.proveedor} · ingreso a ${compra.sede} · pagado desde ${compra.caja}`)];
+  const numeroOC = await numeroOCCompra(data.generarOC);
+  const oc = numeroOC ? ocDeCompra(compra, numeroOC, rol) : undefined;
+  if (oc) {
+    compra.ordenCompraId = oc.id;
+    compra.ordenCompraNumero = oc.numero;
+  }
+  compra.historial = [
+    evento(rol, "Compra registrada", `${compra.numero} · ${compra.proveedor} · ingreso a ${compra.sede} · ${textoPagoCompra(compra)}${oc ? ` · ${oc.numero}` : ""}`),
+  ];
   escribir(KEYS.COMPRAS, [compra, ...getCompras()]);
-  ingresarStock(compra.sede, compra.items, { tipo: "INGRESO", documento: `${compra.tipoComprobante === "BOLETA" ? "Boleta" : "Factura"} ${compra.numero}` });
-  return compra;
+  ingresarStock(compra.sede, compra.items, { tipo: "INGRESO", documento: docCompra(compra) });
+  if (oc) escribir(KEYS.ORDENES, [oc, ...getOrdenes()]);
+  return { compra, oc };
 }
 
 /**
  * Corrige una compra registrada: devuelve al almacén (AJUSTE en el kardex) lo que ingresó y vuelve a ingresar
  * lo corregido. Si esos productos ya se usaron (no alcanza el stock), no se puede editar: se avisa antes de tocar nada.
+ * Si la compra tiene OC, la OC se actualiza con los datos corregidos; si se marca "Generar OC" y no tenía, se crea.
  */
-export function editarCompra(id: string, data: DatosCompra, rol: Rol): Compra {
+export async function editarCompra(id: string, data: DatosCompra, rol: Rol): Promise<{ compra: Compra; oc?: OrdenCompra }> {
   const lista = getCompras();
   const vieja = lista.find((c) => c.id === id);
   if (!vieja) throw new ErpError("Compra no encontrada.");
   const nueva = prepararCompra(data, id);
+  const previa = vieja.ordenCompraId ? getOrdenes().find((o) => o.id === vieja.ordenCompraId) : undefined;
+  const numeroOC = await numeroOCCompra(data.generarOC, previa);
   const doc = `Edición ${vieja.tipoComprobante === "BOLETA" ? "boleta" : "factura"} ${vieja.numero}`;
   descontarStock(vieja.sede, vieja.items, { tipo: "AJUSTE", documento: doc, motivo: "Se revierte el ingreso para corregir la compra" });
-  ingresarStock(nueva.sede, nueva.items, { tipo: "INGRESO", documento: `${nueva.tipoComprobante === "BOLETA" ? "Boleta" : "Factura"} ${nueva.numero} (corregida)` });
-  const editada = marcarEditado({ ...vieja, ...nueva }, rol, "Compra editada", `${vieja.numero} · ${soles(vieja.total)} → ${nueva.numero} · ${soles(nueva.total)}`);
+  ingresarStock(nueva.sede, nueva.items, { tipo: "INGRESO", documento: `${docCompra(nueva)} (corregida)` });
+  const editada = marcarEditado({ ...vieja, ...nueva }, rol, "Compra editada", `${vieja.numero} · ${soles(vieja.total)} → ${nueva.numero} · ${soles(nueva.total)} · ${textoPagoCompra(nueva)}`);
+  const oc = previa || numeroOC ? ocDeCompra(editada, numeroOC ?? previa!.numero, rol, previa) : undefined;
+  if (oc) {
+    editada.ordenCompraId = oc.id;
+    editada.ordenCompraNumero = oc.numero;
+    const ordenes = getOrdenes();
+    escribir(KEYS.ORDENES, previa ? ordenes.map((o) => (o.id === oc.id ? oc : o)) : [oc, ...ordenes]);
+  }
   escribir(KEYS.COMPRAS, lista.map((c) => (c.id === id ? editada : c)));
-  return editada;
+  return { compra: editada, oc };
+}
+
+/** "PAGADO desde CAJA GENERAL" / "PENDIENTE (crédito, vence 30/10/2026)" para el historial. */
+function textoPagoCompra(c: Pick<Compra, "caja" | "pago">): string {
+  const p = c.pago;
+  if (!p) return `pagado desde ${c.caja}`;
+  if (p.estado === "PAGADO") return `PAGADO desde ${c.caja}${p.bancarizacion ? ` (${textoBancarizacion(p.bancarizacion)})` : ""}`;
+  return `PENDIENTE (${p.formaPago === "CREDITO" ? "crédito" : "contado"}, vence ${fechaPE(p.fechaVencimiento)}) · cuenta ${c.caja}`;
 }
 
 /** Elimina una compra registrada y saca del almacén lo que ingresó (AJUSTE en el kardex). */
@@ -2738,6 +2834,7 @@ function prepararCompra(data: DatosCompra, excluirId?: string): Omit<Compra, "id
   if (data.fecha > hoy()) throw new ErpError("La fecha de compra no puede ser futura.");
   if (!data.sede.trim()) throw new ErpError("Seleccione la sede / almacén de ingreso.");
   if (!data.caja?.trim()) throw new ErpError("Seleccione de qué cuenta se realiza el pago.");
+  const pago = data.pago ? validarPagoCompra(data.pago, data.fecha, data.caja.trim()) : undefined;
   const numero = data.numero.trim().toUpperCase();
   if (!NUM_COMPROBANTE[data.tipoComprobante].test(numero))
     throw new ErpError(`N° de ${data.tipoComprobante.toLowerCase()} inválido. Ej: ${data.tipoComprobante === "FACTURA" ? "F001-00001234" : "B001-00000456"}`);
@@ -2764,10 +2861,28 @@ function prepararCompra(data: DatosCompra, excluirId?: string): Omit<Compra, "id
     numero,
     sede: data.sede,
     caja: data.caja.trim(),
+    ...(pago ? { pago } : {}),
     items,
     subtotal,
     igv,
     total,
+  };
+}
+
+/** Comprobante de pago y origen de la compra: la cuenta es la de la compra; la bancarización solo si está PAGADO. */
+function validarPagoCompra(p: PagoCompra, fechaCompra: string, caja: string): PagoCompra {
+  if (p.formaPago !== "CONTADO" && p.formaPago !== "CREDITO") throw new ErpError("Seleccione la forma de pago.");
+  if (p.estado !== "PAGADO" && p.estado !== "PENDIENTE") throw new ErpError("Seleccione el estado de pago.");
+  const venc = p.fechaVencimiento || fechaCompra;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(venc)) throw new ErpError("Fecha de vencimiento inválida.");
+  if (venc < fechaCompra) throw new ErpError("La fecha de vencimiento no puede ser anterior a la fecha de compra.");
+  const obs = p.observaciones?.trim();
+  return {
+    formaPago: p.formaPago,
+    estado: p.estado,
+    fechaVencimiento: venc,
+    ...(p.estado === "PAGADO" ? { bancarizacion: validarBancarizacion({ ...(p.bancarizacion ?? { tipo: TIPOS_BANCARIZACION[0], fecha: hoy() }), caja }) } : {}),
+    ...(obs ? { observaciones: obs } : {}),
   };
 }
 
