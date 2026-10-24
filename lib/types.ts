@@ -179,6 +179,8 @@ export interface ItemServicio {
   /** Si la línea es un producto del catálogo maestro. */
   productoId?: string;
   sku?: string;
+  /** false: servicio en texto libre (OS de Registrar gasto), no viene del catálogo. */
+  esCatalogo?: boolean;
 }
 
 export interface OrdenServicio {

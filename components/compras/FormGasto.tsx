@@ -30,6 +30,7 @@ import {
 import type { ArchivoGasto, Factura, Bancarizacion, ComprobanteGasto, OrdenAGenerar, Proveedor, Rol, StockItem, TipoGasto } from "@/lib/types";
 import { ProductoInput } from "@/components/productos/ProductoInput";
 import { SelectorOrden } from "@/components/compras/SelectorOrden";
+import { ServiciosOS, lineasServicio, servicioVacio, type FilaServicio } from "@/components/compras/ServiciosOS";
 import {
   OPCIONES_COMPROBANTE,
   PORC_RETENCION_RHE,
@@ -74,6 +75,8 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
   const [orden, setOrden] = useState<OrdenAGenerar>("NINGUNA");
   const conOC = orden !== "NINGUNA";
   const [filas, setFilas] = useState<FilaOC[]>([filaOC()]);
+  // OS: servicios en texto libre (sin catálogo)
+  const [servicios, setServicios] = useState<FilaServicio[]>([servicioVacio()]);
   // Bancarización: con ella el gasto queda PAGADO ("Registrar y pagar")
   const [pagar, setPagar] = useState(false);
   const [banc, setBanc] = useState<Bancarizacion>(bancarizacionVacia);
@@ -119,7 +122,15 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
     let dj: Factura | undefined;
     const ok = await ejecutarAsync(
       async () => {
-        const r = await registrarGastoCompleto({ ...d, fecha: fechaISO }, { items: conOC ? filas : undefined, orden: orden === "OS" ? "OS" : "OC", bancarizacion: pagar ? banc : undefined }, rol);
+        const r = await registrarGastoCompleto(
+          { ...d, fecha: fechaISO },
+          {
+            items: orden === "OC" ? filas : undefined,
+            servicios: orden === "OS" ? lineasServicio(servicios, d.descripcion, d.importe, d.comprobante === "FACTURA") : undefined,
+            bancarizacion: pagar ? banc : undefined,
+          },
+          rol
+        );
         id = r.gasto.id;
         if (r.gasto.comprobanteGasto === "DJ") dj = r.gasto;
         return r;
@@ -136,6 +147,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
     setD(vacio());
     setOrden("NINGUNA");
     setFilas([filaOC()]);
+    setServicios([servicioVacio()]);
     setPagar(false);
     setBanc(bancarizacionVacia());
     onGuardado?.();
@@ -190,9 +202,12 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
         {/* Orden de compra u orden de servicio opcional (una sola) */}
         <div className="md:col-span-3">
           <SelectorOrden value={orden} onChange={setOrden} nota="Opcional. La OS nace APROBADA con correlativo OS-001-2026.">
+            {orden === "OS" ? (
+              <ServiciosOS filas={servicios} onChange={setServicios} descripcionGasto={d.descripcion} importe={d.importe} conIgv={d.comprobante === "FACTURA"} />
+            ) : (
             <div className="mt-3 space-y-3">
               <p className="text-xs text-plomo-500">
-                La {orden === "OS" ? "OS" : "OC"} se emite a nombre del proveedor de abajo. Busque los productos en el almacén o escríbalos; precios {d.comprobante === "FACTURA" ? "sin IGV" : "finales"}.
+                La OC se emite a nombre del proveedor de abajo. Busque los productos en el almacén o escríbalos; precios {d.comprobante === "FACTURA" ? "sin IGV" : "finales"}.
               </p>
               <datalist id="productos-oc-gasto">
                 {productos.map((p) => (
@@ -249,11 +264,12 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
                   <Plus size={14} /> Agregar producto
                 </Button>
                 <p className={cn("text-sm", Math.abs(totalOC - (d.importe || 0)) > 0.05 ? "text-red-600" : "text-emerald-700")}>
-                  Total {orden === "OS" ? "OS" : "OC"} <b>{soles(totalOC)}</b>
+                  Total OC <b>{soles(totalOC)}</b>
                   {d.comprobante === "FACTURA" ? ` (${soles(subOC)} + IGV)` : ""} · debe coincidir con el importe {soles(d.importe || 0)}
                 </p>
               </div>
             </div>
+            )}
           </SelectorOrden>
         </div>
         <Field label="Tipo de comprobante *">
