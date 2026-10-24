@@ -30,6 +30,7 @@ import { abrirDoc } from "@/components/doc-viewer";
 import { FormGasto } from "@/components/compras/FormGasto";
 import { SelectorCaja } from "@/components/SelectorCaja";
 import { FormBancarizacion, bancarizacionVacia } from "@/components/compras/FormBancarizacion";
+import { PagoCompraForm, pagoCompraDe, pagoCompraVacio, type FormPagoCompra } from "@/components/compras/PagoCompra";
 import { CAJA_POR_DEFECTO } from "@/lib/cajas";
 import {
   IGV,
@@ -495,7 +496,9 @@ function RegistrarCompra({
   const [tipo, setTipo] = useState<TipoComprobanteCompra>("FACTURA");
   const [numero, setNumero] = useState("");
   const [sede, setSede] = useState(SEDES[0]);
-  const [cajaCompra, setCajaCompra] = useState(CAJA_POR_DEFECTO);
+  const [pago, setPago] = useState<FormPagoCompra>(pagoCompraVacio);
+  const [generarOC, setGenerarOC] = useState(false);
+  const [guardandoCompra, setGuardandoCompra] = useState(false);
   const [filas, setFilas] = useState<FilaCompra[]>([filaVacia()]);
   const habilitado = puede(rol, "compra.crear");
   const sesion = getSesion();
@@ -512,7 +515,8 @@ function RegistrarCompra({
     setTipo(c.tipoComprobante);
     setNumero(c.numero);
     setSede(c.sede);
-    setCajaCompra(c.caja ?? CAJA_POR_DEFECTO);
+    setPago(pagoCompraDe(c));
+    setGenerarOC(!!c.ordenCompraId);
     setFilas(c.items.map((i) => ({ id: uid(), nombre: i.nombre, unidad: i.unidad, cantidad: i.cantidad, precioUnit: i.precioUnit })));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -520,6 +524,8 @@ function RegistrarCompra({
     setEditando(null);
     setNumero("");
     setFilas([filaVacia()]);
+    setPago(pagoCompraVacio());
+    setGenerarOC(false);
   };
 
   const fechaISO = parseFechaPE(fechaTxt);
@@ -539,12 +545,32 @@ function RegistrarCompra({
     }
   };
 
-  const guardar = () => {
-    const datos = { proveedorId, fecha: fechaISO, tipoComprobante: tipo, numero, sede, caja: cajaCompra, items: filas };
-    const ok = editando
-      ? ejecutar(() => void editarCompra(editando.id, datos, rol), `${editando.numero} corregida · stock de ${sede} ajustado`)
-      : ejecutar(() => registrarCompra(datos, rol), `Compra registrada · stock de ${sede} actualizado`);
-    if (ok) cancelarEdicion();
+  const guardar = async () => {
+    const { bancarizacion, ...resto } = pago;
+    const datos = {
+      proveedorId,
+      fecha: fechaISO,
+      tipoComprobante: tipo,
+      numero,
+      sede,
+      caja: bancarizacion.caja,
+      pago: { ...resto, ...(pago.estado === "PAGADO" ? { bancarizacion } : {}) },
+      generarOC,
+      items: filas,
+    };
+    setGuardandoCompra(true);
+    let ocNumero = "";
+    const ok = await ejecutarAsync(
+      async () => {
+        const r = editando ? await editarCompra(editando.id, datos, rol) : await registrarCompra(datos, rol);
+        ocNumero = r.oc?.numero ?? "";
+      },
+      editando ? `${editando.numero} corregida · stock de ${sede} ajustado` : `Compra registrada · stock de ${sede} actualizado`
+    );
+    setGuardandoCompra(false);
+    if (!ok) return;
+    if (ocNumero) toast(`Orden de compra ${ocNumero} vinculada a la compra (APROBADA)`);
+    cancelarEdicion();
   };
 
   // Compras (con stock) y gastos de Tesorería en una sola lista, de la más reciente a la más antigua
@@ -632,7 +658,6 @@ function RegistrarCompra({
             <Field label="Ingresa a almacén">
               <Select value={sede} onChange={(e) => setSede(e.target.value)} options={SEDES.map((x) => ({ value: x, label: x }))} />
             </Field>
-            <SelectorCaja value={cajaCompra} onChange={setCajaCompra} className="md:col-span-2" />
           </div>
 
           <div className="overflow-x-auto">
@@ -695,13 +720,34 @@ function RegistrarCompra({
           </div>
           {conIgv && <p className="px-5 pt-3 text-right text-xs text-plomo-500">Boleta: los precios incluyen IGV; la base imponible se obtiene dividiendo el total entre 1.18.</p>}
           <Totales subtotal={subtotal} igv={igv} total={total} />
+          <div className="space-y-4 px-5 pb-5">
+            {/* Orden de compra opcional: se genera con los productos de esta compra */}
+            <div className="rounded-xl border border-plomo-200 p-4">
+              <label className={cn("flex items-center gap-2 text-sm font-semibold text-fg", editando?.ordenCompraId ? "cursor-default" : "cursor-pointer")}>
+                <input
+                  type="checkbox"
+                  checked={generarOC}
+                  disabled={!!editando?.ordenCompraId || !puede(rol, "oc.crear")}
+                  onChange={(e) => setGenerarOC(e.target.checked)}
+                  className="h-4 w-4 accent-corp"
+                />
+                <ShoppingBag size={15} /> Generar Orden de Compra OC
+              </label>
+              <p className="mt-1 text-xs text-plomo-500">
+                {editando?.ordenCompraId
+                  ? `Vinculada a ${editando.ordenCompraNumero}: al guardar se actualiza con los datos corregidos.`
+                  : "Crea una OC con correlativo, APROBADA y ya ingresada a almacén, con los productos de esta compra."}
+              </p>
+            </div>
+            <PagoCompraForm value={pago} onChange={setPago} />
+          </div>
           <div className="flex justify-end border-t border-plomo-100 px-5 py-4">
             {editando && (
               <Button variant="secondary" onClick={cancelarEdicion} className="mr-2">
                 Cancelar edición
               </Button>
             )}
-            <Button onClick={guardar} disabled={!proveedorId || !fechaISO}>
+            <Button onClick={guardar} disabled={!proveedorId || !fechaISO || guardandoCompra}>
               {editando ? <Pencil size={16} /> : <PackagePlus size={16} />} {editando ? "Guardar cambios" : "Guardar compra e ingresar a stock"}
             </Button>
           </div>
@@ -763,10 +809,16 @@ function RegistrarCompra({
               id: c.id,
               fecha: c.fecha,
               contraparte: c.proveedor,
-              ref: <span className="whitespace-nowrap font-semibold text-fg">{c.numero}</span>,
+              ref: (
+                <span className="whitespace-nowrap font-semibold text-fg">
+                  {c.numero}
+                  {c.ordenCompraNumero && <span className="ml-1.5 text-xs font-normal text-plomo-500">{c.ordenCompraNumero}</span>}
+                </span>
+              ),
               total: soles(c.total),
               buscar: `${c.numero} ${c.ruc} ${c.sede} ${c.items.map((i) => i.nombre).join(" ")}`,
               tipoDoc: "COMPRA",
+              ...(c.pago ? { estado: c.pago.estado === "PAGADO" ? "PAGADA" : "POR_PAGAR" } : {}),
               acciones: (
                 <div className="flex gap-1">
                   <Button size="sm" variant="ghost" onClick={() => setVerCompra(c)} title="Ver detalle" aria-label="Ver">
@@ -801,7 +853,22 @@ function RegistrarCompra({
                   ["Fecha", fechaPE(verCompra.fecha)],
                   ["Proveedor", `${verCompra.proveedor} · RUC ${verCompra.ruc}`],
                   ["Ingresó a almacén", verCompra.sede],
-                  ["Pagado desde", verCompra.caja ?? "-"],
+                  [verCompra.pago?.estado === "PENDIENTE" ? "Cuenta de pago" : "Pagado desde", verCompra.caja ?? "-"],
+                  ...(verCompra.pago
+                    ? ([
+                        ["Forma de pago", verCompra.pago.formaPago === "CREDITO" ? "Crédito" : "Contado"],
+                        ["Estado de pago", verCompra.pago.estado === "PAGADO" ? "Pagado" : "Pendiente"],
+                        ["Fecha de vencimiento", fechaPE(verCompra.pago.fechaVencimiento)],
+                        ...(verCompra.pago.bancarizacion
+                          ? [
+                              ["Fecha de pago", fechaPE(verCompra.pago.bancarizacion.fecha)],
+                              ["Bancarización", `${verCompra.pago.bancarizacion.tipo}${verCompra.pago.bancarizacion.nroOperacion ? ` · N° ${verCompra.pago.bancarizacion.nroOperacion}` : ""}`],
+                            ]
+                          : []),
+                        ...(verCompra.pago.observaciones ? [["Observaciones de pago", verCompra.pago.observaciones]] : []),
+                      ] as [string, string][])
+                    : []),
+                  ...(verCompra.ordenCompraNumero ? ([["Orden de compra", verCompra.ordenCompraNumero]] as [string, string][]) : []),
                 ] as [string, string][]
               ).map(([k, v]) => (
                 <div key={k}>

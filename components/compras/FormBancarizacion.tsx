@@ -8,9 +8,24 @@ import type { Bancarizacion, TipoBancarizacion } from "@/lib/types";
 
 export const bancarizacionVacia = (): Bancarizacion => ({ tipo: "TRANSFERENCIA BCP", nroOperacion: "", fecha: hoy(), caja: CAJA_POR_DEFECTO });
 
-/** BANCARIZACIÓN: tipo, N° de operación, fecha de pago y cuenta de origen (mismo selector de todos los pagos). */
-export function FormBancarizacion({ value, onChange }: { value: Bancarizacion; onChange: (b: Bancarizacion) => void }) {
+/**
+ * BANCARIZACIÓN: tipo, N° de operación, fecha de pago y cuenta de origen (mismo selector de todos los pagos).
+ * `soloCuenta`: pago aún pendiente, solo se elige la cuenta de la que saldrá.
+ */
+export function FormBancarizacion({
+  value,
+  onChange,
+  soloCuenta = false,
+  encabezado = true,
+}: {
+  value: Bancarizacion;
+  onChange: (b: Bancarizacion) => void;
+  soloCuenta?: boolean;
+  encabezado?: boolean;
+}) {
   const set = <K extends keyof Bancarizacion>(k: K, v: Bancarizacion[K]) => onChange({ ...value, [k]: v });
+  const cuenta = <SelectorCaja value={value.caja} onChange={(caja) => set("caja", caja)} encabezado={encabezado} className="md:col-span-3" />;
+  if (soloCuenta) return <div className="grid gap-4 md:grid-cols-3">{cuenta}</div>;
   return (
     <div className="grid gap-4 md:grid-cols-3">
       <Field label="Tipo de bancarización *">
@@ -22,7 +37,7 @@ export function FormBancarizacion({ value, onChange }: { value: Bancarizacion; o
       <Field label="Fecha de pago *">
         <Input type="date" value={value.fecha} max={hoy()} onChange={(e) => set("fecha", e.target.value)} />
       </Field>
-      <SelectorCaja value={value.caja} onChange={(caja) => set("caja", caja)} className="md:col-span-3" />
+      {cuenta}
     </div>
   );
 }
