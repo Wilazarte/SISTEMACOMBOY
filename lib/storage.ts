@@ -2438,6 +2438,50 @@ export function registrarGastoTesoreria(d: DatosGasto, rol: Rol): Factura {
   return f;
 }
 
+/** Línea de la OS del gasto: servicio en texto libre (no es producto del catálogo ni pasa por almacén). */
+export type ServicioOSGasto = { descripcion: string; cantidad: number; unidad: string; precioUnit: number };
+
+/**
+ * OS del gasto con servicios en texto libre: sin catálogo ni kardex. Con una sola línea toma el importe del gasto
+ * (base sin IGV si es factura); con varias, su total debe coincidir con el importe.
+ */
+async function osDeGasto(f: Factura, d: DatosGasto, servicios: ServicioOSGasto[], rol: Rol): Promise<OrdenServicio> {
+  const lineas = servicios
+    .map((s) => ({ ...s, descripcion: s.descripcion.trim() || (servicios.length === 1 ? d.descripcion.trim() : "") }))
+    .filter((s) => s.descripcion);
+  if (!lineas.length) throw new ErpError("Describa el servicio de la orden de servicio.");
+  if (lineas.some((s) => !(s.cantidad > 0))) throw new ErpError("Cada servicio de la OS necesita una cantidad mayor a 0.");
+  const una = lineas.length === 1;
+  if (!una && lineas.some((s) => !(s.precioUnit > 0))) throw new ErpError("Cada servicio de la OS necesita precio mayor a 0.");
+  const items: ItemPrecio[] = lineas.map((s) => {
+    const subtotal = una ? f.subtotal : r2(s.cantidad * s.precioUnit);
+    return {
+      itemReqId: uid(),
+      nombre: s.descripcion,
+      cantidad: s.cantidad,
+      unidad: s.unidad || "SERVICIO",
+      marca: "",
+      precioUnit: una ? r2(subtotal / s.cantidad) : r2(s.precioUnit),
+      subtotal,
+    };
+  });
+  const subtotal = una ? f.subtotal : r2(items.reduce((a, i) => a + i.subtotal, 0));
+  const igv = una ? f.igv : d.comprobante === "FACTURA" ? r2(subtotal * IGV) : 0;
+  const total = r2(subtotal + igv);
+  if (Math.abs(total - f.total) > 0.05)
+    throw new ErpError(`El total de la OS (${soles(total)}) no coincide con el importe del gasto (${soles(f.total)}). Revise cantidades y precios${igv ? " (sin IGV)" : ""}.`);
+  // El N° se reserva cuando todo ya validó
+  const os = osDirecta(
+    { fecha: d.fecha, proveedor: f.proveedor, ruc: f.ruc, concepto: d.descripcion.trim(), origen: "GASTO", gastoId: f.id, gastoNumero: f.numero, items, subtotal, igv, total },
+    await reservarNumeroOS(),
+    rol,
+    `${COMPROBANTES_GASTO[d.comprobante]} ${f.numero}`
+  );
+  // Servicio libre: no es del catálogo maestro
+  os.items = os.items.map((i) => ({ ...i, esCatalogo: false }));
+  return os;
+}
+
 /** Ítems de la OC opcional del gasto (productos del almacén o escritos a mano). */
 export type ItemOCGasto = { nombre: string; unidad: string; cantidad: number; precioUnit: number };
 
@@ -2449,8 +2493,8 @@ export type ItemOCGasto = { nombre: string; unidad: string; cantidad: number; pr
  */
 export async function registrarGastoCompleto(
   d: DatosGasto,
-  /** `items` + `orden`: con ellos se emite la OC (por defecto) o la OS del gasto. */
-  opc: { items?: ItemOCGasto[]; orden?: "OC" | "OS"; bancarizacion?: Bancarizacion },
+  /** `items`: OC del gasto (productos del catálogo). `servicios`: OS del gasto (texto libre). Solo una de las dos. */
+  opc: { items?: ItemOCGasto[]; servicios?: ServicioOSGasto[]; bancarizacion?: Bancarizacion },
   rol: Rol
 ): Promise<{ gasto: Factura; oc?: OrdenCompra; os?: OrdenServicio }> {
   // Declaración jurada: el N° lo pone el servidor (DJ-0001, DJ-0002…) al final, cuando todo lo demás ya validó
@@ -2459,11 +2503,12 @@ export async function registrarGastoCompleto(
   const b = opc.bancarizacion ? validarBancarizacion(opc.bancarizacion) : undefined;
   let oc: OrdenCompra | undefined;
   let os: OrdenServicio | undefined;
-  const sigla = opc.orden === "OS" ? "OS" : "OC";
+  if (opc.items && opc.servicios) throw new ErpError("Elija una sola orden: OC u OS.");
+  if (opc.servicios) os = await osDeGasto(f, d, opc.servicios, rol);
   if (opc.items) {
     const filas = opc.items.filter((i) => i.nombre.trim());
-    if (!filas.length) throw new ErpError(`Agregue al menos un producto a la orden de ${sigla === "OS" ? "servicio" : "compra"}.`);
-    if (filas.some((i) => !(i.cantidad > 0) || !(i.precioUnit > 0))) throw new ErpError(`Cada producto de la ${sigla} necesita cantidad y precio mayores a 0.`);
+    if (!filas.length) throw new ErpError("Agregue al menos un producto a la orden de compra.");
+    if (filas.some((i) => !(i.cantidad > 0) || !(i.precioUnit > 0))) throw new ErpError("Cada producto de la OC necesita cantidad y precio mayores a 0.");
     const items: ItemPrecio[] = canonizarItems(filas).map((i) => ({
       itemReqId: uid(),
       nombre: i.nombre,
@@ -2479,42 +2524,33 @@ export async function registrarGastoCompleto(
     const igv = d.comprobante === "FACTURA" ? r2(subtotal * IGV) : 0;
     const total = r2(subtotal + igv);
     if (Math.abs(total - f.total) > 0.05)
-      throw new ErpError(`El total de la ${sigla} (${soles(total)}) no coincide con el importe del gasto (${soles(f.total)}). Revise cantidades y precios${igv ? " (sin IGV)" : ""}.`);
-    if (sigla === "OS") {
-      os = osDirecta(
-        { fecha: d.fecha, proveedor: f.proveedor, ruc: f.ruc, concepto: d.descripcion.trim(), origen: "GASTO", gastoId: f.id, gastoNumero: f.numero, items, subtotal, igv, total },
-        await reservarNumeroOS(),
-        rol,
-        `${COMPROBANTES_GASTO[d.comprobante]} ${f.numero}`
-      );
-    } else {
-      const numero = formatear("OC", await siguiente("OC"));
-      oc = {
-        id: uid(),
-        numero,
-        fecha: d.fecha,
-        cotizacionId: "",
-        cotizacionNumero: "-",
-        reqId: "",
-        reqNumero: "-",
-        proveedor: f.proveedor,
-        ruc: f.ruc,
-        formaPago: "CONTADO",
-        tiempoEntrega: "Inmediato",
-        lugarEntrega: "-",
-        items,
-        subtotal,
-        igv,
-        total,
-        // El gasto ya trae su comprobante: la OC nace con factura (fin del flujo)
-        estado: "FACTURADA",
-        gastoId: f.id,
-        ...(b ? { bancarizacion: b, caja: b.caja, cuentaOrigenPago: cuentaOrigenDeCaja(b.caja) } : {}),
-        historial: [evento(rol, "Orden de compra emitida desde Registrar gasto", `${COMPROBANTES_GASTO[d.comprobante]} ${f.numero}`)],
-      };
-      f.ocId = oc.id;
-      f.ocNumero = numero;
-    }
+      throw new ErpError(`El total de la OC (${soles(total)}) no coincide con el importe del gasto (${soles(f.total)}). Revise cantidades y precios${igv ? " (sin IGV)" : ""}.`);
+    const numero = formatear("OC", await siguiente("OC"));
+    oc = {
+      id: uid(),
+      numero,
+      fecha: d.fecha,
+      cotizacionId: "",
+      cotizacionNumero: "-",
+      reqId: "",
+      reqNumero: "-",
+      proveedor: f.proveedor,
+      ruc: f.ruc,
+      formaPago: "CONTADO",
+      tiempoEntrega: "Inmediato",
+      lugarEntrega: "-",
+      items,
+      subtotal,
+      igv,
+      total,
+      // El gasto ya trae su comprobante: la OC nace con factura (fin del flujo)
+      estado: "FACTURADA",
+      gastoId: f.id,
+      ...(b ? { bancarizacion: b, caja: b.caja, cuentaOrigenPago: cuentaOrigenDeCaja(b.caja) } : {}),
+      historial: [evento(rol, "Orden de compra emitida desde Registrar gasto", `${COMPROBANTES_GASTO[d.comprobante]} ${f.numero}`)],
+    };
+    f.ocId = oc.id;
+    f.ocNumero = numero;
   }
   if (esDJ) {
     const numero = await siguienteDJ();
