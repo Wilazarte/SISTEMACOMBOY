@@ -252,7 +252,12 @@ export interface Factura {
   comprobanteGasto?: ComprobanteGasto;
   detraccionPorc?: number; // % de detracción (4, 10, 12)
   detraccionMonto?: number;
-  netoPagar?: number; // total - detracción
+  netoPagar?: number; // total - detracción - retención
+  /** Retención de 4ta categoría (RHE por más de S/ 1,500): 8 %. */
+  retencionPorc?: number;
+  retencionMonto?: number;
+  /** Recibo de servicios públicos: N° de suministro. */
+  suministro?: string;
   archivos?: ArchivoGasto[];
   /** Declaración jurada de gasto: PENDIENTE (recién emitida), ENVIADA (a Gerencia), APROBADA. */
   djEstado?: "PENDIENTE" | "ENVIADA" | "APROBADA";
@@ -262,8 +267,32 @@ export interface Factura {
   editadoEn?: string;
 }
 
-export type TipoGasto = "REPRESENTACION" | "SERVICIO_BASICO" | "TRANSPORTE" | "COMPRA_SIN_REQ" | "OTROS" | "PLANILLA";
-export type ComprobanteGasto = "FACTURA" | "BOLETA" | "RXH" | "SERVICIO_PUBLICO" | "DJ" | "TICKET" | "RECIBO" | "SIN_COMPROBANTE";
+export type TipoGasto =
+  | "REPRESENTACION"
+  | "SERVICIO_BASICO"
+  | "TRANSPORTE"
+  | "COMPRA_SIN_REQ"
+  | "SERV_PROFESIONALES"
+  | "SERV_TERCEROS"
+  | "MANO_OBRA"
+  | "ALQUILER"
+  | "MANTENIMIENTO"
+  | "OTROS"
+  | "PLANILLA";
+/** Comprobantes SUNAT de "Registrar gasto / compra". RECIBO queda solo para registros antiguos (y egresos de planilla). */
+export type ComprobanteGasto =
+  | "FACTURA"
+  | "BOLETA"
+  | "RXH"
+  | "SERVICIO_PUBLICO"
+  | "ARRENDAMIENTO"
+  | "LIQUIDACION_COMPRA"
+  | "TICKET"
+  | "NOTA_VENTA"
+  | "DJ"
+  | "TRANSPORTE_GUIA"
+  | "SIN_COMPROBANTE"
+  | "RECIBO";
 export interface ArchivoGasto {
   tipo: "FACTURA" | "GUIA";
   nombre: string;

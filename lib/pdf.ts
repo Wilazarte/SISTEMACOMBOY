@@ -742,6 +742,7 @@ function pdfGasto(f: Factura, codigo: string): void {
         ...(f.igv ? ([["Subtotal", soles(f.subtotal)], ["IGV 18%", soles(f.igv)]] as [string, string][]) : []),
         ["Total", soles(f.total)],
         ...(f.detraccionMonto ? ([[`Detracción ${f.detraccionPorc}%`, `- ${soles(f.detraccionMonto)}`]] as [string, string][]) : []),
+        ...(f.retencionMonto ? ([[`Retención 4ta cat. ${f.retencionPorc}%`, `- ${soles(f.retencionMonto)}`]] as [string, string][]) : []),
         ["NETO A PAGAR", soles(f.netoPagar ?? f.total)],
       ],
       firmas: ["Solicitante", "Tesorería", "Gerencia"],

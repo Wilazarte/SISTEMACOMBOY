@@ -51,7 +51,17 @@ import { generarCodigo } from "./utils/codigos";
 import { clavesDeModulos } from "./storage.por-modulo";
 import { canonizarItems } from "./productos";
 import { normalizarNombre } from "./productos-modelos";
-import { COMPROBANTES, NUM_COMPROBANTE, numeroAutomatico, numeroSinComprobante } from "./comprobantes";
+import {
+  COMPROBANTES,
+  EJEMPLO_NUMERO,
+  NUM_COMPROBANTE,
+  PORC_RETENCION_RHE,
+  TOPE_DJ_MOVILIDAD_DIA,
+  TOPE_RETENCION_RHE,
+  numeroAutomatico,
+  numeroSinComprobante,
+  retencionRHE,
+} from "./comprobantes";
 
 export const KEYS = {
   REQS_PENDIENTES: "reqs_almacen_pendientes",
@@ -2302,10 +2312,15 @@ export function transferirStock(nombre: string, unidad: string, cantidad: number
 
 export const TIPOS_GASTO: Record<TipoGasto, string> = {
   REPRESENTACION: "Almuerzo ejecutivo / Representación",
-  SERVICIO_BASICO: "Servicio básico (Luz / Agua / Internet / Celular)",
-  TRANSPORTE: "Transporte / Agencia / Flete",
+  SERVICIO_BASICO: "Servicios Públicos (Luz, Agua, Internet, Teléfono)",
+  TRANSPORTE: "Servicios de Transporte / Agencia / Flete",
   COMPRA_SIN_REQ: "Compra sin requerimiento",
-  OTROS: "Otros",
+  SERV_PROFESIONALES: "Servicios Profesionales / Recibo por Honorarios (4ta Categoría)",
+  SERV_TERCEROS: "Servicios de Terceros / Locación de Servicios",
+  MANO_OBRA: "Mano de obra / Personal por recibo",
+  ALQUILER: "Alquiler de bienes muebles / inmuebles",
+  MANTENIMIENTO: "Mantenimiento y Reparación",
+  OTROS: "Otros Servicios",
   PLANILLA: "Planilla semanal (sueldos)",
 };
 
@@ -2317,6 +2332,11 @@ export const DETRACCION_SUGERIDA: Record<TipoGasto, number> = {
   SERVICIO_BASICO: 12,
   TRANSPORTE: 4,
   COMPRA_SIN_REQ: 10,
+  SERV_PROFESIONALES: 12,
+  SERV_TERCEROS: 12,
+  MANO_OBRA: 12,
+  ALQUILER: 10,
+  MANTENIMIENTO: 12,
   OTROS: 12,
   PLANILLA: 0,
 };
@@ -2334,6 +2354,10 @@ export interface DatosGasto {
   detraccion: boolean;
   detraccionPorc: number;
   archivos: ArchivoGasto[];
+  /** RHE por más de S/ 1,500: aplicar la retención de 4ta categoría (8 %). Por defecto sí. */
+  retencion?: boolean;
+  /** Recibo de servicios públicos: N° de suministro. */
+  suministro?: string;
 }
 
 /** Detracción y neto a pagar: ej. agencia S/ 100 con 4 % -> detracción S/ 4, neto S/ 96. */
@@ -2528,12 +2552,16 @@ function prepararGasto(d: DatosGasto, rol: Rol): Factura {
   const numero = d.numero.trim().toUpperCase();
   if (!numero) throw new ErpError(`Ingrese el N° de ${COMPROBANTES_GASTO[d.comprobante].toLowerCase()}.`);
   const re = NUM_GASTO[d.comprobante];
-  if (re && !re.test(numero)) throw new ErpError(`N° de ${d.comprobante.toLowerCase()} inválido. Ej: ${d.comprobante === "FACTURA" ? "F001-00001234" : "B001-00000456"}`);
+  if (re && !re.test(numero)) throw new ErpError(`N° de ${COMPROBANTES[d.comprobante].toLowerCase()} inválido. Ej: ${EJEMPLO_NUMERO[d.comprobante]}`);
   const proveedor = d.proveedor.trim().toUpperCase();
-  if (!proveedor) throw new ErpError("Indique el proveedor o agencia.");
+  if (!proveedor) throw new ErpError(d.comprobante === "DJ" ? "Indique el nombre de quien declara." : "Indique el proveedor o agencia.");
   const ruc = d.ruc.trim();
   if (ruc && !/^\d{8}$/.test(ruc) && !/^\d{11}$/.test(ruc)) throw new ErpError("RUC (11 dígitos) o DNI (8 dígitos) inválido.");
   if (d.comprobante === "FACTURA" && ruc.length !== 11) throw new ErpError("La factura requiere el RUC del proveedor.");
+  if (d.comprobante === "RXH" && !ruc) throw new ErpError("El recibo por honorarios requiere el RUC (10…) o DNI de la persona.");
+  if (d.comprobante === "DJ" && !/^\d{8}$/.test(ruc)) throw new ErpError("La declaración jurada solo lleva el DNI (8 dígitos) de quien declara.");
+  if (d.comprobante === "DJ" && total > TOPE_DJ_MOVILIDAD_DIA)
+    throw new ErpError(`La declaración jurada de movilidad tiene un tope de ${soles(TOPE_DJ_MOVILIDAD_DIA)} por día (SUNAT). Registre un día por declaración.`);
   if (ruc.length === 11 && !rucValido(ruc)) throw new ErpError("RUC inválido (dígito verificador).");
   if (getFacturas().some((f) => f.numero === numero && (ruc ? f.ruc === ruc : f.proveedor === proveedor)) || (ruc && getCompras().some((c) => c.numero === numero && c.ruc === ruc)))
     throw new ErpError(`El comprobante ${numero} de ${proveedor} ya fue registrado.`);
@@ -2542,7 +2570,11 @@ function prepararGasto(d: DatosGasto, rol: Rol): Factura {
 
   // Factura: el importe incluye IGV (crédito fiscal). Boleta / DJ / recibo: sin IGV separado.
   const subtotal = d.comprobante === "FACTURA" ? r2(total / (1 + IGV)) : total;
-  const { monto, neto } = calcularDetraccion(total, d.detraccion, d.detraccionPorc);
+  const { monto, neto: netoDetraccion } = calcularDetraccion(total, d.detraccion, d.detraccionPorc);
+  // RHE por más de S/ 1,500: se retiene el 8 % (4ta categoría) y se paga el neto
+  const retencion = d.comprobante === "RXH" ? retencionRHE(total, d.retencion ?? true) : 0;
+  const neto = r2(netoDetraccion - retencion);
+  const suministro = d.comprobante === "SERVICIO_PUBLICO" ? d.suministro?.trim().toUpperCase() : undefined;
   const f: Factura = {
     id: uid(),
     tipo: d.comprobante === "DJ" ? "DECLARACION_JURADA" : "FACTURA",
@@ -2559,12 +2591,14 @@ function prepararGasto(d: DatosGasto, rol: Rol): Factura {
     igv: r2(total - subtotal),
     total,
     estadoPago: "POR_PAGAR",
-    historial: [evento(rol, "Gasto de Tesorería registrado", `${TIPOS_GASTO[d.tipoGasto]} · ${COMPROBANTES_GASTO[d.comprobante]} ${numero}${monto ? ` · detracción ${d.detraccionPorc}% S/ ${monto.toFixed(2)}` : ""}`)],
+    historial: [evento(rol, "Gasto de Tesorería registrado", `${TIPOS_GASTO[d.tipoGasto]} · ${COMPROBANTES_GASTO[d.comprobante]} ${numero}${monto ? ` · detracción ${d.detraccionPorc}% S/ ${monto.toFixed(2)}` : ""}${retencion ? ` · retención 4ta ${PORC_RETENCION_RHE}% S/ ${retencion.toFixed(2)}` : ""}`)],
     esGastoTesoreria: true,
     tipoGasto: d.tipoGasto,
     descripcion: d.descripcion.trim(),
     comprobanteGasto: d.comprobante,
     ...(d.detraccion ? { detraccionPorc: d.detraccionPorc, detraccionMonto: monto } : {}),
+    ...(retencion ? { retencionPorc: PORC_RETENCION_RHE, retencionMonto: retencion } : {}),
+    ...(suministro ? { suministro } : {}),
     netoPagar: neto,
     ...(d.archivos.length ? { archivos: d.archivos } : {}),
     creadoPor: usuarioActual(),
@@ -2611,8 +2645,12 @@ export function editarGasto(id: string, c: EdicionGasto, rol: Rol): Factura {
     throw new ErpError(`El comprobante ${numero} de ${proveedor} ya fue registrado.`);
   const total = f.ocId ? f.total : r2(Number(c.importe));
   if (!(total > 0)) throw new ErpError("El importe total debe ser mayor a 0.");
+  if (comp === "DJ" && total > TOPE_DJ_MOVILIDAD_DIA) throw new ErpError(`La declaración jurada de movilidad tiene un tope de ${soles(TOPE_DJ_MOVILIDAD_DIA)} por día (SUNAT).`);
   const subtotal = comp === "FACTURA" ? r2(total / (1 + IGV)) : total;
-  const { monto, neto } = calcularDetraccion(total, !!f.detraccionPorc, f.detraccionPorc ?? 0);
+  const { monto, neto: netoDetraccion } = calcularDetraccion(total, !!f.detraccionPorc, f.detraccionPorc ?? 0);
+  // RHE: la retención sigue la decisión del registro (si se quitó con un importe > S/ 1,500, sigue sin retención)
+  const retencion = comp === "RXH" ? retencionRHE(total, f.retencionPorc !== undefined || f.total <= TOPE_RETENCION_RHE) : 0;
+  const neto = r2(netoDetraccion - retencion);
   const cambios = [numero !== f.numero && `N° ${f.numero} → ${numero}`, total !== f.total && `importe ${soles(f.total)} → ${soles(total)}`].filter(Boolean).join(" · ");
   const editado: Factura = {
     ...f,
@@ -2627,6 +2665,8 @@ export function editarGasto(id: string, c: EdicionGasto, rol: Rol): Factura {
     igv: r2(total - subtotal),
     total,
     ...(f.detraccionPorc ? { detraccionMonto: monto } : {}),
+    retencionPorc: retencion ? PORC_RETENCION_RHE : undefined,
+    retencionMonto: retencion || undefined,
     netoPagar: neto,
     editadoPor: usuarioActual(),
     editadoEn: new Date().toISOString(),
