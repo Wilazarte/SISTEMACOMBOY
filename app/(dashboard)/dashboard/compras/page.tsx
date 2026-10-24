@@ -23,6 +23,7 @@ import {
   Upload,
   X,
   Users,
+  Wrench,
 } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
@@ -94,8 +95,9 @@ import QuickActions, { QA_IDS } from "@/components/tesoreria/QuickActions";
 import { BotonNuevo } from "@/components/ui/BotonFiltros";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { EditarGasto } from "@/components/compras/EditarGasto";
+import { FormOrdenServicio, filasOrdenesServicio } from "@/components/compras/OrdenesServicio";
 import type { Trabajador } from "@/lib/types";
-import type { Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, Proveedor, Requerimiento, Rol, StockItem, TipoComprobanteCompra } from "@/lib/types";
+import type { Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, OrdenServicio, Proveedor, Requerimiento, Rol, StockItem, TipoComprobanteCompra } from "@/lib/types";
 
 type Tab = "registrar" | "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias" | "planilla" | "declaraciones";
 
@@ -138,6 +140,7 @@ export default function ComprasPage() {
   const procesados = useStore<Requerimiento[]>(KEYS.REQS_PROCESADOS, []);
   const cotizaciones = useStore<Cotizacion[]>(KEYS.COTIZACIONES, []);
   const ordenes = useStore<OrdenCompra[]>(KEYS.ORDENES, []);
+  const ordenesServicio = useStore<OrdenServicio[]>(KEYS.ORDENES_SERVICIO, []);
   const facturas = useStore<Factura[]>(KEYS.FACTURAS, []);
   const guias = useStore<Guia[]>(KEYS.GUIAS, []);
   const proveedores = useStore<Proveedor[]>(KEYS.PROVEEDORES, []);
@@ -171,7 +174,7 @@ export default function ComprasPage() {
       /* almacenamiento bloqueado */
     }
   }, [tab]);
-  const [pre, setPre] = useState<{ req?: string; coti?: string; oc?: string; fac?: string }>({});
+  const [pre, setPre] = useState<{ req?: string; coti?: string; oc?: string; fac?: string; gasto?: string }>({});
 
   const ir = (t: Tab, p: typeof pre = {}) => {
     setPre(p);
@@ -218,7 +221,7 @@ export default function ComprasPage() {
             ? [
                 { id: "registrar" as const, label: "Registrar gasto", icon: <PackagePlus size={16} /> },
                 { id: "cotizaciones" as const, label: "Cotizaciones", icon: <FileSpreadsheet size={16} />, count: cotizables.filter((r) => r.estado === "ACEPTADO").length },
-                { id: "ordenes" as const, label: "Órdenes compra", icon: <ShoppingBag size={16} />, count: cotisSinOC.length },
+                { id: "ordenes" as const, label: "Órdenes OC / OS", icon: <ShoppingBag size={16} />, count: cotisSinOC.length },
                 { id: "facturas" as const, label: "Facturas", icon: <Receipt size={16} />, count: ocsSinFactura.length },
                 // Guías de remisión: ya no son parte del flujo (pestaña oculta; las guías cargadas siguen guardadas)
               ]
@@ -233,13 +236,25 @@ export default function ComprasPage() {
         ]}
       />
 
-      {tab === "registrar" && <RegistrarCompra rol={rol} proveedores={proveedores} compras={compras} gastos={facturas.filter((f) => f.esGastoTesoreria)} stock={stock} />}
+      {tab === "registrar" && <RegistrarCompra rol={rol} proveedores={proveedores} compras={compras} gastos={facturas.filter((f) => f.esGastoTesoreria)} stock={stock} onGenerarOS={(id) => ir("ordenes", { gasto: id })} />}
       {tab === "antecedentes" && <Antecedentes reqs={procesados} ordenes={ordenes} rol={rol} onCotizar={(id) => ir("cotizaciones", { req: id })} onIr={irTab} />}
       {tab === "cotizaciones" && (
         <Cotizaciones key={pre.req ?? "c"} rol={rol} reqs={cotizables} cotizaciones={cotizaciones} preReq={pre.req} onOC={(id) => ir("ordenes", { coti: id })} onIr={irTab} />
       )}
       {tab === "ordenes" && (
-        <Ordenes key={pre.coti ?? "o"} rol={rol} cotis={cotisSinOC} todasCotis={cotizaciones} ordenes={ordenes} reqs={procesados} preCoti={pre.coti} onFacturar={(id) => ir("facturas", { oc: id })} onIr={irTab} onVerCoti={(reqId) => ir("cotizaciones", { req: reqId })} />
+        <Ordenes
+          key={pre.coti ?? pre.gasto ?? "o"}
+          rol={rol}
+          cotis={cotisSinOC}
+          todasCotis={cotizaciones}
+          ordenes={ordenes}
+          reqs={procesados}
+          preCoti={pre.coti}
+          onFacturar={(id) => ir("facturas", { oc: id })}
+          onIr={irTab}
+          onVerCoti={(reqId) => ir("cotizaciones", { req: reqId })}
+          servicio={{ ordenes: ordenesServicio, reqs: [...pendientes, ...procesados], gastos: facturas.filter((f) => f.esGastoTesoreria), proveedores, preGasto: pre.gasto }}
+        />
       )}
       {tab === "facturas" && <Facturas key={pre.oc ?? "f"} rol={rol} ocs={ocsSinFactura} ordenes={ordenes} facturas={facturas} preOc={pre.oc} onIr={irTab} />}
       {tab === "declaraciones" && veCompras && <DeclaracionesJuradas facturas={facturas} rol={rol} />}
@@ -457,7 +472,22 @@ const MODOS_REGISTRO: { value: ModoRegistro; label: string }[] = [
   { value: "COMPRA", label: "Compra con ingreso a stock" },
 ];
 
-function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Rol; proveedores: Proveedor[]; compras: Compra[]; gastos: Factura[]; stock: StockItem[] }) {
+function RegistrarCompra({
+  rol,
+  proveedores,
+  compras,
+  gastos,
+  stock,
+  onGenerarOS,
+}: {
+  rol: Rol;
+  proveedores: Proveedor[];
+  compras: Compra[];
+  gastos: Factura[];
+  stock: StockItem[];
+  /** "Generar OS" de un gasto: abre Órdenes con el formulario de Orden de Servicio precargado. */
+  onGenerarOS: (gastoId: string) => void;
+}) {
   const [modo, setModo] = useState<ModoRegistro>("GASTO");
   const [proveedorId, setProveedorId] = useState("");
   const [nuevoProv, setNuevoProv] = useState<{ razonSocial: string; ruc: string } | null>(null);
@@ -716,6 +746,13 @@ function RegistrarCompra({ rol, proveedores, compras, gastos, stock }: { rol: Ro
                         <Pencil size={15} />
                       </Button>
                     </span>
+                    {g.tipoGasto !== "PLANILLA" && puede(rol, "oc.crear") && (
+                      <span className="tip" data-tip="Generar orden de servicio desde este gasto">
+                        <Button size="sm" variant="ghost" onClick={() => onGenerarOS(g.id)} aria-label="Generar OS">
+                          <Wrench size={15} />
+                        </Button>
+                      </span>
+                    )}
                   </div>
                 ),
               };
@@ -1136,6 +1173,7 @@ function Ordenes({
   onFacturar,
   onIr,
   onVerCoti,
+  servicio,
 }: {
   rol: Rol;
   cotis: Cotizacion[];
@@ -1147,6 +1185,8 @@ function Ordenes({
   onIr: (tab: string) => void;
   /** Abre Cotizaciones con el REQ de la cotización elegida. */
   onVerCoti: (reqId: string) => void;
+  /** Órdenes de servicio (misma lista, Tipo doc. OS) y lo que necesita su formulario. */
+  servicio: { ordenes: OrdenServicio[]; reqs: Requerimiento[]; gastos: Factura[]; proveedores: Proveedor[]; preGasto?: string };
 }) {
   const [bancarizar, setBancarizar] = useState<OrdenCompra | null>(null);
   const [editar, setEditar] = useState<OrdenCompra | null>(null);
@@ -1207,6 +1247,8 @@ function Ordenes({
 
   // Por defecto solo la lista; el formulario se abre con "Emitir OC" (o al venir de "Generar OC" con una cotización)
   const [showRegistrar, setShowRegistrar] = useState(!!preCoti);
+  // Orden de Servicio: su propio formulario (al venir de "Generar OS" de un gasto se abre precargado)
+  const [showOS, setShowOS] = useState(!!servicio.preGasto && !preCoti);
   const [enviando, setEnviando] = useState(false);
   const guardar = async () => {
     setEnviando(true);
@@ -1236,8 +1278,14 @@ function Ordenes({
       <QuickActions
         tab="ordenes"
         onIr={onIr}
-        onBuscar={() => setShowRegistrar(false)}
-        onNuevo={() => setShowRegistrar(true)}
+        onBuscar={() => {
+          setShowRegistrar(false);
+          setShowOS(false);
+        }}
+        onNuevo={() => {
+          setShowOS(false);
+          setShowRegistrar(true);
+        }}
         puedeCrear={habilitado}
         onVerCoti={coti ? () => onVerCoti(coti.reqId) : undefined}
       />
@@ -1354,12 +1402,34 @@ function Ordenes({
       </Card>
       )}
 
-      {!showRegistrar && (
+      {showOS && !showRegistrar && (
+        <FormOrdenServicio
+          rol={rol}
+          reqs={servicio.reqs}
+          gastos={servicio.gastos}
+          proveedores={servicio.proveedores}
+          ordenesServicio={servicio.ordenes}
+          pre={{ gastoId: servicio.preGasto }}
+          onClose={() => setShowOS(false)}
+        />
+      )}
+
+      {!showRegistrar && !showOS && (
       <Card id={QA_IDS.listaOrdenes}>
-        <CardHeader title="Órdenes de compra" />
+        <CardHeader
+          title="Órdenes de compra y de servicio"
+          subtitle="Filtre por Tipo doc. (OC / OS) en Buscar / Filtrar."
+          action={
+            habilitado && (
+              <Button size="sm" variant="secondary" onClick={() => setShowOS(true)}>
+                <Wrench size={14} /> Generar OS desde Requerimiento/Gasto
+              </Button>
+            )
+          }
+        />
         <ListaDocs
           tipo="ordenes"
-          filas={ordenes.map((o): FilaDoc => {
+          filas={[...ordenes.map((o): FilaDoc => {
           return {
           id: o.id,
           fecha: o.fecha,
@@ -1420,7 +1490,7 @@ function Ordenes({
           tipoDoc: "OC",
           estado: o.estado,
           };
-        })}
+        }), ...filasOrdenesServicio(servicio.ordenes, rol)].sort((a, b) => b.fecha.localeCompare(a.fecha))}
         />
       </Card>
       )}

@@ -6,7 +6,7 @@ import { Button, Card, CardHeader, Field, Input, Select, Textarea, ejecutarAsync
 import { BotonNuevo } from "@/components/ui/BotonFiltros";
 import { ItemsEditor, itemVacio } from "@/components/compras/EditarReq";
 import { hoy } from "@/lib/storage";
-import type { ItemReq } from "@/lib/types";
+import type { ItemReq, TipoRequerimiento } from "@/lib/types";
 
 export interface DatosRequerimiento {
   sede: string;
@@ -14,6 +14,8 @@ export interface DatosRequerimiento {
   fecha: string;
   motivo: string;
   items: ItemReq[];
+  /** BIEN (por defecto) o SERVICIO: este último lo atiende Tesorería con una Orden de Servicio. */
+  tipo?: TipoRequerimiento;
 }
 
 /**
@@ -29,6 +31,7 @@ export function RequerimientoForm({
   modulo,
   textoEnviar,
   mensajeOk,
+  conTipo = false,
   onEnviar,
   onCreado,
   onCancelar,
@@ -45,6 +48,8 @@ export function RequerimientoForm({
   modulo: string;
   textoEnviar: string;
   mensajeOk: string;
+  /** Muestra "Tipo: Bien / Servicio" (Arequipa). Secocha pide solo bienes. */
+  conTipo?: boolean;
   onEnviar: (d: DatosRequerimiento) => Promise<unknown>;
   onCreado: () => void;
   onCancelar: () => void;
@@ -54,15 +59,17 @@ export function RequerimientoForm({
   const [fecha, setFecha] = useState(hoy());
   const [motivo, setMotivo] = useState("");
   const [items, setItems] = useState<ItemReq[]>([itemVacio()]);
+  const [tipo, setTipo] = useState<TipoRequerimiento>("BIEN");
   const [enviando, setEnviando] = useState(false);
 
   const guardar = async () => {
     setEnviando(true);
-    const ok = await ejecutarAsync(() => onEnviar({ sede, solicitante, fecha, motivo, items }), mensajeOk);
+    const ok = await ejecutarAsync(() => onEnviar({ sede, solicitante, fecha, motivo, items, ...(conTipo ? { tipo } : {}) }), mensajeOk);
     setEnviando(false);
     if (ok) {
       setMotivo("");
       setItems([itemVacio()]);
+      setTipo("BIEN");
       onCreado();
     }
   };
@@ -95,11 +102,23 @@ export function RequerimientoForm({
         <Field label="Fecha">
           <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
         </Field>
+        {conTipo && (
+          <Field label="Tipo" hint={tipo === "SERVICIO" ? "Tesorería lo atiende con una Orden de Servicio (OS)" : undefined}>
+            <Select
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value as TipoRequerimiento)}
+              options={[
+                { value: "BIEN", label: "Bien / producto" },
+                { value: "SERVICIO", label: "Servicio" },
+              ]}
+            />
+          </Field>
+        )}
         <Field label="Motivo *" className="md:col-span-4">
           <Textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej: Mantenimiento preventivo del remolcador U35 — cambio de rodamientos" />
         </Field>
       </div>
-      <ItemsEditor items={items} onChange={setItems} modulo={modulo} />
+      <ItemsEditor items={items} onChange={setItems} modulo={modulo} servicio={conTipo && tipo === "SERVICIO"} />
       <div className="flex justify-end border-t border-plomo-100 px-5 py-4">
         <Button onClick={guardar} disabled={enviando}>
           <Send size={16} /> {enviando ? "Emitiendo…" : textoEnviar}

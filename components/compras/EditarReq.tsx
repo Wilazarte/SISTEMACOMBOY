@@ -27,7 +27,18 @@ export function permisoEditarReq(req: Requerimiento, sesion: Sesion | null): { o
 // =====================================================================
 // Editor de productos (nuevo requerimiento, edición y corrección)
 // =====================================================================
-export function ItemsEditor({ items, onChange, modulo = "Almacén · Requerimiento" }: { items: ItemReq[]; onChange: (i: ItemReq[]) => void; modulo?: string }) {
+export function ItemsEditor({
+  items,
+  onChange,
+  modulo = "Almacén · Requerimiento",
+  servicio = false,
+}: {
+  items: ItemReq[];
+  onChange: (i: ItemReq[]) => void;
+  modulo?: string;
+  /** REQ tipo SERVICIO: la descripción es libre (no tiene que estar en el catálogo maestro). */
+  servicio?: boolean;
+}) {
   const set = (id: string, campo: keyof ItemReq, v: string | number) => onChange(items.map((i) => (i.id === id ? { ...i, [campo]: v } : i)));
   return (
     <div className="overflow-x-auto">
@@ -35,7 +46,7 @@ export function ItemsEditor({ items, onChange, modulo = "Almacén · Requerimien
         <thead className="bg-azul-900 text-[11px] font-semibold uppercase tracking-widest text-white">
           <tr>
             <th className="w-8 px-3 py-2 text-left">#</th>
-            <th className="px-2 py-2 text-left">Producto *</th>
+            <th className="px-2 py-2 text-left">{servicio ? "Servicio / producto *" : "Producto *"}</th>
             <th className="w-24 px-2 py-2 text-left">Cantidad *</th>
             <th className="w-28 px-2 py-2 text-left">Unidad</th>
             <th className="w-40 px-2 py-2 text-left">Marca</th>
@@ -51,6 +62,7 @@ export function ItemsEditor({ items, onChange, modulo = "Almacén · Requerimien
                 <ProductoInput
                   value={i.nombre}
                   modulo={modulo}
+                  {...(servicio ? { libre: () => true, placeholder: "Describa el servicio…" } : {})}
                   onChange={(nombre, p) => onChange(items.map((x) => (x.id === i.id ? { ...x, nombre, ...(p ? { unidad: p.unidad, marca: x.marca || p.marca || "", productoId: p.id, sku: p.sku } : {}) } : x)))}
                 />
               </td>
@@ -124,7 +136,7 @@ export function EditarReq({ req, rol, onClose }: { req: Requerimiento; rol: Rol;
           <Textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} />
         </Field>
       </div>
-      <ItemsEditor items={items} onChange={setItems} />
+      <ItemsEditor items={items} onChange={setItems} servicio={req.tipo === "SERVICIO"} />
       <div className="mt-4 flex justify-end gap-2">
         <Button variant="secondary" onClick={onClose}>
           Cancelar

@@ -17,7 +17,7 @@ import { toast } from "@/components/ui";
 import type { Adelanto } from "./adelantos";
 import type { HistorialDetalle, HistorialPlanilla } from "./historial";
 import type { ConcesionContratista, LugarEntrega } from "./types";
-import type { ComprobanteVenta, Cotizacion, Factura, Guia, LineaVenta, NotaPedido, OrdenCompra, OrdenDespacho, Requerimiento } from "./types";
+import type { ComprobanteVenta, Cotizacion, Factura, Guia, LineaVenta, NotaPedido, OrdenCompra, OrdenDespacho, OrdenServicio, Requerimiento } from "./types";
 import type { Traslado, VentaSucursal } from "./sucursal-modelos";
 
 type RGB = [number, number, number];
@@ -678,6 +678,44 @@ export function pdfOrdenCompra(o: OrdenCompra): void {
       firmas: ["Elaborado: Compras", "Aprobado: Gerencia", "Proveedor"],
     }),
     codigo
+  );
+}
+
+/** Orden de Servicio: misma plantilla que la OC, con título "ORDEN DE SERVICIO". */
+export function pdfOrdenServicio(o: OrdenServicio): void {
+  const origen = o.origen === "REQUERIMIENTO" ? o.reqNumero ?? "-" : o.origen === "GASTO" ? `Gasto ${o.gastoNumero ?? ""}` : "Registro directo";
+  guardar(
+    construir({
+      titulo: "ORDEN DE SERVICIO",
+      numero: o.numero,
+      estado: estadoDocumento(o.estado),
+      datos: [
+        ["N° OS", o.numero],
+        ["Proveedor", o.proveedor],
+        ["RUC", o.ruc || "-"],
+        ["Fecha", fechaPE(o.fecha)],
+        ["Cond. de pago", o.formaPago],
+        ["Plazo", o.plazo || "-"],
+        ["Lugar del servicio", o.lugarServicio || "-"],
+        ["Origen", origen],
+        ["Estado", o.estado],
+        ["Concepto", o.concepto],
+        ...(o.adjuntoNombre ? ([["Adjunto", o.adjuntoNombre]] as [string, string][]) : []),
+        ...(o.estado === "ANULADA" && o.motivoAnulacion ? ([["Motivo anulación", o.motivoAnulacion]] as [string, string][]) : []),
+      ],
+      head: ["#", "Descripción del servicio", "Cant.", "Und.", "P. Unit.", "Importe"],
+      body: o.items.map((i, k) => [k + 1, i.descripcion, i.cantidad, i.unidad, soles(i.precioUnit), soles(i.subtotal)]),
+      alinearDerecha: [2, 4, 5],
+      totales: totales(o.subtotal, o.igv, o.total),
+      notas: [
+        "1. Consignar el Nro de esta Orden de Servicio en la factura o recibo por honorarios.",
+        "2. El servicio se da por conforme previa verificación del área solicitante.",
+        "3. El comprobante electrónico debe emitirse a nombre de " + `${EMPRESA.razonSocial} RUC ${EMPRESA.ruc}.`,
+        ...(o.observacion ? [`Observación: ${o.observacion}`] : []),
+      ],
+      firmas: ["Elaborado: Compras", "Aprobado: Gerencia", "Proveedor"],
+    }),
+    o.numero
   );
 }
 

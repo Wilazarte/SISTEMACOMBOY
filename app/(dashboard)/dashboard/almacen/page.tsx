@@ -124,6 +124,7 @@ function NuevoReq({ rol, onCreado, onCancelar }: { rol: Rol; onCreado: () => voi
       modulo="Almacén · Requerimiento"
       textoEnviar="Emitir y notificar a Tesorería"
       mensajeOk="Requerimiento enviado a Tesorería"
+      conTipo
       onEnviar={(d) => crearRequerimiento(d, rol)}
       onCreado={onCreado}
       onCancelar={onCancelar}

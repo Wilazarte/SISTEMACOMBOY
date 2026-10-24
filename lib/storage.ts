@@ -31,6 +31,8 @@ import type {
   Guia,
   ItemCompra,
   OrdenCompra,
+  OrdenServicio,
+  ItemServicio,
   Proveedor,
   Requerimiento,
   Rol,
@@ -53,6 +55,7 @@ export const KEYS = {
   REQS_PROCESADOS: "reqs_procesados_compras",
   COTIZACIONES: "cotizaciones",
   ORDENES: "ordenes_compra",
+  ORDENES_SERVICIO: "ordenes_servicio",
   FACTURAS: "facturas",
   GUIAS: "guias",
   CONTADORES: "erp_contadores",
@@ -196,6 +199,7 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.REQS_PROCESADOS]: { tabla: "compras", tipo: "req_procesado", forma: "lista" },
   [KEYS.COTIZACIONES]: { tabla: "compras", tipo: "cotizacion", forma: "lista" },
   [KEYS.ORDENES]: { tabla: "compras", tipo: "orden", forma: "lista" },
+  [KEYS.ORDENES_SERVICIO]: { tabla: "compras", tipo: "orden_servicio", forma: "lista" },
   [KEYS.FACTURAS]: { tabla: "compras", tipo: "factura", forma: "lista" },
   [KEYS.GUIAS]: { tabla: "compras", tipo: "guia", forma: "lista" },
   [KEYS.PROVEEDORES]: { tabla: "compras", tipo: "proveedor", forma: "lista" },
@@ -916,6 +920,12 @@ function actualizarOC(id: string, fn: (o: OrdenCompra) => OrdenCompra): void {
 // 1. ALMACÉN: crea requerimiento
 // ---------------------------------------------------------------------
 
+/** Ítems del REQ: los de BIEN se canonizan con el catálogo maestro; los de SERVICIO son descripciones libres. */
+function itemsDeReq<T extends { nombre: string }>(tipo: Requerimiento["tipo"], items: T[]): (T & { productoId?: string; sku?: string })[] {
+  const conNombre = items.filter((i) => i.nombre.trim());
+  return tipo === "SERVICIO" ? conNombre.map((i) => ({ ...i, nombre: i.nombre.trim() })) : canonizarItems(conNombre);
+}
+
 export async function crearRequerimiento(
   data: Omit<Requerimiento, "id" | "numero" | "estado" | "historial">,
   rol: Rol
@@ -924,7 +934,7 @@ export async function crearRequerimiento(
   if (!data.solicitante.trim()) throw new ErpError("Ingrese el solicitante.");
   if (!data.motivo.trim()) throw new ErpError("Ingrese el motivo del requerimiento.");
   // Catálogo maestro: el mismo producto con el mismo nombre en todos los almacenes
-  const items = canonizarItems(data.items.filter((i) => i.nombre.trim()));
+  const items = itemsDeReq(data.tipo, data.items);
   if (items.length === 0) throw new ErpError("Agregue al menos un producto.");
   if (items.some((i) => !(i.cantidad > 0))) throw new ErpError("Todas las cantidades deben ser mayores a 0.");
 
@@ -956,7 +966,7 @@ export function editarRequerimiento(
   if (!cambios.sede.trim()) throw new ErpError("Seleccione la sede.");
   if (!cambios.solicitante.trim()) throw new ErpError("Ingrese el solicitante.");
   if (!cambios.motivo.trim()) throw new ErpError("Ingrese el motivo del requerimiento.");
-  const items = canonizarItems(cambios.items.filter((i) => i.nombre.trim()));
+  const items = itemsDeReq(req.tipo, cambios.items);
   if (items.length === 0) throw new ErpError("Agregue al menos un producto.");
   if (items.some((i) => !(i.cantidad > 0))) throw new ErpError("Todas las cantidades deben ser mayores a 0.");
   const editado: Requerimiento = {
@@ -979,7 +989,7 @@ export function reenviarRequerimiento(
   const lista = getProcesados();
   const req = lista.find((r) => r.id === id);
   if (!req || req.estado !== "OBSERVADO") throw new ErpError("Solo se pueden reenviar requerimientos OBSERVADOS.");
-  const items = canonizarItems(cambios.items.filter((i) => i.nombre.trim()));
+  const items = itemsDeReq(req.tipo, cambios.items);
   if (items.length === 0) throw new ErpError("Agregue al menos un producto.");
   const actualizado: Requerimiento = {
     ...req,
@@ -2759,6 +2769,116 @@ function prepararCompra(data: DatosCompra, excluirId?: string): Omit<Compra, "id
     igv,
     total,
   };
+}
+
+// ---------------------------------------------------------------------
+// ÓRDENES DE SERVICIO (OS-001-2026): mismos datos que la OC, sin tocar su flujo.
+// Tabla compras, tipo 'orden_servicio'. Se generan desde un REQ tipo SERVICIO, un gasto de Tesorería o a mano.
+// PENDIENTE -> APROBADA (Gerencia) | ANULADA. Correlativo propio por año: siguiente_numero_os()
+// (supabase/migrations/20261030_orden_servicio.sql).
+// ---------------------------------------------------------------------
+
+export const getOrdenesServicio = () => leer<OrdenServicio[]>(KEYS.ORDENES_SERVICIO, []);
+
+/** Reserva el siguiente N° de OS del año en Supabase (atómico): OS-001-2026. */
+async function reservarNumeroOS(): Promise<string> {
+  const { data, error } = await createClient().rpc("siguiente_numero_os");
+  if (error) {
+    if (error.code === "42501") throw new ErpError(error.message);
+    if (error.code === "PGRST202" || /could not find the function/i.test(error.message))
+      throw new ErpError("Falta la numeración de Órdenes de Servicio en Supabase: ejecute supabase/migrations/20261030_orden_servicio.sql.");
+    throw new ErpError(`No se pudo obtener el número de la OS: ${error.message}`);
+  }
+  const anio = Number(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric" }).format(new Date()));
+  return `OS-${String(Number(data)).padStart(3, "0")}-${anio}`;
+}
+
+export type DatosOrdenServicio = Pick<
+  OrdenServicio,
+  "fecha" | "proveedor" | "ruc" | "concepto" | "formaPago" | "lugarServicio" | "plazo" | "origen" | "reqId" | "reqNumero" | "gastoId" | "gastoNumero" | "observacion"
+> & { items: Omit<ItemServicio, "subtotal">[]; conIgv: boolean };
+
+/** Subtotal, IGV y total de las líneas (precios SIN IGV; `conIgv = false` para recibos por honorarios, etc.). */
+export function totalesOS(items: Pick<ItemServicio, "cantidad" | "precioUnit">[], conIgv = true): { subtotal: number; igv: number; total: number } {
+  const subtotal = r2(items.reduce((a, i) => a + (i.cantidad || 0) * (i.precioUnit || 0), 0));
+  const igv = conIgv ? r2(subtotal * IGV) : 0;
+  return { subtotal, igv, total: r2(subtotal + igv) };
+}
+
+/** Emite la OS (Tesorería / Creador). El adjunto es opcional y va a Storage (tesoreria/ordenes_servicio/…). */
+export async function emitirOrdenServicio(data: DatosOrdenServicio, adjunto: File | null, rol: Rol): Promise<OrdenServicio> {
+  if (!puede(rol, "oc.crear")) throw new ErpError("Solo Tesorería puede emitir órdenes de servicio.");
+  if (!data.proveedor.trim()) throw new ErpError("Ingrese el proveedor.");
+  if (data.ruc.trim() && !/^\d{8}$|^\d{11}$/.test(data.ruc.trim())) throw new ErpError("El RUC debe tener 11 dígitos (o DNI de 8).");
+  if (!data.concepto.trim()) throw new ErpError("Ingrese el concepto del servicio.");
+  const items: ItemServicio[] = data.items
+    .filter((i) => i.descripcion.trim())
+    .map((i) => ({ ...i, descripcion: i.descripcion.trim(), subtotal: r2((i.cantidad || 0) * (i.precioUnit || 0)) }));
+  if (items.length === 0) throw new ErpError("Agregue al menos una línea de detalle.");
+  if (items.some((i) => !(i.cantidad > 0))) throw new ErpError("Todas las cantidades deben ser mayores a 0.");
+  if (items.some((i) => !(i.precioUnit >= 0))) throw new ErpError("Los precios no pueden ser negativos.");
+  if (data.origen === "REQUERIMIENTO" && !data.reqId) throw new ErpError("Seleccione el requerimiento de origen.");
+  if (data.origen === "GASTO" && !data.gastoId) throw new ErpError("Seleccione el gasto de origen.");
+  const { conIgv, ...resto } = data;
+  const { subtotal, igv, total } = totalesOS(items, conIgv);
+  if (!(total > 0)) throw new ErpError("El total de la orden de servicio debe ser mayor a 0.");
+  if (adjunto) validarVoucher(adjunto);
+
+  const numero = await reservarNumeroOS();
+  const archivo = adjunto ? await subirBaucher(adjunto, "ordenes_servicio") : null;
+  const os: OrdenServicio = {
+    ...resto,
+    id: uid(),
+    numero,
+    proveedor: data.proveedor.trim(),
+    ruc: data.ruc.trim(),
+    concepto: data.concepto.trim(),
+    items,
+    subtotal,
+    igv,
+    total,
+    estado: "PENDIENTE",
+    ...(archivo && adjunto ? { adjunto: archivo.ref, adjuntoNombre: adjunto.name } : {}),
+    creadoPor: usuarioActual(),
+    historial: [
+      evento(
+        rol,
+        "Orden de servicio emitida",
+        data.origen === "REQUERIMIENTO" ? `Desde ${data.reqNumero}` : data.origen === "GASTO" ? `Desde gasto ${data.gastoNumero}` : "Registro manual"
+      ),
+    ],
+  };
+  escribir(KEYS.ORDENES_SERVICIO, [os, ...getOrdenesServicio()]);
+  return os;
+}
+
+function actualizarOS(id: string, fn: (o: OrdenServicio) => OrdenServicio): OrdenServicio {
+  const lista = getOrdenesServicio();
+  const i = lista.findIndex((o) => o.id === id);
+  if (i < 0) throw new ErpError("Orden de servicio no encontrada.");
+  lista[i] = fn(lista[i]);
+  escribir(KEYS.ORDENES_SERVICIO, lista);
+  return lista[i];
+}
+
+/** Gerencia aprueba la OS PENDIENTE. */
+export function aprobarOrdenServicio(id: string, rol: Rol): OrdenServicio {
+  if (!puede(rol, "dj.aprobar")) throw new ErpError("Solo Gerencia aprueba órdenes de servicio.");
+  return actualizarOS(id, (o) => {
+    if (o.estado !== "PENDIENTE") throw new ErpError(`La ${o.numero} ya está ${o.estado}.`);
+    return { ...o, estado: "APROBADA", aprobadoPor: usuarioActual(), historial: [...o.historial, evento(rol, "Orden de servicio aprobada")] };
+  });
+}
+
+/** Anula la OS: Gerencia siempre; Tesorería solo mientras está PENDIENTE. */
+export function anularOrdenServicio(id: string, motivo: string, rol: Rol): OrdenServicio {
+  if (!motivo.trim()) throw new ErpError("Indique el motivo de la anulación.");
+  return actualizarOS(id, (o) => {
+    if (o.estado === "ANULADA") throw new ErpError(`La ${o.numero} ya está anulada.`);
+    if (!puede(rol, "dj.aprobar") && !(puede(rol, "oc.crear") && o.estado === "PENDIENTE"))
+      throw new ErpError("Solo Gerencia puede anular una orden de servicio aprobada.");
+    return { ...o, estado: "ANULADA", motivoAnulacion: motivo.trim(), historial: [...o.historial, evento(rol, "Orden de servicio anulada", motivo.trim())] };
+  });
 }
 
 // ---------------------------------------------------------------------

@@ -71,7 +71,11 @@ export interface Requerimiento {
   sucursalId?: string;
   /** Sede que lo emitió (multi-sede): la pone la base al guardar. */
   sedeId?: string;
+  /** BIEN (por defecto, los REQ antiguos no lo tienen) o SERVICIO: este último se atiende con una Orden de Servicio. */
+  tipo?: TipoRequerimiento;
 }
+
+export type TipoRequerimiento = "BIEN" | "SERVICIO";
 
 export interface ItemPrecio {
   itemReqId: string;
@@ -154,6 +158,56 @@ export interface OrdenCompra {
   voucherNombre?: string;
   voucherTipo?: string;
   voucherMonto?: number;
+  historial: EventoHistorial[];
+}
+
+/**
+ * Orden de Servicio (OS-001-2026): mismos datos que la OC, para servicios (no ingresa a almacén).
+ * Tabla compras, tipo 'orden_servicio'. Flujo: PENDIENTE -> APROBADA (Gerencia) | ANULADA.
+ */
+export type EstadoOS = "PENDIENTE" | "APROBADA" | "ANULADA";
+
+export interface ItemServicio {
+  id: string;
+  descripcion: string;
+  cantidad: number;
+  unidad: string;
+  precioUnit: number; // valor unitario SIN IGV
+  subtotal: number;
+  /** Si la línea es un producto del catálogo maestro. */
+  productoId?: string;
+  sku?: string;
+}
+
+export interface OrdenServicio {
+  id: string;
+  numero: string; // OS-001-2026
+  fecha: string;
+  proveedor: string;
+  ruc: string;
+  concepto: string;
+  items: ItemServicio[];
+  subtotal: number;
+  igv: number;
+  total: number;
+  /** Condición de pago (mismas opciones que la OC). */
+  formaPago: FormaPago;
+  lugarServicio?: string;
+  plazo?: string;
+  estado: EstadoOS;
+  /** De dónde se generó: requerimiento tipo SERVICIO, gasto de Tesorería o a mano. */
+  origen: "REQUERIMIENTO" | "GASTO" | "MANUAL";
+  reqId?: string;
+  reqNumero?: string;
+  gastoId?: string;
+  gastoNumero?: string;
+  /** Adjunto (cotización del proveedor, contrato…): "sb:tesoreria/<ruta>" o base64 antiguo. */
+  adjunto?: string;
+  adjuntoNombre?: string;
+  observacion?: string;
+  aprobadoPor?: string;
+  motivoAnulacion?: string;
+  creadoPor?: string;
   historial: EventoHistorial[];
 }
 

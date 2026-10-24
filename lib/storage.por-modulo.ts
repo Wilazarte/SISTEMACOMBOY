@@ -17,6 +17,7 @@ const COMPRAS: StoreKey[] = [
   "reqs_procesados_compras",
   "cotizaciones",
   "ordenes_compra",
+  "ordenes_servicio",
   "facturas",
   "guias",
   "proveedores",
