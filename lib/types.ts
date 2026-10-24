@@ -411,7 +411,8 @@ export type TipoServicioContratista =
   | "OTRO";
 
 export interface ComprobanteContratista {
-  tipo: "RH" | "FACTURA" | "BOLETA" | "OTRO";
+  /** Lista SUNAT de lib/comprobantes.ts; "RH" y "OTRO" quedan de registros antiguos. */
+  tipo: ComprobanteGasto | "RH" | "OTRO";
   numero: string;
   monto: number;
   fecha: string;
