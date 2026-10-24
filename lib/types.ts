@@ -197,12 +197,14 @@ export interface OrdenServicio {
   lugarServicio?: string;
   plazo?: string;
   estado: EstadoOS;
-  /** De dónde se generó: requerimiento tipo SERVICIO, gasto de Tesorería o a mano. */
-  origen: "REQUERIMIENTO" | "GASTO" | "MANUAL";
+  /** De dónde se generó: requerimiento tipo SERVICIO, gasto de Tesorería, compra con ingreso a stock o a mano. */
+  origen: "REQUERIMIENTO" | "GASTO" | "COMPRA" | "MANUAL";
   reqId?: string;
   reqNumero?: string;
   gastoId?: string;
   gastoNumero?: string;
+  compraId?: string;
+  compraNumero?: string;
   /** Adjunto (cotización del proveedor, contrato…): "sb:tesoreria/<ruta>" o base64 antiguo. */
   adjunto?: string;
   adjuntoNombre?: string;
@@ -440,6 +442,9 @@ export interface ItemCompra {
   subtotal: number; // cantidad × precioUnit (mismo criterio que precioUnit)
 }
 
+/** Orden que se emite junto con un gasto o una compra en "Registrar gasto": una sola por registro. */
+export type OrdenAGenerar = "NINGUNA" | "OC" | "OS";
+
 /** Pago de una compra con ingreso a stock: la cuenta de origen va en `Compra.caja`. */
 export interface PagoCompra {
   formaPago: "CONTADO" | "CREDITO";
@@ -465,6 +470,9 @@ export interface Compra {
   /** OC generada al registrar la compra ("Generar Orden de Compra OC"). */
   ordenCompraId?: string;
   ordenCompraNumero?: string;
+  /** OS generada al registrar la compra ("Generar Orden de Servicio OS"); una compra lleva OC u OS, no las dos. */
+  ordenServicioId?: string;
+  ordenServicioNumero?: string;
   items: ItemCompra[];
   subtotal: number;
   igv: number;

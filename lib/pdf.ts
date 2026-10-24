@@ -684,7 +684,7 @@ export function pdfOrdenCompra(o: OrdenCompra): void {
 
 /** Orden de Servicio: misma plantilla que la OC, con título "ORDEN DE SERVICIO". */
 export function pdfOrdenServicio(o: OrdenServicio): void {
-  const origen = o.origen === "REQUERIMIENTO" ? o.reqNumero ?? "-" : o.origen === "GASTO" ? `Gasto ${o.gastoNumero ?? ""}` : "Registro directo";
+  const origen = o.origen === "REQUERIMIENTO" ? o.reqNumero ?? "-" : o.origen === "GASTO" ? `Gasto ${o.gastoNumero ?? ""}` : o.origen === "COMPRA" ? `Compra ${o.compraNumero ?? ""}` : "Registro directo";
   guardar(
     construir({
       titulo: "ORDEN DE SERVICIO",

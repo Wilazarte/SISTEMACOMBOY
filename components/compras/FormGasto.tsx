@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { FileUp, Paperclip, Plus, Receipt, ShoppingBag, Trash2, X } from "lucide-react";
+import { FileUp, Paperclip, Plus, Receipt, Trash2, X } from "lucide-react";
 import { FormBancarizacion, bancarizacionVacia } from "@/components/compras/FormBancarizacion";
 import { UNIDADES } from "@/lib/empresa";
 import { pdfDeclaracionJurada } from "@/lib/pdf";
@@ -27,8 +27,9 @@ import {
   type DatosGasto,
   subirBaucher,
 } from "@/lib/storage";
-import type { ArchivoGasto, Factura, Bancarizacion, ComprobanteGasto, Proveedor, Rol, StockItem, TipoGasto } from "@/lib/types";
+import type { ArchivoGasto, Factura, Bancarizacion, ComprobanteGasto, OrdenAGenerar, Proveedor, Rol, StockItem, TipoGasto } from "@/lib/types";
 import { ProductoInput } from "@/components/productos/ProductoInput";
+import { SelectorOrden } from "@/components/compras/SelectorOrden";
 import { OPCIONES_COMPROBANTE, numeroAutomatico, placeholderComprobante } from "@/lib/comprobantes";
 
 type FilaOC = { id: string; nombre: string; unidad: string; cantidad: number; precioUnit: number };
@@ -59,8 +60,9 @@ const vacio = (): Omit<DatosGasto, "fecha"> => ({
  */
 export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: Rol; proveedores: Proveedor[]; stock?: StockItem[]; onGuardado?: () => void }) {
   const [d, setD] = useState(vacio);
-  // Orden de compra opcional por este gasto
-  const [conOC, setConOC] = useState(false);
+  // Orden de compra o de servicio opcional por este gasto (solo una)
+  const [orden, setOrden] = useState<OrdenAGenerar>("NINGUNA");
+  const conOC = orden !== "NINGUNA";
   const [filas, setFilas] = useState<FilaOC[]>([filaOC()]);
   // Bancarización: con ella el gasto queda PAGADO ("Registrar y pagar")
   const [pagar, setPagar] = useState(false);
@@ -104,12 +106,12 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
     let dj: Factura | undefined;
     const ok = await ejecutarAsync(
       async () => {
-        const r = await registrarGastoCompleto({ ...d, fecha: fechaISO }, { items: conOC ? filas : undefined, bancarizacion: pagar ? banc : undefined }, rol);
+        const r = await registrarGastoCompleto({ ...d, fecha: fechaISO }, { items: conOC ? filas : undefined, orden: orden === "OS" ? "OS" : "OC", bancarizacion: pagar ? banc : undefined }, rol);
         id = r.gasto.id;
         if (r.gasto.comprobanteGasto === "DJ") dj = r.gasto;
         return r;
       },
-      `Gasto registrado${conOC ? " con su orden de compra" : ""} · ${pagar ? `PAGADO desde ${banc.caja}` : `en Facturas como POR PAGAR${monto ? ` (neto ${soles(neto)})` : ""}`}`
+      `Gasto registrado${conOC ? ` con su orden de ${orden === "OS" ? "servicio (APROBADA)" : "compra"}` : ""} · ${pagar ? `PAGADO desde ${banc.caja}` : `en Facturas como POR PAGAR${monto ? ` (neto ${soles(neto)})` : ""}`}`
     );
     setGuardando(false);
     if (!ok) return;
@@ -119,7 +121,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
       pdfDeclaracionJurada(dj);
     }
     setD(vacio());
-    setConOC(false);
+    setOrden("NINGUNA");
     setFilas([filaOC()]);
     setPagar(false);
     setBanc(bancarizacionVacia());
@@ -159,16 +161,12 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
           <Textarea value={d.descripcion} onChange={(e) => set("descripcion", e.target.value)} placeholder="Ej: Servicio de transporte Arequipa - Lima" />
         </Field>
 
-        {/* Orden de compra opcional */}
-        <div className="rounded-xl border border-plomo-200 p-4 md:col-span-3">
-          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-fg">
-            <input type="checkbox" checked={conOC} onChange={(e) => setConOC(e.target.checked)} className="h-4 w-4 accent-corp" />
-            <ShoppingBag size={15} /> ¿Emitir Orden de Compra por este gasto? (opcional)
-          </label>
-          {conOC && (
+        {/* Orden de compra u orden de servicio opcional (una sola) */}
+        <div className="md:col-span-3">
+          <SelectorOrden value={orden} onChange={setOrden} nota="Opcional. La OS nace APROBADA con correlativo OS-001-2026.">
             <div className="mt-3 space-y-3">
               <p className="text-xs text-plomo-500">
-                La OC se emite a nombre del proveedor de abajo. Busque los productos en el almacén o escríbalos; precios {d.comprobante === "FACTURA" ? "sin IGV" : "finales"}.
+                La {orden === "OS" ? "OS" : "OC"} se emite a nombre del proveedor de abajo. Busque los productos en el almacén o escríbalos; precios {d.comprobante === "FACTURA" ? "sin IGV" : "finales"}.
               </p>
               <datalist id="productos-oc-gasto">
                 {productos.map((p) => (
@@ -225,12 +223,12 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
                   <Plus size={14} /> Agregar producto
                 </Button>
                 <p className={cn("text-sm", Math.abs(totalOC - (d.importe || 0)) > 0.05 ? "text-red-600" : "text-emerald-700")}>
-                  Total OC <b>{soles(totalOC)}</b>
+                  Total {orden === "OS" ? "OS" : "OC"} <b>{soles(totalOC)}</b>
                   {d.comprobante === "FACTURA" ? ` (${soles(subOC)} + IGV)` : ""} · debe coincidir con el importe {soles(d.importe || 0)}
                 </p>
               </div>
             </div>
-          )}
+          </SelectorOrden>
         </div>
         <Field label="Tipo de comprobante *">
           <Select
