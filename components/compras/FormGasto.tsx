@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { FileUp, Paperclip, Plus, Receipt, ShoppingBag, Trash2, X } from "lucide-react";
+import { FileUp, Paperclip, Plus, Receipt, Trash2, X } from "lucide-react";
 import { FormBancarizacion, bancarizacionVacia } from "@/components/compras/FormBancarizacion";
 import { UNIDADES } from "@/lib/empresa";
 import { pdfDeclaracionJurada } from "@/lib/pdf";
@@ -27,8 +27,18 @@ import {
   type DatosGasto,
   subirBaucher,
 } from "@/lib/storage";
-import type { ArchivoGasto, Factura, Bancarizacion, ComprobanteGasto, Proveedor, Rol, StockItem, TipoGasto } from "@/lib/types";
+import type { ArchivoGasto, Factura, Bancarizacion, ComprobanteGasto, OrdenAGenerar, Proveedor, Rol, StockItem, TipoGasto } from "@/lib/types";
 import { ProductoInput } from "@/components/productos/ProductoInput";
+import { SelectorOrden } from "@/components/compras/SelectorOrden";
+import {
+  OPCIONES_COMPROBANTE,
+  PORC_RETENCION_RHE,
+  TOPE_DJ_MOVILIDAD_DIA,
+  TOPE_RETENCION_RHE,
+  numeroAutomatico,
+  placeholderComprobante,
+  retencionRHE,
+} from "@/lib/comprobantes";
 
 type FilaOC = { id: string; nombre: string; unidad: string; cantidad: number; precioUnit: number };
 const filaOC = (): FilaOC => ({ id: Math.random().toString(36).slice(2), nombre: "", unidad: "UND", cantidad: 1, precioUnit: 0 });
@@ -50,6 +60,8 @@ const vacio = (): Omit<DatosGasto, "fecha"> => ({
   detraccion: false,
   detraccionPorc: DETRACCION_SUGERIDA.TRANSPORTE,
   archivos: [],
+  retencion: true,
+  suministro: "",
 });
 
 /**
@@ -58,8 +70,9 @@ const vacio = (): Omit<DatosGasto, "fecha"> => ({
  */
 export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: Rol; proveedores: Proveedor[]; stock?: StockItem[]; onGuardado?: () => void }) {
   const [d, setD] = useState(vacio);
-  // Orden de compra opcional por este gasto
-  const [conOC, setConOC] = useState(false);
+  // Orden de compra o de servicio opcional por este gasto (solo una)
+  const [orden, setOrden] = useState<OrdenAGenerar>("NINGUNA");
+  const conOC = orden !== "NINGUNA";
   const [filas, setFilas] = useState<FilaOC[]>([filaOC()]);
   // Bancarización: con ella el gasto queda PAGADO ("Registrar y pagar")
   const [pagar, setPagar] = useState(false);
@@ -76,7 +89,10 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
   const set = <K extends keyof typeof d>(k: K, v: (typeof d)[K]) => setD((x) => ({ ...x, [k]: v }));
   const fechaISO = parseFechaPE(fechaTxt);
   const fechaError = fechaTxt.length === 10 && !fechaISO ? "Fecha inexistente" : fechaISO > hoy() ? "La fecha no puede ser futura" : undefined;
-  const { monto, neto } = calcularDetraccion(d.importe, d.detraccion, d.detraccionPorc);
+  const { monto, neto: netoDetraccion } = calcularDetraccion(d.importe, d.detraccion, d.detraccionPorc);
+  const esRHE = d.comprobante === "RXH";
+  const retencion = esRHE ? retencionRHE(d.importe || 0, d.retencion ?? true) : 0;
+  const neto = r2(netoDetraccion - retencion);
   const rucMal = d.ruc.length === 11 && !rucValido(d.ruc);
   const subOC = r2(filas.reduce((a, f) => a + (f.cantidad || 0) * (f.precioUnit || 0), 0));
   const totalOC = d.comprobante === "FACTURA" ? r2(subOC * (1 + IGV)) : subOC;
@@ -103,12 +119,12 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
     let dj: Factura | undefined;
     const ok = await ejecutarAsync(
       async () => {
-        const r = await registrarGastoCompleto({ ...d, fecha: fechaISO }, { items: conOC ? filas : undefined, bancarizacion: pagar ? banc : undefined }, rol);
+        const r = await registrarGastoCompleto({ ...d, fecha: fechaISO }, { items: conOC ? filas : undefined, orden: orden === "OS" ? "OS" : "OC", bancarizacion: pagar ? banc : undefined }, rol);
         id = r.gasto.id;
         if (r.gasto.comprobanteGasto === "DJ") dj = r.gasto;
         return r;
       },
-      `Gasto registrado${conOC ? " con su orden de compra" : ""} · ${pagar ? `PAGADO desde ${banc.caja}` : `en Facturas como POR PAGAR${monto ? ` (neto ${soles(neto)})` : ""}`}`
+      `Gasto registrado${conOC ? ` con su orden de ${orden === "OS" ? "servicio (APROBADA)" : "compra"}` : ""} · ${pagar ? `PAGADO desde ${banc.caja}` : `en Facturas como POR PAGAR${monto ? ` (neto ${soles(neto)})` : ""}`}`
     );
     setGuardando(false);
     if (!ok) return;
@@ -118,7 +134,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
       pdfDeclaracionJurada(dj);
     }
     setD(vacio());
-    setConOC(false);
+    setOrden("NINGUNA");
     setFilas([filaOC()]);
     setPagar(false);
     setBanc(bancarizacionVacia());
@@ -143,31 +159,40 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
             value={d.tipoGasto}
             onChange={(e) => {
               const tipoGasto = e.target.value as TipoGasto;
-              setD((x) => ({ ...x, tipoGasto, detraccionPorc: DETRACCION_SUGERIDA[tipoGasto] }));
+              // Servicios profesionales (4ta categoría): por defecto, recibo por honorarios electrónico
+              setD((x) => ({ ...x, tipoGasto, detraccionPorc: DETRACCION_SUGERIDA[tipoGasto], ...(tipoGasto === "SERV_PROFESIONALES" ? { comprobante: "RXH" as const } : {}) }));
             }}
             options={(Object.keys(TIPOS_GASTO) as TipoGasto[]).filter((k) => k !== "PLANILLA").map((k) => ({ value: k, label: TIPOS_GASTO[k] }))}
           />
+          {d.tipoGasto === "SERV_PROFESIONALES" && <span className="mt-1 block text-xs text-plomo-500">Persona natural con RUC 10 - 4ta categoría</span>}
         </Field>
         <Field label="Fecha de gasto *" hint={fechaError ? `⚠ ${fechaError}` : "DD/MM/AAAA"}>
           <Input value={fechaTxt} inputMode="numeric" maxLength={10} onChange={(e) => setFechaTxt(mascara(e.target.value))} className={cn(fechaError && "border-red-400")} />
         </Field>
-        <Field label="Importe total (S/) *" hint={d.comprobante === "FACTURA" ? "Con IGV incluido" : undefined}>
+        <Field
+          label="Importe total (S/) *"
+          hint={
+            d.comprobante === "FACTURA"
+              ? "Con IGV incluido"
+              : d.comprobante === "DJ"
+                ? `Movilidad: máx. ${soles(TOPE_DJ_MOVILIDAD_DIA)} por día (SUNAT)`
+                : esRHE
+                  ? `Monto bruto del RHE (retención 8 % si pasa ${soles(TOPE_RETENCION_RHE)})`
+                  : undefined
+          }
+        >
           <Input type="number" min={0} step="0.01" value={d.importe || ""} onChange={(e) => set("importe", parseFloat(e.target.value) || 0)} className="text-lg font-semibold" />
         </Field>
         <Field label="Descripción del gasto *" className="md:col-span-3">
           <Textarea value={d.descripcion} onChange={(e) => set("descripcion", e.target.value)} placeholder="Ej: Servicio de transporte Arequipa - Lima" />
         </Field>
 
-        {/* Orden de compra opcional */}
-        <div className="rounded-xl border border-plomo-200 p-4 md:col-span-3">
-          <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-fg">
-            <input type="checkbox" checked={conOC} onChange={(e) => setConOC(e.target.checked)} className="h-4 w-4 accent-corp" />
-            <ShoppingBag size={15} /> ¿Emitir Orden de Compra por este gasto? (opcional)
-          </label>
-          {conOC && (
+        {/* Orden de compra u orden de servicio opcional (una sola) */}
+        <div className="md:col-span-3">
+          <SelectorOrden value={orden} onChange={setOrden} nota="Opcional. La OS nace APROBADA con correlativo OS-001-2026.">
             <div className="mt-3 space-y-3">
               <p className="text-xs text-plomo-500">
-                La OC se emite a nombre del proveedor de abajo. Busque los productos en el almacén o escríbalos; precios {d.comprobante === "FACTURA" ? "sin IGV" : "finales"}.
+                La {orden === "OS" ? "OS" : "OC"} se emite a nombre del proveedor de abajo. Busque los productos en el almacén o escríbalos; precios {d.comprobante === "FACTURA" ? "sin IGV" : "finales"}.
               </p>
               <datalist id="productos-oc-gasto">
                 {productos.map((p) => (
@@ -224,30 +249,40 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
                   <Plus size={14} /> Agregar producto
                 </Button>
                 <p className={cn("text-sm", Math.abs(totalOC - (d.importe || 0)) > 0.05 ? "text-red-600" : "text-emerald-700")}>
-                  Total OC <b>{soles(totalOC)}</b>
+                  Total {orden === "OS" ? "OS" : "OC"} <b>{soles(totalOC)}</b>
                   {d.comprobante === "FACTURA" ? ` (${soles(subOC)} + IGV)` : ""} · debe coincidir con el importe {soles(d.importe || 0)}
                 </p>
               </div>
             </div>
-          )}
+          </SelectorOrden>
         </div>
         <Field label="Tipo de comprobante *">
           <Select
             value={d.comprobante}
             onChange={(e) => set("comprobante", e.target.value as ComprobanteGasto)}
-            options={(Object.keys(COMPROBANTES_GASTO) as ComprobanteGasto[]).map((k) => ({ value: k, label: COMPROBANTES_GASTO[k] }))}
+            options={OPCIONES_COMPROBANTE}
           />
+          {esRHE && <span className="mt-1 block text-xs text-plomo-500">Persona natural con RUC 10 - 4ta categoría</span>}
         </Field>
-        <Field label={d.comprobante === "DJ" ? "N° DJ" : `N° ${COMPROBANTES_GASTO[d.comprobante].toLowerCase()} *`} hint={d.comprobante === "DJ" ? "Se asigna solo al guardar (correlativo)" : undefined}>
+        <Field
+          label={d.comprobante === "DJ" ? "N° DJ" : numeroAutomatico(d.comprobante) ? "N° interno" : `N° ${COMPROBANTES_GASTO[d.comprobante].toLowerCase()} *`}
+          hint={d.comprobante === "DJ" ? "Se asigna solo al guardar (correlativo)" : numeroAutomatico(d.comprobante) ? "Se asigna solo al guardar" : undefined}
+        >
           <Input
-            value={d.comprobante === "DJ" ? "" : d.numero}
-            disabled={d.comprobante === "DJ"}
+            value={numeroAutomatico(d.comprobante) ? "" : d.numero}
+            disabled={numeroAutomatico(d.comprobante)}
             onChange={(e) => set("numero", e.target.value.toUpperCase())}
-            placeholder={d.comprobante === "FACTURA" ? "F001-00001234" : d.comprobante === "BOLETA" ? "B001-00000456" : d.comprobante === "DJ" ? "Auto: DJ-XXXX" : "N° de recibo"}
+            placeholder={placeholderComprobante(d.comprobante)}
           />
         </Field>
-        <div />
-        <Field label="Proveedor / agencia *" className="md:col-span-2">
+        {d.comprobante === "SERVICIO_PUBLICO" ? (
+          <Field label="N° de suministro" hint="Sin IGV separado">
+            <Input value={d.suministro ?? ""} onChange={(e) => set("suministro", e.target.value.toUpperCase())} placeholder="Ej: 123456 (SEAL / SEDAPAR)" />
+          </Field>
+        ) : (
+          <div />
+        )}
+        <Field label={d.comprobante === "DJ" ? "Nombre de quien declara *" : esRHE ? "Persona que emite el RHE *" : "Proveedor / agencia *"} className="md:col-span-2">
           <Input value={d.proveedor} list="proveedores-gasto" onChange={(e) => {
             const p = proveedores.find((x) => x.razonSocial === e.target.value.toUpperCase());
             setD((x) => ({ ...x, proveedor: e.target.value, ruc: p?.ruc ?? x.ruc }));
@@ -260,15 +295,43 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
             ))}
           </datalist>
         </Field>
-        <Field label={d.comprobante === "FACTURA" ? "RUC *" : "RUC / DNI"} hint={rucMal ? "⚠ Dígito verificador inválido" : undefined}>
+        <Field
+          label={d.comprobante === "FACTURA" ? "RUC *" : d.comprobante === "DJ" ? "DNI *" : esRHE ? "RUC (10…) / DNI *" : "RUC / DNI"}
+          hint={rucMal ? "⚠ Dígito verificador inválido" : undefined}
+        >
           <Input
             value={d.ruc}
-            maxLength={11}
+            maxLength={d.comprobante === "DJ" ? 8 : 11}
             inputMode="numeric"
             onChange={(e) => set("ruc", e.target.value.replace(/\D/g, ""))}
             className={cn(d.ruc.length === 11 && (rucMal ? "border-red-400" : "border-emerald-400"))}
           />
         </Field>
+
+        {/* Retención de 4ta categoría (RHE por más de S/ 1,500) */}
+        {esRHE && (
+          <div className="rounded-xl border border-plomo-200 p-4 md:col-span-3">
+            <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-fg">
+              <input type="checkbox" checked={d.retencion ?? true} onChange={(e) => set("retencion", e.target.checked)} className="h-4 w-4 accent-corp" />
+              Retención 4ta categoría ({PORC_RETENCION_RHE} %)
+            </label>
+            <p className="mt-1 text-xs text-plomo-500">
+              {(d.importe || 0) > TOPE_RETENCION_RHE
+                ? "Aplica: el recibo supera S/ 1,500. Desmárquela solo si el emisor tiene suspensión de retenciones (Formulario 1609)."
+                : `No aplica: el recibo no supera ${soles(TOPE_RETENCION_RHE)}.`}
+            </p>
+            {retencion > 0 && (
+              <div className="mt-3 flex flex-wrap gap-3">
+                <div className="rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">
+                  Retención: <b>{soles(retencion)}</b>
+                </div>
+                <div className="rounded-lg bg-emerald-50 px-4 py-2 text-sm text-emerald-800">
+                  Neto a pagar: <b>{soles(neto)}</b>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Detracción */}
         <div className="rounded-xl border border-plomo-200 p-4 md:col-span-3">
@@ -352,7 +415,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
       <div className="flex items-center justify-between gap-3 border-t border-plomo-100 px-5 py-4">
         <p className="text-sm text-plomo-600">
           Total <b className="text-fg">{soles(d.importe || 0)}</b>
-          {d.detraccion && (
+          {(d.detraccion || retencion > 0) && (
             <>
               {" "}
               · neto a pagar <b className="text-emerald-700">{soles(neto)}</b>

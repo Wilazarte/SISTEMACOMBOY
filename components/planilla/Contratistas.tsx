@@ -29,6 +29,7 @@ import QuickActions, { QA_IDS } from "@/components/tesoreria/QuickActions";
 import { BotonFiltros } from "@/components/ui/BotonFiltros";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { KEYS, fechaPE, hoy, r2, rucValido, soles, useStore } from "@/lib/storage";
+import { OPCIONES_COMPROBANTE } from "@/lib/comprobantes";
 import type { ComprobanteContratista, ConcesionContratista, PagoContratista, TipoServicioContratista } from "@/lib/types";
 
 const OPC_TIPO = (Object.keys(TIPOS_SERVICIO) as TipoServicioContratista[]).map((k) => ({ value: k, label: TIPOS_SERVICIO[k] }));
@@ -251,7 +252,7 @@ function FormConcesion({ form, onChange, onClose }: { form: ConcesionContratista
 }
 
 function PagosConcesion({ c, soloLectura, onClose }: { c: ConcesionContratista; soloLectura: boolean; onClose: () => void }) {
-  const [comp, setComp] = useState<ComprobanteContratista>({ tipo: "RH", numero: "", monto: 0, fecha: hoy() });
+  const [comp, setComp] = useState<ComprobanteContratista>({ tipo: "RXH", numero: "", monto: 0, fecha: hoy() });
   const [pago, setPago] = useState<PagoContratista>({ fecha: hoy(), monto: 0, medio: "TRANSFERENCIA", caja: CAJA_POR_DEFECTO });
   const [motivo, setMotivo] = useState("");
   const saldo = calcularSaldo(c);
@@ -364,7 +365,7 @@ function PagosConcesion({ c, soloLectura, onClose }: { c: ConcesionContratista; 
           {activa && (
             <div className="flex flex-wrap items-end gap-2 p-4">
               <Field label="Tipo">
-                <Select value={comp.tipo} onChange={(e) => setComp({ ...comp, tipo: e.target.value as ComprobanteContratista["tipo"] })} options={Object.entries(TIPOS_COMPROBANTE).map(([value, label]) => ({ value, label }))} />
+                <Select value={comp.tipo} onChange={(e) => setComp({ ...comp, tipo: e.target.value as ComprobanteContratista["tipo"] })} options={OPCIONES_COMPROBANTE} />
               </Field>
               <Field label="Número">
                 <Input value={comp.numero} onChange={(e) => setComp({ ...comp, numero: e.target.value.toUpperCase() })} placeholder="E001-123" className="w-36" />

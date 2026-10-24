@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Pencil } from "lucide-react";
 import { Button, Field, Input, Modal, Select, Textarea, cn, ejecutar } from "@/components/ui";
+import { numeroAutomatico } from "@/lib/comprobantes";
 import { COMPROBANTES_GASTO, TIPOS_GASTO, editarGasto, fechaPE, parseFechaPE, rucValido, soles } from "@/lib/storage";
 import type { Factura, Rol, TipoGasto } from "@/lib/types";
 
@@ -55,7 +56,7 @@ export function EditarGasto({ gasto, rol, onClose }: { gasto: Factura; rol: Rol;
           <Input value={COMPROBANTES_GASTO[comp]} disabled />
         </Field>
         <Field label={comp === "DJ" ? "N° DJ *" : `N° ${COMPROBANTES_GASTO[comp].toLowerCase()} *`}>
-          <Input value={numero} disabled={comp === "DJ"} onChange={(e) => setNumero(e.target.value.toUpperCase())} />
+          <Input value={numero} disabled={numeroAutomatico(comp)} onChange={(e) => setNumero(e.target.value.toUpperCase())} />
         </Field>
         <div />
         <Field label="Proveedor / agencia *" className="md:col-span-2">

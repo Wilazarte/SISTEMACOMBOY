@@ -30,6 +30,7 @@ import type {
   MovimientoCajaManual,
   Guia,
   ItemCompra,
+  OrdenAGenerar,
   OrdenCompra,
   PagoCompra,
   OrdenServicio,
@@ -50,6 +51,17 @@ import { generarCodigo } from "./utils/codigos";
 import { clavesDeModulos } from "./storage.por-modulo";
 import { canonizarItems } from "./productos";
 import { normalizarNombre } from "./productos-modelos";
+import {
+  COMPROBANTES,
+  EJEMPLO_NUMERO,
+  NUM_COMPROBANTE,
+  PORC_RETENCION_RHE,
+  TOPE_DJ_MOVILIDAD_DIA,
+  TOPE_RETENCION_RHE,
+  numeroAutomatico,
+  numeroSinComprobante,
+  retencionRHE,
+} from "./comprobantes";
 
 export const KEYS = {
   REQS_PENDIENTES: "reqs_almacen_pendientes",
@@ -2300,19 +2312,19 @@ export function transferirStock(nombre: string, unidad: string, cantidad: number
 
 export const TIPOS_GASTO: Record<TipoGasto, string> = {
   REPRESENTACION: "Almuerzo ejecutivo / Representación",
-  SERVICIO_BASICO: "Servicio básico (Luz / Agua / Internet / Celular)",
-  TRANSPORTE: "Transporte / Agencia / Flete",
+  SERVICIO_BASICO: "Servicios Públicos (Luz, Agua, Internet, Teléfono)",
+  TRANSPORTE: "Servicios de Transporte / Agencia / Flete",
   COMPRA_SIN_REQ: "Compra sin requerimiento",
-  OTROS: "Otros",
+  SERV_PROFESIONALES: "Servicios Profesionales / Recibo por Honorarios (4ta Categoría)",
+  SERV_TERCEROS: "Servicios de Terceros / Locación de Servicios",
+  MANO_OBRA: "Mano de obra / Personal por recibo",
+  ALQUILER: "Alquiler de bienes muebles / inmuebles",
+  MANTENIMIENTO: "Mantenimiento y Reparación",
+  OTROS: "Otros Servicios",
   PLANILLA: "Planilla semanal (sueldos)",
 };
 
-export const COMPROBANTES_GASTO: Record<ComprobanteGasto, string> = {
-  FACTURA: "Factura",
-  BOLETA: "Boleta",
-  DJ: "Declaración Jurada de Gasto",
-  RECIBO: "Recibo",
-};
+export const COMPROBANTES_GASTO = COMPROBANTES;
 
 /** % de detracción sugerido según el servicio (transporte de carga 4 %, servicios en general 12 %, otros 10 %). */
 export const DETRACCION_SUGERIDA: Record<TipoGasto, number> = {
@@ -2320,6 +2332,11 @@ export const DETRACCION_SUGERIDA: Record<TipoGasto, number> = {
   SERVICIO_BASICO: 12,
   TRANSPORTE: 4,
   COMPRA_SIN_REQ: 10,
+  SERV_PROFESIONALES: 12,
+  SERV_TERCEROS: 12,
+  MANO_OBRA: 12,
+  ALQUILER: 10,
+  MANTENIMIENTO: 12,
   OTROS: 12,
   PLANILLA: 0,
 };
@@ -2337,6 +2354,10 @@ export interface DatosGasto {
   detraccion: boolean;
   detraccionPorc: number;
   archivos: ArchivoGasto[];
+  /** RHE por más de S/ 1,500: aplicar la retención de 4ta categoría (8 %). Por defecto sí. */
+  retencion?: boolean;
+  /** Recibo de servicios públicos: N° de suministro. */
+  suministro?: string;
 }
 
 /** Detracción y neto a pagar: ej. agencia S/ 100 con 4 % -> detracción S/ 4, neto S/ 96. */
@@ -2346,10 +2367,7 @@ export function calcularDetraccion(importe: number, aplica: boolean, porc: numbe
   return { monto, neto: r2(total - monto) };
 }
 
-const NUM_GASTO: Partial<Record<ComprobanteGasto, RegExp>> = {
-  FACTURA: /^[EF][A-Z0-9]{3}-\d{1,8}$/,
-  BOLETA: /^[BE][A-Z0-9]{3}-\d{1,8}$/,
-};
+const NUM_GASTO = NUM_COMPROBANTE;
 
 const DJ_AUTO = "DJ-AUTO";
 
@@ -2431,18 +2449,21 @@ export type ItemOCGasto = { nombre: string; unidad: string; cantidad: number; pr
  */
 export async function registrarGastoCompleto(
   d: DatosGasto,
-  opc: { items?: ItemOCGasto[]; bancarizacion?: Bancarizacion },
+  /** `items` + `orden`: con ellos se emite la OC (por defecto) o la OS del gasto. */
+  opc: { items?: ItemOCGasto[]; orden?: "OC" | "OS"; bancarizacion?: Bancarizacion },
   rol: Rol
-): Promise<{ gasto: Factura; oc?: OrdenCompra }> {
+): Promise<{ gasto: Factura; oc?: OrdenCompra; os?: OrdenServicio }> {
   // Declaración jurada: el N° lo pone el servidor (DJ-0001, DJ-0002…) al final, cuando todo lo demás ya validó
   const esDJ = d.comprobante === "DJ";
-  const f = prepararGasto(esDJ ? { ...d, numero: DJ_AUTO } : d, rol);
+  const f = prepararGasto(esDJ ? { ...d, numero: DJ_AUTO } : d.comprobante === "SIN_COMPROBANTE" ? { ...d, numero: numeroSinComprobante() } : d, rol);
   const b = opc.bancarizacion ? validarBancarizacion(opc.bancarizacion) : undefined;
   let oc: OrdenCompra | undefined;
+  let os: OrdenServicio | undefined;
+  const sigla = opc.orden === "OS" ? "OS" : "OC";
   if (opc.items) {
     const filas = opc.items.filter((i) => i.nombre.trim());
-    if (!filas.length) throw new ErpError("Agregue al menos un producto a la orden de compra.");
-    if (filas.some((i) => !(i.cantidad > 0) || !(i.precioUnit > 0))) throw new ErpError("Cada producto de la OC necesita cantidad y precio mayores a 0.");
+    if (!filas.length) throw new ErpError(`Agregue al menos un producto a la orden de ${sigla === "OS" ? "servicio" : "compra"}.`);
+    if (filas.some((i) => !(i.cantidad > 0) || !(i.precioUnit > 0))) throw new ErpError(`Cada producto de la ${sigla} necesita cantidad y precio mayores a 0.`);
     const items: ItemPrecio[] = canonizarItems(filas).map((i) => ({
       itemReqId: uid(),
       nombre: i.nombre,
@@ -2458,33 +2479,42 @@ export async function registrarGastoCompleto(
     const igv = d.comprobante === "FACTURA" ? r2(subtotal * IGV) : 0;
     const total = r2(subtotal + igv);
     if (Math.abs(total - f.total) > 0.05)
-      throw new ErpError(`El total de la OC (${soles(total)}) no coincide con el importe del gasto (${soles(f.total)}). Revise cantidades y precios${igv ? " (sin IGV)" : ""}.`);
-    const numero = formatear("OC", await siguiente("OC"));
-    oc = {
-      id: uid(),
-      numero,
-      fecha: d.fecha,
-      cotizacionId: "",
-      cotizacionNumero: "-",
-      reqId: "",
-      reqNumero: "-",
-      proveedor: f.proveedor,
-      ruc: f.ruc,
-      formaPago: "CONTADO",
-      tiempoEntrega: "Inmediato",
-      lugarEntrega: "-",
-      items,
-      subtotal,
-      igv,
-      total,
-      // El gasto ya trae su comprobante: la OC nace con factura (fin del flujo)
-      estado: "FACTURADA",
-      gastoId: f.id,
-      ...(b ? { bancarizacion: b, caja: b.caja, cuentaOrigenPago: cuentaOrigenDeCaja(b.caja) } : {}),
-      historial: [evento(rol, "Orden de compra emitida desde Registrar gasto", `${COMPROBANTES_GASTO[d.comprobante]} ${f.numero}`)],
-    };
-    f.ocId = oc.id;
-    f.ocNumero = numero;
+      throw new ErpError(`El total de la ${sigla} (${soles(total)}) no coincide con el importe del gasto (${soles(f.total)}). Revise cantidades y precios${igv ? " (sin IGV)" : ""}.`);
+    if (sigla === "OS") {
+      os = osDirecta(
+        { fecha: d.fecha, proveedor: f.proveedor, ruc: f.ruc, concepto: d.descripcion.trim(), origen: "GASTO", gastoId: f.id, gastoNumero: f.numero, items, subtotal, igv, total },
+        await reservarNumeroOS(),
+        rol,
+        `${COMPROBANTES_GASTO[d.comprobante]} ${f.numero}`
+      );
+    } else {
+      const numero = formatear("OC", await siguiente("OC"));
+      oc = {
+        id: uid(),
+        numero,
+        fecha: d.fecha,
+        cotizacionId: "",
+        cotizacionNumero: "-",
+        reqId: "",
+        reqNumero: "-",
+        proveedor: f.proveedor,
+        ruc: f.ruc,
+        formaPago: "CONTADO",
+        tiempoEntrega: "Inmediato",
+        lugarEntrega: "-",
+        items,
+        subtotal,
+        igv,
+        total,
+        // El gasto ya trae su comprobante: la OC nace con factura (fin del flujo)
+        estado: "FACTURADA",
+        gastoId: f.id,
+        ...(b ? { bancarizacion: b, caja: b.caja, cuentaOrigenPago: cuentaOrigenDeCaja(b.caja) } : {}),
+        historial: [evento(rol, "Orden de compra emitida desde Registrar gasto", `${COMPROBANTES_GASTO[d.comprobante]} ${f.numero}`)],
+      };
+      f.ocId = oc.id;
+      f.ocNumero = numero;
+    }
   }
   if (esDJ) {
     const numero = await siguienteDJ();
@@ -2493,6 +2523,10 @@ export async function registrarGastoCompleto(
     f.djEstado = "PENDIENTE";
     f.historial = poner(f.historial);
     if (oc) oc.historial = poner(oc.historial);
+    if (os) {
+      os.gastoNumero = numero;
+      os.historial = poner(os.historial);
+    }
   }
   if (b) {
     f.estadoPago = "PAGADA";
@@ -2501,8 +2535,9 @@ export async function registrarGastoCompleto(
     f.historial = [...f.historial, evento(rol, "Marcada como PAGADA", textoBancarizacion(b))];
   }
   if (oc) escribir(KEYS.ORDENES, [oc, ...getOrdenes()]);
+  if (os) escribir(KEYS.ORDENES_SERVICIO, [os, ...getOrdenesServicio()]);
   escribir(KEYS.FACTURAS, [f, ...getFacturas()]);
-  return { gasto: f, oc };
+  return { gasto: f, oc, os };
 }
 
 /** Valida el gasto y arma la fila de Facturas (sin guardar). */
@@ -2517,12 +2552,16 @@ function prepararGasto(d: DatosGasto, rol: Rol): Factura {
   const numero = d.numero.trim().toUpperCase();
   if (!numero) throw new ErpError(`Ingrese el N° de ${COMPROBANTES_GASTO[d.comprobante].toLowerCase()}.`);
   const re = NUM_GASTO[d.comprobante];
-  if (re && !re.test(numero)) throw new ErpError(`N° de ${d.comprobante.toLowerCase()} inválido. Ej: ${d.comprobante === "FACTURA" ? "F001-00001234" : "B001-00000456"}`);
+  if (re && !re.test(numero)) throw new ErpError(`N° de ${COMPROBANTES[d.comprobante].toLowerCase()} inválido. Ej: ${EJEMPLO_NUMERO[d.comprobante]}`);
   const proveedor = d.proveedor.trim().toUpperCase();
-  if (!proveedor) throw new ErpError("Indique el proveedor o agencia.");
+  if (!proveedor) throw new ErpError(d.comprobante === "DJ" ? "Indique el nombre de quien declara." : "Indique el proveedor o agencia.");
   const ruc = d.ruc.trim();
   if (ruc && !/^\d{8}$/.test(ruc) && !/^\d{11}$/.test(ruc)) throw new ErpError("RUC (11 dígitos) o DNI (8 dígitos) inválido.");
   if (d.comprobante === "FACTURA" && ruc.length !== 11) throw new ErpError("La factura requiere el RUC del proveedor.");
+  if (d.comprobante === "RXH" && !ruc) throw new ErpError("El recibo por honorarios requiere el RUC (10…) o DNI de la persona.");
+  if (d.comprobante === "DJ" && !/^\d{8}$/.test(ruc)) throw new ErpError("La declaración jurada solo lleva el DNI (8 dígitos) de quien declara.");
+  if (d.comprobante === "DJ" && total > TOPE_DJ_MOVILIDAD_DIA)
+    throw new ErpError(`La declaración jurada de movilidad tiene un tope de ${soles(TOPE_DJ_MOVILIDAD_DIA)} por día (SUNAT). Registre un día por declaración.`);
   if (ruc.length === 11 && !rucValido(ruc)) throw new ErpError("RUC inválido (dígito verificador).");
   if (getFacturas().some((f) => f.numero === numero && (ruc ? f.ruc === ruc : f.proveedor === proveedor)) || (ruc && getCompras().some((c) => c.numero === numero && c.ruc === ruc)))
     throw new ErpError(`El comprobante ${numero} de ${proveedor} ya fue registrado.`);
@@ -2531,7 +2570,11 @@ function prepararGasto(d: DatosGasto, rol: Rol): Factura {
 
   // Factura: el importe incluye IGV (crédito fiscal). Boleta / DJ / recibo: sin IGV separado.
   const subtotal = d.comprobante === "FACTURA" ? r2(total / (1 + IGV)) : total;
-  const { monto, neto } = calcularDetraccion(total, d.detraccion, d.detraccionPorc);
+  const { monto, neto: netoDetraccion } = calcularDetraccion(total, d.detraccion, d.detraccionPorc);
+  // RHE por más de S/ 1,500: se retiene el 8 % (4ta categoría) y se paga el neto
+  const retencion = d.comprobante === "RXH" ? retencionRHE(total, d.retencion ?? true) : 0;
+  const neto = r2(netoDetraccion - retencion);
+  const suministro = d.comprobante === "SERVICIO_PUBLICO" ? d.suministro?.trim().toUpperCase() : undefined;
   const f: Factura = {
     id: uid(),
     tipo: d.comprobante === "DJ" ? "DECLARACION_JURADA" : "FACTURA",
@@ -2548,12 +2591,14 @@ function prepararGasto(d: DatosGasto, rol: Rol): Factura {
     igv: r2(total - subtotal),
     total,
     estadoPago: "POR_PAGAR",
-    historial: [evento(rol, "Gasto de Tesorería registrado", `${TIPOS_GASTO[d.tipoGasto]} · ${COMPROBANTES_GASTO[d.comprobante]} ${numero}${monto ? ` · detracción ${d.detraccionPorc}% S/ ${monto.toFixed(2)}` : ""}`)],
+    historial: [evento(rol, "Gasto de Tesorería registrado", `${TIPOS_GASTO[d.tipoGasto]} · ${COMPROBANTES_GASTO[d.comprobante]} ${numero}${monto ? ` · detracción ${d.detraccionPorc}% S/ ${monto.toFixed(2)}` : ""}${retencion ? ` · retención 4ta ${PORC_RETENCION_RHE}% S/ ${retencion.toFixed(2)}` : ""}`)],
     esGastoTesoreria: true,
     tipoGasto: d.tipoGasto,
     descripcion: d.descripcion.trim(),
     comprobanteGasto: d.comprobante,
     ...(d.detraccion ? { detraccionPorc: d.detraccionPorc, detraccionMonto: monto } : {}),
+    ...(retencion ? { retencionPorc: PORC_RETENCION_RHE, retencionMonto: retencion } : {}),
+    ...(suministro ? { suministro } : {}),
     netoPagar: neto,
     ...(d.archivos.length ? { archivos: d.archivos } : {}),
     creadoPor: usuarioActual(),
@@ -2583,25 +2628,29 @@ export function editarGasto(id: string, c: EdicionGasto, rol: Rol): Factura {
   const f = lista.find((x) => x.id === id);
   if (!f || !f.esGastoTesoreria) throw new ErpError("Gasto no encontrado.");
   if (f.estadoPago !== "POR_PAGAR") throw new ErpError("Documento ya procesado: el gasto ya fue pagado.");
-  if (!/^d{4}-d{2}-d{2}$/.test(c.fecha) || c.fecha > hoy()) throw new ErpError("Fecha del gasto inválida (no puede ser futura).");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(c.fecha) || c.fecha > hoy()) throw new ErpError("Fecha del gasto inválida (no puede ser futura).");
   if (!(c.tipoGasto in TIPOS_GASTO)) throw new ErpError("Seleccione el tipo de gasto.");
   if (!c.descripcion?.trim()) throw new ErpError("Describa el gasto.");
   const comp = f.comprobanteGasto ?? "FACTURA";
-  const numero = comp === "DJ" ? f.numero : c.numero.trim().toUpperCase(); // el N° de DJ es correlativo: no se edita
+  const numero = numeroAutomatico(comp) ? f.numero : c.numero.trim().toUpperCase(); // DJ / sin comprobante: N° del sistema, no se edita
   const re = NUM_GASTO[comp];
   if (!numero || (re && !re.test(numero))) throw new ErpError(`N° de ${COMPROBANTES_GASTO[comp].toLowerCase()} inválido.`);
   const proveedor = c.proveedor.trim().toUpperCase();
   if (!proveedor) throw new ErpError("Indique el proveedor o agencia.");
   const ruc = c.ruc.trim();
-  if (ruc && !/^d{8}$/.test(ruc) && !/^d{11}$/.test(ruc)) throw new ErpError("RUC (11 dígitos) o DNI (8 dígitos) inválido.");
+  if (ruc && !/^\d{8}$/.test(ruc) && !/^\d{11}$/.test(ruc)) throw new ErpError("RUC (11 dígitos) o DNI (8 dígitos) inválido.");
   if (comp === "FACTURA" && ruc.length !== 11) throw new ErpError("La factura requiere el RUC del proveedor.");
   if (ruc.length === 11 && !rucValido(ruc)) throw new ErpError("RUC inválido (dígito verificador).");
   if (lista.some((x) => x.id !== id && x.numero === numero && (ruc ? x.ruc === ruc : x.proveedor === proveedor)))
     throw new ErpError(`El comprobante ${numero} de ${proveedor} ya fue registrado.`);
   const total = f.ocId ? f.total : r2(Number(c.importe));
   if (!(total > 0)) throw new ErpError("El importe total debe ser mayor a 0.");
+  if (comp === "DJ" && total > TOPE_DJ_MOVILIDAD_DIA) throw new ErpError(`La declaración jurada de movilidad tiene un tope de ${soles(TOPE_DJ_MOVILIDAD_DIA)} por día (SUNAT).`);
   const subtotal = comp === "FACTURA" ? r2(total / (1 + IGV)) : total;
-  const { monto, neto } = calcularDetraccion(total, !!f.detraccionPorc, f.detraccionPorc ?? 0);
+  const { monto, neto: netoDetraccion } = calcularDetraccion(total, !!f.detraccionPorc, f.detraccionPorc ?? 0);
+  // RHE: la retención sigue la decisión del registro (si se quitó con un importe > S/ 1,500, sigue sin retención)
+  const retencion = comp === "RXH" ? retencionRHE(total, f.retencionPorc !== undefined || f.total <= TOPE_RETENCION_RHE) : 0;
+  const neto = r2(netoDetraccion - retencion);
   const cambios = [numero !== f.numero && `N° ${f.numero} → ${numero}`, total !== f.total && `importe ${soles(f.total)} → ${soles(total)}`].filter(Boolean).join(" · ");
   const editado: Factura = {
     ...f,
@@ -2616,6 +2665,8 @@ export function editarGasto(id: string, c: EdicionGasto, rol: Rol): Factura {
     igv: r2(total - subtotal),
     total,
     ...(f.detraccionPorc ? { detraccionMonto: monto } : {}),
+    retencionPorc: retencion ? PORC_RETENCION_RHE : undefined,
+    retencionMonto: retencion || undefined,
     netoPagar: neto,
     editadoPor: usuarioActual(),
     editadoEn: new Date().toISOString(),
@@ -2667,26 +2718,23 @@ export function registrarEgresoPlanilla(
   return f;
 }
 
+/** IGV de la compra: factura = precios sin IGV (+18 %); boleta = IGV incluido; recibos, DJ, ticket y sin comprobante = sin IGV. */
 export function totalesCompra(tipo: Compra["tipoComprobante"], items: { cantidad: number; precioUnit: number }[]) {
   const suma = r2(items.reduce((a, i) => a + r2((i.cantidad || 0) * (i.precioUnit || 0)), 0));
   if (tipo === "BOLETA") {
     const subtotal = r2(suma / (1 + IGV));
     return { subtotal, igv: r2(suma - subtotal), total: suma };
   }
+  if (tipo !== "FACTURA") return { subtotal: suma, igv: 0, total: suma };
   const igv = r2(suma * IGV);
   return { subtotal: suma, igv, total: r2(suma + igv) };
 }
 
-const NUM_COMPROBANTE: Record<Compra["tipoComprobante"], RegExp> = {
-  FACTURA: /^[EF][A-Z0-9]{3}-\d{1,8}$/,
-  BOLETA: /^[BE][A-Z0-9]{3}-\d{1,8}$/,
-};
-
 /** Registra la compra y suma las cantidades al stock de la sede. Valida todo antes de escribir. */
 export type DatosCompra = Pick<Compra, "fecha" | "proveedorId" | "tipoComprobante" | "numero" | "sede"> &
-  Partial<Pick<Compra, "caja" | "pago">> & { items: Omit<ItemCompra, "subtotal">[]; /** "Generar Orden de Compra OC" */ generarOC?: boolean };
+  Partial<Pick<Compra, "caja" | "pago">> & { items: Omit<ItemCompra, "subtotal">[]; /** "Generar Orden de Compra OC / de Servicio OS" */ generarOrden?: OrdenAGenerar };
 
-const docCompra = (c: Pick<Compra, "tipoComprobante" | "numero">) => `${c.tipoComprobante === "BOLETA" ? "Boleta" : "Factura"} ${c.numero}`;
+export const docCompra = (c: Pick<Compra, "tipoComprobante" | "numero">) => `${COMPROBANTES[c.tipoComprobante] ?? "Factura"} ${c.numero}`;
 
 /**
  * OC de una compra con ingreso a stock: nace APROBADA (ya tiene comprobante y la mercadería ya entró),
@@ -2747,54 +2795,122 @@ function ocDeCompra(c: Compra, numero: string, rol: Rol, previa?: OrdenCompra): 
   };
 }
 
-/** Reserva el N° de la OC (si se pidió y la compra aún no tiene una). Va después de validar la compra. */
-async function numeroOCCompra(generar: boolean | undefined, previa?: OrdenCompra): Promise<string | undefined> {
-  if (!generar || previa) return undefined;
-  return formatear("OC", await siguiente("OC"));
+/**
+ * OS de una compra con ingreso a stock: nace APROBADA con los mismos productos. Líneas sin IGV (la boleta trae el
+ * IGV dentro: se separa); los totales son los de la compra. `previa`: la OS ya vinculada (al editar).
+ */
+function osDeCompra(c: Compra, numero: string, rol: Rol, previa?: OrdenServicio): OrdenServicio {
+  const base = c.tipoComprobante === "BOLETA" ? 1 + IGV : 1;
+  const items: ItemPrecio[] = (c.items as (ItemCompra & { productoId?: string; sku?: string })[]).map((i) => ({
+    itemReqId: i.id,
+    nombre: i.nombre,
+    ...(i.productoId ? { productoId: i.productoId, sku: i.sku } : {}),
+    cantidad: i.cantidad,
+    unidad: i.unidad || "UND",
+    marca: "",
+    precioUnit: r2(i.precioUnit / base),
+    subtotal: r2(i.subtotal / base),
+  }));
+  const datos = {
+    fecha: c.fecha,
+    proveedor: c.proveedor,
+    ruc: c.ruc,
+    concepto: `Compra ${docCompra(c)}`,
+    origen: "COMPRA" as const,
+    compraId: c.id,
+    compraNumero: c.numero,
+    items,
+    subtotal: c.subtotal,
+    igv: c.igv,
+    total: c.total,
+    formaPago: c.pago?.formaPago === "CREDITO" ? ("CREDITO 30 DIAS" as const) : ("CONTADO" as const),
+    lugarServicio: c.sede,
+  };
+  if (!previa) return osDirecta(datos, numero, rol, docCompra(c));
+  const nueva = osDirecta(datos, previa.numero, rol, docCompra(c));
+  // Conserva id, estado (una OS anulada sigue anulada) y quién la aprobó
+  return { ...previa, ...nueva, id: previa.id, estado: previa.estado, aprobadoPor: previa.aprobadoPor, creadoPor: previa.creadoPor, historial: [...previa.historial, evento(rol, "Actualizada por edición de la compra", `${docCompra(c)} · ${soles(c.total)}`)] };
 }
 
-export async function registrarCompra(data: DatosCompra, rol: Rol): Promise<{ compra: Compra; oc?: OrdenCompra }> {
+/** Orden (OC u OS) que la compra ya tiene vinculada; una compra lleva solo una. */
+function ordenesDeCompra(c?: Compra): { oc?: OrdenCompra; os?: OrdenServicio } {
+  if (!c) return {};
+  return {
+    oc: c.ordenCompraId ? getOrdenes().find((o) => o.id === c.ordenCompraId) : undefined,
+    os: c.ordenServicioId ? getOrdenesServicio().find((o) => o.id === c.ordenServicioId) : undefined,
+  };
+}
+
+/**
+ * Genera o actualiza la OC / OS de la compra. Reserva el N° antes de tocar el stock; si la compra ya tiene una
+ * orden, se actualiza esa y no se crea otra. Devuelve lo que hay que escribir al final.
+ */
+async function prepararOrdenCompra(quiere: OrdenAGenerar | undefined, rol: Rol, vieja?: Compra) {
+  const previa = ordenesDeCompra(vieja);
+  const tipo: OrdenAGenerar = previa.oc ? "OC" : previa.os ? "OS" : quiere ?? "NINGUNA";
+  const numero = tipo === "OC" && !previa.oc ? formatear("OC", await siguiente("OC")) : tipo === "OS" && !previa.os ? await reservarNumeroOS() : undefined;
+  return {
+    /** Se llama con la compra ya corregida (al editar), justo antes de guardar. */
+    armar(c: Compra): { oc?: OrdenCompra; os?: OrdenServicio } {
+      if (tipo === "OC") {
+        const oc = ocDeCompra(c, numero ?? previa.oc!.numero, rol, previa.oc);
+        c.ordenCompraId = oc.id;
+        c.ordenCompraNumero = oc.numero;
+        const ordenes = getOrdenes();
+        escribir(KEYS.ORDENES, previa.oc ? ordenes.map((o) => (o.id === oc.id ? oc : o)) : [oc, ...ordenes]);
+        return { oc };
+      }
+      if (tipo === "OS") {
+        const os = osDeCompra(c, numero ?? previa.os!.numero, rol, previa.os);
+        c.ordenServicioId = os.id;
+        c.ordenServicioNumero = os.numero;
+        const lista = getOrdenesServicio();
+        escribir(KEYS.ORDENES_SERVICIO, previa.os ? lista.map((o) => (o.id === os.id ? os : o)) : [os, ...lista]);
+        return { os };
+      }
+      return {};
+    },
+  };
+}
+
+/** N° de una compra con DJ (correlativo del servidor) o sin comprobante; al editar sin cambiar el tipo se conserva. */
+async function numeroCompraAuto(tipo: Compra["tipoComprobante"], vieja?: Compra): Promise<string | undefined> {
+  if (!numeroAutomatico(tipo)) return undefined;
+  if (vieja?.tipoComprobante === tipo) return vieja.numero;
+  return tipo === "DJ" ? siguienteDJ() : numeroSinComprobante();
+}
+
+export async function registrarCompra(data: DatosCompra, rol: Rol): Promise<{ compra: Compra; oc?: OrdenCompra; os?: OrdenServicio }> {
   const compra: Compra = { ...prepararCompra(data), id: uid(), creadoPor: usuarioActual(), historial: [] };
-  const numeroOC = await numeroOCCompra(data.generarOC);
-  const oc = numeroOC ? ocDeCompra(compra, numeroOC, rol) : undefined;
-  if (oc) {
-    compra.ordenCompraId = oc.id;
-    compra.ordenCompraNumero = oc.numero;
-  }
-  compra.historial = [
-    evento(rol, "Compra registrada", `${compra.numero} · ${compra.proveedor} · ingreso a ${compra.sede} · ${textoPagoCompra(compra)}${oc ? ` · ${oc.numero}` : ""}`),
-  ];
-  escribir(KEYS.COMPRAS, [compra, ...getCompras()]);
+  compra.numero = (await numeroCompraAuto(compra.tipoComprobante)) ?? compra.numero;
+  const orden = await prepararOrdenCompra(data.generarOrden, rol);
   ingresarStock(compra.sede, compra.items, { tipo: "INGRESO", documento: docCompra(compra) });
-  if (oc) escribir(KEYS.ORDENES, [oc, ...getOrdenes()]);
-  return { compra, oc };
+  const { oc, os } = orden.armar(compra);
+  const n = oc?.numero ?? os?.numero;
+  compra.historial = [evento(rol, "Compra registrada", `${compra.numero} · ${compra.proveedor} · ingreso a ${compra.sede} · ${textoPagoCompra(compra)}${n ? ` · ${n}` : ""}`)];
+  escribir(KEYS.COMPRAS, [compra, ...getCompras()]);
+  return { compra, oc, os };
 }
 
 /**
  * Corrige una compra registrada: devuelve al almacén (AJUSTE en el kardex) lo que ingresó y vuelve a ingresar
  * lo corregido. Si esos productos ya se usaron (no alcanza el stock), no se puede editar: se avisa antes de tocar nada.
- * Si la compra tiene OC, la OC se actualiza con los datos corregidos; si se marca "Generar OC" y no tenía, se crea.
+ * Si la compra tiene OC u OS, se actualiza con los datos corregidos; si no tenía y se elige una, se crea.
  */
-export async function editarCompra(id: string, data: DatosCompra, rol: Rol): Promise<{ compra: Compra; oc?: OrdenCompra }> {
+export async function editarCompra(id: string, data: DatosCompra, rol: Rol): Promise<{ compra: Compra; oc?: OrdenCompra; os?: OrdenServicio }> {
   const lista = getCompras();
   const vieja = lista.find((c) => c.id === id);
   if (!vieja) throw new ErpError("Compra no encontrada.");
   const nueva = prepararCompra(data, id);
-  const previa = vieja.ordenCompraId ? getOrdenes().find((o) => o.id === vieja.ordenCompraId) : undefined;
-  const numeroOC = await numeroOCCompra(data.generarOC, previa);
-  const doc = `Edición ${vieja.tipoComprobante === "BOLETA" ? "boleta" : "factura"} ${vieja.numero}`;
+  nueva.numero = (await numeroCompraAuto(nueva.tipoComprobante, vieja)) ?? nueva.numero;
+  const orden = await prepararOrdenCompra(data.generarOrden, rol, vieja);
+  const doc = `Edición ${docCompra(vieja).toLowerCase()}`;
   descontarStock(vieja.sede, vieja.items, { tipo: "AJUSTE", documento: doc, motivo: "Se revierte el ingreso para corregir la compra" });
   ingresarStock(nueva.sede, nueva.items, { tipo: "INGRESO", documento: `${docCompra(nueva)} (corregida)` });
   const editada = marcarEditado({ ...vieja, ...nueva }, rol, "Compra editada", `${vieja.numero} · ${soles(vieja.total)} → ${nueva.numero} · ${soles(nueva.total)} · ${textoPagoCompra(nueva)}`);
-  const oc = previa || numeroOC ? ocDeCompra(editada, numeroOC ?? previa!.numero, rol, previa) : undefined;
-  if (oc) {
-    editada.ordenCompraId = oc.id;
-    editada.ordenCompraNumero = oc.numero;
-    const ordenes = getOrdenes();
-    escribir(KEYS.ORDENES, previa ? ordenes.map((o) => (o.id === oc.id ? oc : o)) : [oc, ...ordenes]);
-  }
+  const { oc, os } = orden.armar(editada);
   escribir(KEYS.COMPRAS, lista.map((c) => (c.id === id ? editada : c)));
-  return { compra: editada, oc };
+  return { compra: editada, oc, os };
 }
 
 /** "PAGADO desde CAJA GENERAL" / "PENDIENTE (crédito, vence 30/10/2026)" para el historial. */
@@ -2835,10 +2951,14 @@ function prepararCompra(data: DatosCompra, excluirId?: string): Omit<Compra, "id
   if (!data.sede.trim()) throw new ErpError("Seleccione la sede / almacén de ingreso.");
   if (!data.caja?.trim()) throw new ErpError("Seleccione de qué cuenta se realiza el pago.");
   const pago = data.pago ? validarPagoCompra(data.pago, data.fecha, data.caja.trim()) : undefined;
-  const numero = data.numero.trim().toUpperCase();
-  if (!NUM_COMPROBANTE[data.tipoComprobante].test(numero))
-    throw new ErpError(`N° de ${data.tipoComprobante.toLowerCase()} inválido. Ej: ${data.tipoComprobante === "FACTURA" ? "F001-00001234" : "B001-00000456"}`);
-  if (getCompras().some((c) => c.id !== excluirId && c.numero === numero && c.ruc === prov.ruc) || getFacturas().some((f) => f.numero === numero && f.ruc === prov.ruc))
+  if (!(data.tipoComprobante in COMPROBANTES)) throw new ErpError("Seleccione el tipo de comprobante.");
+  // DJ / sin comprobante: el N° lo pone el sistema al guardar (numeroCompraAuto)
+  const auto = numeroAutomatico(data.tipoComprobante);
+  const numero = auto ? data.numero.trim().toUpperCase() || DJ_AUTO : data.numero.trim().toUpperCase();
+  const re = NUM_COMPROBANTE[data.tipoComprobante];
+  if (!auto && (!numero || (re && !re.test(numero))))
+    throw new ErpError(`N° de ${COMPROBANTES[data.tipoComprobante].toLowerCase()} inválido.${re ? ` Ej: ${data.tipoComprobante === "FACTURA" ? "F001-00001234" : "B001-00000456"}` : ""}`);
+  if (!auto && (getCompras().some((c) => c.id !== excluirId && c.numero === numero && c.ruc === prov.ruc) || getFacturas().some((f) => f.numero === numero && f.ruc === prov.ruc)))
     throw new ErpError(`El comprobante ${numero} de ${prov.razonSocial} ya fue registrado.`);
 
   const filas = data.items.filter((i) => i.nombre.trim());
@@ -2965,6 +3085,39 @@ export async function emitirOrdenServicio(data: DatosOrdenServicio, adjunto: Fil
   };
   escribir(KEYS.ORDENES_SERVICIO, [os, ...getOrdenesServicio()]);
   return os;
+}
+
+/**
+ * OS emitida junto con un gasto o una compra de "Registrar gasto": el registro ya trae su comprobante, así que
+ * nace APROBADA (no pasa por la aprobación de Gerencia). Líneas con precio sin IGV.
+ */
+function osDirecta(
+  d: Pick<OrdenServicio, "fecha" | "proveedor" | "ruc" | "concepto" | "origen" | "gastoId" | "gastoNumero" | "compraId" | "compraNumero" | "subtotal" | "igv" | "total"> &
+    Partial<Pick<OrdenServicio, "formaPago" | "lugarServicio">> & { items: ItemPrecio[] },
+  numero: string,
+  rol: Rol,
+  documento: string
+): OrdenServicio {
+  const { items, ...resto } = d;
+  return {
+    formaPago: "CONTADO",
+    ...resto,
+    id: uid(),
+    numero,
+    items: items.map((i) => ({
+      id: i.itemReqId || uid(),
+      descripcion: i.nombre,
+      cantidad: i.cantidad,
+      unidad: i.unidad,
+      precioUnit: i.precioUnit,
+      subtotal: i.subtotal,
+      ...(i.productoId ? { productoId: i.productoId, sku: i.sku } : {}),
+    })),
+    estado: "APROBADA",
+    aprobadoPor: usuarioActual(),
+    creadoPor: usuarioActual(),
+    historial: [evento(rol, `Orden de servicio emitida desde Registrar ${d.origen === "COMPRA" ? "compra" : "gasto"} (APROBADA)`, documento)],
+  };
 }
 
 function actualizarOS(id: string, fn: (o: OrdenServicio) => OrdenServicio): OrdenServicio {

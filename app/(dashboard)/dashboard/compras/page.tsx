@@ -30,11 +30,14 @@ import { abrirDoc } from "@/components/doc-viewer";
 import { FormGasto } from "@/components/compras/FormGasto";
 import { SelectorCaja } from "@/components/SelectorCaja";
 import { FormBancarizacion, bancarizacionVacia } from "@/components/compras/FormBancarizacion";
+import { OPCIONES_COMPROBANTE, numeroAutomatico, placeholderComprobante } from "@/lib/comprobantes";
+import { SelectorOrden } from "@/components/compras/SelectorOrden";
 import { PagoCompraForm, pagoCompraDe, pagoCompraVacio, type FormPagoCompra } from "@/components/compras/PagoCompra";
 import { CAJA_POR_DEFECTO } from "@/lib/cajas";
 import {
   IGV,
   COMPROBANTES_GASTO,
+  docCompra,
   CUENTAS_ORIGEN_PAGO,
   cuentaOrigenDeCaja,
   bancarizarOC,
@@ -98,7 +101,7 @@ import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { EditarGasto } from "@/components/compras/EditarGasto";
 import { FormOrdenServicio, filasOrdenesServicio } from "@/components/compras/OrdenesServicio";
 import type { Trabajador } from "@/lib/types";
-import type { Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, OrdenServicio, Proveedor, Requerimiento, Rol, StockItem, TipoComprobanteCompra } from "@/lib/types";
+import type { Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, OrdenServicio, Proveedor, Requerimiento, Rol, OrdenAGenerar, StockItem, TipoComprobanteCompra } from "@/lib/types";
 
 type Tab = "registrar" | "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias" | "planilla" | "declaraciones";
 
@@ -497,7 +500,9 @@ function RegistrarCompra({
   const [numero, setNumero] = useState("");
   const [sede, setSede] = useState(SEDES[0]);
   const [pago, setPago] = useState<FormPagoCompra>(pagoCompraVacio);
-  const [generarOC, setGenerarOC] = useState(false);
+  const [generarOrden, setGenerarOrden] = useState<OrdenAGenerar>("NINGUNA");
+  const ordenesServicio = useStore<OrdenServicio[]>(KEYS.ORDENES_SERVICIO, []);
+  const gastosConOS = useMemo(() => new Set(ordenesServicio.filter((o) => o.estado !== "ANULADA" && o.gastoId).map((o) => o.gastoId!)), [ordenesServicio]);
   const [guardandoCompra, setGuardandoCompra] = useState(false);
   const [filas, setFilas] = useState<FilaCompra[]>([filaVacia()]);
   const habilitado = puede(rol, "compra.crear");
@@ -516,7 +521,7 @@ function RegistrarCompra({
     setNumero(c.numero);
     setSede(c.sede);
     setPago(pagoCompraDe(c));
-    setGenerarOC(!!c.ordenCompraId);
+    setGenerarOrden(c.ordenCompraId ? "OC" : c.ordenServicioId ? "OS" : "NINGUNA");
     setFilas(c.items.map((i) => ({ id: uid(), nombre: i.nombre, unidad: i.unidad, cantidad: i.cantidad, precioUnit: i.precioUnit })));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -525,7 +530,7 @@ function RegistrarCompra({
     setNumero("");
     setFilas([filaVacia()]);
     setPago(pagoCompraVacio());
-    setGenerarOC(false);
+    setGenerarOrden("NINGUNA");
   };
 
   const fechaISO = parseFechaPE(fechaTxt);
@@ -551,25 +556,25 @@ function RegistrarCompra({
       proveedorId,
       fecha: fechaISO,
       tipoComprobante: tipo,
-      numero,
+      numero: numeroAutomatico(tipo) ? "" : numero,
       sede,
       caja: bancarizacion.caja,
       pago: { ...resto, ...(pago.estado === "PAGADO" ? { bancarizacion } : {}) },
-      generarOC,
+      generarOrden,
       items: filas,
     };
     setGuardandoCompra(true);
-    let ocNumero = "";
+    let ordenNumero = "";
     const ok = await ejecutarAsync(
       async () => {
         const r = editando ? await editarCompra(editando.id, datos, rol) : await registrarCompra(datos, rol);
-        ocNumero = r.oc?.numero ?? "";
+        ordenNumero = r.oc?.numero ?? r.os?.numero ?? "";
       },
       editando ? `${editando.numero} corregida · stock de ${sede} ajustado` : `Compra registrada · stock de ${sede} actualizado`
     );
     setGuardandoCompra(false);
     if (!ok) return;
-    if (ocNumero) toast(`Orden de compra ${ocNumero} vinculada a la compra (APROBADA)`);
+    if (ordenNumero) toast(`${ordenNumero.startsWith("OS") ? "Orden de servicio" : "Orden de compra"} ${ordenNumero} vinculada a la compra (APROBADA)`);
     cancelarEdicion();
   };
 
@@ -622,7 +627,7 @@ function RegistrarCompra({
             subtitle={
               editando
                 ? "Al guardar se devuelve al almacén lo que ingresó esta compra y entra lo corregido (queda como AJUSTE en el kardex)."
-                : "Factura: precios sin IGV (se suma 18 %). Boleta: precios con IGV incluido. Al guardar, los productos ingresan al stock del almacén seleccionado."
+                : "Factura: precios sin IGV (se suma 18 %). Boleta: precios con IGV incluido. Recibos, DJ, ticket y sin comprobante: sin IGV. Al guardar, los productos ingresan al stock del almacén seleccionado."
             }
           />
           <div className="grid gap-4 p-5 md:grid-cols-3">
@@ -650,10 +655,18 @@ function RegistrarCompra({
               />
             </Field>
             <Field label="Comprobante">
-              <Select value={tipo} onChange={(e) => setTipo(e.target.value as TipoComprobanteCompra)} options={[{ value: "FACTURA", label: "Factura" }, { value: "BOLETA", label: "Boleta de venta" }]} />
+              <Select value={tipo} onChange={(e) => setTipo(e.target.value as TipoComprobanteCompra)} options={OPCIONES_COMPROBANTE} />
             </Field>
-            <Field label={`N° ${tipo === "FACTURA" ? "factura" : "boleta"}`}>
-              <Input value={numero} onChange={(e) => setNumero(e.target.value.toUpperCase())} placeholder={tipo === "FACTURA" ? "F001-00001234" : "B001-00000456"} />
+            <Field
+              label={numeroAutomatico(tipo) ? (tipo === "DJ" ? "N° DJ" : "N° interno") : `N° ${COMPROBANTES_GASTO[tipo].toLowerCase()}`}
+              hint={numeroAutomatico(tipo) && !(editando && editando.tipoComprobante === tipo) ? "Se asigna solo al guardar" : undefined}
+            >
+              <Input
+                value={numeroAutomatico(tipo) ? (editando?.tipoComprobante === tipo ? editando.numero : "") : numero}
+                disabled={numeroAutomatico(tipo)}
+                onChange={(e) => setNumero(e.target.value.toUpperCase())}
+                placeholder={placeholderComprobante(tipo)}
+              />
             </Field>
             <Field label="Ingresa a almacén">
               <Select value={sede} onChange={(e) => setSede(e.target.value)} options={SEDES.map((x) => ({ value: x, label: x }))} />
@@ -668,7 +681,7 @@ function RegistrarCompra({
                   <th className="px-2 py-2 text-left">Producto *</th>
                   <th className="w-28 px-2 py-2 text-left">Unidad</th>
                   <th className="w-28 px-2 py-2 text-left">Cantidad *</th>
-                  <th className="w-36 px-2 py-2 text-left">P. Unit. ({conIgv ? "con" : "sin"} IGV) *</th>
+                  <th className="w-36 px-2 py-2 text-left">P. Unit. ({conIgv ? "con IGV" : tipo === "FACTURA" ? "sin IGV" : "final"}) *</th>
                   <th className="w-32 px-2 py-2 text-right">Subtotal</th>
                   <th className="w-10" />
                 </tr>
@@ -721,24 +734,20 @@ function RegistrarCompra({
           {conIgv && <p className="px-5 pt-3 text-right text-xs text-plomo-500">Boleta: los precios incluyen IGV; la base imponible se obtiene dividiendo el total entre 1.18.</p>}
           <Totales subtotal={subtotal} igv={igv} total={total} />
           <div className="space-y-4 px-5 pb-5">
-            {/* Orden de compra opcional: se genera con los productos de esta compra */}
-            <div className="rounded-xl border border-plomo-200 p-4">
-              <label className={cn("flex items-center gap-2 text-sm font-semibold text-fg", editando?.ordenCompraId ? "cursor-default" : "cursor-pointer")}>
-                <input
-                  type="checkbox"
-                  checked={generarOC}
-                  disabled={!!editando?.ordenCompraId || !puede(rol, "oc.crear")}
-                  onChange={(e) => setGenerarOC(e.target.checked)}
-                  className="h-4 w-4 accent-corp"
-                />
-                <ShoppingBag size={15} /> Generar Orden de Compra OC
-              </label>
-              <p className="mt-1 text-xs text-plomo-500">
-                {editando?.ordenCompraId
-                  ? `Vinculada a ${editando.ordenCompraNumero}: al guardar se actualiza con los datos corregidos.`
-                  : "Crea una OC con correlativo, APROBADA y ya ingresada a almacén, con los productos de esta compra."}
-              </p>
-            </div>
+            {/* OC u OS opcional (una sola): se genera con los productos de esta compra */}
+            <SelectorOrden
+              value={generarOrden}
+              onChange={setGenerarOrden}
+              bloqueado={!!(editando?.ordenCompraId || editando?.ordenServicioId)}
+              disabled={!puede(rol, "oc.crear")}
+              nota={
+                editando?.ordenCompraId || editando?.ordenServicioId
+                  ? `Vinculada a ${editando.ordenCompraNumero ?? editando.ordenServicioNumero}: al guardar se actualiza con los datos corregidos.`
+                  : generarOrden === "OS"
+                    ? "Crea una OS con correlativo (OS-001-2026), APROBADA, con los productos / servicios de esta compra."
+                    : "OC: con correlativo, APROBADA y ya ingresada a almacén, con los productos de esta compra."
+              }
+            />
             <PagoCompraForm value={pago} onChange={setPago} />
           </div>
           <div className="flex justify-end border-t border-plomo-100 px-5 py-4">
@@ -792,7 +801,8 @@ function RegistrarCompra({
                         <Pencil size={15} />
                       </Button>
                     </span>
-                    {g.tipoGasto !== "PLANILLA" && puede(rol, "oc.crear") && (
+                    {/* Una sola orden por gasto: sin botón si ya tiene OC u OS vigente */}
+                    {g.tipoGasto !== "PLANILLA" && !g.ocId && !gastosConOS.has(g.id) && puede(rol, "oc.crear") && (
                       <span className="tip" data-tip="Generar orden de servicio desde este gasto">
                         <Button size="sm" variant="ghost" onClick={() => onGenerarOS(g.id)} aria-label="Generar OS">
                           <Wrench size={15} />
@@ -812,7 +822,7 @@ function RegistrarCompra({
               ref: (
                 <span className="whitespace-nowrap font-semibold text-fg">
                   {c.numero}
-                  {c.ordenCompraNumero && <span className="ml-1.5 text-xs font-normal text-plomo-500">{c.ordenCompraNumero}</span>}
+                  {(c.ordenCompraNumero || c.ordenServicioNumero) && <span className="ml-1.5 text-xs font-normal text-plomo-500">{c.ordenCompraNumero ?? c.ordenServicioNumero}</span>}
                 </span>
               ),
               total: soles(c.total),
@@ -849,7 +859,7 @@ function RegistrarCompra({
             <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
               {(
                 [
-                  ["Comprobante", `${verCompra.tipoComprobante === "FACTURA" ? "Factura" : "Boleta"} ${verCompra.numero}`],
+                  ["Comprobante", docCompra(verCompra)],
                   ["Fecha", fechaPE(verCompra.fecha)],
                   ["Proveedor", `${verCompra.proveedor} · RUC ${verCompra.ruc}`],
                   ["Ingresó a almacén", verCompra.sede],
@@ -869,6 +879,7 @@ function RegistrarCompra({
                       ] as [string, string][])
                     : []),
                   ...(verCompra.ordenCompraNumero ? ([["Orden de compra", verCompra.ordenCompraNumero]] as [string, string][]) : []),
+                  ...(verCompra.ordenServicioNumero ? ([["Orden de servicio", verCompra.ordenServicioNumero]] as [string, string][]) : []),
                 ] as [string, string][]
               ).map(([k, v]) => (
                 <div key={k}>

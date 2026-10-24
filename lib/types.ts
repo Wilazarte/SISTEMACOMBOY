@@ -197,12 +197,14 @@ export interface OrdenServicio {
   lugarServicio?: string;
   plazo?: string;
   estado: EstadoOS;
-  /** De dónde se generó: requerimiento tipo SERVICIO, gasto de Tesorería o a mano. */
-  origen: "REQUERIMIENTO" | "GASTO" | "MANUAL";
+  /** De dónde se generó: requerimiento tipo SERVICIO, gasto de Tesorería, compra con ingreso a stock o a mano. */
+  origen: "REQUERIMIENTO" | "GASTO" | "COMPRA" | "MANUAL";
   reqId?: string;
   reqNumero?: string;
   gastoId?: string;
   gastoNumero?: string;
+  compraId?: string;
+  compraNumero?: string;
   /** Adjunto (cotización del proveedor, contrato…): "sb:tesoreria/<ruta>" o base64 antiguo. */
   adjunto?: string;
   adjuntoNombre?: string;
@@ -250,7 +252,12 @@ export interface Factura {
   comprobanteGasto?: ComprobanteGasto;
   detraccionPorc?: number; // % de detracción (4, 10, 12)
   detraccionMonto?: number;
-  netoPagar?: number; // total - detracción
+  netoPagar?: number; // total - detracción - retención
+  /** Retención de 4ta categoría (RHE por más de S/ 1,500): 8 %. */
+  retencionPorc?: number;
+  retencionMonto?: number;
+  /** Recibo de servicios públicos: N° de suministro. */
+  suministro?: string;
   archivos?: ArchivoGasto[];
   /** Declaración jurada de gasto: PENDIENTE (recién emitida), ENVIADA (a Gerencia), APROBADA. */
   djEstado?: "PENDIENTE" | "ENVIADA" | "APROBADA";
@@ -260,8 +267,32 @@ export interface Factura {
   editadoEn?: string;
 }
 
-export type TipoGasto = "REPRESENTACION" | "SERVICIO_BASICO" | "TRANSPORTE" | "COMPRA_SIN_REQ" | "OTROS" | "PLANILLA";
-export type ComprobanteGasto = "FACTURA" | "BOLETA" | "DJ" | "RECIBO";
+export type TipoGasto =
+  | "REPRESENTACION"
+  | "SERVICIO_BASICO"
+  | "TRANSPORTE"
+  | "COMPRA_SIN_REQ"
+  | "SERV_PROFESIONALES"
+  | "SERV_TERCEROS"
+  | "MANO_OBRA"
+  | "ALQUILER"
+  | "MANTENIMIENTO"
+  | "OTROS"
+  | "PLANILLA";
+/** Comprobantes SUNAT de "Registrar gasto / compra". RECIBO queda solo para registros antiguos (y egresos de planilla). */
+export type ComprobanteGasto =
+  | "FACTURA"
+  | "BOLETA"
+  | "RXH"
+  | "SERVICIO_PUBLICO"
+  | "ARRENDAMIENTO"
+  | "LIQUIDACION_COMPRA"
+  | "TICKET"
+  | "NOTA_VENTA"
+  | "DJ"
+  | "TRANSPORTE_GUIA"
+  | "SIN_COMPROBANTE"
+  | "RECIBO";
 export interface ArchivoGasto {
   tipo: "FACTURA" | "GUIA";
   nombre: string;
@@ -380,7 +411,8 @@ export type TipoServicioContratista =
   | "OTRO";
 
 export interface ComprobanteContratista {
-  tipo: "RH" | "FACTURA" | "BOLETA" | "OTRO";
+  /** Lista SUNAT de lib/comprobantes.ts; "RH" y "OTRO" quedan de registros antiguos. */
+  tipo: ComprobanteGasto | "RH" | "OTRO";
   numero: string;
   monto: number;
   fecha: string;
@@ -428,7 +460,8 @@ export interface Proveedor {
   ruc: string;
 }
 
-export type TipoComprobanteCompra = "FACTURA" | "BOLETA";
+/** Mismos tipos que el gasto sin stock (lib/comprobantes.ts). */
+export type TipoComprobanteCompra = ComprobanteGasto;
 
 export interface ItemCompra {
   id: string;
@@ -438,6 +471,9 @@ export interface ItemCompra {
   precioUnit: number; // FACTURA: sin IGV · BOLETA: con IGV incluido
   subtotal: number; // cantidad × precioUnit (mismo criterio que precioUnit)
 }
+
+/** Orden que se emite junto con un gasto o una compra en "Registrar gasto": una sola por registro. */
+export type OrdenAGenerar = "NINGUNA" | "OC" | "OS";
 
 /** Pago de una compra con ingreso a stock: la cuenta de origen va en `Compra.caja`. */
 export interface PagoCompra {
@@ -464,6 +500,9 @@ export interface Compra {
   /** OC generada al registrar la compra ("Generar Orden de Compra OC"). */
   ordenCompraId?: string;
   ordenCompraNumero?: string;
+  /** OS generada al registrar la compra ("Generar Orden de Servicio OS"); una compra lleva OC u OS, no las dos. */
+  ordenServicioId?: string;
+  ordenServicioNumero?: string;
   items: ItemCompra[];
   subtotal: number;
   igv: number;

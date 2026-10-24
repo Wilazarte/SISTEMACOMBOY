@@ -19,6 +19,7 @@ import type { HistorialDetalle, HistorialPlanilla } from "./historial";
 import type { ConcesionContratista, LugarEntrega } from "./types";
 import type { ComprobanteVenta, Cotizacion, Factura, Guia, LineaVenta, NotaPedido, OrdenCompra, OrdenDespacho, OrdenServicio, Requerimiento } from "./types";
 import type { Traslado, VentaSucursal } from "./sucursal-modelos";
+import { COMPROBANTES } from "./comprobantes";
 
 type RGB = [number, number, number];
 // Plantilla corporativa COMBOY VID
@@ -683,7 +684,7 @@ export function pdfOrdenCompra(o: OrdenCompra): void {
 
 /** Orden de Servicio: misma plantilla que la OC, con título "ORDEN DE SERVICIO". */
 export function pdfOrdenServicio(o: OrdenServicio): void {
-  const origen = o.origen === "REQUERIMIENTO" ? o.reqNumero ?? "-" : o.origen === "GASTO" ? `Gasto ${o.gastoNumero ?? ""}` : "Registro directo";
+  const origen = o.origen === "REQUERIMIENTO" ? o.reqNumero ?? "-" : o.origen === "GASTO" ? `Gasto ${o.gastoNumero ?? ""}` : o.origen === "COMPRA" ? `Compra ${o.compraNumero ?? ""}` : "Registro directo";
   guardar(
     construir({
       titulo: "ORDEN DE SERVICIO",
@@ -721,7 +722,7 @@ export function pdfOrdenServicio(o: OrdenServicio): void {
 
 /** Gasto / servicio de Tesorería (sin OC ni stock). */
 function pdfGasto(f: Factura, codigo: string): void {
-  const comp = { FACTURA: "Factura", BOLETA: "Boleta", DJ: "Declaración Jurada de Gasto", RECIBO: "Recibo" }[f.comprobanteGasto ?? "FACTURA"];
+  const comp = COMPROBANTES[f.comprobanteGasto ?? "FACTURA"];
   guardar(
     construir({
       titulo: "GASTO",
@@ -741,6 +742,7 @@ function pdfGasto(f: Factura, codigo: string): void {
         ...(f.igv ? ([["Subtotal", soles(f.subtotal)], ["IGV 18%", soles(f.igv)]] as [string, string][]) : []),
         ["Total", soles(f.total)],
         ...(f.detraccionMonto ? ([[`Detracción ${f.detraccionPorc}%`, `- ${soles(f.detraccionMonto)}`]] as [string, string][]) : []),
+        ...(f.retencionMonto ? ([[`Retención 4ta cat. ${f.retencionPorc}%`, `- ${soles(f.retencionMonto)}`]] as [string, string][]) : []),
         ["NETO A PAGAR", soles(f.netoPagar ?? f.total)],
       ],
       firmas: ["Solicitante", "Tesorería", "Gerencia"],

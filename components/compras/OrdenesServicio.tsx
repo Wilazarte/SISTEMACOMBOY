@@ -411,7 +411,7 @@ function AccionesOS({ os, rol }: { os: OrdenServicio; rol: Rol }) {
                 ["Cond. de pago", os.formaPago],
                 ["Plazo", os.plazo || "-"],
                 ["Lugar del servicio", os.lugarServicio || "-"],
-                ["Origen", os.origen === "REQUERIMIENTO" ? os.reqNumero : os.origen === "GASTO" ? `Gasto ${os.gastoNumero}` : "Registro directo"],
+                ["Origen", os.origen === "REQUERIMIENTO" ? os.reqNumero : os.origen === "GASTO" ? `Gasto ${os.gastoNumero}` : os.origen === "COMPRA" ? `Compra ${os.compraNumero ?? ""}` : "Registro directo"],
                 ["Concepto", os.concepto],
                 ["Estado", os.estado === "ANULADA" && os.motivoAnulacion ? `ANULADA · ${os.motivoAnulacion}` : os.estado],
               ] as [string, string | undefined][]
@@ -480,7 +480,7 @@ export function filasOrdenesServicio(lista: OrdenServicio[], rol: Rol): FilaDoc[
     ref: (
       <>
         <span className="font-semibold text-fg">{o.numero}</span>
-        <span className="ml-1.5 text-xs text-plomo-500">{o.reqNumero ?? o.gastoNumero ?? ""}</span>
+        <span className="ml-1.5 text-xs text-plomo-500">{o.reqNumero ?? o.gastoNumero ?? o.compraNumero ?? ""}</span>
         <span className="ml-2 inline-block align-middle">
           <Badge estado={o.estado} />
         </span>
@@ -488,7 +488,7 @@ export function filasOrdenesServicio(lista: OrdenServicio[], rol: Rol): FilaDoc[
     ),
     total: soles(o.total),
     acciones: <AccionesOS os={o} rol={rol} />,
-    buscar: `${o.numero} ${o.reqNumero ?? ""} ${o.gastoNumero ?? ""} ${o.ruc} ${o.concepto} ${o.formaPago}`,
+    buscar: `${o.numero} ${o.reqNumero ?? ""} ${o.gastoNumero ?? ""} ${o.compraNumero ?? ""} ${o.ruc} ${o.concepto} ${o.formaPago}`,
     tipoDoc: "OS",
     estado: o.estado,
   }));

@@ -3,6 +3,7 @@
 // Se guardan en la tabla planilla (tipo 'contratista') con la misma caché + Realtime del ERP.
 
 import { ErpError, KEYS, escribir, hoy, leer, r2, rucValido, uid } from "./storage";
+import { COMPROBANTES } from "./comprobantes";
 import type { ComprobanteContratista, ConcesionContratista, PagoContratista, TipoServicioContratista } from "./types";
 
 export const TIPOS_SERVICIO: Record<TipoServicioContratista, string> = {
@@ -15,10 +16,10 @@ export const TIPOS_SERVICIO: Record<TipoServicioContratista, string> = {
   OTRO: "Otro",
 };
 
+/** Mismos comprobantes SUNAT que Registrar gasto / compra (más los tipos antiguos, solo para mostrarlos). */
 export const TIPOS_COMPROBANTE: Record<ComprobanteContratista["tipo"], string> = {
+  ...COMPROBANTES,
   RH: "Recibo por honorarios",
-  FACTURA: "Factura",
-  BOLETA: "Boleta",
   OTRO: "Otro",
 };
 
