@@ -7,6 +7,7 @@
 // Así no hay un segundo registro que pueda descuadrarse: al pagar un gasto con Caja Chica, aparece aquí solo.
 import type { Adelanto } from "./adelantos";
 import type { Compra, Factura, MovimientoCajaManual } from "./types";
+import { COMPROBANTES } from "./comprobantes";
 
 export const CUENTAS_CAJA = [
   { codigo: "CAJA_CHICA", nombre: "CAJA CHICA", titulo: "Caja Chica" },
@@ -57,7 +58,7 @@ export function movimientosCaja(facturas: Factura[], compras: Compra[], adelanto
   for (const c of compras) {
     const cuenta = cuentaDe(c.caja);
     if (!cuenta) continue;
-    out.push({ id: `com-${c.id}`, cuenta, fecha: c.fecha, concepto: `Compra ${c.tipoComprobante === "BOLETA" ? "boleta" : "factura"} ${c.numero}`, documento: c.numero, proveedor: c.proveedor, debe: 0, haber: c.total, origen: "COMPRA" });
+    out.push({ id: `com-${c.id}`, cuenta, fecha: c.fecha, concepto: `Compra ${(COMPROBANTES[c.tipoComprobante] ?? "Factura").toLowerCase()} ${c.numero}`, documento: c.numero, proveedor: c.proveedor, debe: 0, haber: c.total, origen: "COMPRA" });
   }
   for (const a of adelantos) {
     const cuenta = cuentaDe(a.caja_nombre);

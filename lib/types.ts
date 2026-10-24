@@ -261,7 +261,7 @@ export interface Factura {
 }
 
 export type TipoGasto = "REPRESENTACION" | "SERVICIO_BASICO" | "TRANSPORTE" | "COMPRA_SIN_REQ" | "OTROS" | "PLANILLA";
-export type ComprobanteGasto = "FACTURA" | "BOLETA" | "DJ" | "RECIBO";
+export type ComprobanteGasto = "FACTURA" | "BOLETA" | "RXH" | "SERVICIO_PUBLICO" | "DJ" | "TICKET" | "RECIBO" | "SIN_COMPROBANTE";
 export interface ArchivoGasto {
   tipo: "FACTURA" | "GUIA";
   nombre: string;
@@ -428,7 +428,8 @@ export interface Proveedor {
   ruc: string;
 }
 
-export type TipoComprobanteCompra = "FACTURA" | "BOLETA";
+/** Mismos tipos que el gasto sin stock (lib/comprobantes.ts). */
+export type TipoComprobanteCompra = ComprobanteGasto;
 
 export interface ItemCompra {
   id: string;

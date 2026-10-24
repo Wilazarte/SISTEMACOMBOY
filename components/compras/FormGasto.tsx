@@ -29,6 +29,7 @@ import {
 } from "@/lib/storage";
 import type { ArchivoGasto, Factura, Bancarizacion, ComprobanteGasto, Proveedor, Rol, StockItem, TipoGasto } from "@/lib/types";
 import { ProductoInput } from "@/components/productos/ProductoInput";
+import { OPCIONES_COMPROBANTE, numeroAutomatico, placeholderComprobante } from "@/lib/comprobantes";
 
 type FilaOC = { id: string; nombre: string; unidad: string; cantidad: number; precioUnit: number };
 const filaOC = (): FilaOC => ({ id: Math.random().toString(36).slice(2), nombre: "", unidad: "UND", cantidad: 1, precioUnit: 0 });
@@ -235,15 +236,18 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
           <Select
             value={d.comprobante}
             onChange={(e) => set("comprobante", e.target.value as ComprobanteGasto)}
-            options={(Object.keys(COMPROBANTES_GASTO) as ComprobanteGasto[]).map((k) => ({ value: k, label: COMPROBANTES_GASTO[k] }))}
+            options={OPCIONES_COMPROBANTE}
           />
         </Field>
-        <Field label={d.comprobante === "DJ" ? "N° DJ" : `N° ${COMPROBANTES_GASTO[d.comprobante].toLowerCase()} *`} hint={d.comprobante === "DJ" ? "Se asigna solo al guardar (correlativo)" : undefined}>
+        <Field
+          label={d.comprobante === "DJ" ? "N° DJ" : numeroAutomatico(d.comprobante) ? "N° interno" : `N° ${COMPROBANTES_GASTO[d.comprobante].toLowerCase()} *`}
+          hint={d.comprobante === "DJ" ? "Se asigna solo al guardar (correlativo)" : numeroAutomatico(d.comprobante) ? "Se asigna solo al guardar" : undefined}
+        >
           <Input
-            value={d.comprobante === "DJ" ? "" : d.numero}
-            disabled={d.comprobante === "DJ"}
+            value={numeroAutomatico(d.comprobante) ? "" : d.numero}
+            disabled={numeroAutomatico(d.comprobante)}
             onChange={(e) => set("numero", e.target.value.toUpperCase())}
-            placeholder={d.comprobante === "FACTURA" ? "F001-00001234" : d.comprobante === "BOLETA" ? "B001-00000456" : d.comprobante === "DJ" ? "Auto: DJ-XXXX" : "N° de recibo"}
+            placeholder={placeholderComprobante(d.comprobante)}
           />
         </Field>
         <div />

@@ -50,6 +50,7 @@ import { generarCodigo } from "./utils/codigos";
 import { clavesDeModulos } from "./storage.por-modulo";
 import { canonizarItems } from "./productos";
 import { normalizarNombre } from "./productos-modelos";
+import { COMPROBANTES, NUM_COMPROBANTE, numeroAutomatico, numeroSinComprobante } from "./comprobantes";
 
 export const KEYS = {
   REQS_PENDIENTES: "reqs_almacen_pendientes",
@@ -2307,12 +2308,7 @@ export const TIPOS_GASTO: Record<TipoGasto, string> = {
   PLANILLA: "Planilla semanal (sueldos)",
 };
 
-export const COMPROBANTES_GASTO: Record<ComprobanteGasto, string> = {
-  FACTURA: "Factura",
-  BOLETA: "Boleta",
-  DJ: "Declaración Jurada de Gasto",
-  RECIBO: "Recibo",
-};
+export const COMPROBANTES_GASTO = COMPROBANTES;
 
 /** % de detracción sugerido según el servicio (transporte de carga 4 %, servicios en general 12 %, otros 10 %). */
 export const DETRACCION_SUGERIDA: Record<TipoGasto, number> = {
@@ -2346,10 +2342,7 @@ export function calcularDetraccion(importe: number, aplica: boolean, porc: numbe
   return { monto, neto: r2(total - monto) };
 }
 
-const NUM_GASTO: Partial<Record<ComprobanteGasto, RegExp>> = {
-  FACTURA: /^[EF][A-Z0-9]{3}-\d{1,8}$/,
-  BOLETA: /^[BE][A-Z0-9]{3}-\d{1,8}$/,
-};
+const NUM_GASTO = NUM_COMPROBANTE;
 
 const DJ_AUTO = "DJ-AUTO";
 
@@ -2436,7 +2429,7 @@ export async function registrarGastoCompleto(
 ): Promise<{ gasto: Factura; oc?: OrdenCompra }> {
   // Declaración jurada: el N° lo pone el servidor (DJ-0001, DJ-0002…) al final, cuando todo lo demás ya validó
   const esDJ = d.comprobante === "DJ";
-  const f = prepararGasto(esDJ ? { ...d, numero: DJ_AUTO } : d, rol);
+  const f = prepararGasto(esDJ ? { ...d, numero: DJ_AUTO } : d.comprobante === "SIN_COMPROBANTE" ? { ...d, numero: numeroSinComprobante() } : d, rol);
   const b = opc.bancarizacion ? validarBancarizacion(opc.bancarizacion) : undefined;
   let oc: OrdenCompra | undefined;
   if (opc.items) {
@@ -2583,17 +2576,17 @@ export function editarGasto(id: string, c: EdicionGasto, rol: Rol): Factura {
   const f = lista.find((x) => x.id === id);
   if (!f || !f.esGastoTesoreria) throw new ErpError("Gasto no encontrado.");
   if (f.estadoPago !== "POR_PAGAR") throw new ErpError("Documento ya procesado: el gasto ya fue pagado.");
-  if (!/^d{4}-d{2}-d{2}$/.test(c.fecha) || c.fecha > hoy()) throw new ErpError("Fecha del gasto inválida (no puede ser futura).");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(c.fecha) || c.fecha > hoy()) throw new ErpError("Fecha del gasto inválida (no puede ser futura).");
   if (!(c.tipoGasto in TIPOS_GASTO)) throw new ErpError("Seleccione el tipo de gasto.");
   if (!c.descripcion?.trim()) throw new ErpError("Describa el gasto.");
   const comp = f.comprobanteGasto ?? "FACTURA";
-  const numero = comp === "DJ" ? f.numero : c.numero.trim().toUpperCase(); // el N° de DJ es correlativo: no se edita
+  const numero = numeroAutomatico(comp) ? f.numero : c.numero.trim().toUpperCase(); // DJ / sin comprobante: N° del sistema, no se edita
   const re = NUM_GASTO[comp];
   if (!numero || (re && !re.test(numero))) throw new ErpError(`N° de ${COMPROBANTES_GASTO[comp].toLowerCase()} inválido.`);
   const proveedor = c.proveedor.trim().toUpperCase();
   if (!proveedor) throw new ErpError("Indique el proveedor o agencia.");
   const ruc = c.ruc.trim();
-  if (ruc && !/^d{8}$/.test(ruc) && !/^d{11}$/.test(ruc)) throw new ErpError("RUC (11 dígitos) o DNI (8 dígitos) inválido.");
+  if (ruc && !/^\d{8}$/.test(ruc) && !/^\d{11}$/.test(ruc)) throw new ErpError("RUC (11 dígitos) o DNI (8 dígitos) inválido.");
   if (comp === "FACTURA" && ruc.length !== 11) throw new ErpError("La factura requiere el RUC del proveedor.");
   if (ruc.length === 11 && !rucValido(ruc)) throw new ErpError("RUC inválido (dígito verificador).");
   if (lista.some((x) => x.id !== id && x.numero === numero && (ruc ? x.ruc === ruc : x.proveedor === proveedor)))
@@ -2667,26 +2660,23 @@ export function registrarEgresoPlanilla(
   return f;
 }
 
+/** IGV de la compra: factura = precios sin IGV (+18 %); boleta = IGV incluido; recibos, DJ, ticket y sin comprobante = sin IGV. */
 export function totalesCompra(tipo: Compra["tipoComprobante"], items: { cantidad: number; precioUnit: number }[]) {
   const suma = r2(items.reduce((a, i) => a + r2((i.cantidad || 0) * (i.precioUnit || 0)), 0));
   if (tipo === "BOLETA") {
     const subtotal = r2(suma / (1 + IGV));
     return { subtotal, igv: r2(suma - subtotal), total: suma };
   }
+  if (tipo !== "FACTURA") return { subtotal: suma, igv: 0, total: suma };
   const igv = r2(suma * IGV);
   return { subtotal: suma, igv, total: r2(suma + igv) };
 }
-
-const NUM_COMPROBANTE: Record<Compra["tipoComprobante"], RegExp> = {
-  FACTURA: /^[EF][A-Z0-9]{3}-\d{1,8}$/,
-  BOLETA: /^[BE][A-Z0-9]{3}-\d{1,8}$/,
-};
 
 /** Registra la compra y suma las cantidades al stock de la sede. Valida todo antes de escribir. */
 export type DatosCompra = Pick<Compra, "fecha" | "proveedorId" | "tipoComprobante" | "numero" | "sede"> &
   Partial<Pick<Compra, "caja" | "pago">> & { items: Omit<ItemCompra, "subtotal">[]; /** "Generar Orden de Compra OC" */ generarOC?: boolean };
 
-const docCompra = (c: Pick<Compra, "tipoComprobante" | "numero">) => `${c.tipoComprobante === "BOLETA" ? "Boleta" : "Factura"} ${c.numero}`;
+export const docCompra = (c: Pick<Compra, "tipoComprobante" | "numero">) => `${COMPROBANTES[c.tipoComprobante] ?? "Factura"} ${c.numero}`;
 
 /**
  * OC de una compra con ingreso a stock: nace APROBADA (ya tiene comprobante y la mercadería ya entró),
@@ -2753,8 +2743,16 @@ async function numeroOCCompra(generar: boolean | undefined, previa?: OrdenCompra
   return formatear("OC", await siguiente("OC"));
 }
 
+/** N° de una compra con DJ (correlativo del servidor) o sin comprobante; al editar sin cambiar el tipo se conserva. */
+async function numeroCompraAuto(tipo: Compra["tipoComprobante"], vieja?: Compra): Promise<string | undefined> {
+  if (!numeroAutomatico(tipo)) return undefined;
+  if (vieja?.tipoComprobante === tipo) return vieja.numero;
+  return tipo === "DJ" ? siguienteDJ() : numeroSinComprobante();
+}
+
 export async function registrarCompra(data: DatosCompra, rol: Rol): Promise<{ compra: Compra; oc?: OrdenCompra }> {
   const compra: Compra = { ...prepararCompra(data), id: uid(), creadoPor: usuarioActual(), historial: [] };
+  compra.numero = (await numeroCompraAuto(compra.tipoComprobante)) ?? compra.numero;
   const numeroOC = await numeroOCCompra(data.generarOC);
   const oc = numeroOC ? ocDeCompra(compra, numeroOC, rol) : undefined;
   if (oc) {
@@ -2780,9 +2778,10 @@ export async function editarCompra(id: string, data: DatosCompra, rol: Rol): Pro
   const vieja = lista.find((c) => c.id === id);
   if (!vieja) throw new ErpError("Compra no encontrada.");
   const nueva = prepararCompra(data, id);
+  nueva.numero = (await numeroCompraAuto(nueva.tipoComprobante, vieja)) ?? nueva.numero;
   const previa = vieja.ordenCompraId ? getOrdenes().find((o) => o.id === vieja.ordenCompraId) : undefined;
   const numeroOC = await numeroOCCompra(data.generarOC, previa);
-  const doc = `Edición ${vieja.tipoComprobante === "BOLETA" ? "boleta" : "factura"} ${vieja.numero}`;
+  const doc = `Edición ${docCompra(vieja).toLowerCase()}`;
   descontarStock(vieja.sede, vieja.items, { tipo: "AJUSTE", documento: doc, motivo: "Se revierte el ingreso para corregir la compra" });
   ingresarStock(nueva.sede, nueva.items, { tipo: "INGRESO", documento: `${docCompra(nueva)} (corregida)` });
   const editada = marcarEditado({ ...vieja, ...nueva }, rol, "Compra editada", `${vieja.numero} · ${soles(vieja.total)} → ${nueva.numero} · ${soles(nueva.total)} · ${textoPagoCompra(nueva)}`);
@@ -2835,10 +2834,14 @@ function prepararCompra(data: DatosCompra, excluirId?: string): Omit<Compra, "id
   if (!data.sede.trim()) throw new ErpError("Seleccione la sede / almacén de ingreso.");
   if (!data.caja?.trim()) throw new ErpError("Seleccione de qué cuenta se realiza el pago.");
   const pago = data.pago ? validarPagoCompra(data.pago, data.fecha, data.caja.trim()) : undefined;
-  const numero = data.numero.trim().toUpperCase();
-  if (!NUM_COMPROBANTE[data.tipoComprobante].test(numero))
-    throw new ErpError(`N° de ${data.tipoComprobante.toLowerCase()} inválido. Ej: ${data.tipoComprobante === "FACTURA" ? "F001-00001234" : "B001-00000456"}`);
-  if (getCompras().some((c) => c.id !== excluirId && c.numero === numero && c.ruc === prov.ruc) || getFacturas().some((f) => f.numero === numero && f.ruc === prov.ruc))
+  if (!(data.tipoComprobante in COMPROBANTES)) throw new ErpError("Seleccione el tipo de comprobante.");
+  // DJ / sin comprobante: el N° lo pone el sistema al guardar (numeroCompraAuto)
+  const auto = numeroAutomatico(data.tipoComprobante);
+  const numero = auto ? data.numero.trim().toUpperCase() || DJ_AUTO : data.numero.trim().toUpperCase();
+  const re = NUM_COMPROBANTE[data.tipoComprobante];
+  if (!auto && (!numero || (re && !re.test(numero))))
+    throw new ErpError(`N° de ${COMPROBANTES[data.tipoComprobante].toLowerCase()} inválido.${re ? ` Ej: ${data.tipoComprobante === "FACTURA" ? "F001-00001234" : "B001-00000456"}` : ""}`);
+  if (!auto && (getCompras().some((c) => c.id !== excluirId && c.numero === numero && c.ruc === prov.ruc) || getFacturas().some((f) => f.numero === numero && f.ruc === prov.ruc)))
     throw new ErpError(`El comprobante ${numero} de ${prov.razonSocial} ya fue registrado.`);
 
   const filas = data.items.filter((i) => i.nombre.trim());

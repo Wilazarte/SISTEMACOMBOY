@@ -30,11 +30,13 @@ import { abrirDoc } from "@/components/doc-viewer";
 import { FormGasto } from "@/components/compras/FormGasto";
 import { SelectorCaja } from "@/components/SelectorCaja";
 import { FormBancarizacion, bancarizacionVacia } from "@/components/compras/FormBancarizacion";
+import { OPCIONES_COMPROBANTE, numeroAutomatico, placeholderComprobante } from "@/lib/comprobantes";
 import { PagoCompraForm, pagoCompraDe, pagoCompraVacio, type FormPagoCompra } from "@/components/compras/PagoCompra";
 import { CAJA_POR_DEFECTO } from "@/lib/cajas";
 import {
   IGV,
   COMPROBANTES_GASTO,
+  docCompra,
   CUENTAS_ORIGEN_PAGO,
   cuentaOrigenDeCaja,
   bancarizarOC,
@@ -551,7 +553,7 @@ function RegistrarCompra({
       proveedorId,
       fecha: fechaISO,
       tipoComprobante: tipo,
-      numero,
+      numero: numeroAutomatico(tipo) ? "" : numero,
       sede,
       caja: bancarizacion.caja,
       pago: { ...resto, ...(pago.estado === "PAGADO" ? { bancarizacion } : {}) },
@@ -622,7 +624,7 @@ function RegistrarCompra({
             subtitle={
               editando
                 ? "Al guardar se devuelve al almacén lo que ingresó esta compra y entra lo corregido (queda como AJUSTE en el kardex)."
-                : "Factura: precios sin IGV (se suma 18 %). Boleta: precios con IGV incluido. Al guardar, los productos ingresan al stock del almacén seleccionado."
+                : "Factura: precios sin IGV (se suma 18 %). Boleta: precios con IGV incluido. Recibos, DJ, ticket y sin comprobante: sin IGV. Al guardar, los productos ingresan al stock del almacén seleccionado."
             }
           />
           <div className="grid gap-4 p-5 md:grid-cols-3">
@@ -650,10 +652,18 @@ function RegistrarCompra({
               />
             </Field>
             <Field label="Comprobante">
-              <Select value={tipo} onChange={(e) => setTipo(e.target.value as TipoComprobanteCompra)} options={[{ value: "FACTURA", label: "Factura" }, { value: "BOLETA", label: "Boleta de venta" }]} />
+              <Select value={tipo} onChange={(e) => setTipo(e.target.value as TipoComprobanteCompra)} options={OPCIONES_COMPROBANTE} />
             </Field>
-            <Field label={`N° ${tipo === "FACTURA" ? "factura" : "boleta"}`}>
-              <Input value={numero} onChange={(e) => setNumero(e.target.value.toUpperCase())} placeholder={tipo === "FACTURA" ? "F001-00001234" : "B001-00000456"} />
+            <Field
+              label={numeroAutomatico(tipo) ? (tipo === "DJ" ? "N° DJ" : "N° interno") : `N° ${COMPROBANTES_GASTO[tipo].toLowerCase()}`}
+              hint={numeroAutomatico(tipo) && !(editando && editando.tipoComprobante === tipo) ? "Se asigna solo al guardar" : undefined}
+            >
+              <Input
+                value={numeroAutomatico(tipo) ? (editando?.tipoComprobante === tipo ? editando.numero : "") : numero}
+                disabled={numeroAutomatico(tipo)}
+                onChange={(e) => setNumero(e.target.value.toUpperCase())}
+                placeholder={placeholderComprobante(tipo)}
+              />
             </Field>
             <Field label="Ingresa a almacén">
               <Select value={sede} onChange={(e) => setSede(e.target.value)} options={SEDES.map((x) => ({ value: x, label: x }))} />
@@ -668,7 +678,7 @@ function RegistrarCompra({
                   <th className="px-2 py-2 text-left">Producto *</th>
                   <th className="w-28 px-2 py-2 text-left">Unidad</th>
                   <th className="w-28 px-2 py-2 text-left">Cantidad *</th>
-                  <th className="w-36 px-2 py-2 text-left">P. Unit. ({conIgv ? "con" : "sin"} IGV) *</th>
+                  <th className="w-36 px-2 py-2 text-left">P. Unit. ({conIgv ? "con IGV" : tipo === "FACTURA" ? "sin IGV" : "final"}) *</th>
                   <th className="w-32 px-2 py-2 text-right">Subtotal</th>
                   <th className="w-10" />
                 </tr>
@@ -849,7 +859,7 @@ function RegistrarCompra({
             <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
               {(
                 [
-                  ["Comprobante", `${verCompra.tipoComprobante === "FACTURA" ? "Factura" : "Boleta"} ${verCompra.numero}`],
+                  ["Comprobante", docCompra(verCompra)],
                   ["Fecha", fechaPE(verCompra.fecha)],
                   ["Proveedor", `${verCompra.proveedor} · RUC ${verCompra.ruc}`],
                   ["Ingresó a almacén", verCompra.sede],

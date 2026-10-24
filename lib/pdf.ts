@@ -19,6 +19,7 @@ import type { HistorialDetalle, HistorialPlanilla } from "./historial";
 import type { ConcesionContratista, LugarEntrega } from "./types";
 import type { ComprobanteVenta, Cotizacion, Factura, Guia, LineaVenta, NotaPedido, OrdenCompra, OrdenDespacho, OrdenServicio, Requerimiento } from "./types";
 import type { Traslado, VentaSucursal } from "./sucursal-modelos";
+import { COMPROBANTES } from "./comprobantes";
 
 type RGB = [number, number, number];
 // Plantilla corporativa COMBOY VID
@@ -721,7 +722,7 @@ export function pdfOrdenServicio(o: OrdenServicio): void {
 
 /** Gasto / servicio de Tesorería (sin OC ni stock). */
 function pdfGasto(f: Factura, codigo: string): void {
-  const comp = { FACTURA: "Factura", BOLETA: "Boleta", DJ: "Declaración Jurada de Gasto", RECIBO: "Recibo" }[f.comprobanteGasto ?? "FACTURA"];
+  const comp = COMPROBANTES[f.comprobanteGasto ?? "FACTURA"];
   guardar(
     construir({
       titulo: "GASTO",
