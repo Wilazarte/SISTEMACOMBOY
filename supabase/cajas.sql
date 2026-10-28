@@ -44,7 +44,7 @@ alter table public.planilla_historial add column if not exists caja_nombre text;
 create or replace function public.fijar_caja_planilla(p_id uuid, p_caja text) returns void
 language plpgsql security definer set search_path = public as $$
 begin
-  if public.mi_rol() not in ('creador', 'planilla', 'admin') then
+  if public.mi_rol() not in ('creador', 'planilla', 'tesoreria', 'admin') then
     raise exception 'Su usuario no puede pagar planillas' using errcode = '42501';
   end if;
   if coalesce(btrim(p_caja), '') = '' then
