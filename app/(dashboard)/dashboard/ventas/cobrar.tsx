@@ -1,8 +1,9 @@
 "use client";
 
-import { FiltrosPlegables } from "@/components/ui/BotonFiltros";
+import { BotonFiltros } from "@/components/ui/BotonFiltros";
 import { useState } from "react";
-import { FileCheck2, Wallet } from "lucide-react";
+import { BarChart3, FileCheck2, FileSpreadsheet, Wallet, X } from "lucide-react";
+import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, cn, ejecutar } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { KEYS, fechaPE, hoy, puede, r2, soles, useRol, useStore } from "@/lib/storage";
@@ -12,19 +13,40 @@ import {
   registrarCobro,
   registrarCobroNP,
   registrarComprobanteExterno,
+  reporteDeuda,
+  type AgruparDeuda,
   type EstadoCxC,
   type FilaCxC,
 } from "@/lib/ventas";
 import type { CobroVenta, ComprobanteExterno, ComprobanteVenta, NotaPedido, TipoComprobanteExterno } from "@/lib/types";
 import { CUENTAS_COBRO, medioCobro } from "./comun";
 
+const filtrosVacios = {
+  buscar: "",
+  cliente: "",
+  vendedor: "",
+  equipo: "",
+  desde: "",
+  hasta: "",
+  porVencimiento: false,
+  estado: "" as "" | EstadoCxC,
+  origen: "" as "" | FilaCxC["origen"],
+  externo: "" as "" | "SI" | "NO",
+};
+
+const AGRUPAR: Record<AgruparDeuda, string> = { cliente: "Cliente", vendedor: "Vendedor", mes: "Mes de emisión", equipo: "Equipo / producto" };
+
+const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"];
+const mesLabel = (ym: string) => `${MESES[Number(ym.slice(5, 7)) - 1] ?? ym} ${ym.slice(0, 4)}`;
+
 export function CuentasPorCobrar() {
   const [rol] = useRol();
   const notas = useStore<NotaPedido[]>(KEYS.NOTAS_PEDIDO, []);
   const comprobantes = useStore<ComprobanteVenta[]>(KEYS.COMPROBANTES, []);
   const cobros = useStore<CobroVenta[]>(KEYS.COBROS, []);
-  const [filtro, setFiltro] = useState<"" | EstadoCxC>("");
-  const [origen, setOrigen] = useState<"" | FilaCxC["origen"]>("");
+  const [f, setF] = useState(filtrosVacios);
+  const { showFiltros, setShowFiltros } = useTogglePanel();
+  const [reporte, setReporte] = useState<AgruparDeuda | null>(null);
   const [sel, setSel] = useState<FilaCxC | null>(null);
   const [externo, setExterno] = useState<FilaCxC | null>(null);
   const [datos, setDatos] = useState({ monto: 0, cuenta: CUENTAS_COBRO[0], referencia: "", fecha: hoy() });
@@ -33,12 +55,61 @@ export function CuentasPorCobrar() {
 
   // Saldos de las notas de pedido aprobadas + comprobantes del sistema emitidos a crédito o con saldo
   const todas = filasCxC(notas, comprobantes);
+  const unicos = (xs: string[]) => [...new Set(xs)].sort((a, b) => a.localeCompare(b)).map((v) => ({ value: v, label: v }));
+  const clientes = unicos(todas.map((x) => x.cliente));
+  const vendedores = unicos(todas.map((x) => x.vendedor));
+  const equipos = unicos(todas.flatMap((x) => x.items.map((i) => i.nombre)));
+  const texto = f.buscar.trim().toLowerCase();
   const cxc = todas
-    .filter((x) => (!filtro || x.estado === filtro) && (!origen || x.origen === origen))
+    .filter(
+      (x) =>
+        (!f.estado || x.estado === f.estado) &&
+        (!f.origen || x.origen === f.origen) &&
+        (!f.cliente || x.cliente === f.cliente) &&
+        (!f.vendedor || x.vendedor === f.vendedor) &&
+        (!f.equipo || x.items.some((i) => i.nombre === f.equipo)) &&
+        (!f.desde || (f.porVencimiento ? x.vencimiento : x.fecha) >= f.desde) &&
+        (!f.hasta || (f.porVencimiento ? x.vencimiento : x.fecha) <= f.hasta) &&
+        (f.externo === "" || (f.externo === "SI") === !!x.externo) &&
+        (!texto ||
+          [x.documento, x.cliente, x.clienteDoc, x.vendedor, x.detalle, x.externo?.numero ?? "", ...x.items.map((i) => i.nombre)].join(" ").toLowerCase().includes(texto))
+    )
     .sort((a, b) => a.vencimiento.localeCompare(b.vencimiento));
-  const totalSaldo = r2(todas.reduce((a, x) => a + x.saldo, 0));
-  const vencido = r2(todas.filter((x) => x.estado === "VENCIDO").reduce((a, x) => a + x.saldo, 0));
-  const sinComprobante = todas.filter((x) => x.origen === "NP" && !x.externo).length;
+  const activos = Object.entries(f).filter(([k, v]) => k !== "porVencimiento" && v !== "").length;
+  // Los indicadores siguen a los filtros (deuda del cliente, vendedor o periodo elegido)
+  const totalSaldo = r2(cxc.reduce((a, x) => a + x.saldo, 0));
+  const vencido = r2(cxc.filter((x) => x.estado === "VENCIDO").reduce((a, x) => a + x.saldo, 0));
+  const sinComprobante = cxc.filter((x) => x.origen === "NP" && !x.externo).length;
+  const grupos = reporte ? reporteDeuda(cxc, reporte) : [];
+
+  // xlsx se carga solo al exportar
+  const exportarExcel = async () => {
+    const XLSX = await import("xlsx");
+    const libro = XLSX.utils.book_new();
+    const detalle = cxc.map((x) => ({
+      Documento: x.documento,
+      "Comprobante externo": x.externo ? `${TIPOS_COMPROBANTE_EXTERNO[x.externo.tipo]} ${x.externo.numero}` : "",
+      Cliente: x.cliente,
+      "RUC / DNI": x.clienteDoc,
+      Vendedor: x.vendedor,
+      Emisión: fechaPE(x.fecha),
+      Vencimiento: fechaPE(x.vencimiento),
+      "Días vencido": x.diasVencido || "",
+      Total: x.total,
+      Pagado: x.pagado,
+      Saldo: x.saldo,
+      Estado: x.estado,
+      "Productos / equipos": x.items.map((i) => i.nombre).join(", "),
+    }));
+    XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(detalle), "Cuentas por cobrar");
+    if (reporte)
+      XLSX.utils.book_append_sheet(
+        libro,
+        XLSX.utils.json_to_sheet(grupos.map((g) => ({ [AGRUPAR[reporte]]: g.grupo, Documentos: g.documentos, Total: g.total, Pagado: g.pagado, Saldo: g.saldo, Vencido: g.vencido }))),
+        `Deuda por ${AGRUPAR[reporte].toLowerCase()}`.slice(0, 31)
+      );
+    XLSX.writeFile(libro, `Cuentas-por-cobrar-${hoy()}.xlsx`);
+  };
 
   const abrir = (f: FilaCxC) => {
     setDatos({ monto: f.saldo, cuenta: CUENTAS_COBRO[0], referencia: "", fecha: hoy() });
@@ -72,32 +143,127 @@ export function CuentasPorCobrar() {
           subtitle="Saldos de las notas de pedido aprobadas y de los comprobantes a crédito. Registre cobros parciales o totales y el N° del comprobante emitido en el sistema externo."
           action={
             <div className="flex flex-wrap items-center gap-2">
-              <FiltrosPlegables activos={(filtro ? 1 : 0) + (origen ? 1 : 0)}>
-                <Select
-                  value={origen}
-                  onChange={(e) => setOrigen(e.target.value as "" | FilaCxC["origen"])}
-                  placeholder="Todos los documentos"
-                  options={[
-                    { value: "NP", label: "Notas de pedido" },
-                    { value: "COMPROBANTE", label: "Comprobantes del sistema" },
-                  ]}
-                  className="w-52"
-                />
-                <Select
-                  value={filtro}
-                  onChange={(e) => setFiltro(e.target.value as "" | EstadoCxC)}
-                  placeholder="Todos"
-                  options={[
-                    { value: "PENDIENTE", label: "Pendiente" },
-                    { value: "VENCIDO", label: "Vencido" },
-                    { value: "PAGADO", label: "Pagado" },
-                  ]}
-                  className="w-40"
-                />
-              </FiltrosPlegables>
+              <BotonFiltros abierto={showFiltros} onClick={() => setShowFiltros(!showFiltros)} activos={activos} />
+              <Button size="sm" variant={reporte ? "warning" : "secondary"} onClick={() => setReporte(reporte ? null : "cliente")}>
+                {reporte ? <X size={14} /> : <BarChart3 size={14} />} {reporte ? "Cerrar reporte" : "Reporte de deuda"}
+              </Button>
+              <Button size="sm" variant="secondary" onClick={exportarExcel} disabled={cxc.length === 0}>
+                <FileSpreadsheet size={14} /> Excel
+              </Button>
             </div>
           }
         />
+        {showFiltros && (
+          <div className="grid gap-3 border-b border-plomo-100 px-5 py-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Field label="Buscar" className="lg:col-span-2">
+              <Input value={f.buscar} placeholder="N° NP / comprobante, cliente, RUC, vendedor, producto…" onChange={(e) => setF({ ...f, buscar: e.target.value })} autoFocus />
+            </Field>
+            <Field label="Cliente">
+              <Select value={f.cliente} onChange={(e) => setF({ ...f, cliente: e.target.value })} placeholder="Todos" options={clientes} />
+            </Field>
+            <Field label="Vendedor">
+              <Select value={f.vendedor} onChange={(e) => setF({ ...f, vendedor: e.target.value })} placeholder="Todos" options={vendedores} />
+            </Field>
+            <Field label="Equipo / producto">
+              <Select value={f.equipo} onChange={(e) => setF({ ...f, equipo: e.target.value })} placeholder="Todos" options={equipos} />
+            </Field>
+            <Field label={f.porVencimiento ? "Vence desde" : "Emitido desde"}>
+              <Input type="date" value={f.desde} onChange={(e) => setF({ ...f, desde: e.target.value })} />
+            </Field>
+            <Field label={f.porVencimiento ? "Vence hasta" : "Emitido hasta"}>
+              <Input type="date" value={f.hasta} onChange={(e) => setF({ ...f, hasta: e.target.value })} />
+            </Field>
+            <Field label="Fechas por">
+              <Select
+                value={f.porVencimiento ? "VENCE" : "EMISION"}
+                onChange={(e) => setF({ ...f, porVencimiento: e.target.value === "VENCE" })}
+                options={[
+                  { value: "EMISION", label: "Fecha de emisión" },
+                  { value: "VENCE", label: "Fecha de vencimiento" },
+                ]}
+              />
+            </Field>
+            <Field label="Estado">
+              <Select
+                value={f.estado}
+                onChange={(e) => setF({ ...f, estado: e.target.value as "" | EstadoCxC })}
+                placeholder="Todos"
+                options={[
+                  { value: "PENDIENTE", label: "Pendiente" },
+                  { value: "VENCIDO", label: "Vencido" },
+                  { value: "PAGADO", label: "Pagado" },
+                ]}
+              />
+            </Field>
+            <Field label="Documento">
+              <Select
+                value={f.origen}
+                onChange={(e) => setF({ ...f, origen: e.target.value as "" | FilaCxC["origen"] })}
+                placeholder="Todos"
+                options={[
+                  { value: "NP", label: "Notas de pedido" },
+                  { value: "COMPROBANTE", label: "Comprobantes del sistema" },
+                ]}
+              />
+            </Field>
+            <Field label="Comprobante externo">
+              <Select
+                value={f.externo}
+                onChange={(e) => setF({ ...f, externo: e.target.value as "" | "SI" | "NO" })}
+                placeholder="Todos"
+                options={[
+                  { value: "SI", label: "Referido" },
+                  { value: "NO", label: "Sin referir" },
+                ]}
+              />
+            </Field>
+            <div className="flex items-end">
+              <Button size="sm" variant="ghost" onClick={() => setF(filtrosVacios)} disabled={activos === 0}>
+                <X size={14} /> Limpiar filtros
+              </Button>
+            </div>
+          </div>
+        )}
+        {reporte && (
+          <div className="border-b border-plomo-100 px-5 py-4">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-fg">Reporte de deuda por</span>
+              {(Object.keys(AGRUPAR) as AgruparDeuda[]).map((k) => (
+                <Button key={k} size="sm" variant={reporte === k ? "warning" : "ghost"} onClick={() => setReporte(k)}>
+                  {AGRUPAR[k]}
+                </Button>
+              ))}
+              <span className="ml-auto text-xs text-plomo-500">
+                {cxc.length} documento(s){activos ? " filtrados" : ""}
+                {reporte === "equipo" && " · el saldo de cada documento se reparte según el importe de cada producto"}
+              </span>
+            </div>
+            <Table compacto head={[AGRUPAR[reporte], "Documentos", "Total", "Pagado", "Saldo", "Vencido", "% de la deuda"]} empty={grupos.length === 0}>
+              {grupos.map((g) => (
+                <tr key={g.grupo}>
+                  <Td className="max-w-[22rem] whitespace-normal font-semibold text-fg">{reporte === "mes" ? mesLabel(g.grupo) : g.grupo}</Td>
+                  <Td className="text-center">{g.documentos}</Td>
+                  <Td className="text-right">{soles(g.total)}</Td>
+                  <Td className="text-right text-emerald-700">{soles(g.pagado)}</Td>
+                  <Td className="text-right font-semibold">{soles(g.saldo)}</Td>
+                  <Td className={cn("text-right", g.vencido > 0 && "font-semibold text-red-600")}>{soles(g.vencido)}</Td>
+                  <Td className="text-right">{totalSaldo > 0 ? `${((g.saldo / totalSaldo) * 100).toFixed(1)} %` : "-"}</Td>
+                </tr>
+              ))}
+              {grupos.length > 1 && (
+                <tr className="font-semibold">
+                  <Td className="text-fg">Total</Td>
+                  <Td className="text-center">{cxc.length}</Td>
+                  <Td className="text-right">{soles(r2(grupos.reduce((a, g) => a + g.total, 0)))}</Td>
+                  <Td className="text-right text-emerald-700">{soles(r2(grupos.reduce((a, g) => a + g.pagado, 0)))}</Td>
+                  <Td className="text-right">{soles(totalSaldo)}</Td>
+                  <Td className="text-right text-red-600">{soles(vencido)}</Td>
+                  <Td className="text-right">100 %</Td>
+                </tr>
+              )}
+            </Table>
+          </div>
+        )}
         {/* Compacta: entra completa en pantalla sin deslizar (fechas y días en una columna, acciones con íconos) */}
         <Table compacto head={["Documento", "Comprobante externo", "Cliente", "Emisión / Vence", "Total", "Pagado", "Saldo", "Estado", ""]} empty={cxc.length === 0}>
           {cxc.map((f) => (

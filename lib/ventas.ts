@@ -1161,10 +1161,16 @@ export interface FilaCxC {
   total: number;
   saldo: number;
   externo?: ComprobanteExterno;
+  vendedor: string;
+  /** Productos / equipos vendidos (para el reporte por equipo). */
+  items: { nombre: string; total: number }[];
   estado: EstadoCxC;
   diasVencido: number;
   pagado: number;
 }
+
+const itemsCxC = (items: LineaVenta[]) =>
+  items.map((l) => ({ nombre: (l.productoNombre || l.descripcion || "Sin descripción").trim().toUpperCase(), total: l.total }));
 
 /** Cuentas por cobrar: saldos de las NP aprobadas + comprobantes emitidos a crédito o con saldo. */
 export function filasCxC(notas: NotaPedido[], comprobantes: ComprobanteVenta[]): FilaCxC[] {
@@ -1181,6 +1187,8 @@ export function filasCxC(notas: NotaPedido[], comprobantes: ComprobanteVenta[]):
       total: n.total,
       saldo: saldoNP(n),
       externo: n.comprobanteExterno,
+      vendedor: n.vendedor || "-",
+      items: itemsCxC(n.items),
       ...estadoCxCNP(n),
     })
   );
@@ -1199,10 +1207,54 @@ export function filasCxC(notas: NotaPedido[], comprobantes: ComprobanteVenta[]):
         total: c.total,
         saldo: c.saldo,
         externo: c.comprobanteExterno,
+        vendedor: c.vendedor || "-",
+        items: itemsCxC(c.items),
         ...estadoCxC(c),
       })
     );
   return [...deNP, ...deComp];
+}
+
+export type AgruparDeuda = "cliente" | "vendedor" | "mes" | "equipo";
+
+export interface GrupoDeuda {
+  grupo: string;
+  documentos: number;
+  total: number;
+  pagado: number;
+  saldo: number;
+  vencido: number;
+}
+
+/**
+ * Reporte de deuda agrupado. Por equipo / producto, el total, lo pagado y el saldo de cada documento
+ * se reparten según el peso de cada línea en el documento.
+ */
+export function reporteDeuda(filas: FilaCxC[], por: AgruparDeuda): GrupoDeuda[] {
+  const grupos = new Map<string, GrupoDeuda & { docs: Set<string> }>();
+  const sumar = (clave: string, doc: string, peso: number, f: FilaCxC) => {
+    const g = grupos.get(clave) ?? { grupo: clave, documentos: 0, total: 0, pagado: 0, saldo: 0, vencido: 0, docs: new Set<string>() };
+    g.docs.add(doc);
+    g.total += f.total * peso;
+    g.pagado += f.pagado * peso;
+    g.saldo += f.saldo * peso;
+    if (f.estado === "VENCIDO") g.vencido += f.saldo * peso;
+    grupos.set(clave, g);
+  };
+  for (const f of filas) {
+    const doc = `${f.origen}-${f.id}`;
+    if (por === "equipo") {
+      const base = f.items.reduce((a, i) => a + i.total, 0);
+      if (!f.items.length || !(base > 0)) sumar("Sin detalle", doc, 1, f);
+      else f.items.forEach((i) => sumar(i.nombre, doc, i.total / base, f));
+    } else {
+      const clave = por === "cliente" ? `${f.cliente} · ${f.clienteDoc}` : por === "vendedor" ? f.vendedor : f.fecha.slice(0, 7);
+      sumar(clave, doc, 1, f);
+    }
+  }
+  return [...grupos.values()]
+    .map(({ docs, ...g }) => ({ ...g, documentos: docs.size, total: r2(g.total), pagado: r2(g.pagado), saldo: r2(g.saldo), vencido: r2(g.vencido) }))
+    .sort((a, b) => (por === "mes" ? b.grupo.localeCompare(a.grupo) : b.saldo - a.saldo));
 }
 
 /** Cobro a cuenta de una NP aprobada: DEBE Caja/Banco / HABER 1212 (la venta ya se registró al aprobar). */
