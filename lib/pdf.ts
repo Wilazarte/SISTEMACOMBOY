@@ -760,6 +760,8 @@ export function pdfEstadoCuenta(d: {
   egresos: number;
   saldoFinal: number;
   movimientos: { fecha: string; concepto: string; documento: string; proveedor: string; debe: number; haber: number; saldo?: number }[];
+  descripcion?: string;
+  cuentasBancarias?: [string, string][]; // ["Interbank Soles", "N° … · CCI …"]
 }): void {
   const nombre = `ESTADO-CUENTA-${d.cuenta.replace(/\s+/g, "-")}-${d.periodo.replace(/\s+/g, "-")}`;
   guardar(
@@ -768,7 +770,8 @@ export function pdfEstadoCuenta(d: {
       numero: d.periodo.toUpperCase(),
       estado: "REPORTE",
       datos: [
-        ["Cuenta", d.cuenta],
+        ["Cuenta", d.descripcion ? `${d.cuenta} · ${d.descripcion}` : d.cuenta],
+        ...(d.cuentasBancarias ?? []),
         ["Periodo", d.periodo],
         ["Sede", "Arequipa"],
         ["Emitido", fechaPE(new Date().toISOString().slice(0, 10))],

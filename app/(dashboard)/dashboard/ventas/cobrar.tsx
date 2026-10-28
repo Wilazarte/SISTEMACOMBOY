@@ -8,7 +8,7 @@ import { getSesion } from "@/lib/auth";
 import { KEYS, fechaPE, hoy, puede, r2, soles, useRol, useStore } from "@/lib/storage";
 import { estadoCxC, registrarCobro, tipoLabel, type EstadoCxC } from "@/lib/ventas";
 import type { CobroVenta, ComprobanteVenta } from "@/lib/types";
-import { CUENTAS_COBRO } from "./comun";
+import { CUENTAS_COBRO, medioCobro } from "./comun";
 
 export function CuentasPorCobrar() {
   const [rol] = useRol();
@@ -124,7 +124,7 @@ export function CuentasPorCobrar() {
             onSubmit={(e) => {
               e.preventDefault();
               const ok = ejecutar(
-                () => registrarCobro(sel.id, { ...datos, medio: datos.cuenta.startsWith("Caja") ? "CAJA" : "BANCO" }, getSesion()?.usuario ?? "", rol),
+                () => registrarCobro(sel.id, { ...datos, medio: medioCobro(datos.cuenta) }, getSesion()?.usuario ?? "", rol),
                 "Cobro registrado"
               );
               if (ok) setSel(null);

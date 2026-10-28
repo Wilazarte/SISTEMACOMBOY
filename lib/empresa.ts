@@ -6,9 +6,10 @@ export const EMPRESA = {
   direccion: "El Nazareno Mz. A Lt. 25 - Paucarpata, Arequipa - Perú", // <-- reemplazar
   telefono: "+51 942304539", // <-- reemplazar
   email: "informatica@comboyvid.com", // <-- reemplazar
-  /** Cuentas para pagos (Nota de Pedido y comprobantes). */
+  /** Cuentas para pagos (Nota de Pedido y comprobantes): Interbank Negocios de la CAJA GENERAL (las mismas de lib/cajas.ts). */
   cuentas: [
-    { banco: "BCP", moneda: "Soles", numero: "21515158381091", cci: "21515158381091" }, // <-- reemplazar
+    { banco: "Interbank", moneda: "Soles", numero: "3003008986156", cci: "00330000300898615618" },
+    { banco: "Interbank", moneda: "Dólares", numero: "3003008986163", cci: "00330000300898616314" },
   ],
   /** Logo opcional en base64 (data:image/png;base64,...). Si queda vacío se dibuja un isotipo. */
   logoDataUrl: "",

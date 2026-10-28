@@ -1448,7 +1448,10 @@ export async function crearOrdenCompra(
 // BANCARIZACIÓN: OC -> BANCARIZACIÓN -> FACTURA
 // ---------------------------------------------------------------------
 
-export const TIPOS_BANCARIZACION: TipoBancarizacion[] = ["EFECTIVO", "TRANSFERENCIA BCP", "YAPE", "BBVA", "INTERBANK", "DETRACCIÓN"];
+/** Todos los tipos válidos (los pagos antiguos pueden tener BCP, BBVA o Yape). */
+export const TIPOS_BANCARIZACION: TipoBancarizacion[] = ["EFECTIVO", "INTERBANK", "DETRACCIÓN", "TRANSFERENCIA BCP", "YAPE", "BBVA"];
+/** Los que se ofrecen en un pago nuevo: Arequipa paga en efectivo (Caja Chica, Fondo de Reserva) o por Interbank (Caja General). */
+export const TIPOS_BANCARIZACION_ACTUALES: TipoBancarizacion[] = ["EFECTIVO", "INTERBANK", "DETRACCIÓN"];
 /** Monto desde el que el pago debe bancarizarse. */
 export const TOPE_BANCARIZACION = 2000;
 

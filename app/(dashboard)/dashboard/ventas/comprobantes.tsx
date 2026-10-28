@@ -23,7 +23,7 @@ import {
   type DatosComprobante,
 } from "@/lib/ventas";
 import type { ComprobanteVenta, FormaPagoVenta, NotaPedido, OrdenDespacho, TipoComprobanteVenta } from "@/lib/types";
-import { CUENTAS_COBRO, DatosDespachoForm, LineasEditor, SelectorCliente, TotalesVenta, useVentas } from "./comun";
+import { CUENTAS_COBRO, DatosDespachoForm, medioCobro, LineasEditor, SelectorCliente, TotalesVenta, useVentas } from "./comun";
 
 type Filtro = "TODOS" | TipoComprobanteVenta;
 
@@ -52,7 +52,7 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
   const [filtro, setFiltro] = useState<Filtro>("TODOS");
   const [form, setForm] = useState<DatosComprobante | null>(null);
   const [borradorId, setBorradorId] = useState<string | undefined>();
-  const [cobro, setCobro] = useState<{ medio: "CAJA" | "BANCO"; cuenta: string }>({ medio: "CAJA", cuenta: CUENTAS_COBRO[0] });
+  const [cobro, setCobro] = useState<{ medio: "CAJA" | "BANCO"; cuenta: string }>({ medio: medioCobro(CUENTAS_COBRO[0]), cuenta: CUENTAS_COBRO[0] });
   const [anular, setAnular] = useState<ComprobanteVenta | null>(null);
   const [motivo, setMotivo] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -302,7 +302,7 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
                 <Field label={form.formaPago === "CONTADO" ? "Cobro al contado en" : "Inicial cobrada en"}>
                   <Select
                     value={cobro.cuenta}
-                    onChange={(e) => setCobro({ cuenta: e.target.value, medio: e.target.value.startsWith("Caja") ? "CAJA" : "BANCO" })}
+                    onChange={(e) => setCobro({ cuenta: e.target.value, medio: medioCobro(e.target.value) })}
                     options={CUENTAS_COBRO.map((c) => ({ value: c, label: c }))}
                   />
                 </Field>
