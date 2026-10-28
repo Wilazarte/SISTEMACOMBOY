@@ -6,7 +6,7 @@ import { abrirBuscadorDePagina } from "@/components/layout/IslandMenu";
 import { CatalogoProductos } from "@/components/productos/CatalogoProductos";
 import { Button, Tabs } from "@/components/ui";
 import { KEYS, useStore } from "@/lib/storage";
-import { estadoCxC, estadoOD, npsSinDespacho } from "@/lib/ventas";
+import { estadoOD, filasCxC, npsSinDespacho } from "@/lib/ventas";
 import type { ComprobanteVenta, NotaPedido, OrdenDespacho } from "@/lib/types";
 import { OrdenesDespacho } from "../almacen/despacho";
 import { CuentasPorCobrar } from "./cobrar";
@@ -19,7 +19,8 @@ import { RequerimientosSecocha, useSecocha } from "./secocha";
 type Tab = "secocha" | "notas" | "comprobantes" | "despachos" | "productos" | "condiciones" | "clientes" | "cobrar";
 
 /**
- * VENTAS — Nota de Pedido -> Aprobada -> Factura/Boleta -> Orden de Despacho (Almacén) -> Cobro.
+ * VENTAS — Nota de Pedido -> Aprobada (cuenta por cobrar) -> Factura/Boleta -> Orden de Despacho (Almacén) -> Cobro.
+ * Sin SUNAT: el N° del comprobante emitido en el sistema externo se refiere en la NP o en Cuentas por cobrar.
  * Secocha: sus requerimientos y ventas derivadas llegan a "Requerimientos de Secocha" y se aceptan como NP.
  * Catálogo de Productos (antes /dashboard/productos): catálogo maestro, solicitudes y duplicados.
  */
@@ -33,7 +34,7 @@ export default function VentasPage() {
   const comprobantes = useStore<ComprobanteVenta[]>(KEYS.COMPROBANTES, []);
   const despachos = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, []);
   const sinOD = npsSinDespacho(notas, despachos);
-  const vencidos = comprobantes.filter((c) => c.estado === "EMITIDO" && estadoCxC(c).estado === "VENCIDO").length;
+  const vencidos = filasCxC(notas, comprobantes).filter((f) => f.estado === "VENCIDO").length;
   const secocha = useSecocha();
   // Campana "Requerimiento de Secocha": /dashboard/ventas?tab=secocha
   useEffect(() => {

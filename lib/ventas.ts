@@ -32,6 +32,7 @@ import type {
   AsientoContable,
   Cliente,
   CobroVenta,
+  ComprobanteExterno,
   ComprobanteVenta,
   CondicionPago,
   CostosNP,
@@ -47,6 +48,7 @@ import type {
   OrdenDespacho,
   OrigenSecocha,
   Rol,
+  TipoComprobanteExterno,
   TipoComprobanteVenta,
   TipoDocCliente,
 } from "./types";
@@ -828,7 +830,10 @@ export const avisoOD = (o: OrdenDespacho): string =>
 export const odsNuevas = (ods: OrdenDespacho[]) => ods.filter((o) => o.vistoAlmacen === false && estadoOD(o) === "PENDIENTE");
 
 export const saldoCliente = (clienteId: string): number =>
-  r2(getComprobantes().filter((c) => c.clienteId === clienteId && c.estado === "EMITIDO").reduce((a, c) => a + c.saldo, 0));
+  r2(
+    getComprobantes().filter((c) => c.clienteId === clienteId && c.estado === "EMITIDO").reduce((a, c) => a + c.saldo, 0) +
+      getNotasPedido().filter((n) => n.clienteId === clienteId && npPorCobrar(n)).reduce((a, n) => a + saldoNP(n), 0)
+  );
 
 function generarCuotas(fecha: string, monto: number, n: number, dias: number): Cuota[] {
   const cuotas: Cuota[] = [];
@@ -989,10 +994,12 @@ export async function emitirComprobante(
   const odNP = np ? odDeNP(np) : undefined;
   c.despacho = odNP ? np!.despacho : validarDespacho(data.despacho); // antes de pedir números
   const cliente = getClientes().find((x) => x.id === c.clienteId)!;
-  const porCobrar = r2(c.total - (c.formaPago === "CONTADO" ? c.total : c.inicial));
-  if (porCobrar > 0 && cliente.lineaCredito > 0 && saldoCliente(cliente.id) + porCobrar > cliente.lineaCredito)
+  const porCobrar = r2(c.total - (c.formaPago === "CONTADO" ? c.total : c.inicial) - (np?.cobrado ?? 0));
+  // La NP que se factura deja de contar como deuda propia (pasa al comprobante)
+  const saldoPrevio = r2(saldoCliente(cliente.id) - (np && npPorCobrar(np) ? saldoNP(np) : 0));
+  if (porCobrar > 0 && cliente.lineaCredito > 0 && saldoPrevio + porCobrar > cliente.lineaCredito)
     throw new ErpError(
-      `Supera la línea de crédito de ${cliente.razonSocial} (S/ ${cliente.lineaCredito.toFixed(2)}; saldo actual S/ ${saldoCliente(cliente.id).toFixed(2)}).`
+      `Supera la línea de crédito de ${cliente.razonSocial} (S/ ${cliente.lineaCredito.toFixed(2)}; saldo actual S/ ${saldoPrevio.toFixed(2)}).`
     );
 
   // Números primero (atómicos en Supabase); luego todas las escrituras
@@ -1032,7 +1039,10 @@ export async function emitirComprobante(
   c.odNumero = od.numero;
   c.asientoId = asientoNP?.id ?? asiento!.id;
 
-  const cobrado = c.formaPago === "CONTADO" ? c.total : c.inicial;
+  // Lo ya cobrado a cuenta de la NP (cuentas por cobrar de la NP) se descuenta del comprobante
+  const previoNP = r2(Math.min(np?.cobrado ?? 0, c.total));
+  const cobrado = c.formaPago === "CONTADO" ? r2(c.total - previoNP) : r2(Math.min(c.inicial, c.total - previoNP));
+  c.comprobanteExterno = c.comprobanteExterno ?? np?.comprobanteExterno;
   const asientos = asiento ? [asiento] : [];
   const cobros: CobroVenta[] = [];
   if (cobrado > 0) {
@@ -1051,9 +1061,10 @@ export async function emitirComprobante(
     });
     asientos.push(asientoCobro(c, cobrado, cobro.medio, cobro.cuenta));
   }
-  c.saldo = r2(c.total - cobrado);
+  c.saldo = r2(c.total - previoNP - cobrado);
   c.historial = [
     ...c.historial,
+    ...(previoNP > 0 ? [nuevoEvento(rol, "Cobrado en la nota de pedido", `${np!.numero}: S/ ${previoNP.toFixed(2)} a cuenta`)] : []),
     nuevoEvento(rol, "Emitido", `${numero} · ${c.formaPago}${c.saldo > 0 ? ` · saldo S/ ${c.saldo.toFixed(2)} a Cuentas por Cobrar` : " · cobrado"}`),
   ];
 
@@ -1111,8 +1122,203 @@ export type EstadoCxC = "PENDIENTE" | "PAGADO" | "VENCIDO";
 export function estadoCxC(c: ComprobanteVenta): { estado: EstadoCxC; diasVencido: number; pagado: number } {
   const pagado = r2(c.total - c.saldo);
   if (c.saldo <= 0) return { estado: "PAGADO", diasVencido: 0, pagado };
-  const dias = Math.floor((new Date(`${hoy()}T12:00:00`).getTime() - new Date(`${c.fechaVenc}T12:00:00`).getTime()) / 86400000);
+  const dias = diasAtraso(c.fechaVenc);
   return dias > 0 ? { estado: "VENCIDO", diasVencido: dias, pagado } : { estado: "PENDIENTE", diasVencido: 0, pagado };
+}
+
+/** Días de atraso respecto a una fecha de vencimiento (0 si aún no vence). */
+const diasAtraso = (venc: string) =>
+  Math.max(0, Math.floor((new Date(`${hoy()}T12:00:00`).getTime() - new Date(`${venc}T12:00:00`).getTime()) / 86400000));
+
+/**
+ * NP que genera cuenta por cobrar: APROBADA (ya tiene asiento 1212) y sin comprobante del sistema.
+ * Al facturarse en el ERP la deuda pasa al comprobante. Secocha no: es traslado interno.
+ */
+export const npPorCobrar = (n: NotaPedido): boolean => n.estado === "APROBADA" && n.origen !== "SECOCHA";
+
+export const saldoNP = (n: NotaPedido): number => r2(Math.max(0, n.total - (n.cobrado ?? 0)));
+
+/** Vencimiento de la NP: fecha + días de crédito (contado = fecha de la nota). */
+export const vencimientoNP = (n: NotaPedido): string => n.fechaVencimiento || n.fecha;
+
+export function estadoCxCNP(n: NotaPedido): { estado: EstadoCxC; diasVencido: number; pagado: number } {
+  const pagado = r2(n.cobrado ?? 0);
+  if (saldoNP(n) <= 0) return { estado: "PAGADO", diasVencido: 0, pagado };
+  const dias = diasAtraso(vencimientoNP(n));
+  return dias > 0 ? { estado: "VENCIDO", diasVencido: dias, pagado } : { estado: "PENDIENTE", diasVencido: 0, pagado };
+}
+
+/** Fila de Cuentas por Cobrar: nota de pedido aprobada o comprobante del sistema. */
+export interface FilaCxC {
+  origen: "NP" | "COMPROBANTE";
+  id: string;
+  documento: string; // NP-0001 / F001-0001
+  detalle: string; // "Nota de pedido" / "Factura"
+  cliente: string;
+  clienteDoc: string;
+  fecha: string;
+  vencimiento: string;
+  total: number;
+  saldo: number;
+  externo?: ComprobanteExterno;
+  estado: EstadoCxC;
+  diasVencido: number;
+  pagado: number;
+}
+
+/** Cuentas por cobrar: saldos de las NP aprobadas + comprobantes emitidos a crédito o con saldo. */
+export function filasCxC(notas: NotaPedido[], comprobantes: ComprobanteVenta[]): FilaCxC[] {
+  const deNP = notas.filter(npPorCobrar).map(
+    (n): FilaCxC => ({
+      origen: "NP",
+      id: n.id,
+      documento: n.numero,
+      detalle: `Nota de pedido · ${n.condPagoNombre}`,
+      cliente: n.cliente,
+      clienteDoc: n.clienteDoc,
+      fecha: n.fecha,
+      vencimiento: vencimientoNP(n),
+      total: n.total,
+      saldo: saldoNP(n),
+      externo: n.comprobanteExterno,
+      ...estadoCxCNP(n),
+    })
+  );
+  const deComp = comprobantes
+    .filter((c) => c.estado === "EMITIDO" && (c.formaPago !== "CONTADO" || c.saldo > 0))
+    .map(
+      (c): FilaCxC => ({
+        origen: "COMPROBANTE",
+        id: c.id,
+        documento: c.numero,
+        detalle: `${tipoLabel[c.tipo]}${c.npNumero ? ` · ${c.npNumero}` : ""}`,
+        cliente: c.cliente,
+        clienteDoc: c.clienteDoc,
+        fecha: c.fecha,
+        vencimiento: c.fechaVenc,
+        total: c.total,
+        saldo: c.saldo,
+        externo: c.comprobanteExterno,
+        ...estadoCxC(c),
+      })
+    );
+  return [...deNP, ...deComp];
+}
+
+/** Cobro a cuenta de una NP aprobada: DEBE Caja/Banco / HABER 1212 (la venta ya se registró al aprobar). */
+export function registrarCobroNP(
+  npId: string,
+  datos: { monto: number; medio: CobroVenta["medio"]; cuenta: string; referencia: string; fecha: string },
+  usuario: string,
+  rol: Rol
+): void {
+  if (!puede(rol, "venta.cobrar")) throw new ErpError("Su usuario no puede registrar cobros.");
+  const np = getNotasPedido().find((n) => n.id === npId);
+  if (!np) throw new ErpError("Nota de pedido no encontrada.");
+  if (!npPorCobrar(np)) throw new ErpError(`La ${np.numero} está ${np.estado}: solo se cobran notas APROBADAS.`);
+  const saldo = saldoNP(np);
+  const monto = r2(Number(datos.monto) || 0);
+  if (!(monto > 0)) throw new ErpError("El monto debe ser mayor a 0.");
+  if (monto > saldo + 0.001) throw new ErpError(`El monto supera el saldo (S/ ${saldo.toFixed(2)}).`);
+  if (!datos.cuenta.trim()) throw new ErpError("Indique la caja o banco.");
+  const cuenta = datos.cuenta.trim();
+  const ref = np.comprobanteExterno ? `${np.numero} (${np.comprobanteExterno.numero})` : np.numero;
+  const cobro: CobroVenta = {
+    id: uid(),
+    comprobanteId: "",
+    comprobanteNumero: np.comprobanteExterno?.numero ?? "",
+    npId: np.id,
+    npNumero: np.numero,
+    cliente: np.cliente,
+    fecha: datos.fecha || hoy(),
+    monto,
+    medio: datos.medio,
+    cuenta,
+    referencia: datos.referencia.trim(),
+    usuario,
+    created_at: new Date().toISOString(),
+  };
+  const asiento: AsientoContable = {
+    id: uid(),
+    fecha: cobro.fecha,
+    glosa: `Cobro ${ref} · ${np.cliente} · ${cuenta}`,
+    comprobanteId: np.id,
+    lineas: [
+      { cuenta: datos.medio === "CAJA" ? "1011" : "1041", nombre: datos.medio === "CAJA" ? "Caja" : `Cuenta corriente ${cuenta}`, debe: monto, haber: 0 },
+      { cuenta: "1212", nombre: "Emitidas en cartera (cuentas por cobrar)", debe: 0, haber: monto },
+    ],
+  };
+  actualizarNP(np.id, (n) => {
+    const cobrado = r2((n.cobrado ?? 0) + monto);
+    return {
+      ...n,
+      cobrado,
+      historial: [...n.historial, nuevoEvento(rol, cobrado >= n.total - 0.001 ? "Cobrado (total)" : "Cobro parcial", `S/ ${monto.toFixed(2)} · ${cuenta}`)],
+    };
+  });
+  escribir(KEYS.COBROS, [cobro, ...getCobros()]);
+  escribir(KEYS.ASIENTOS, [asiento, ...getAsientos()]);
+}
+
+export const TIPOS_COMPROBANTE_EXTERNO: Record<TipoComprobanteExterno, string> = {
+  FACTURA: "Factura",
+  BOLETA: "Boleta de venta",
+  NOTA_VENTA: "Nota de venta",
+  RECIBO: "Recibo",
+  OTRO: "Otro",
+};
+
+/** Formato SUNAT para factura / boleta electrónica: serie de 4 (F001 / B001 / E001) y correlativo hasta 8 dígitos. */
+const FORMATO_EXTERNO: Partial<Record<TipoComprobanteExterno, RegExp>> = {
+  FACTURA: /^[FE][A-Z0-9]{3}-\d{1,8}$/,
+  BOLETA: /^[BE][A-Z0-9]{3}-\d{1,8}$/,
+};
+
+/**
+ * Refiere el comprobante emitido en un sistema externo (sin conexión a SUNAT) a una NP o a un comprobante del ERP.
+ * Vacío = quitar la referencia. No se repite el mismo tipo + número en otra venta.
+ */
+export function registrarComprobanteExterno(
+  origen: "NP" | "COMPROBANTE",
+  id: string,
+  datos: { tipo: TipoComprobanteExterno; numero: string; fecha: string } | null,
+  usuario: string,
+  rol: Rol
+): void {
+  if (!puede(rol, "venta.gestionar") && !puede(rol, "venta.cobrar")) throw new ErpError("Su usuario no puede modificar ventas.");
+  let externo: ComprobanteExterno | undefined;
+  if (datos) {
+    const numero = datos.numero.trim().toUpperCase().replace(/\s+/g, "");
+    if (!(datos.tipo in TIPOS_COMPROBANTE_EXTERNO)) throw new ErpError("Seleccione el tipo de comprobante.");
+    if (!numero) throw new ErpError("Ingrese el N° del comprobante.");
+    const re = FORMATO_EXTERNO[datos.tipo];
+    if (re && !re.test(numero)) throw new ErpError(`N° de ${TIPOS_COMPROBANTE_EXTERNO[datos.tipo].toLowerCase()} inválido. Ej: ${datos.tipo === "FACTURA" ? "F001-00001234" : "B001-00000456"}`);
+    if (!datos.fecha) throw new ErpError("Indique la fecha de emisión del comprobante.");
+    const mismo = (e?: ComprobanteExterno) => e?.tipo === datos.tipo && e.numero === numero;
+    // La NP y su comprobante del ERP comparten la referencia: no cuentan como repetida
+    const npPropia = origen === "NP" ? id : getComprobantes().find((c) => c.id === id)?.npId;
+    const repetida =
+      getNotasPedido().find((n) => n.id !== npPropia && n.estado !== "ANULADA" && mismo(n.comprobanteExterno))?.numero ??
+      getComprobantes().find((c) => c.id !== id && (!npPropia || c.npId !== npPropia) && c.estado !== "ANULADO" && mismo(c.comprobanteExterno))?.numero;
+    if (repetida) throw new ErpError(`El comprobante ${numero} ya está referido en ${repetida}.`);
+    externo = { tipo: datos.tipo, numero, fecha: datos.fecha, registradoPor: usuario, registradoEn: new Date().toISOString() };
+  }
+  const texto = externo ? `${TIPOS_COMPROBANTE_EXTERNO[externo.tipo]} ${externo.numero}` : "Referencia quitada";
+  if (origen === "NP") {
+    actualizarNP(id, (n) => {
+      if (n.estado === "ANULADA") throw new ErpError(`La ${n.numero} está anulada.`);
+      return { ...n, comprobanteExterno: externo, historial: [...n.historial, nuevoEvento(rol, "Comprobante externo", texto)] };
+    });
+    return;
+  }
+  const lista = getComprobantes();
+  const c = lista.find((x) => x.id === id);
+  if (!c) throw new ErpError("Comprobante no encontrado.");
+  if (c.estado === "ANULADO") throw new ErpError(`El ${c.numero} está anulado.`);
+  escribir(
+    KEYS.COMPROBANTES,
+    lista.map((x) => (x.id === id ? { ...x, comprobanteExterno: externo, historial: [...x.historial, nuevoEvento(rol, "Comprobante externo", texto)] } : x))
+  );
 }
 
 export function registrarCobro(

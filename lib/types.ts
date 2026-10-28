@@ -706,9 +706,24 @@ export interface NotaPedido {
   origenId?: string;
   origenSecocha?: OrigenSecocha;
   costos?: CostosNP;
+  /** Cobrado a cuenta de la NP aprobada (cuentas por cobrar sin comprobante del sistema). */
+  cobrado?: number;
+  /** Comprobante emitido en un sistema externo (aún no hay conexión con SUNAT). */
+  comprobanteExterno?: ComprobanteExterno;
   historial: EventoHistorial[];
   editadoPor?: string;
   editadoEn?: string;
+}
+
+export type TipoComprobanteExterno = "FACTURA" | "BOLETA" | "NOTA_VENTA" | "RECIBO" | "OTRO";
+
+/** Comprobante de la venta hecho fuera del ERP (facturador SUNAT u otro sistema). */
+export interface ComprobanteExterno {
+  tipo: TipoComprobanteExterno;
+  numero: string; // F001-00001234
+  fecha: string;
+  registradoPor: string;
+  registradoEn: string;
 }
 
 export type TipoComprobanteVenta = "FACTURA" | "BOLETA" | "NOTA_CREDITO" | "NOTA_DEBITO";
@@ -755,13 +770,17 @@ export interface ComprobanteVenta {
   odNumero?: string;
   asientoId?: string;
   vendedor: string;
+  comprobanteExterno?: ComprobanteExterno;
   historial: EventoHistorial[];
 }
 
 export interface CobroVenta {
   id: string;
+  /** "" cuando el cobro es de una nota de pedido (npId). */
   comprobanteId: string;
   comprobanteNumero: string;
+  npId?: string;
+  npNumero?: string;
   cliente: string;
   fecha: string;
   monto: number;
