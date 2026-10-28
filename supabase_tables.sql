@@ -413,7 +413,7 @@ declare
   hr numeric;
   n integer := 0;
 begin
-  if rol is null or rol not in ('creador', 'planilla', 'admin') then
+  if rol is null or rol not in ('creador', 'planilla', 'tesoreria', 'admin') then
     raise exception 'Su usuario no puede importar asistencia' using errcode = '42501';
   end if;
   if per = '' then
@@ -600,7 +600,7 @@ declare
   hid uuid;
   malas int;
 begin
-  if rol is null or rol not in ('creador', 'planilla', 'admin') then
+  if rol is null or rol not in ('creador', 'planilla', 'tesoreria', 'admin') then
     raise exception 'Su usuario no puede cerrar la planilla' using errcode = '42501';
   end if;
   if per = '' then
@@ -908,8 +908,8 @@ drop policy if exists adelantos_escribir on public.adelantos;
 create policy adelantos_select on public.adelantos for select to authenticated
   using (public.puede_ver('/dashboard/planilla'));
 create policy adelantos_escribir on public.adelantos for all to authenticated
-  using (public.mi_rol() in ('creador', 'planilla', 'admin'))
-  with check (public.mi_rol() in ('creador', 'planilla', 'admin'));
+  using (public.mi_rol() in ('creador', 'planilla', 'tesoreria', 'admin'))
+  with check (public.mi_rol() in ('creador', 'planilla', 'tesoreria', 'admin'));
 revoke all on public.adelantos from anon;
 grant select, insert, update, delete on public.adelantos to authenticated;
 

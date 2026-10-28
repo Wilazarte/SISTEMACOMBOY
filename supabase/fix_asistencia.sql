@@ -29,7 +29,7 @@ declare
   hr numeric;
   n integer := 0;
 begin
-  if rol is null or rol not in ('creador', 'planilla', 'admin') then
+  if rol is null or rol not in ('creador', 'planilla', 'tesoreria', 'admin') then
     raise exception 'Su usuario no puede importar asistencia' using errcode = '42501';
   end if;
   if per = '' then
