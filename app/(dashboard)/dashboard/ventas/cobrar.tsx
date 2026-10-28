@@ -98,12 +98,15 @@ export function CuentasPorCobrar() {
             </div>
           }
         />
-        <Table head={["Documento", "Comprobante externo", "Cliente", "Emisión", "Vencimiento", "Total", "Pagado", "Saldo", "Días vencido", "Estado", ""]} empty={cxc.length === 0}>
+        {/* Compacta: entra completa en pantalla sin deslizar (fechas y días en una columna, acciones con íconos) */}
+        <Table compacto head={["Documento", "Comprobante externo", "Cliente", "Emisión / Vence", "Total", "Pagado", "Saldo", "Estado", ""]} empty={cxc.length === 0}>
           {cxc.map((f) => (
             <tr key={`${f.origen}-${f.id}`} className="hover:bg-plomo-50">
               <Td className="font-semibold text-fg">
                 {f.documento}
-                <p className="text-xs font-normal text-plomo-500">{f.detalle}</p>
+                <p className="max-w-[11rem] truncate text-xs font-normal text-plomo-500" title={f.detalle}>
+                  {f.detalle}
+                </p>
               </Td>
               <Td>
                 {f.externo ? (
@@ -117,30 +120,38 @@ export function CuentasPorCobrar() {
                   <span className="text-xs text-plomo-500">Sin referir</span>
                 )}
               </Td>
-              <Td>
+              <Td className="max-w-[14rem] whitespace-normal">
                 {f.cliente}
                 <p className="text-xs text-plomo-500">{f.clienteDoc}</p>
               </Td>
-              <Td>{fechaPE(f.fecha)}</Td>
-              <Td className={cn(f.estado === "VENCIDO" && "font-semibold text-red-600")}>{fechaPE(f.vencimiento)}</Td>
+              <Td>
+                {fechaPE(f.fecha)}
+                <p className={cn("text-xs", f.estado === "VENCIDO" ? "font-semibold text-red-600" : "text-plomo-500")}>
+                  Vence {fechaPE(f.vencimiento)}
+                  {f.diasVencido > 0 && ` · ${f.diasVencido} d`}
+                </p>
+              </Td>
               <Td className="text-right">{soles(f.total)}</Td>
               <Td className="text-right text-emerald-700">{soles(f.pagado)}</Td>
               <Td className="text-right font-semibold">{soles(f.saldo)}</Td>
-              <Td className={cn("text-center", f.diasVencido > 0 && "font-semibold text-red-600")}>{f.diasVencido || "-"}</Td>
               <Td>
                 <Badge estado={f.estado} />
               </Td>
               <Td>
-                <div className="flex flex-wrap gap-1">
+                <div className="flex gap-1">
                   {habilitado && f.saldo > 0 && (
-                    <Button size="sm" variant="warning" onClick={() => abrir(f)}>
-                      <Wallet size={14} /> Registrar cobro
-                    </Button>
+                    <span className="tip" data-tip="Registrar cobro">
+                      <Button size="sm" variant="warning" onClick={() => abrir(f)} aria-label="Registrar cobro">
+                        <Wallet size={14} />
+                      </Button>
+                    </span>
                   )}
                   {puedeReferir && (
-                    <Button size="sm" variant="ghost" title="N° de comprobante emitido en el sistema externo" onClick={() => setExterno(f)}>
-                      <FileCheck2 size={14} /> {f.externo ? "Comprobante" : "Referir comprobante"}
-                    </Button>
+                    <span className="tip" data-tip={f.externo ? "Ver / cambiar comprobante externo" : "Referir comprobante externo"}>
+                      <Button size="sm" variant="ghost" onClick={() => setExterno(f)} aria-label="Comprobante externo">
+                        <FileCheck2 size={14} />
+                      </Button>
+                    </span>
                   )}
                 </div>
               </Td>

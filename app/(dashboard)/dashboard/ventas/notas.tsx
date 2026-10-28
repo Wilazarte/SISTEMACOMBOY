@@ -220,9 +220,11 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
                   </Button>
                 )}
                 {habilitado && n.origen !== "SECOCHA" && (n.estado === "APROBADA" || n.estado === "FACTURADA") && (
-                  <Button size="sm" variant="ghost" title="N° de comprobante emitido en el sistema externo" onClick={() => setExterno(n)}>
-                    <FileCheck2 size={14} /> {n.comprobanteExterno ? "Comprobante" : "Referir comprobante"}
-                  </Button>
+                  <span className="tip" data-tip={n.comprobanteExterno ? "Ver / cambiar comprobante externo" : "Referir comprobante externo"}>
+                    <Button size="sm" variant="ghost" onClick={() => setExterno(n)} aria-label="Comprobante externo">
+                      <FileCheck2 size={14} />
+                    </Button>
+                  </span>
                 )}
                 {habilitado && n.origen !== "SECOCHA" && (
                   <Button size="sm" variant="ghost" title="Duplicar" onClick={() => ejecutarAsync(() => clonarNP(n.id, vendedor, rol), "Nota de pedido duplicada")}>
