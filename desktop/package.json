@@ -1,0 +1,57 @@
+{
+  "name": "comboy-vid-desktop",
+  "productName": "COMBOY VID ERP",
+  "version": "1.0.0",
+  "description": "App de escritorio de COMBOY VID ERP (carga https://sistemacomboy.vercel.app)",
+  "author": "INVERSIONES GLOBAL COMPANY ROUSVID S.A.C.",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64",
+    "dist:instalador": "electron-builder --win nsis --x64",
+    "dist:portable": "electron-builder --win portable --x64"
+  },
+  "devDependencies": {
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8",
+    "resedit": "^2.0.3"
+  },
+  "build": {
+    "appId": "com.comboyvid.erp",
+    "productName": "COMBOY VID ERP",
+    "copyright": "INVERSIONES GLOBAL COMPANY ROUSVID S.A.C.",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "offline/**/*",
+      "build/icon.png"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "COMBOY VID ERP",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "COMBOY-VID-ERP-Instalador-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "COMBOY-VID-ERP-Portable-${version}.${ext}"
+    },
+    "afterPack": "build/poner-icono.js"
+  }
+}
