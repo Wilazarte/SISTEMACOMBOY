@@ -972,7 +972,7 @@ export function pdfNotaPedido(n: NotaPedido): void {
         `Condiciones: precios en soles${n.conIgv ? " incluyen IGV" : " no incluyen IGV"}. Oferta válida ${n.validezDias} días. Medidas en metros; el m² se calcula ancho × alto × cantidad. Plazo de entrega sujeto a confirmación del pedido.`,
       ],
       qr: `${EMPRESA.ruc}|NP|${n.numero}|${n.total.toFixed(2)}|${n.fecha}|${n.clienteDoc}`,
-      qrTexto: ["Pagos a nombre de " + EMPRESA.razonSocial + ":", ...lineasCuentas(), `Enviar constancia indicando la ${n.numero}.`],
+      qrTexto: [`Pagos a nombre de ${EMPRESA.razonSocial} · RUC ${EMPRESA.ruc}:`, ...lineasCuentas(), `Enviar constancia indicando la ${n.numero}.`],
       firmas: [`Vendedor: ${n.vendedor}`, "Aceptado: Cliente"],
     }),
     codigo

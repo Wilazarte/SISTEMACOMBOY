@@ -1,6 +1,7 @@
 // Datos de la empresa para cabeceras de PDF. Edítalos con los datos reales.
 export const EMPRESA = {
-  razonSocial: "COMBOY VID",
+  /** Titular legal: facturas, pagos a nombre de, declaraciones juradas. */
+  razonSocial: "INVERSIONES GLOBAL COMPANY ROUSVID S.A.C.",
   nombreComercial: "Inversiones Global Company Rousvid SAC",
   ruc: "20613238566", //
   direccion: "El Nazareno Mz. A Lt. 25 - Paucarpata, Arequipa - Perú", // <-- reemplazar
