@@ -6,7 +6,7 @@
 
 create table if not exists public.cajas (
   id uuid primary key default gen_random_uuid(),
-  nombre text not null,              -- CAJA GENERAL, CAJA CHICA, FONDO DE RESERVA, YAPE EMPRESA…
+  nombre text not null,              -- CAJA CHICA, CAJA GENERAL, FONDO DE RESERVA
   tipo text not null,                -- EFECTIVO | YAPE | BCP | BBVA | INTERBANK
   saldo_actual numeric(10,2) default 0,
   responsable text,
@@ -17,12 +17,11 @@ create table if not exists public.cajas (
 alter table public.cajas add column if not exists orden integer default 100;
 create unique index if not exists cajas_nombre_key on public.cajas (upper(btrim(nombre)));
 
+-- Las 3 cajas de Arequipa (datos Interbank y cajas viejas inactivas: migrations/20261031_cajas_arequipa.sql)
 insert into public.cajas (nombre, tipo, orden) values
-  ('CAJA GENERAL', 'EFECTIVO', 10),
-  ('CAJA CHICA', 'EFECTIVO', 20),
-  ('FONDO DE RESERVA', 'EFECTIVO', 30),
-  ('YAPE EMPRESA', 'YAPE', 40),
-  ('BCP EMPRESA - CTA 123', 'BCP', 50)
+  ('CAJA CHICA', 'EFECTIVO', 10),
+  ('CAJA GENERAL', 'INTERBANK', 20),
+  ('FONDO DE RESERVA', 'EFECTIVO', 30)
 on conflict do nothing;
 
 -- RLS: todos los usuarios ven las cajas; las administran creador, tesorería y admin

@@ -766,7 +766,7 @@ export interface CobroVenta {
   fecha: string;
   monto: number;
   medio: "CAJA" | "BANCO";
-  cuenta: string; // Caja principal / BCP / Interbank / Yape ...
+  cuenta: string; // Caja General · Interbank Soles / Caja Chica (efectivo) / Fondo de Reserva (efectivo); antiguos: Caja principal, BCP…
   referencia: string; // N° operación
   usuario: string;
   created_at: string;

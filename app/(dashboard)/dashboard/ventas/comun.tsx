@@ -299,7 +299,10 @@ export function FormCliente({
   );
 }
 
-export const CUENTAS_COBRO = ["Caja principal", "BCP Soles", "Interbank Soles", "BBVA Soles", "Yape / Plin"];
+/** Dónde entra el cobro: las 3 cajas de Arequipa (Caja General = Interbank Negocios). */
+export const CUENTAS_COBRO = ["Caja General · Interbank Soles", "Caja General · Interbank Dólares", "Caja Chica (efectivo)", "Fondo de Reserva (efectivo)"];
+/** Interbank = BANCO (cuenta 1041); Caja Chica y Fondo de Reserva = CAJA (1011). */
+export const medioCobro = (cuenta: string): "CAJA" | "BANCO" => (/interbank|bcp|bbva|yape/i.test(cuenta) ? "BANCO" : "CAJA");
 
 /**
  * Datos de despacho (obligatorios): 6 lugares de entrega en grilla 3×2 y los datos de cada uno

@@ -6,6 +6,7 @@ import { BookOpen, FileDown, FileSpreadsheet, Plus, Trash2, Wallet } from "lucid
 import { Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, cn, ejecutar, toast } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { listarAdelantos, type Adelanto } from "@/lib/adelantos";
+import { datosCaja } from "@/lib/cajas";
 import { CUENTAS_CAJA, movimientosCaja, resumenCuenta, type CuentaCaja } from "@/lib/estadoCuenta";
 import { pdfEstadoCuenta } from "@/lib/pdf";
 import { KEYS, eliminarMovimientoCaja, fechaPE, hoy, registrarMovimientoCaja, soles, useStore } from "@/lib/storage";
@@ -50,7 +51,7 @@ export function EstadosCuenta({ anio, mes, onVerDiario }: { anio: number; mes: n
   const exportarPDF = () => {
     if (!cuenta) return toast("Elija una cuenta para el PDF (cada estado de cuenta es de una caja).", "error");
     const r = resumenCuenta(movs, cuenta, desde, hasta);
-    pdfEstadoCuenta({ cuenta, periodo, ...r, movimientos: lista });
+    pdfEstadoCuenta({ cuenta, periodo, ...r, movimientos: lista, descripcion: datosCaja(cuenta)?.descripcion, cuentasBancarias: datosCaja(cuenta)?.cuentas.map((b): [string, string] => [`${b.banco} ${b.monedaNombre}`, `N° ${b.numero} · CCI ${b.cci}`]) });
   };
   // xlsx se carga solo al exportar (no pesa en la pantalla)
   const exportarExcel = async () => {
@@ -77,6 +78,12 @@ export function EstadosCuenta({ anio, mes, onVerDiario }: { anio: number; mes: n
                 <Wallet size={14} /> {c.titulo}
               </p>
               <p className={cn("mt-1 text-2xl font-bold", r.saldoActual < 0 ? "text-red-600" : "text-fg")}>{soles(r.saldoActual)}</p>
+              <p className="text-[11px] text-plomo-500">{datosCaja(c.nombre)?.descripcion}</p>
+              {datosCaja(c.nombre)?.cuentas.map((b) => (
+                <p key={b.numero} className="text-[11px] text-plomo-500">
+                  {b.monedaNombre} N° {b.numero} · CCI {b.cci}
+                </p>
+              ))}
               <p className="mt-1 text-xs text-plomo-500">
                 {periodo}: ingresos <span className="font-semibold text-emerald-600">{soles(r.ingresos)}</span> · egresos <span className="font-semibold text-red-600">{soles(r.egresos)}</span>
               </p>
@@ -181,7 +188,7 @@ function NuevoMovimiento({ cuentaInicial, onClose }: { cuentaInicial: CuentaCaja
             value={d.tipo}
             onChange={(e) => set("tipo", e.target.value as "INGRESO" | "EGRESO")}
             options={[
-              { value: "INGRESO", label: "Ingreso (saldo inicial, reposición)" },
+              { value: "INGRESO", label: "Ingreso (saldo inicial, reposición, inyección de accionistas)" },
               { value: "EGRESO", label: "Egreso / ajuste" },
             ]}
           />
@@ -193,7 +200,7 @@ function NuevoMovimiento({ cuentaInicial, onClose }: { cuentaInicial: CuentaCaja
           <Input type="number" min={0} step="0.01" value={d.monto || ""} onChange={(e) => set("monto", parseFloat(e.target.value) || 0)} />
         </Field>
         <Field label="Concepto" className="sm:col-span-2">
-          <Input value={d.concepto} onChange={(e) => set("concepto", e.target.value)} placeholder="Ej: Saldo inicial octubre / Reposición de caja chica" />
+          <Input value={d.concepto} onChange={(e) => set("concepto", e.target.value)} placeholder={d.cuenta === "FONDO DE RESERVA" ? "Ej: Inyección de accionistas / Saldo inicial octubre" : "Ej: Saldo inicial octubre / Reposición de caja chica"} />
         </Field>
         <Field label="Doc. referencia (opcional)">
           <Input value={d.documento} onChange={(e) => set("documento", e.target.value)} />
