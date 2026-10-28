@@ -3,16 +3,17 @@
 import { FiltrosPlegables } from "@/components/ui/BotonFiltros";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useState } from "react";
-import { Ban, Calculator, CalendarClock, Check, Copy, FileText, Pencil, Plus, Receipt, Truck } from "lucide-react";
+import { Ban, Calculator, CalendarClock, Check, Copy, FileCheck2, FileText, Pencil, Plus, Receipt, Truck } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, Textarea, ejecutar, ejecutarAsync } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { pdfNotaPedido } from "@/lib/pdf";
 import { codigoDesdeNumero } from "@/lib/utils/codigos";
 import { KEYS, fechaPE, hoy, puede, soles, useRol, useStore } from "@/lib/storage";
-import { costosDeNP, guardarCostosNP, totalCostos, anularNP, aprobarNP, despachoVacio, faltaDespacho, estadoOD, generarDespachoNP, odDeNP, clienteVacio, clonarNP, crearNotaPedido, editarNotaPedido, permisoEditarNP, getCondicionesPago, guardarCliente, guardarCondicion, lineaVacia, pideDias, sumarDias, type DatosNP } from "@/lib/ventas";
+import { TIPOS_COMPROBANTE_EXTERNO, npPorCobrar, saldoNP, costosDeNP, guardarCostosNP, totalCostos, anularNP, aprobarNP, despachoVacio, faltaDespacho, estadoOD, generarDespachoNP, odDeNP, clienteVacio, clonarNP, crearNotaPedido, editarNotaPedido, permisoEditarNP, getCondicionesPago, guardarCliente, guardarCondicion, lineaVacia, pideDias, sumarDias, type DatosNP } from "@/lib/ventas";
 import type { Cliente, CondicionPago, CostosNP, DatosDespacho, NotaPedido, OrdenDespacho } from "@/lib/types";
 import { AvisoCondiciones, DatosDespachoForm, FormCliente, LineasEditor, SelectorCliente, TotalesVenta, useCargaCondiciones, useVentas } from "./comun";
 import { FormCondicion, condVacia } from "./maestros";
+import { ModalComprobanteExterno } from "./cobrar";
 
 const npVacia = (): DatosNP => ({
   fecha: hoy(),
@@ -46,6 +47,8 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
   const [aprobar, setAprobar] = useState<{ np: NotaPedido; despacho: DatosDespacho } | null>(null);
   // Costeo de las NP que vienen de Secocha (PENDIENTE_COSTEO)
   const [costear, setCostear] = useState<{ np: NotaPedido; costos: CostosNP } | null>(null);
+  // N° del comprobante emitido en el sistema externo (sin SUNAT)
+  const [externo, setExterno] = useState<NotaPedido | null>(null);
   const habilitado = puede(rol, "venta.gestionar");
   const sesion = getSesion();
   const vendedor = sesion?.usuario ?? "";
@@ -163,11 +166,21 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
                   SECOCHA · {n.origenId}
                 </span>
               )}
+              {n.comprobanteExterno && (
+                <span className="ml-1.5 text-xs text-plomo-500" title="Comprobante emitido en el sistema externo">
+                  {TIPOS_COMPROBANTE_EXTERNO[n.comprobanteExterno.tipo]} {n.comprobanteExterno.numero}
+                </span>
+              )}
             </>
           ),
           total: (
             <>
               {soles(n.total)}
+              {npPorCobrar(n) && (
+                <span className={`block text-xs ${saldoNP(n) > 0 ? "text-amber-600" : "text-emerald-700"}`}>
+                  {saldoNP(n) > 0 ? `Saldo ${soles(saldoNP(n))}` : "Cobrada"}
+                </span>
+              )}
             </>
           ),
           acciones: (
@@ -206,6 +219,11 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
                     <Receipt size={14} /> Facturar
                   </Button>
                 )}
+                {habilitado && n.origen !== "SECOCHA" && (n.estado === "APROBADA" || n.estado === "FACTURADA") && (
+                  <Button size="sm" variant="ghost" title="N° de comprobante emitido en el sistema externo" onClick={() => setExterno(n)}>
+                    <FileCheck2 size={14} /> {n.comprobanteExterno ? "Comprobante" : "Referir comprobante"}
+                  </Button>
+                )}
                 {habilitado && n.origen !== "SECOCHA" && (
                   <Button size="sm" variant="ghost" title="Duplicar" onClick={() => ejecutarAsync(() => clonarNP(n.id, vendedor, rol), "Nota de pedido duplicada")}>
                     <Copy size={14} />
@@ -219,7 +237,7 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
               </div>
             </>
           ),
-          buscar: `${n.numero} ${n.clienteDoc} ${n.vendedor} ${n.condPagoNombre}`,
+          buscar: `${n.numero} ${n.clienteDoc} ${n.vendedor} ${n.condPagoNombre} ${n.comprobanteExterno?.numero ?? ""}`,
           tipoDoc: "NP",
           estado: n.estado,
           };
@@ -445,6 +463,11 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
           </div>
         )}
       </Modal>
+
+      <ModalComprobanteExterno
+        doc={externo && { origen: "NP", id: externo.id, documento: externo.numero, externo: externo.comprobanteExterno }}
+        onClose={() => setExterno(null)}
+      />
 
       <Modal open={!!anular} onClose={() => setAnular(null)} title={`Anular ${anular?.numero ?? ""}`}>
         <Field label="Motivo">
