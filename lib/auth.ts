@@ -11,7 +11,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "./supabase/client";
 import type { Rol } from "./types";
-import { HOME_PERFIL, RUTA_NO_AUTORIZADO, homePlantaDe, perfilPlanta, permisosPlanta } from "./permisosPlanta";
+import { HOME_PERFIL, RUTA_NO_AUTORIZADO, homePlantaDe, isAdmin, perfilPlanta, permisosPlanta } from "./permisosPlanta";
 
 /** Roles con permisos definidos en el ERP. Cualquier otro rol de la tabla perfiles se trata como solo lectura. */
 export type RolAuth = "creador" | "tesoreria" | "almacen" | "planilla" | "gerencia" | "sucursal";
@@ -154,7 +154,7 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
   // Producción: también Almacén (registra las órdenes de producción y el QC)
   if (ruta === RUTA_PRODUCCION || ruta.startsWith(`${RUTA_PRODUCCION}/`)) if (sesion.rol === "almacen") return true;
   if (ruta === RUTA_NO_AUTORIZADO) return true;
-  // Homes de la planta: SOPORTE y FINANZAS entran a las 4; los moduladores (Logística, Almacén, Producción) solo a la suya
+  // Homes de la planta: solo SOPORTE entra a las 4; los moduladores (Finanzas, Logística, Almacén, Producción) solo a la suya
   const homePlanta = homePlantaDe(ruta);
   const perfil = perfilPlanta(sesion);
   if (homePlanta && perfil && perfil !== "soporte") return permisosPlanta(sesion).canViewOtherModules || homePlanta === HOME_PERFIL[perfil];
@@ -288,5 +288,5 @@ const NOMBRES: Partial<Record<RolAuth, string>> = {
 export const nombreDe = (s: Sesion): string => (esSoporte(s) ? ETIQUETA_SOPORTE : s.nombreCompleto?.trim() || NOMBRES[s.rol] || s.nombre);
 
 /** El rol creador se muestra como SOPORTE (Dueño): solo cambia lo que se ve, el rol en la base sigue siendo "creador". */
-export const esSoporte = (s: Sesion | null): boolean => s?.rol === "creador";
+export const esSoporte = (s: Sesion | null): boolean => isAdmin(s);
 export const ETIQUETA_SOPORTE = "SOPORTE (Dueño)";

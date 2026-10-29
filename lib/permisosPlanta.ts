@@ -7,14 +7,26 @@ import type { Sesion } from "./auth";
 export type PerfilPlanta = "soporte" | "logistica" | "almacen" | "finanzas" | "produccion";
 
 /**
- * - soporte: creador / gerencia o módulos "*".
- * - logistica, almacen, finanzas (tesorería, planilla), produccion.
+ * ADMIN = únicamente SOPORTE (regla de Williams, 2026-10-29). En la BD SOPORTE es el rol "creador"
+ * (se muestra como SOPORTE); también se acepta un rol "soporte" si se crea. Nadie más es admin.
+ */
+export const isAdmin = (sesion: Sesion | null): boolean => {
+  const rol = sesion?.rol as string | undefined;
+  return rol === "creador" || rol === "soporte";
+};
+
+/** Todo el que no es SOPORTE es modulador: solo ve su módulo. */
+export const isModulador = (sesion: Sesion | null): boolean => !!sesion && !isAdmin(sesion);
+
+/**
+ * - soporte: solo isAdmin (SOPORTE).
+ * - moduladores: logistica, almacen, finanzas (tesorería, planilla), produccion.
  * Los roles logistica / finanzas / produccion se reconocen si existen en la tabla perfiles.
  */
 export function perfilPlanta(sesion: Sesion | null): PerfilPlanta | null {
   if (!sesion) return null;
   const rol = sesion.rol as string;
-  if (rol === "creador" || rol === "gerencia" || sesion.modulos.includes("*")) return "soporte";
+  if (isAdmin(sesion)) return "soporte";
   if (rol === "logistica") return "logistica";
   if (rol === "almacen") return "almacen";
   if (rol === "produccion") return "produccion";
@@ -33,7 +45,7 @@ export interface PermisosPlanta {
   canAccessMundoVentas: boolean;
   /**
    * Ve los accesos rápidos a los 4 módulos (Logística, Almacén, Finanzas, Producción) y navega entre sus homes.
-   * ADMIN / SOPORTE / FINANZAS sí; los moduladores (almacén, producción, logística, taller…) solo su módulo.
+   * Solo SOPORTE (isAdmin). Los moduladores (Finanzas, Logística, Almacén, Producción…) solo su módulo.
    */
   canViewOtherModules: boolean;
 }
@@ -43,7 +55,7 @@ const NINGUNO: PermisosPlanta = { canEmitFactura: false, canViewFacturas: false,
 const PERMISOS: Record<PerfilPlanta, PermisosPlanta> = {
   soporte: { canEmitFactura: true, canViewFacturas: true, canEmitGuia: true, canAccessMundoVentas: true, canViewOtherModules: true },
   logistica: { canEmitFactura: true, canViewFacturas: true, canEmitGuia: true, canAccessMundoVentas: true, canViewOtherModules: false },
-  finanzas: { ...NINGUNO, canViewFacturas: true, canViewOtherModules: true },
+  finanzas: { ...NINGUNO, canViewFacturas: true },
   almacen: { ...NINGUNO, canEmitGuia: true },
   produccion: NINGUNO,
 };
@@ -61,11 +73,11 @@ export const ETIQUETA_PERFIL: Record<PerfilPlanta, { label: string; titulo: stri
   soporte: { label: "SOPORTE", titulo: "SOPORTE (Dueño) · acceso a todos los módulos", badge: "Soporte Dueño" },
   logistica: { label: "LOGISTICA", titulo: "Logística · dueña de ventas", badge: "Dueño de Ventas" },
   almacen: { label: "ALMACEN", titulo: "Almacén · acceso solo a su módulo" },
-  finanzas: { label: "FINANZAS", titulo: "Finanzas · acceso a todos los módulos" },
+  finanzas: { label: "FINANZAS", titulo: "Finanzas · acceso solo a su módulo" },
   produccion: { label: "PRODUCCION", titulo: "Producción · acceso solo a su módulo" },
 };
 
-/** Home de cada perfil de la planta (SOPORTE y FINANZAS entran a las 4). */
+/** Home de cada perfil de la planta (solo SOPORTE entra a las 4). */
 export const HOME_PERFIL: Record<Exclude<PerfilPlanta, "soporte">, string> = {
   logistica: "/logistica",
   almacen: "/almacen",

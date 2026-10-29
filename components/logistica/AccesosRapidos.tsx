@@ -132,8 +132,8 @@ function GrillaAcciones({ acciones }: { acciones: Accion[] }) {
 }
 
 /**
- * Accesos rápidos según el perfil. La barra de los 4 módulos solo la ven ADMIN / SOPORTE / FINANZAS
- * (canViewOtherModules); los moduladores ven únicamente las funciones de su módulo.
+ * Accesos rápidos según el perfil. La barra de los 4 módulos solo la ve SOPORTE (canViewOtherModules);
+ * los moduladores (Finanzas, Logística, Almacén, Producción) ven únicamente las funciones de su módulo.
  * SOPORTE además tiene las funciones globales. Cada acción abre el módulo de siempre en otra pestaña.
  */
 export function AccesosRapidos({ sesion, actual }: { sesion: Sesion | null; actual: ModuloPlanta }) {
