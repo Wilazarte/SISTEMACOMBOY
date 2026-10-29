@@ -45,7 +45,7 @@ interface Accion {
   permiso?: string;
   /** Permiso del perfil que exige la acción. */
   requiere?: keyof PermisosPlanta;
-  /** Botón naranja grande (Mundo Ventas). */
+  /** Botón rojo grande (Mundo Ventas). */
   destacado?: boolean;
 }
 
@@ -119,11 +119,11 @@ function GrillaAcciones({ acciones }: { acciones: Accion[] }) {
           title="Se abre en una pestaña nueva"
           className={
             a.destacado
-              ? "group col-span-2 flex min-h-[110px] items-center justify-center gap-3 rounded-xl bg-[#f97316] px-4 py-4 text-center text-white transition hover:bg-[#ea580c]"
-              : "group flex min-h-[110px] flex-col items-center justify-center gap-2 rounded-xl border border-[#2a3445] bg-[#1a212e] px-3 py-4 text-center transition hover:border-[#f97316]"
+              ? "group col-span-2 flex min-h-[110px] items-center justify-center gap-3 rounded-xl bg-[#d50000] px-4 py-4 text-center text-white transition hover:bg-[#b00000]"
+              : "group flex min-h-[110px] flex-col items-center justify-center gap-2 rounded-xl border border-[#2a2a2a] bg-[#141414] px-3 py-4 text-center transition hover:border-[#d50000]"
           }
         >
-          <span className={a.destacado ? "text-white" : "text-[#f97316] transition group-hover:scale-105"}>{a.icono}</span>
+          <span className={a.destacado ? "text-white" : "text-[#d50000] transition group-hover:scale-105"}>{a.icono}</span>
           <span className={a.destacado ? "text-xl font-bold" : "text-[15px] font-bold text-white"}>{a.destacado ? `${a.label} · Ir a Ventas` : a.label}</span>
         </button>
       ))}
@@ -152,7 +152,7 @@ export function AccesosRapidos({ sesion, actual }: { sesion: Sesion | null; actu
       <div className="space-y-4">
         {barraModulos}
         <div>
-          <h3 className="mb-2 text-[13px] font-bold uppercase text-[#fb923c]">Funciones globales</h3>
+          <h3 className="mb-2 text-[13px] font-bold uppercase text-[#ff5252]">Funciones globales</h3>
           <GrillaAcciones acciones={GLOBALES.filter(visible)} />
         </div>
       </div>
@@ -169,7 +169,7 @@ export function AccesosRapidos({ sesion, actual }: { sesion: Sesion | null; actu
     <div className="space-y-4">
       {barraModulos}
       <section>
-        <h2 className={barraModulos ? "mb-2 text-[13px] font-bold uppercase text-[#fb923c]" : "mb-3 text-xl font-bold uppercase text-[#fb923c]"}>
+        <h2 className={barraModulos ? "mb-2 text-[13px] font-bold uppercase text-[#ff5252]" : "mb-3 text-xl font-bold uppercase text-[#ff5252]"}>
           {barraModulos ? "Funciones del módulo" : "Accesos rápidos"}
         </h2>
         <GrillaAcciones acciones={acciones} />

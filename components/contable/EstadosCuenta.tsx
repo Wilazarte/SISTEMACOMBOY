@@ -72,7 +72,7 @@ export function EstadosCuenta({ anio, mes, onVerDiario }: { anio: number; mes: n
               key={c.codigo}
               type="button"
               onClick={() => setCuenta(cuenta === c.nombre ? "" : c.nombre)}
-              className={cn("rounded-xl border bg-surface/80 p-4 text-left shadow-card transition", cuenta === c.nombre ? "border-[#f97316] ring-2 ring-[#f97316]/40" : "border-plomo-200 hover:border-plomo-500/40")}
+              className={cn("rounded-xl border bg-surface/80 p-4 text-left shadow-card transition", cuenta === c.nombre ? "border-[#d50000] ring-2 ring-[#d50000]/40" : "border-plomo-200 hover:border-plomo-500/40")}
             >
               <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-plomo-500">
                 <Wallet size={14} /> {c.titulo}

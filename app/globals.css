@@ -100,56 +100,41 @@ html, body, button, input, select, textarea, table, th, td, div, span, p, h1, h2
   --blue-50: 15 27 46; --blue-200: 30 58 95; --blue-600: 96 165 250; --blue-800: 191 219 254;
 }
 
-/* Tema AZUL OSCURO premium de los módulos (app/(dashboard)/layout.tsx: clases "dark tema-azul").
-   Va después de .dark para ganarle: fondo #070b14, cards #0e1424, bordes #1e2a45, primario #2a7bff, secundario #1e3a8a. */
-.tema-azul {
-  --canvas: 7 11 20;
-  --surface: 14 20 36;
-  --corp: 42 123 255;
-  --vino-900: 30 100 230;
-  --azul-900: 30 58 138;
-  --plomo-50: 14 20 36;
-  --plomo-100: 17 26 47;
-  --plomo-200: 30 42 69;
-  --plomo-500: 138 153 184;
-  --plomo-600: 168 182 210;
-  --slate-100: 17 26 47; --slate-200: 30 42 69; --slate-300: 30 58 95;
-  --sb-activo: 42 123 255;
-}
-/* Tema PLANTA (diseño único de todos los módulos, igual que Logística Planta): va después de .tema-azul.
-   Fondo #0e1219, tarjetas #1a212e, bordes #2a3445, primario naranja #f97316, texto blanco. */
+/* Tema PLANTA (diseño único de todos los módulos, según los 5 diseños de Williams, 2026-10-29): va después de .dark.
+   Fondo negro #0A0A0A con grid, tarjetas #141414, bordes #2A2A2A, primario naranja #d50000, texto blanco. */
 .tema-planta {
-  --canvas: 14 18 25;
-  --surface: 26 33 46;
+  color-scheme: dark;
+  --canvas: 10 10 10;
+  --surface: 20 20 20;
   --fg: 255 255 255;
-  --fg-2: 229 231 235;
-  --corp: 249 115 22;
-  --vino-900: 234 88 12;
-  --vino: 251 146 60;
-  --rojo: 251 146 60;
-  --rojo-soft: 58 36 20;
-  --rojo-tenue: 124 58 18;
-  --azul-900: 33 42 58;
+  --fg-2: 229 229 229;
+  --corp: 213 0 0;
+  --vino-900: 176 0 0;
+  --vino: 255 82 82;
+  --rojo: 255 82 82;
+  --rojo-soft: 51 10 10;
+  --rojo-tenue: 122 0 0;
+  --azul-900: 28 28 28;
   --azul-700: 212 212 216;
   --azul-500: 161 161 170;
-  --plomo-50: 33 42 58;
-  --plomo-100: 38 48 67;
-  --plomo-200: 42 52 69;
+  --plomo-50: 28 28 28;
+  --plomo-100: 35 35 35;
+  --plomo-200: 42 42 42;
   --plomo-500: 161 161 170;
   --plomo-600: 212 212 216;
-  --slate-100: 33 42 58; --slate-200: 42 52 69; --slate-300: 58 69 88;
-  --sb: 14 18 25;
-  --sb-borde: 42 52 69;
-  --sb-activo: 249 115 22;
+  --slate-100: 28 28 28; --slate-200: 42 42 42; --slate-300: 58 58 58;
+  --sb: 10 10 10;
+  --sb-borde: 42 42 42;
+  --sb-activo: 213 0 0;
 }
-.tema-azul.tema-planta :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea):not(.bg-transparent) {
-  background-color: #212a3a;
-  border-color: #2a3445;
+.tema-planta :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea):not(.bg-transparent) {
+  background-color: #1c1c1c;
+  border-color: #2a2a2a;
   color: #fff;
 }
-.tema-azul.tema-planta :is(input, select, textarea):not(.bg-transparent):focus {
-  border-color: #f97316;
-  box-shadow: 0 0 0 3px rgb(249 115 22 / 0.3);
+.tema-planta :is(input, select, textarea):not(.bg-transparent):focus {
+  border-color: #d50000;
+  box-shadow: 0 0 0 3px rgb(213 0 0 / 0.3);
 }
 /* COMBOY VID SUCURSAL (app/(sucursal)): siempre claro, header blanco, aunque el ERP esté en oscuro */
 .tema-claro {
@@ -159,17 +144,6 @@ html, body, button, input, select, textarea, table, th, td, div, span, p, h1, h2
   --fg: 10 10 11;
   --blue-50: 239 246 255; --blue-200: 191 219 254; --blue-600: 37 99 235; --blue-800: 30 64 175;
 }
-/* Inputs del tema azul (sin pisar los transparentes como el buscador de la paleta) */
-.tema-azul :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea):not(.bg-transparent) {
-  background-color: #111a2f;
-  border-color: #1e3a5f;
-  color: #fff;
-}
-.tema-azul :is(input, select, textarea):not(.bg-transparent):focus {
-  border-color: #2a7bff;
-  box-shadow: 0 0 0 3px rgb(42 123 255 / 0.3);
-}
-
 /* Menú lateral rojo sólido (preferencia del usuario) */
 [data-sidebar="rojo"] {
   --sb: 204 0 0;
@@ -226,4 +200,13 @@ table, .tabular { font-variant-numeric: tabular-nums; }
 .ticker-pista:hover { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
   .ticker-pista { animation: none; }
+}
+
+/* Fondo de los módulos: negro con grid tenue (ErpLayout) */
+.fondo-grid {
+  background-color: #0a0a0a;
+  background-image:
+    linear-gradient(rgb(213 0 0 / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(213 0 0 / 0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
 }

@@ -464,7 +464,7 @@ function ModalDerivar({ venta, onClose }: { venta: VentaSucursal; onClose: () =>
                 onClick={() => setMotivo(m)}
                 className={cn(
                   "flex flex-col items-center gap-2 rounded-xl border p-4 text-sm font-medium transition",
-                  motivo === m ? "border-[#f97316] bg-[#f97316]/20 text-white" : "border-plomo-200 text-fg-2 hover:border-slate-500"
+                  motivo === m ? "border-[#d50000] bg-[#d50000]/20 text-white" : "border-plomo-200 text-fg-2 hover:border-slate-500"
                 )}
               >
                 <Icon size={22} />

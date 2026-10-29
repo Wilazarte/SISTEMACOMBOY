@@ -54,7 +54,7 @@ export function CardHeader({ title, subtitle, action }: { title: string; subtitl
   return (
     <div className="flex flex-wrap items-start justify-between gap-3 border-b border-plomo-100 px-5 py-4">
       <div>
-        <h3 className="text-[15px] font-bold uppercase tracking-wide text-[#fb923c]">{title}</h3>
+        <h3 className="text-[15px] font-bold uppercase tracking-wide text-[#ff5252]">{title}</h3>
         {subtitle && <p className="mt-0.5 text-[13px] text-plomo-500">{subtitle}</p>}
       </div>
       {action}
@@ -329,8 +329,8 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
     </div>
   );
   // Fuera de las tarjetas: su backdrop-blur hace de contenedor del "fixed" y recortaba el modal. Se monta en la
-  // raíz del tema (ModuloLayout, .tema-azul) para conservar sus colores; sin ella, en el body.
-  const raiz = typeof document === "undefined" ? null : (document.querySelector(".tema-azul") ?? document.body);
+  // raíz del tema (ErpLayout, .tema-planta) para conservar sus colores; sin ella, en el body.
+  const raiz = typeof document === "undefined" ? null : (document.querySelector(".tema-planta") ?? document.body);
   return raiz ? createPortal(modal, raiz) : modal;
 }
 

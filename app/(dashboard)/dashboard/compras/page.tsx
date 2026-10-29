@@ -316,13 +316,13 @@ function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requ
               <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-white/10 bg-white/10 px-2 py-1 text-xs font-medium text-white">
                 <input
                   type="checkbox"
-                  className="h-3.5 w-3.5 accent-[#f97316]"
+                  className="h-3.5 w-3.5 accent-[#d50000]"
                   checked={todos}
                   onChange={() => setMarcados(todos ? new Set() : new Set(pendientes.map((r) => r.id)))}
                 />
                 Seleccionar todos ({pendientes.length})
               </label>
-              <button className={`${BTN_REQ} h-7 border-[#f97316] bg-[#f97316] px-2`} disabled={elegidos.length === 0} onClick={aceptarLote}>
+              <button className={`${BTN_REQ} h-7 border-[#d50000] bg-[#d50000] px-2`} disabled={elegidos.length === 0} onClick={aceptarLote}>
                 <Check size={13} /> Aceptar{elegidos.length ? ` (${elegidos.length})` : ""}
               </button>
               <button className={`${BTN_REQ} h-7 border-[#ff1a1a] bg-[#ff1a1a] px-2 font-bold`} disabled={elegidos.length === 0} onClick={() => setRechazoLote(true)}>
@@ -333,13 +333,13 @@ function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requ
         }
       >
         {pendientes.map((r) => (
-          <div key={r.id} className={cn("flex flex-col rounded-lg border bg-[#212a3a] p-3", marcados.has(r.id) ? "border-[#f97316]" : "border-amber-500/30")}>
+          <div key={r.id} className={cn("flex flex-col rounded-lg border bg-[#1c1c1c] p-3", marcados.has(r.id) ? "border-[#d50000]" : "border-amber-500/30")}>
             <div className="flex items-start justify-between">
               <div className="flex items-start gap-2.5">
                 {habilitado && (
                   <input
                     type="checkbox"
-                    className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-[#f97316]"
+                    className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-[#d50000]"
                     checked={marcados.has(r.id)}
                     onChange={() => marcar(r.id)}
                     aria-label={`Seleccionar ${r.numero}`}
@@ -379,10 +379,10 @@ function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requ
                   </span>
                 );
               })()}
-              <button className={`${BTN_REQ} border-[#f97316] bg-[#f97316] shadow-[0_0_14px_rgba(249,115,22,0.6)]`} disabled={!habilitado} onClick={() => ejecutar(() => aceptarRequerimiento(r.id, rol), `${r.numero} ACEPTADO`)}>
+              <button className={`${BTN_REQ} border-[#d50000] bg-[#d50000] shadow-[0_0_14px_rgba(213,0,0,0.6)]`} disabled={!habilitado} onClick={() => ejecutar(() => aceptarRequerimiento(r.id, rol), `${r.numero} ACEPTADO`)}>
                 <Check size={14} /> Aceptar
               </button>
-              <button className={`${BTN_REQ} border-[#f97316] bg-[#212a3a] shadow-[0_0_12px_rgba(249,115,22,0.35)]`} disabled={!habilitado} onClick={() => { setMotivo(""); setObs(r); }}>
+              <button className={`${BTN_REQ} border-[#d50000] bg-[#1c1c1c] shadow-[0_0_12px_rgba(213,0,0,0.35)]`} disabled={!habilitado} onClick={() => { setMotivo(""); setObs(r); }}>
                 <MessageSquareWarning size={14} /> Observar
               </button>
               <button className={`${BTN_REQ} border-[#ff1a1a] bg-[#ff1a1a] font-bold shadow-[0_0_14px_rgba(255,26,26,0.6)]`} disabled={!habilitado} onClick={() => setRechazo(r)}>
@@ -776,7 +776,7 @@ function RegistrarCompra({
                 ref: esDeclaracionJurada(g) ? (
                   <span className="whitespace-nowrap">
                     <span className="font-semibold text-fg">{g.codigo ?? "-"}</span>
-                    <button type="button" onClick={() => pdfDeclaracionJurada(g)} className="ml-1.5 text-xs font-semibold text-[#f97316] underline" title="Ver PDF de la declaración jurada">
+                    <button type="button" onClick={() => pdfDeclaracionJurada(g)} className="ml-1.5 text-xs font-semibold text-[#d50000] underline" title="Ver PDF de la declaración jurada">
                       {g.numero}
                     </button>
                   </span>

@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { AlertTriangle, ArrowLeft, ArrowLeftRight, Bell, Building2, Clock, Container, Factory, FileText, MapPin, ShoppingCart, Truck, Wrench } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, Building2, Clock, Container, Factory, FileText, ShoppingCart, Truck, Wrench } from "lucide-react";
 import { useSesion } from "@/lib/auth";
 import { avanceOC, useLogistica, type DatosLogistica } from "@/lib/logistica";
-import { useNotificaciones, type Notificacion } from "@/lib/notificaciones";
+import { useNotificaciones } from "@/lib/notificaciones";
 import { permisosPlanta } from "@/lib/permisosPlanta";
 import { fechaPE, soles } from "@/lib/storage";
 import { ESTADOS_OD, estadoOD, resumenEntrega } from "@/lib/ventas";
 import { Barra, BotonAccion, BotonVer, Etiqueta, Panel, SinRegistro, Vacio } from "./piezas";
+import { EncabezadoPlanta, MarcoPlanta, PanelLateral } from "./planta";
 
 export const SECCIONES = ["agencias", "proveedores", "infraestructura", "transferencias", "guia-sunat", "cotizar-flete", "historial"] as const;
 export type Seccion = (typeof SECCIONES)[number];
@@ -42,7 +43,7 @@ function Tabla({ head, children }: { head: string[]; children: ReactNode }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[560px] border-collapse">
-        <thead className="border-b border-[#2a3445]">
+        <thead className="border-b border-[#2a2a2a]">
           <tr>
             {head.map((h) => (
               <th key={h} className={th}>
@@ -51,7 +52,7 @@ function Tabla({ head, children }: { head: string[]; children: ReactNode }) {
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#2a3445]">{children}</tbody>
+        <tbody className="divide-y divide-[#2a2a2a]">{children}</tbody>
       </table>
     </div>
   );
@@ -70,15 +71,15 @@ function Compras({ d }: { d: DatosLogistica }) {
             <tr key={o.id}>
               <td className={`${td} font-semibold text-white`}>{o.numero}</td>
               <td className={td}>
-                <span className="block font-semibold text-[#fdba74]">{o.proveedor}</span>
+                <span className="block font-semibold text-[#ff8a80]">{o.proveedor}</span>
                 <span className="block text-[11px] text-[#a1a1aa]">{o.items.map((i) => i.nombre).filter(Boolean).slice(0, 2).join(" · ") || o.reqNumero}</span>
               </td>
-              <td className={`${td} whitespace-nowrap font-semibold text-[#fb923c]`}>{soles(o.total)}</td>
+              <td className={`${td} whitespace-nowrap font-semibold text-[#ff5252]`}>{soles(o.total)}</td>
               <td className={td}>
                 <Etiqueta tono={o.estado === "BANCARIZADA" || o.estado === "APROBADA" ? "verde" : "naranja"}>{ESTADO_OC[o.estado] ?? o.estado}</Etiqueta>
               </td>
               <td className={`${td} w-40`}>
-                <span className="mb-1 block text-right text-[11px] font-semibold text-[#fdba74]">{avanceOC(o)}%</span>
+                <span className="mb-1 block text-right text-[11px] font-semibold text-[#ff8a80]">{avanceOC(o)}%</span>
                 <Barra pct={avanceOC(o)} />
                 {o.lugarEntrega && <span className="mt-1 block truncate text-[11px] text-[#a1a1aa]">Entrega: {o.lugarEntrega}</span>}
               </td>
@@ -106,7 +107,7 @@ function Ventas({ d }: { d: DatosLogistica }) {
           ) : (
             <ul className="space-y-1.5">
               {d.ptPorTipo.map(([tipo, n]) => (
-                <li key={tipo} className="flex items-center justify-between rounded-lg bg-[#212a3a] px-3 py-2 text-[13px]">
+                <li key={tipo} className="flex items-center justify-between rounded-lg bg-[#1c1c1c] px-3 py-2 text-[13px]">
                   <span className="font-semibold text-white">{tipo}</span>
                   <Etiqueta tono="verde">{n} disponible(s)</Etiqueta>
                 </li>
@@ -115,7 +116,7 @@ function Ventas({ d }: { d: DatosLogistica }) {
           )}
           <div className="mt-3 grid grid-cols-3 gap-2">
             {d.agencias.slice(0, 3).map((a) => (
-              <div key={a.id} className="rounded-lg border border-[#2a3445] bg-[#212a3a] px-2 py-2 text-center">
+              <div key={a.id} className="rounded-lg border border-[#2a2a2a] bg-[#1c1c1c] px-2 py-2 text-center">
                 <span className="block text-[14px] font-bold text-white">{a.nombre}</span>
                 <span className="block text-[11px] text-[#a1a1aa]">{a.detalle}</span>
               </div>
@@ -151,14 +152,14 @@ function Agencias({ d, completo }: { d: DatosLogistica; completo?: boolean }) {
     <Panel titulo="Agencias de transporte" icono={<Building2 size={17} />} accion={<BotonVer href="/dashboard/almacen?tab=despacho">Órdenes de despacho</BotonVer>}>
       <div className="grid gap-3 md:grid-cols-3">
         {d.agencias.map((a) => (
-          <div key={a.id} className="rounded-lg border border-[#2a3445] bg-[#212a3a] p-3">
+          <div key={a.id} className="rounded-lg border border-[#2a2a2a] bg-[#1c1c1c] p-3">
             <p className="text-[16px] font-bold text-white">{a.nombre}</p>
             {a.detalle && <p className="text-[12px] text-[#a1a1aa]">{a.detalle}</p>}
             <dl className="mt-2 grid grid-cols-2 gap-1 text-[12px]">
               <dt className="text-[#a1a1aa]">Envíos</dt>
               <dd className="text-right font-semibold text-white">{a.envios}</dd>
               <dt className="text-[#a1a1aa]">En tránsito</dt>
-              <dd className="text-right font-semibold text-[#fdba74]">{a.enTransito}</dd>
+              <dd className="text-right font-semibold text-[#ff8a80]">{a.enTransito}</dd>
               <dt className="text-[#a1a1aa]">Flete total</dt>
               <dd className="text-right font-semibold text-white">{soles(a.flete)}</dd>
             </dl>
@@ -218,7 +219,7 @@ function Proveedores({ d, completo }: { d: DatosLogistica; completo?: boolean })
               <td className={td}>{p.ruc || "-"}</td>
               <td className={td}>{p.ocs}</td>
               <td className={td}>{p.activas ? <Etiqueta>{p.activas}</Etiqueta> : "-"}</td>
-              <td className={`${td} font-semibold text-[#fb923c]`}>{soles(p.total)}</td>
+              <td className={`${td} font-semibold text-[#ff5252]`}>{soles(p.total)}</td>
               <td className={td}>
                 {p.ultima.numero} · {fechaPE(p.ultima.fecha)}
               </td>
@@ -230,10 +231,10 @@ function Proveedores({ d, completo }: { d: DatosLogistica; completo?: boolean })
           {lista.map((p) => (
             <li key={p.ruc || p.proveedor} className="flex justify-between gap-3">
               <span className="truncate">
-                <span className="text-[#f97316]">• </span>
+                <span className="text-[#d50000]">• </span>
                 <span className="font-semibold text-white">{p.proveedor}</span> <span className="text-[#a1a1aa]">· {p.ocs} OC</span>
               </span>
-              <span className="whitespace-nowrap font-semibold text-[#fdba74]">{soles(p.total)}</span>
+              <span className="whitespace-nowrap font-semibold text-[#ff8a80]">{soles(p.total)}</span>
             </li>
           ))}
         </ul>
@@ -253,7 +254,7 @@ function Infraestructura({ d }: { d: DatosLogistica }) {
     <Panel titulo="Infraestructura planta" icono={<Wrench size={17} />} accion={<BotonVer href="/logistica/produccion">Ver Producción</BotonVer>}>
       <div className="grid gap-2 sm:grid-cols-3">
         {ESTACIONES.map((e) => (
-          <div key={e.nombre} className="rounded-lg border border-[#2a3445] bg-[#212a3a] p-3">
+          <div key={e.nombre} className="rounded-lg border border-[#2a2a2a] bg-[#1c1c1c] p-3">
             <p className="text-[14px] font-bold text-white">{e.nombre}</p>
             <p className="text-[12px] text-[#a1a1aa]">{e.detalle}</p>
             <p className="mt-1 text-[11px] italic text-[#71717a]">Estado / OEE / mantenimiento: sin registro</p>
@@ -266,7 +267,7 @@ function Infraestructura({ d }: { d: DatosLogistica }) {
       ) : (
         <ul className="space-y-1.5 text-[13px]">
           {d.opsActivas.map((o) => (
-            <li key={o.id} className="flex flex-wrap justify-between gap-2 rounded-lg bg-[#212a3a] px-3 py-2">
+            <li key={o.id} className="flex flex-wrap justify-between gap-2 rounded-lg bg-[#1c1c1c] px-3 py-2">
               <span>
                 <span className="font-semibold text-white">{o.id}</span> · {o.tipo_equipo} {o.modelo} · chasis {o.codigo_chasis || "-"}
               </span>
@@ -352,10 +353,10 @@ function CotizarFlete({ d }: { d: DatosLogistica }) {
       <p className="mb-3 text-[12px] text-[#a1a1aa]">Referencia de fletes pagados por agencia y destino (costo de envío registrado en las órdenes de despacho).</p>
       <div className="mb-4 grid gap-2 sm:grid-cols-3">
         {d.agencias.slice(0, 3).map((a) => (
-          <div key={a.id} className="rounded-lg border border-[#2a3445] bg-[#212a3a] p-3 text-center">
+          <div key={a.id} className="rounded-lg border border-[#2a2a2a] bg-[#1c1c1c] p-3 text-center">
             <p className="font-bold text-white">{a.nombre}</p>
             <p className="text-[12px] text-[#a1a1aa]">Flete promedio</p>
-            <p className="text-lg font-bold text-[#fb923c]">{a.fletePromedio ? soles(a.fletePromedio) : "-"}</p>
+            <p className="text-lg font-bold text-[#ff5252]">{a.fletePromedio ? soles(a.fletePromedio) : "-"}</p>
           </div>
         ))}
       </div>
@@ -368,7 +369,7 @@ function CotizarFlete({ d }: { d: DatosLogistica }) {
               <td className={`${td} font-semibold text-white`}>{x.agencia}</td>
               <td className={td}>{x.destino}</td>
               <td className={td}>{x.n}</td>
-              <td className={`${td} font-semibold text-[#fb923c]`}>{soles(x.total / x.n)}</td>
+              <td className={`${td} font-semibold text-[#ff5252]`}>{soles(x.total / x.n)}</td>
               <td className={td}>{fechaPE(x.ultimo)}</td>
             </tr>
           ))}
@@ -404,77 +405,53 @@ function Historial({ d }: { d: DatosLogistica }) {
 
 // ------------------------------------------------------------------ Panel derecho
 
-function Lista({ titulo, icono, items, vacio }: { titulo: string; icono: ReactNode; items: { clave: string; titulo: string; detalle: string; href: string }[]; vacio: string }) {
-  return (
-    <div>
-      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#fb923c]">
-        {icono} {titulo}
-      </p>
-      {items.length === 0 ? (
-        <p className="text-[12px] text-[#71717a]">{vacio}</p>
-      ) : (
-        <ul className="space-y-1.5">
-          {items.slice(0, 5).map((n) => (
-            <li key={n.clave} className="rounded-lg bg-[#212a3a] px-3 py-2">
-              <Link href={n.href} target="_blank" className="block hover:text-white">
-                <span className="block text-[13px] font-semibold text-white">{n.titulo}</span>
-                <span className="block text-[12px] text-[#a1a1aa]">{n.detalle}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-function PanelDerecho({ notifs, d }: { notifs: Notificacion[]; d: DatosLogistica }) {
-  return (
-    <Panel className="space-y-4">
-      <Lista titulo="Notificaciones" icono={<Bell size={15} />} items={notifs.filter((n) => n.tipo !== "stock")} vacio="Sin notificaciones nuevas." />
-      <Lista titulo="Alertas · stock bajo" icono={<AlertTriangle size={15} />} items={notifs.filter((n) => n.tipo === "stock")} vacio="Sin alertas de stock." />
-      <Lista titulo="Recordatorios" icono={<Clock size={15} />} items={d.pendientes} vacio="Sin pendientes." />
-    </Panel>
-  );
-}
-
-// ------------------------------------------------------------------ Página
-
 export function LogisticaDetalle({ solo }: { solo?: Seccion }) {
   const { sesion } = useSesion();
   const d = useLogistica();
   const notifs = useNotificaciones(sesion);
 
+  const accionesRapidas = (
+    <section className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-xl font-bold uppercase text-white">
+          Acciones rápidas <BotonVer href="/logistica/ventas">VENTAS</BotonVer>
+        </h2>
+        <BotonVer href="/logistica">Ver Detalle</BotonVer>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <BotonAccion href="/logistica/guia-sunat" lleno icono={<FileText size={17} />}>
+          Nueva Guía SUNAT
+        </BotonAccion>
+        <BotonAccion href="/logistica/cotizar-flete" lleno icono={<Building2 size={17} />}>
+          Cotizar Flete Agencia
+        </BotonAccion>
+        <BotonAccion href="/logistica/transferencias" lleno icono={<ArrowLeftRight size={17} />}>
+          Transferencia Planta-Sucursal vía Agencia
+        </BotonAccion>
+        <BotonAccion href="/logistica/historial" icono={<Clock size={17} />}>
+          Historial General
+        </BotonAccion>
+      </div>
+    </section>
+  );
+
+  // Diseño 3: encabezado de la planta, acciones rápidas, secciones y panel derecho con pestañas
   return (
-    <div className="w-full space-y-4 rounded-2xl bg-[#0e1219] p-3 text-[#e5e7eb] sm:p-5">
-      <header className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#2a3445] bg-[#1a212e] px-5 py-3">
-        <div>
-          <Link href="/logistica" className="mb-1 inline-flex items-center gap-1 text-[12px] text-[#a1a1aa] hover:text-[#fdba74]">
-            <ArrowLeft size={13} /> Logística Planta
-          </Link>
-          <h1 className="text-xl font-bold uppercase text-white lg:text-2xl">{solo ? TITULOS[solo] : "Comboy Vid Logística Planta · Detalle"}</h1>
-          <p className="flex items-center gap-1 text-[12px] text-[#a1a1aa]">
-            <MapPin size={12} /> Compras y Ventas Nacionales · Sin Flota · Marvisur · Grael · Shalom · Arequipa, Perú
-          </p>
-        </div>
-        {!solo && (
-          <div className="flex flex-wrap gap-2">
-            <BotonVer href="/logistica/ventas">VENTAS</BotonVer>
-            <BotonAccion href="/logistica/guia-sunat" lleno icono={<FileText size={15} />}>
-              Nueva Guía SUNAT
-            </BotonAccion>
-            <BotonAccion href="/logistica/cotizar-flete" icono={<Building2 size={15} />}>
-              Cotizar Flete Agencia
-            </BotonAccion>
-            <BotonAccion href="/logistica/transferencias" icono={<ArrowLeftRight size={15} />}>
-              Transferencia Planta-Sucursal
-            </BotonAccion>
-            <BotonAccion href="/logistica/historial" icono={<Clock size={15} />}>
-              Historial General
-            </BotonAccion>
-          </div>
-        )}
-      </header>
+    <MarcoPlanta
+      lateral={
+        solo ? undefined : (
+          <PanelLateral sesion={sesion} modulo="Logística" notifs={notifs} recordatorios={d.pendientes.map((p) => ({ clave: p.clave, titulo: p.titulo, detalle: p.detalle, href: p.href }))} />
+        )
+      }
+    >
+      <Link href="/logistica" className="inline-flex items-center gap-1 text-[12px] text-[#a1a1aa] hover:text-[#ff8a80]">
+        <ArrowLeft size={13} /> Logística Planta
+      </Link>
+      <EncabezadoPlanta
+        icono={<Truck size={30} />}
+        titulo={solo ? TITULOS[solo] : "LOGISTICA"}
+        subtitulo="Compras y Ventas Nacionales · Sin Flota · Marvisur · Grael · Shalom · Arequipa - Perú"
+      />
 
       {solo ? (
         <>
@@ -487,20 +464,18 @@ export function LogisticaDetalle({ solo }: { solo?: Seccion }) {
           {solo === "historial" && <Historial d={d} />}
         </>
       ) : (
-        <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
-          <div className="min-w-0 space-y-4">
-            <Compras d={d} />
-            <Ventas d={d} />
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Proveedores d={d} />
-              <Infraestructura d={d} />
-            </div>
-            <Transferencias d={d} />
+        <>
+          {accionesRapidas}
+          <Compras d={d} />
+          <Ventas d={d} />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Proveedores d={d} />
+            <Infraestructura d={d} />
           </div>
-          <PanelDerecho notifs={notifs} d={d} />
-        </div>
+          <Transferencias d={d} />
+        </>
       )}
-    </div>
+    </MarcoPlanta>
   );
 }
 

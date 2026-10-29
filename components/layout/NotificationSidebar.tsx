@@ -56,22 +56,22 @@ export function NotificationSidebar({
           type="button"
           onClick={onToggle}
           aria-expanded={false}
-          className="fixed right-2 top-[72px] z-40 flex items-center gap-1.5 rounded-lg border border-[#2a3445] bg-[#1a212e] px-2.5 py-1.5 text-[13px] font-bold text-white shadow-lg transition hover:border-[#f97316] print:hidden"
+          className="fixed right-2 top-[72px] z-40 flex items-center gap-1.5 rounded-lg border border-[#2a2a2a] bg-[#141414] px-2.5 py-1.5 text-[13px] font-bold text-white shadow-lg transition hover:border-[#d50000] print:hidden"
           style={{ fontFamily: TIMES }}
         >
-          <Bell size={14} className="text-[#f97316]" /> Notificaciones ({notifs.length})
+          <Bell size={14} className="text-[#d50000]" /> Notificaciones ({notifs.length})
         </button>
       )}
 
       <aside
         // Sin transform: los modales de las secciones del módulo (position fixed) deben seguir centrados en pantalla
-        className={`fixed top-16 z-30 h-[calc(100vh-64px)] w-[min(320px,85vw)] overflow-y-auto border-l border-[#2a3445] bg-[#1a212e]/95 p-5 backdrop-blur pb-28 transition-[right] duration-300 print:hidden ${abierta ? "right-0" : "pointer-events-none -right-[340px]"}`}
+        className={`fixed top-16 z-30 h-[calc(100vh-64px)] w-[min(320px,85vw)] overflow-y-auto border-l border-[#2a2a2a] bg-[#141414]/95 p-5 backdrop-blur pb-28 transition-[right] duration-300 print:hidden ${abierta ? "right-0" : "pointer-events-none -right-[340px]"}`}
         style={{ fontFamily: TIMES }}
         aria-hidden={!abierta}
       >
         <button type="button" onClick={onToggle} aria-expanded={abierta} className="mb-6 flex w-full items-center gap-2 text-left" title="Ocultar notificaciones">
-          <Bell className="h-5 w-5 text-[#f97316]" />
-          <h3 className="flex-1 text-[17px] font-bold uppercase text-[#fb923c]">Notificaciones ({notifs.length})</h3>
+          <Bell className="h-5 w-5 text-[#d50000]" />
+          <h3 className="flex-1 text-[17px] font-bold uppercase text-[#ff5252]">Notificaciones ({notifs.length})</h3>
           <ChevronsRight className="h-5 w-5 text-[#a1a1aa]" />
         </button>
 
@@ -109,7 +109,7 @@ export function NotificationSidebar({
         )}
 
         {unicas.length > VISIBLES && (
-          <button type="button" onClick={() => setTodas(!todas)} className="mt-6 text-sm font-semibold text-[#fb923c] hover:text-[#fdba74]">
+          <button type="button" onClick={() => setTodas(!todas)} className="mt-6 text-sm font-semibold text-[#ff5252] hover:text-[#ff8a80]">
             {todas ? "Ver menos" : "Ver todas las notificaciones →"}
           </button>
         )}

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import {
   AlertTriangle,
+  Bell,
+  LayoutGrid,
   ArrowLeftRight,
   Building2,
   ClipboardList,
@@ -20,15 +21,14 @@ import { useNotificaciones } from "@/lib/notificaciones";
 import { RUTA_MUNDO_VENTAS, permisosPlanta } from "@/lib/permisosPlanta";
 import { soles } from "@/lib/storage";
 import { ErpAlertList } from "@/components/erp/ErpAlertList";
-import { BotonVer, Etiqueta, Kpi, Panel } from "./piezas";
-import { EncabezadoPlanta, MarcoPlanta, PanelLateral } from "./planta";
+import { Acceso, BotonVer, Etiqueta, Kpi, Panel } from "./piezas";
+import { EncabezadoPlanta, MarcoPlanta } from "./planta";
 import { AccesosRapidos } from "./AccesosRapidos";
 
 /** Monto corto para los KPI: S/130k, S/1.2M. */
 const corto = (n: number): string =>
   n >= 1_000_000 ? `S/${(n / 1_000_000).toLocaleString("es-PE", { maximumFractionDigits: 1 })}M` : n >= 1000 ? `S/${Math.round(n / 1000)}k` : soles(n);
 
-const hora = () => new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", hour12: false });
 
 /**
  * Secciones de Logística: ya no se muestran como accesos rápidos (pedido de Williams, 2026-10-29),
@@ -50,28 +50,18 @@ export function LogisticaHome() {
   const { sesion } = useSesion();
   const d = useLogistica();
   const notifs = useNotificaciones(sesion);
-  const [sync, setSync] = useState("");
-  useEffect(() => setSync(hora()), [d]);
 
   const oc = d.ocActivas[0];
   const enTransito = d.odsTransito.length + d.trasladosCamino.length;
   const primerTransito = d.trasladosCamino[0];
   const pt = d.ptPorTipo.map(([t, n]) => `${n} ${t}`).join(" · ");
 
+  // Diseño 2: sin panel derecho; Notificaciones va junto a Pendientes urgentes (chat y reunión: Ver Detalle)
   return (
-    <MarcoPlanta
-      lateral={
-        <PanelLateral
-          sesion={sesion}
-          modulo="Logística"
-          notifs={notifs}
-          recordatorios={d.pendientes.map((p) => ({ clave: p.clave, titulo: p.titulo, detalle: p.detalle, href: p.href }))}
-        />
-      }
-    >
+    <MarcoPlanta>
       <EncabezadoPlanta
         icono={<Truck size={30} />}
-        titulo="Comboy Vid Logística Planta"
+        titulo="LOGISTICA"
         subtitulo="Compras y Ventas Nacionales · Sin Flota · Marvisur · Grael · Shalom · Arequipa · Perú"
         accion={
           <div className="flex flex-wrap gap-2">
@@ -84,14 +74,14 @@ export function LogisticaHome() {
       {/* Resumen de operaciones */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi
-          icono={<ShoppingCart size={18} />}
+          icono={<ShoppingCart size={30} />}
           titulo="Compras activas"
           valor={corto(d.totalOcActivas)}
           detalle={oc ? `${d.ocActivas.length} OC · mayor ${oc.numero} ${oc.proveedor} ${soles(oc.total)}` : "Sin órdenes de compra en curso"}
           href="/logistica/compras"
         />
         <Kpi
-          icono={<Truck size={18} />}
+          icono={<Truck size={30} />}
           titulo="En tránsito"
           valor={`${enTransito} ${enTransito === 1 ? "envío" : "envíos"}`}
           detalle={
@@ -103,19 +93,46 @@ export function LogisticaHome() {
           }
           href="/logistica/transferencias"
         />
-        <Kpi icono={<ClipboardList size={18} />} titulo="OP activas" valor={String(d.opsActivas.length)} detalle="Órdenes de producción en fabricación" href="/logistica/produccion" />
-        <Kpi icono={<Container size={18} />} titulo="PT disponible" valor={`${d.ptDisponible.length} ${d.ptDisponible.length === 1 ? "equipo" : "equipos"}`} detalle={pt || "Sin equipos listos para despacho"} href="/logistica/ventas" />
+        <Kpi icono={<ClipboardList size={30} />} titulo="OT activas" valor={String(d.opsActivas.length)} detalle="Órdenes de trabajo abiertas (OP en fabricación)" href="/logistica/produccion" />
+        <Kpi icono={<Container size={30} />} titulo="PT disponible" valor={`${d.ptDisponible.length} ${d.ptDisponible.length === 1 ? "equipo" : "equipos"}`} detalle={pt || "Sin equipos listos para despacho"} href="/logistica/ventas" />
       </div>
 
-      <Panel titulo="Pendientes urgentes" icono={<AlertTriangle size={17} />}>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Panel titulo="Pendientes urgentes" icono={<AlertTriangle size={17} />}>
           <ErpAlertList
             vacio="No hay pendientes urgentes."
-            max={6}
+            max={4}
             items={d.pendientes.map((p) => ({ clave: p.clave, titulo: p.titulo, detalle: p.detalle, href: p.href, icono: <AlertTriangle size={16} />, derecha: <Etiqueta>{p.etiqueta}</Etiqueta> }))}
           />
         </Panel>
+        <Panel titulo="Notificaciones" icono={<Bell size={17} />}>
+          {notifs.length === 0 ? (
+            <ErpAlertList vacio="Sin notificaciones nuevas." items={[]} />
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {notifs.slice(0, 4).map((n) => (
+                <ErpAlertList key={n.clave} vacio="" items={[{ clave: n.clave, titulo: n.titulo, detalle: n.detalle, href: n.href, icono: n.tipo === "stock" ? <AlertTriangle size={16} /> : <Bell size={16} /> }]} />
+              ))}
+            </div>
+          )}
+        </Panel>
+      </div>
 
+      {/* Accesos rápidos del diseño: las secciones de Logística */}
+      <section>
+        <h2 className="mb-3 flex items-center gap-2 text-2xl font-bold uppercase text-[#ff5252]">
+          <LayoutGrid size={24} /> Accesos rápidos
+        </h2>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {SECCIONES_LOGISTICA.map((a) => (
+            <Acceso key={a.href} icono={a.icono} titulo={a.titulo} texto={a.texto} href={a.href} />
+          ))}
+        </div>
+      </section>
+
+      {/* Funciones de Logística (Crear OC, Emitir Factura, Mundo Ventas…) o, para SOPORTE, la barra de módulos */}
       <AccesosRapidos sesion={sesion} actual="logistica" />
+
 
     </MarcoPlanta>
   );

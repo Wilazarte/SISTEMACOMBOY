@@ -46,22 +46,6 @@ function buscar(q: string): Resultado[] {
   return out.filter((r) => `${r.numero} ${r.detalle}`.toUpperCase().includes(t)).slice(0, 12);
 }
 
-/** Flujo de trabajo de cada módulo: subtítulo pequeño del encabezado (ya no es barra). */
-const FLUJOS: [string, string][] = [
-  ["/dashboard/compras", "Requerimiento → Cotización → OC → Bancarización → Factura"],
-  ["/dashboard/almacen", "Requerimiento → Ingreso a almacén → Stock → Orden de Despacho → Entrega"],
-  ["/dashboard/produccion", "Orden de Producción → QC firmado → Ingreso a Almacén → Venta → Despacho"],
-  ["/dashboard/ventas", "Nota de Pedido → Aprobación → Orden de Despacho → Factura / Boleta → Cobro"],
-  ["/dashboard/planilla", "Trabajadores → Planilla del periodo → Historial → Contratistas"],
-  ["/dashboard/contable", "Libro Diario → Mayor → Balance → Estados Financieros"],
-  ["/dashboard/creador", "Asistencia → Edición manual → Planilla"],
-  ["/almacen", "Requerimiento → Ingreso → Stock → Entrega a Producción → PT → Despacho"],
-  ["/finanzas", "Compra → Pago a proveedor → Facturación → Cobranza → Planilla → Contabilidad"],
-  ["/produccion", "Solicitud de MP → Fabricación → Ensamblaje → QC → Ingreso PT"],
-  ["/gerencia", "Requerimiento → Cotización → OC → Agencia → Almacén → Producción → Despacho → Factura"],
-  ["/logistica", "Compra nacional → Agencia → Almacén → Producción → PT → Venta → Guía → Agencia → Cliente"],
-  ["/dashboard", "Resumen → Compras → Almacén → Ventas → Contable"],
-];
 /** Título centrado del encabezado: MODULO <nombre> (Inventario = Almacén, Reportes = Contable). */
 const NOMBRE_MODULO: [string, string][] = [
   ["/dashboard/compras", "TESORERIA"],
@@ -77,7 +61,6 @@ const NOMBRE_MODULO: [string, string][] = [
   ["/produccion", "PRODUCCION"],
   ["/no-autorizado", "NO AUTORIZADO"],
 ];
-const flujoDe = (ruta: string) => FLUJOS.find(([r]) => ruta === r || ruta.startsWith(`${r}/`))?.[1] ?? "";
 
 const CLAVE_NOTIF = "erp-notificaciones-abierta";
 
@@ -281,7 +264,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <ModuloLayout
       moduleName={nombreModulo}
-      titulo={path === RUTA_GERENCIA ? "ERP COMBOY VID - DASHBOARD GERENCIA - Tiempo real" : undefined}
       sede={SEDE_PLANTA_PRINCIPAL}
       inicio={inicioDe(sesion)}
       sesion={sesion}
@@ -292,7 +274,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <>
           <button
             onClick={() => setPaleta(true)}
-            className="flex h-9 items-center gap-2.5 rounded-lg border border-[#2a3445] bg-[#1a212e] px-2.5 text-[13px] text-[#d4d4d8] transition hover:border-[#f97316] hover:text-white 2xl:w-72"
+            className="flex h-9 items-center gap-2.5 rounded-lg border border-[#2a2a2a] bg-[#141414] px-2.5 text-[13px] text-[#d4d4d8] transition hover:border-[#d50000] hover:text-white 2xl:w-72"
             aria-label="Abrir buscador global (Ctrl K)"
             title={buscador ? "Buscar REQ, OC, factura… (Ctrl K)" : "Buscar o ir a… (Ctrl K)"}
           >
@@ -348,10 +330,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       ) : (
         <ModuloContenido
           key={path}
-          sesion={sesion}
-          sede={SEDE_PLANTA_PRINCIPAL}
-          modulo={nombreModulo}
-          flujo={flujoDe(path === "/dashboard/compras" && tabActiva?.id === "planilla" ? "/dashboard/planilla" : path)}
           avisos={
             <>
               {sesion.soloLectura && (
