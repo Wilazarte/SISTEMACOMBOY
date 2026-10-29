@@ -1,6 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // ERP privado: solo comboyvid.com (o el propio ERP) puede mostrarlo en iframe y los buscadores no lo indexan.
+  // Los navegadores actuales usan frame-ancestors; X-Frame-Options queda para los antiguos.
+  async headers() {
+    return [
+      {
+        source: "/:ruta*",
+        headers: [
+          { key: "Content-Security-Policy", value: "frame-ancestors 'self' https://comboyvid.com https://www.comboyvid.com" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+        ],
+      },
+    ];
+  },
   // El módulo Sucursal ahora es Secocha: las direcciones antiguas siguen funcionando
   async redirects() {
     return [

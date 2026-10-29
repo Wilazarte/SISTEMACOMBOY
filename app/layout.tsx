@@ -5,6 +5,8 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "ERP COMBOY VID",
   description: "Sistema de compras, almacén y tesorería",
+  // Sistema interno: fuera de Google y de cualquier buscador
+  robots: { index: false, follow: false },
 };
 
 // Pinta el tema guardado (lib/preferencias.ts, clave erp_tema) antes de que cargue React: evita el destello claro→oscuro.
