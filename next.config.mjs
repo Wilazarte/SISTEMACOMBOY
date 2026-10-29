@@ -1,6 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // El ERP se abre dentro de comboyvid.com (sección #erp y comboyvid.com/erp) en un iframe: solo esa web puede enmarcarlo
+  async headers() {
+    return [
+      {
+        source: "/:ruta*",
+        headers: [{ key: "Content-Security-Policy", value: "frame-ancestors 'self' https://comboyvid.com https://www.comboyvid.com" }],
+      },
+    ];
+  },
   // El módulo Sucursal ahora es Secocha: las direcciones antiguas siguen funcionando
   async redirects() {
     return [
