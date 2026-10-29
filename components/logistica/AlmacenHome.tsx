@@ -9,7 +9,8 @@ import { KEYS, fechaPE, r2, soles, useStore } from "@/lib/storage";
 import type { Guia, MovimientoKardex, OrdenDespacho, Requerimiento, StockItem, ValeProduccion } from "@/lib/types";
 import { estadoOD } from "@/lib/ventas";
 import { BotonAccion, Etiqueta, Kpi, Panel } from "./piezas";
-import { AccesosModulos, EncabezadoPlanta, Filas, MarcoPlanta, PanelLateral, horaActual, montoCorto } from "./planta";
+import { EncabezadoPlanta, Filas, MarcoPlanta, PanelLateral, horaActual, montoCorto } from "./planta";
+import { AccesosRapidos } from "./AccesosRapidos";
 
 /** Stock crítico: 5 unidades o menos (igual que el Dashboard). */
 const STOCK_CRITICO = 5;
@@ -154,7 +155,7 @@ export function AlmacenHome() {
         </Panel>
       </div>
 
-      <AccesosModulos sesion={sesion} actual="almacen" />
+      <AccesosRapidos sesion={sesion} actual="almacen" />
     </MarcoPlanta>
   );
 }

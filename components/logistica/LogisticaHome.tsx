@@ -19,7 +19,8 @@ import { VERSION_LOGISTICA, abrirPestana, useLogistica } from "@/lib/logistica";
 import { useNotificaciones } from "@/lib/notificaciones";
 import { soles } from "@/lib/storage";
 import { BotonVer, Etiqueta, Kpi, Panel, Vacio } from "./piezas";
-import { AccesosModulos, EncabezadoPlanta, MarcoPlanta, PanelLateral } from "./planta";
+import { EncabezadoPlanta, MarcoPlanta, PanelLateral } from "./planta";
+import { AccesosRapidos } from "./AccesosRapidos";
 
 /** Monto corto para los KPI: S/130k, S/1.2M. */
 const corto = (n: number): string =>
@@ -125,7 +126,7 @@ export function LogisticaHome() {
           )}
         </Panel>
 
-      <AccesosModulos sesion={sesion} actual="logistica" />
+      <AccesosRapidos sesion={sesion} actual="logistica" />
 
       <footer className="pt-1 text-[12px] text-[#a1a1aa]">
         COMBOY VID LOGÍSTICA PLANTA · {VERSION_LOGISTICA} · Última sincronización: Hoy {sync}

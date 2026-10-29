@@ -9,7 +9,8 @@ import { KEYS, fechaPE, hoy, r2, soles, useStore } from "@/lib/storage";
 import type { ComprobanteVenta, Factura, NotaPedido, OrdenCompra, OrdenDespacho } from "@/lib/types";
 import { npPorCobrar, saldoNP, vencimientoNP } from "@/lib/ventas";
 import { BotonAccion, Etiqueta, Kpi, Panel } from "./piezas";
-import { AccesosModulos, EncabezadoPlanta, Filas, MarcoPlanta, PanelLateral, horaActual, montoCorto } from "./planta";
+import { EncabezadoPlanta, Filas, MarcoPlanta, PanelLateral, horaActual, montoCorto } from "./planta";
+import { AccesosRapidos } from "./AccesosRapidos";
 
 /** Home de Finanzas de la planta: Tesorería, CxC, CxP, IGV del mes y facturación. Solo lectura. */
 export function FinanzasHome() {
@@ -137,7 +138,7 @@ export function FinanzasHome() {
         />
       </Panel>
 
-      <AccesosModulos sesion={sesion} actual="finanzas" />
+      <AccesosRapidos sesion={sesion} actual="finanzas" />
     </MarcoPlanta>
   );
 }
