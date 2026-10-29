@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } 
 import { AlertTriangle, Bell, CircleDollarSign, Clock, Cog, Lock, MessageSquare, Package, Plus, Send, Timer, Truck, Users, Video } from "lucide-react";
 import { useChat } from "@/lib/chat";
 import { consumosDeChasis } from "@/lib/inventario";
-import { VERSION_LOGISTICA } from "@/lib/logistica";
 import type { OrdenProduccion } from "@/lib/produccion";
 import { KEYS, r2, soles, useStore } from "@/lib/storage";
 import type { StockItem, ValeProduccion } from "@/lib/types";
@@ -13,6 +12,7 @@ import { puedeVer, type Sesion } from "@/lib/auth";
 import { abrirPestana } from "@/lib/logistica";
 import type { Notificacion } from "@/lib/notificaciones";
 import { urlSala, usePresencia } from "@/lib/presencia";
+import { ErpAlertList } from "@/components/erp/ErpAlertList";
 import { Panel } from "./piezas";
 
 // Piezas comunes de las 4 homes de la planta (Logística, Almacén, Finanzas, Producción).
@@ -28,19 +28,14 @@ export const MODULOS_PLANTA: { id: ModuloPlanta; titulo: string; home: string; t
   { id: "produccion", titulo: "Producción", home: "/produccion", trabajo: "/dashboard/produccion", icono: (g) => <Cog size={g ? 40 : 56} strokeWidth={1.6} /> },
 ];
 
-/** Fondo y grilla de la home: contenido a la izquierda y panel derecho fijo en escritorio. */
+/** Grilla de la home: contenido a la izquierda y panel derecho fijo en escritorio (fondo y pie: ErpLayout). */
 export function MarcoPlanta({ children, lateral }: { children: ReactNode; lateral: ReactNode }) {
-  const [sync, setSync] = useState("");
-  useEffect(() => setSync(horaActual()), []);
   return (
-    <div className="w-full rounded-2xl bg-[#0e1219] p-3 text-[#e5e7eb] sm:p-5">
+    <div className="w-full text-[#e5e7eb]">
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-5">{children}</div>
         <aside className="min-w-0">{lateral}</aside>
       </div>
-      <footer className="pt-4 text-[12px] text-[#a1a1aa]">
-        COMBOY VID PLANTA AREQUIPA · {VERSION_LOGISTICA} · Última sincronización: Hoy {sync}
-      </footer>
     </div>
   );
 }
@@ -111,28 +106,7 @@ export interface ItemLateral {
 }
 
 function Bloque({ titulo, icono, items, vacio }: { titulo: string; icono: ReactNode; items: ItemLateral[]; vacio: string }) {
-  return (
-    <div>
-      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#fb923c]">
-        {icono} {titulo}
-      </p>
-      {items.length === 0 ? (
-        <p className="text-[12px] text-[#71717a]">{vacio}</p>
-      ) : (
-        <ul className="space-y-1.5">
-          {items.slice(0, 5).map((n) => (
-            <li key={n.clave}>
-              <button type="button" onClick={() => abrirPestana(n.href)} className="block w-full rounded-lg bg-[#212a3a] px-3 py-2 text-left transition hover:bg-[#263043]">
-                <span className="block text-[13px] font-semibold text-white">{n.titulo}</span>
-                <span className="block text-[12px] text-[#a1a1aa]">{n.detalle}</span>
-              </button>
-            </li>
-          ))}
-          {items.length > 5 && <li className="text-right text-[11px] text-[#71717a]">y {items.length - 5} más</li>}
-        </ul>
-      )}
-    </div>
-  );
+  return <ErpAlertList titulo={titulo} icono={icono} items={items} vacio={vacio} max={5} />;
 }
 
 /**
@@ -196,30 +170,9 @@ export interface Fila {
   href?: string;
 }
 
-/** Lista de filas clicables (abren en pestaña nueva). */
+/** Lista de filas clicables (abren en pestaña nueva): ErpAlertList del layout global. */
 export function Filas({ items, vacio, max = 8 }: { items: Fila[]; vacio: string; max?: number }) {
-  if (items.length === 0) return <p className="rounded-lg border border-dashed border-[#2a3445] px-3 py-4 text-center text-[13px] text-[#a1a1aa]">{vacio}</p>;
-  return (
-    <ul className="space-y-1.5">
-      {items.slice(0, max).map((f) => (
-        <li key={f.clave}>
-          <button
-            type="button"
-            disabled={!f.href}
-            onClick={() => f.href && abrirPestana(f.href)}
-            className="flex w-full items-center gap-3 rounded-lg border border-[#2a3445] bg-[#212a3a] px-3 py-2 text-left transition enabled:hover:border-[#f97316]"
-          >
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-semibold text-white">{f.titulo}</span>
-              {f.detalle && <span className="block truncate text-[12px] text-[#a1a1aa]">{f.detalle}</span>}
-            </span>
-            {f.derecha}
-          </button>
-        </li>
-      ))}
-      {items.length > max && <li className="text-right text-[12px] text-[#a1a1aa]">y {items.length - max} más</li>}
-    </ul>
-  );
+  return <ErpAlertList items={items} vacio={vacio} max={max} />;
 }
 
 /** Monto corto para los KPI: S/130k, S/1.2M. */

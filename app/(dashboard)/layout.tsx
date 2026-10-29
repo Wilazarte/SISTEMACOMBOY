@@ -287,7 +287,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <>
           <button
             onClick={() => setPaleta(true)}
-            className="flex h-9 items-center gap-2.5 rounded-lg border border-gray-700 bg-[#1e293b] px-2.5 text-[13px] text-gray-300 transition hover:text-white 2xl:w-72"
+            className="flex h-9 items-center gap-2.5 rounded-lg border border-[#2a3445] bg-[#1a212e] px-2.5 text-[13px] text-[#d4d4d8] transition hover:border-[#f97316] hover:text-white 2xl:w-72"
             aria-label="Abrir buscador global (Ctrl K)"
             title={buscador ? "Buscar REQ, OC, factura… (Ctrl K)" : "Buscar o ir a… (Ctrl K)"}
           >
@@ -344,6 +344,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           key={path}
           sesion={sesion}
           sede={SEDE_PLANTA_PRINCIPAL}
+          modulo={nombreModulo}
           flujo={flujoDe(path === "/dashboard/compras" && tabActiva?.id === "planilla" ? "/dashboard/planilla" : path)}
           avisos={
             <>

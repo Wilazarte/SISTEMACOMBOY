@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import { ErpStatsCard } from "@/components/erp/ErpStatsCard";
 import { useState, type ReactNode } from "react";
-import { ArrowRight, GripVertical } from "lucide-react";
+import { GripVertical } from "lucide-react";
 import { cn } from "@/components/ui";
 import { guardarPrefs, usePrefs } from "@/lib/preferencias";
 
@@ -17,7 +17,6 @@ export interface Tarjeta {
   alerta?: boolean;
 }
 
-const TONO = { rojo: "bg-rojo-soft text-rojo", grafito: "bg-azul-900 text-white", neutro: "bg-plomo-100 text-fg-2" };
 
 /** KPIs del Dashboard que se reordenan arrastrando; el orden se guarda en las preferencias del usuario (Supabase). */
 export function TarjetasOrdenables({ tarjetas }: { tarjetas: (Tarjeta | false)[] }) {
@@ -79,23 +78,21 @@ export function TarjetasOrdenables({ tarjetas }: { tarjetas: (Tarjeta | false)[]
               setSobre(null);
             }}
             className={cn(
-              "group relative cursor-grab rounded-xl border bg-surface shadow-card transition duration-200 ease-suave active:cursor-grabbing",
-              arrastrada === t.id ? "opacity-40" : "hover:-translate-y-0.5 hover:border-red-200 hover:shadow-pop",
-              sobre === t.id && arrastrada && arrastrada !== t.id ? "border-dashed border-corp bg-rojo-soft" : "border-plomo-200"
+              "group relative cursor-grab rounded-xl border bg-[#1a212e] transition duration-200 ease-suave active:cursor-grabbing",
+              arrastrada === t.id ? "opacity-40" : "hover:-translate-y-0.5 hover:border-[#f97316]",
+              sobre === t.id && arrastrada && arrastrada !== t.id ? "border-dashed border-corp bg-rojo-soft" : "border-[#2a3445]"
             )}
           >
-            <Link href={t.href} draggable={false} className="flex flex-col gap-3 p-5">
-              <span className="flex items-center gap-2.5">
-                <span className={cn("flex h-8 w-8 items-center justify-center rounded-lg", TONO[t.tono])}>{t.icon}</span>
-                <span className="flex-1 text-[13px] font-medium text-plomo-500">{t.label}</span>
-                <GripVertical size={15} className="text-plomo-500 opacity-0 transition group-hover:opacity-100" aria-hidden />
-              </span>
-              <span className={cn("text-[28px] font-semibold leading-none tracking-tight tabular", t.alerta ? "text-rojo" : "text-fg")}>{t.valor}</span>
-              <span className="flex items-center justify-between gap-2 text-xs text-plomo-500">
-                {t.detalle}
-                <ArrowRight size={14} className="shrink-0 transition group-hover:translate-x-0.5 group-hover:text-rojo" />
-              </span>
-            </Link>
+            <ErpStatsCard
+              href={t.href}
+              icono={t.icon}
+              titulo={t.label}
+              valor={t.valor}
+              detalle={t.detalle}
+              alerta={t.alerta}
+              className="w-full border-0"
+              extra={<GripVertical size={15} className="text-[#a1a1aa] opacity-0 transition group-hover:opacity-100" aria-hidden />}
+            />
           </div>
         ))}
       </div>

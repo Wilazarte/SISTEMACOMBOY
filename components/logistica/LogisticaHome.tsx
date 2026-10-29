@@ -15,11 +15,12 @@ import {
   Container,
 } from "lucide-react";
 import { useSesion } from "@/lib/auth";
-import { VERSION_LOGISTICA, abrirPestana, useLogistica } from "@/lib/logistica";
+import { useLogistica } from "@/lib/logistica";
 import { useNotificaciones } from "@/lib/notificaciones";
 import { RUTA_MUNDO_VENTAS, permisosPlanta } from "@/lib/permisosPlanta";
 import { soles } from "@/lib/storage";
-import { BotonVer, Etiqueta, Kpi, Panel, Vacio } from "./piezas";
+import { ErpAlertList } from "@/components/erp/ErpAlertList";
+import { BotonVer, Etiqueta, Kpi, Panel } from "./piezas";
 import { EncabezadoPlanta, MarcoPlanta, PanelLateral } from "./planta";
 import { AccesosRapidos } from "./AccesosRapidos";
 
@@ -107,29 +108,11 @@ export function LogisticaHome() {
       </div>
 
       <Panel titulo="Pendientes urgentes" icono={<AlertTriangle size={17} />}>
-          {d.pendientes.length === 0 ? (
-            <Vacio>No hay pendientes urgentes.</Vacio>
-          ) : (
-            <ul className="space-y-2">
-              {d.pendientes.slice(0, 6).map((p) => (
-                <li key={p.clave}>
-                  <button
-                    type="button"
-                    onClick={() => abrirPestana(p.href)}
-                    className="flex w-full items-center gap-3 rounded-lg border border-[#2a3445] bg-[#212a3a] px-3 py-2 text-left transition hover:border-[#f97316]"
-                  >
-                    <AlertTriangle size={16} className="shrink-0 text-[#f97316]" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-semibold text-white">{p.titulo}</span>
-                      <span className="block truncate text-[12px] text-[#a1a1aa]">{p.detalle}</span>
-                    </span>
-                    <Etiqueta>{p.etiqueta}</Etiqueta>
-                  </button>
-                </li>
-              ))}
-              {d.pendientes.length > 6 && <li className="text-right text-[12px] text-[#a1a1aa]">y {d.pendientes.length - 6} más</li>}
-            </ul>
-          )}
+          <ErpAlertList
+            vacio="No hay pendientes urgentes."
+            max={6}
+            items={d.pendientes.map((p) => ({ clave: p.clave, titulo: p.titulo, detalle: p.detalle, href: p.href, icono: <AlertTriangle size={16} />, derecha: <Etiqueta>{p.etiqueta}</Etiqueta> }))}
+          />
         </Panel>
 
       <AccesosRapidos sesion={sesion} actual="logistica" />

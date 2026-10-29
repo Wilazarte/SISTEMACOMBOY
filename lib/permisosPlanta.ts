@@ -31,16 +31,19 @@ export interface PermisosPlanta {
   canEmitGuia: boolean;
   /** Botón "Mundo Ventas" (/mundo-ventas → Ventas). */
   canAccessMundoVentas: boolean;
-  /** Accesos rápidos de navegación entre los 4 módulos. */
-  canNavegarModulos: boolean;
+  /**
+   * Ve los accesos rápidos a los 4 módulos (Logística, Almacén, Finanzas, Producción) y navega entre sus homes.
+   * ADMIN / SOPORTE / FINANZAS sí; los moduladores (almacén, producción, logística, taller…) solo su módulo.
+   */
+  canViewOtherModules: boolean;
 }
 
-const NINGUNO: PermisosPlanta = { canEmitFactura: false, canViewFacturas: false, canEmitGuia: false, canAccessMundoVentas: false, canNavegarModulos: false };
+const NINGUNO: PermisosPlanta = { canEmitFactura: false, canViewFacturas: false, canEmitGuia: false, canAccessMundoVentas: false, canViewOtherModules: false };
 
 const PERMISOS: Record<PerfilPlanta, PermisosPlanta> = {
-  soporte: { canEmitFactura: true, canViewFacturas: true, canEmitGuia: true, canAccessMundoVentas: true, canNavegarModulos: true },
-  logistica: { canEmitFactura: true, canViewFacturas: true, canEmitGuia: true, canAccessMundoVentas: true, canNavegarModulos: false },
-  finanzas: { ...NINGUNO, canViewFacturas: true },
+  soporte: { canEmitFactura: true, canViewFacturas: true, canEmitGuia: true, canAccessMundoVentas: true, canViewOtherModules: true },
+  logistica: { canEmitFactura: true, canViewFacturas: true, canEmitGuia: true, canAccessMundoVentas: true, canViewOtherModules: false },
+  finanzas: { ...NINGUNO, canViewFacturas: true, canViewOtherModules: true },
   almacen: { ...NINGUNO, canEmitGuia: true },
   produccion: NINGUNO,
 };
@@ -58,11 +61,11 @@ export const ETIQUETA_PERFIL: Record<PerfilPlanta, { label: string; titulo: stri
   soporte: { label: "SOPORTE", titulo: "SOPORTE (Dueño) · acceso a todos los módulos", badge: "Soporte Dueño" },
   logistica: { label: "LOGISTICA", titulo: "Logística · dueña de ventas", badge: "Dueño de Ventas" },
   almacen: { label: "ALMACEN", titulo: "Almacén · acceso solo a su módulo" },
-  finanzas: { label: "FINANZAS", titulo: "Finanzas · acceso solo a su módulo" },
+  finanzas: { label: "FINANZAS", titulo: "Finanzas · acceso a todos los módulos" },
   produccion: { label: "PRODUCCION", titulo: "Producción · acceso solo a su módulo" },
 };
 
-/** Home de cada perfil de la planta (SOPORTE entra a las 4). */
+/** Home de cada perfil de la planta (SOPORTE y FINANZAS entran a las 4). */
 export const HOME_PERFIL: Record<Exclude<PerfilPlanta, "soporte">, string> = {
   logistica: "/logistica",
   almacen: "/almacen",

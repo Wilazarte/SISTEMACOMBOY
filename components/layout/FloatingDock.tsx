@@ -50,7 +50,7 @@ export function FloatingDock({ sesion, tab }: { sesion: Sesion; tab?: string }) 
   return (
     <nav
       aria-label="Módulos"
-      className="fixed bottom-3 left-1/2 z-50 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 gap-1 rounded-full border border-slate-800 bg-[#1e293b] px-2 py-2 backdrop-blur sm:gap-3 sm:px-4 print:hidden"
+      className="fixed bottom-3 left-1/2 z-50 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 gap-1 rounded-full border border-[#2a3445] bg-[#1a212e] px-2 py-2 backdrop-blur sm:gap-3 sm:px-4 print:hidden"
     >
       {items.map(({ id, href, label, corto, icon: Icon, tab: destino }) => {
         const on = activo === id;
@@ -64,7 +64,7 @@ export function FloatingDock({ sesion, tab }: { sesion: Sesion; tab?: string }) 
             title={label}
             className={cn(
               "flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-full px-2 py-1.5 text-[11px] sm:px-3 transition-colors duration-200",
-              on ? "bg-[#2563eb] font-bold text-white" : "font-normal text-gray-400 hover:bg-white/5 hover:text-white"
+              on ? "bg-[#f97316] font-bold text-white" : "font-normal text-[#a1a1aa] hover:bg-white/5 hover:text-white"
             )}
           >
             <Icon size={18} strokeWidth={2} />

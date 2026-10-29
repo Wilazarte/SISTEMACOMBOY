@@ -11,7 +11,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "./supabase/client";
 import type { Rol } from "./types";
-import { HOME_PERFIL, RUTA_NO_AUTORIZADO, homePlantaDe, perfilPlanta } from "./permisosPlanta";
+import { HOME_PERFIL, RUTA_NO_AUTORIZADO, homePlantaDe, perfilPlanta, permisosPlanta } from "./permisosPlanta";
 
 /** Roles con permisos definidos en el ERP. Cualquier otro rol de la tabla perfiles se trata como solo lectura. */
 export type RolAuth = "creador" | "tesoreria" | "almacen" | "planilla" | "gerencia" | "sucursal";
@@ -154,10 +154,10 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
   // Producción: también Almacén (registra las órdenes de producción y el QC)
   if (ruta === RUTA_PRODUCCION || ruta.startsWith(`${RUTA_PRODUCCION}/`)) if (sesion.rol === "almacen") return true;
   if (ruta === RUTA_NO_AUTORIZADO) return true;
-  // Homes de la planta: cada perfil (Logística, Almacén, Finanzas, Producción) entra solo a la suya; SOPORTE a todas
+  // Homes de la planta: SOPORTE y FINANZAS entran a las 4; los moduladores (Logística, Almacén, Producción) solo a la suya
   const homePlanta = homePlantaDe(ruta);
   const perfil = perfilPlanta(sesion);
-  if (homePlanta && perfil && perfil !== "soporte") return homePlanta === HOME_PERFIL[perfil];
+  if (homePlanta && perfil && perfil !== "soporte") return permisosPlanta(sesion).canViewOtherModules || homePlanta === HOME_PERFIL[perfil];
   // Homes de la planta (/almacen, /finanzas, /produccion): quien puede abrir el módulo de trabajo
   const home = Object.keys(HOMES_PLANTA).find((h) => ruta === h || ruta.startsWith(`${h}/`));
   if (home) return HOMES_PLANTA[home].some((r) => puedeVer(sesion, r));
