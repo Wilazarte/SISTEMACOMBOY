@@ -41,7 +41,7 @@ export function ErpHeader({
       </Link>
 
       <h1
-        className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-[18px] font-extrabold uppercase text-white sm:block sm:text-[26px]"
+        className={`pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 whitespace-nowrap font-extrabold uppercase text-white ${titulo.length > 20 ? "text-[15px] lg:block xl:text-[22px]" : "text-[18px] sm:block sm:text-[26px]"}`}
         style={{ fontFamily: TIMES }}
       >
         {titulo}

@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Factory, LayoutDashboard, Landmark, Receipt, ShoppingCart, Truck, Users, Warehouse, type LucideIcon } from "lucide-react";
+import { BarChart3, Factory, Gauge, LayoutDashboard, Landmark, Receipt, ShoppingCart, Truck, Users, Warehouse, type LucideIcon } from "lucide-react";
 import { EV_IR_PESTANA, cn } from "@/components/ui";
 import { puedeVer, veDashboard, type Sesion } from "@/lib/auth";
 
-type Id = "dashboard" | "logistica" | "finanzas" | "produccion" | "tesoreria" | "sucursal" | "planilla" | "ventas" | "inventario" | "reportes";
+type Id = "dashboard" | "gerencia" | "logistica" | "finanzas" | "produccion" | "tesoreria" | "sucursal" | "planilla" | "ventas" | "inventario" | "reportes";
 
 /**
  * Módulos del dock. `corto` es la etiqueta en móvil. Tesorería y Planilla viven en la misma página
@@ -16,6 +16,8 @@ type Id = "dashboard" | "logistica" | "finanzas" | "produccion" | "tesoreria" | 
  */
 const ITEMS: { id: Id; href: string; label: string; corto: string; icon: LucideIcon; tab?: string; permiso: string; oculto?: boolean }[] = [
   { id: "dashboard", href: "/dashboard", label: "Dashboard", corto: "Dashboard", icon: LayoutDashboard, permiso: "/dashboard", oculto: true },
+  // Dashboard Gerencia: solo lo ven GERENCIA y SOPORTE (puedeVer)
+  { id: "gerencia", href: "/gerencia", label: "Gerencia", corto: "Gerencia", icon: Gauge, permiso: "/gerencia" },
   { id: "logistica", href: "/logistica", label: "Logística", corto: "Logística", icon: Truck, permiso: "/logistica" },
   { id: "inventario", href: "/almacen", label: "Almacén", corto: "Almacén", icon: Warehouse, permiso: "/almacen" },
   // Almacén, Finanzas y Producción abren su home (/almacen, /finanzas, /produccion); desde ahí se abre el módulo de trabajo

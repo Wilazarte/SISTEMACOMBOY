@@ -154,6 +154,8 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
   // Producción: también Almacén (registra las órdenes de producción y el QC)
   if (ruta === RUTA_PRODUCCION || ruta.startsWith(`${RUTA_PRODUCCION}/`)) if (sesion.rol === "almacen") return true;
   if (ruta === RUTA_NO_AUTORIZADO) return true;
+  // Dashboard Gerencia: solo GERENCIA (visor) y SOPORTE
+  if (ruta === RUTA_GERENCIA || ruta.startsWith(`${RUTA_GERENCIA}/`)) return isAdmin(sesion) || sesion.rol === "gerencia";
   // Homes de la planta: solo SOPORTE entra a las 4; los moduladores (Finanzas, Logística, Almacén, Producción) solo a la suya
   const homePlanta = homePlantaDe(ruta);
   const perfil = perfilPlanta(sesion);
@@ -172,6 +174,8 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
 }
 
 export const RUTA_PRODUCCION = "/dashboard/produccion";
+/** Dashboard Gerencia (War Room): GERENCIA y SOPORTE. */
+export const RUTA_GERENCIA = "/gerencia";
 /** Logística Planta: home de compras / ventas nacionales y agencias (solo lectura de los demás módulos). */
 export const RUTA_LOGISTICA = "/logistica";
 /** Homes de la planta -> módulos de trabajo que habilitan verlas. */
@@ -207,6 +211,8 @@ export const soloSecocha = (sesion: Sesion | null): boolean => {
 export function inicioDe(sesion: Sesion): string {
   // El usuario solo de Secocha no entra al ERP: su sistema es /secocha
   if (soloSecocha(sesion)) return RUTA_SUCURSAL;
+  // GERENCIA: su único inicio es el Dashboard Gerencia (visor general, solo lectura)
+  if (sesion.rol === "gerencia") return RUTA_GERENCIA;
   if (sesion.modulos.includes("*") || veDashboard(sesion)) return "/dashboard";
   // Sin módulos asignados se queda en /dashboard (el layout muestra el aviso; evita el bucle con /login)
   return sesion.modulos.find((m) => m.startsWith("/dashboard/")) ?? "/dashboard";

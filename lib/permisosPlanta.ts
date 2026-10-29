@@ -4,7 +4,8 @@
 
 import type { Sesion } from "./auth";
 
-export type PerfilPlanta = "soporte" | "logistica" | "almacen" | "finanzas" | "produccion";
+/** gerencia: visor general (Dashboard Gerencia /gerencia), no es admin ni opera. */
+export type PerfilPlanta = "soporte" | "logistica" | "almacen" | "finanzas" | "produccion" | "gerencia";
 
 /**
  * ADMIN = únicamente SOPORTE (regla de Williams, 2026-10-29). En la BD SOPORTE es el rol "creador"
@@ -27,6 +28,7 @@ export function perfilPlanta(sesion: Sesion | null): PerfilPlanta | null {
   if (!sesion) return null;
   const rol = sesion.rol as string;
   if (isAdmin(sesion)) return "soporte";
+  if (rol === "gerencia") return "gerencia";
   if (rol === "logistica") return "logistica";
   if (rol === "almacen") return "almacen";
   if (rol === "produccion") return "produccion";
@@ -58,6 +60,7 @@ const PERMISOS: Record<PerfilPlanta, PermisosPlanta> = {
   finanzas: { ...NINGUNO, canViewFacturas: true },
   almacen: { ...NINGUNO, canEmitGuia: true },
   produccion: NINGUNO,
+  gerencia: NINGUNO,
 };
 
 export const permisosPlanta = (sesion: Sesion | null): PermisosPlanta => {
@@ -75,6 +78,7 @@ export const ETIQUETA_PERFIL: Record<PerfilPlanta, { label: string; titulo: stri
   almacen: { label: "ALMACEN", titulo: "Almacén · acceso solo a su módulo" },
   finanzas: { label: "FINANZAS", titulo: "Finanzas · acceso solo a su módulo" },
   produccion: { label: "PRODUCCION", titulo: "Producción · acceso solo a su módulo" },
+  gerencia: { label: "GERENCIA", titulo: "Gerencia · visor general (solo lectura)", badge: "Visor General" },
 };
 
 /** Home de cada perfil de la planta (solo SOPORTE entra a las 4). */
@@ -83,6 +87,7 @@ export const HOME_PERFIL: Record<Exclude<PerfilPlanta, "soporte">, string> = {
   almacen: "/almacen",
   finanzas: "/finanzas",
   produccion: "/produccion",
+  gerencia: "/gerencia",
 };
 
 /** Home de la planta a la que pertenece una ruta (/logistica/agencias → /logistica). */

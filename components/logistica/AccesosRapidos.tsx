@@ -142,7 +142,8 @@ export function AccesosRapidos({ sesion, actual }: { sesion: Sesion | null; actu
   const activo = perfil !== "soporte" && perfil !== null;
   const guias = useStore<Guia[]>(KEYS.GUIAS, [], activo);
   const ops = useStore<OrdenProduccion[]>(KEYS.PRODUCCION, [], perfil === "produccion");
-  if (!sesion || perfil === null) return null;
+  // GERENCIA es solo visor: sin accesos a módulos operativos
+  if (!sesion || perfil === null || perfil === "gerencia") return null;
   const visible = (a: Accion) => (!a.requiere || permisos[a.requiere]) && puedeVer(sesion, a.permiso ?? a.href.split(/[?#]/)[0]);
   const barraModulos = permisos.canViewOtherModules && <AccesosModulos sesion={sesion} actual={actual} />;
 

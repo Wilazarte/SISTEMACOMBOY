@@ -18,6 +18,7 @@ const horaActual = () => new Date().toLocaleTimeString("es-PE", { hour: "2-digit
  */
 export function ErpLayout({
   moduleName,
+  titulo,
   sede,
   inicio,
   sesion,
@@ -28,6 +29,8 @@ export function ErpLayout({
   children,
 }: {
   moduleName: string;
+  /** Título centrado del header (por defecto "ERP COMBOY VID"). */
+  titulo?: string;
   /** Sede que se muestra en el pie (el sub-header la recibe ErpContenido). */
   sede: string;
   inicio?: string;
@@ -54,6 +57,7 @@ export function ErpLayout({
       </div>
 
       <ErpHeader
+        titulo={titulo}
         inicio={inicio}
         // Perfil de la planta: SO SOPORTE, AL ALMACEN, FI FINANZAS, LO LOGISTICA, PR PRODUCCION
         usuario={etiqueta?.label ?? sesion.usuario}

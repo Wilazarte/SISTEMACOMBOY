@@ -216,3 +216,14 @@ table, .tabular { font-variant-numeric: tabular-nums; }
   .tip-arriba::after { @apply bottom-[calc(100%+8px)] top-auto; }
   .kbd { @apply inline-flex h-5 min-w-[20px] items-center justify-center rounded-[5px] border border-plomo-200 bg-plomo-50 px-1 text-[11px] font-medium text-plomo-500; }
 }
+
+/* Ticker del Dashboard Gerencia (components/gerencia/GerenciaDashboard.tsx): el contenido va duplicado y corre en bucle */
+@keyframes ticker-correr {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.ticker-pista { animation: ticker-correr 45s linear infinite; }
+.ticker-pista:hover { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .ticker-pista { animation: none; }
+}
