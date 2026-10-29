@@ -285,7 +285,7 @@ Resumen: **118 MANTENER · 19 OPTIMIZAR · 2 ELIMINAR**.
 **Verificación**
 - `tsc --noEmit`: sin errores.
 - `tsc --noUnusedLocals`: 0 avisos (antes eran 22).
-- `next build`: compila; están las mismas 25 rutas de antes.
+- `next build`: compila sin errores con todas las rutas de antes (incluidas las redirecciones).
 
 | Métrica | Antes | Después |
 |---|---:|---:|
