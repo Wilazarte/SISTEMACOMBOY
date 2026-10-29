@@ -152,6 +152,8 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
   if (ruta === RUTA_CREADOR || ruta.startsWith(`${RUTA_CREADOR}/`)) return puedeEditarAsistencia(sesion);
   // Producción: también Almacén (registra las órdenes de producción y el QC)
   if (ruta === RUTA_PRODUCCION || ruta.startsWith(`${RUTA_PRODUCCION}/`)) if (sesion.rol === "almacen") return true;
+  // Logística Planta (/logistica): los roles con Dashboard, o quien lo tenga en perfiles.modulos
+  if (ruta === RUTA_LOGISTICA || ruta.startsWith(`${RUTA_LOGISTICA}/`)) if (veDashboard(sesion)) return true;
   // Secocha (sistema aparte, /secocha): solo quien tiene /secocha en perfiles.modulos (o "*", o es creador)
   if (ruta === RUTA_SUCURSAL || ruta.startsWith(`${RUTA_SUCURSAL}/`)) return tieneSecocha(sesion);
   return sesion.modulos.some((m) => {
@@ -161,6 +163,8 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
 }
 
 export const RUTA_PRODUCCION = "/dashboard/produccion";
+/** Logística Planta: home de compras / ventas nacionales y agencias (solo lectura de los demás módulos). */
+export const RUTA_LOGISTICA = "/logistica";
 /** Módulo Secocha (sucursal): app aparte con su propio login (/secocha/login). Arequipa es la Planta Principal (el ERP). */
 export const RUTA_SUCURSAL = "/secocha";
 export const RUTA_LOGIN_SUCURSAL = "/secocha/login";
