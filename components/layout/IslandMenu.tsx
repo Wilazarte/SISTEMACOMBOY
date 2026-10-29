@@ -44,7 +44,7 @@ export function IslandMenu({
           key={a.label}
           type="button"
           onClick={a.onClick}
-          className="flex shrink-0 items-center gap-1.5 rounded-full border border-[#2a2a2a] bg-[#1c1c1c] px-3 py-1.5 text-[13px] font-medium text-[#e5e7eb] transition hover:border-[#ff6b00] hover:text-white"
+          className="flex shrink-0 items-center gap-1.5 rounded-full border border-[#2a2a2a] bg-[#1c1c1c] px-3 py-1.5 text-[13px] font-medium text-[#e5e7eb] transition hover:border-[#d50000] hover:text-white"
         >
           {a.icon}
           {a.label}
@@ -63,7 +63,7 @@ export function IslandMenu({
               onClick={() => onElegir(t.id)}
               className={cn(
                 "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium transition duration-150",
-                on ? "bg-[#ff6b00] text-white" : "text-[#a1a1aa] hover:bg-[#1c1c1c] hover:text-white"
+                on ? "bg-[#d50000] text-white" : "text-[#a1a1aa] hover:bg-[#1c1c1c] hover:text-white"
               )}
             >
               {t.icon}

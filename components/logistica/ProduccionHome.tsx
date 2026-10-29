@@ -22,10 +22,10 @@ const ESTACIONES = [
 /** Tarjeta KPI del diseño de Producción: icono grande arriba, título y detalle. */
 function KpiProduccion({ icono, titulo, valor, detalle, href }: { icono: ReactNode; titulo: string; valor?: string; detalle: string; href: string }) {
   return (
-    <button type="button" onClick={() => abrirPestana(href)} className="flex flex-col items-center gap-1 rounded-xl border border-[#2a2a2a] border-b-[#ff6b00] bg-[#141414] px-3 py-4 text-center transition hover:border-[#ff6b00]">
+    <button type="button" onClick={() => abrirPestana(href)} className="flex flex-col items-center gap-1 rounded-xl border border-[#2a2a2a] border-b-[#d50000] bg-[#141414] px-3 py-4 text-center transition hover:border-[#d50000]">
       <span className="text-white">{icono}</span>
       <span className="text-[15px] font-bold text-white">{titulo}</span>
-      {valor && <span className="text-2xl font-bold text-[#ff6b00]">{valor}</span>}
+      {valor && <span className="text-2xl font-bold text-[#d50000]">{valor}</span>}
       <span className="text-[12px] text-[#a1a1aa]">{detalle}</span>
     </button>
   );
@@ -35,7 +35,7 @@ function Encargado({ numero, titulo, detalle }: { numero: number; titulo: string
   return (
     <div>
       <h2 className="flex items-center gap-2 text-[17px] font-bold uppercase text-white">
-        <span className="h-4 w-6 rounded-sm bg-[#ff6b00]" aria-hidden /> Encargado {numero} · {titulo}
+        <span className="h-4 w-6 rounded-sm bg-[#d50000]" aria-hidden /> Encargado {numero} · {titulo}
       </h2>
       <p className="text-[13px] text-[#d4d4d8]">{detalle}</p>
     </div>
@@ -83,15 +83,13 @@ export function ProduccionHome() {
     <MarcoPlanta lateral={<PanelLateral sesion={sesion} modulo="Producción" notifs={notifs} recordatorios={recordatorios} />}>
       {/* Barra de contexto */}
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-[#2a2a2a] bg-[#141414] px-4 py-2 text-[13px] font-semibold text-white">
-        <MapPin size={15} className="text-[#ff6b00]" /> Planta Arequipa - Perú <span className="text-[#3a3a3a]">|</span> Usuario: {sesion?.nombre ?? "-"}
+        <MapPin size={15} className="text-[#d50000]" /> Planta Arequipa - Perú <span className="text-[#3a3a3a]">|</span> Usuario: {sesion?.nombre ?? "-"}
         <span className="text-[#3a3a3a]">|</span> {ahora} <span className="text-[#3a3a3a]">|</span> <span className="text-[#4ade80]">Conectado</span>
       </p>
 
       <header>
-        <h1 className="text-3xl font-bold leading-tight text-white lg:text-4xl">
-          <span className="text-[#ff6b00]">COMBOY VID</span> PRODUCCIÓN PLANTA - Fabricación y Ensamblaje
-        </h1>
-        <p className="text-[15px] font-medium text-[#d4d4d8]">Módulo de Producción · Gestión de OT · Planta Arequipa</p>
+        <h1 className="text-3xl font-bold uppercase leading-tight text-white lg:text-4xl">PRODUCCION</h1>
+        <p className="text-[15px] font-medium text-[#d4d4d8]">Fabricación y Ensamblaje · Gestión de OT · Planta Arequipa</p>
       </header>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">

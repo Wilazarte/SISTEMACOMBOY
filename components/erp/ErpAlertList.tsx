@@ -42,7 +42,7 @@ export function ErpAlertList({
   return (
     <div className={className}>
       {titulo && (
-        <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#ff8a3d]">
+        <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#ff5252]">
           {icono} {titulo}
         </p>
       )}
@@ -60,11 +60,11 @@ export function ErpAlertList({
                   disabled={!accion}
                   className={cn(
                     "flex w-full items-center gap-3 rounded-lg border border-[#2a2a2a] bg-[#1c1c1c] px-3 py-2 text-left transition",
-                    accion && "hover:border-[#ff6b00]"
+                    accion && "hover:border-[#d50000]"
                   )}
                 >
-                  {n.nuevo !== undefined && <span className={cn("h-2 w-2 shrink-0 rounded-full", n.nuevo ? "bg-[#ff6b00]" : "bg-[#3a3a3a]")} />}
-                  {n.icono && <span className="shrink-0 text-[#ff6b00]">{n.icono}</span>}
+                  {n.nuevo !== undefined && <span className={cn("h-2 w-2 shrink-0 rounded-full", n.nuevo ? "bg-[#d50000]" : "bg-[#3a3a3a]")} />}
+                  {n.icono && <span className="shrink-0 text-[#d50000]">{n.icono}</span>}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-semibold text-white">{n.titulo}</span>
                     {n.detalle && <span className="block truncate text-[12px] text-[#a1a1aa]">{n.detalle}</span>}

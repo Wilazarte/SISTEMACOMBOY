@@ -89,7 +89,7 @@ export function ReportesSucursal({ ventas, derivaciones, stock, movs }: { ventas
                     );
                   }}
                 />
-                <Bar dataKey="total" fill="#ff6b00" radius={[6, 6, 2, 2]} maxBarSize={44} />
+                <Bar dataKey="total" fill="#d50000" radius={[6, 6, 2, 2]} maxBarSize={44} />
               </BarChart>
             </ResponsiveContainer>
           </div>

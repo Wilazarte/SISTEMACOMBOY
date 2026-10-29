@@ -71,15 +71,15 @@ function Compras({ d }: { d: DatosLogistica }) {
             <tr key={o.id}>
               <td className={`${td} font-semibold text-white`}>{o.numero}</td>
               <td className={td}>
-                <span className="block font-semibold text-[#ffb27a]">{o.proveedor}</span>
+                <span className="block font-semibold text-[#ff8a80]">{o.proveedor}</span>
                 <span className="block text-[11px] text-[#a1a1aa]">{o.items.map((i) => i.nombre).filter(Boolean).slice(0, 2).join(" · ") || o.reqNumero}</span>
               </td>
-              <td className={`${td} whitespace-nowrap font-semibold text-[#ff8a3d]`}>{soles(o.total)}</td>
+              <td className={`${td} whitespace-nowrap font-semibold text-[#ff5252]`}>{soles(o.total)}</td>
               <td className={td}>
                 <Etiqueta tono={o.estado === "BANCARIZADA" || o.estado === "APROBADA" ? "verde" : "naranja"}>{ESTADO_OC[o.estado] ?? o.estado}</Etiqueta>
               </td>
               <td className={`${td} w-40`}>
-                <span className="mb-1 block text-right text-[11px] font-semibold text-[#ffb27a]">{avanceOC(o)}%</span>
+                <span className="mb-1 block text-right text-[11px] font-semibold text-[#ff8a80]">{avanceOC(o)}%</span>
                 <Barra pct={avanceOC(o)} />
                 {o.lugarEntrega && <span className="mt-1 block truncate text-[11px] text-[#a1a1aa]">Entrega: {o.lugarEntrega}</span>}
               </td>
@@ -159,7 +159,7 @@ function Agencias({ d, completo }: { d: DatosLogistica; completo?: boolean }) {
               <dt className="text-[#a1a1aa]">Envíos</dt>
               <dd className="text-right font-semibold text-white">{a.envios}</dd>
               <dt className="text-[#a1a1aa]">En tránsito</dt>
-              <dd className="text-right font-semibold text-[#ffb27a]">{a.enTransito}</dd>
+              <dd className="text-right font-semibold text-[#ff8a80]">{a.enTransito}</dd>
               <dt className="text-[#a1a1aa]">Flete total</dt>
               <dd className="text-right font-semibold text-white">{soles(a.flete)}</dd>
             </dl>
@@ -219,7 +219,7 @@ function Proveedores({ d, completo }: { d: DatosLogistica; completo?: boolean })
               <td className={td}>{p.ruc || "-"}</td>
               <td className={td}>{p.ocs}</td>
               <td className={td}>{p.activas ? <Etiqueta>{p.activas}</Etiqueta> : "-"}</td>
-              <td className={`${td} font-semibold text-[#ff8a3d]`}>{soles(p.total)}</td>
+              <td className={`${td} font-semibold text-[#ff5252]`}>{soles(p.total)}</td>
               <td className={td}>
                 {p.ultima.numero} · {fechaPE(p.ultima.fecha)}
               </td>
@@ -231,10 +231,10 @@ function Proveedores({ d, completo }: { d: DatosLogistica; completo?: boolean })
           {lista.map((p) => (
             <li key={p.ruc || p.proveedor} className="flex justify-between gap-3">
               <span className="truncate">
-                <span className="text-[#ff6b00]">• </span>
+                <span className="text-[#d50000]">• </span>
                 <span className="font-semibold text-white">{p.proveedor}</span> <span className="text-[#a1a1aa]">· {p.ocs} OC</span>
               </span>
-              <span className="whitespace-nowrap font-semibold text-[#ffb27a]">{soles(p.total)}</span>
+              <span className="whitespace-nowrap font-semibold text-[#ff8a80]">{soles(p.total)}</span>
             </li>
           ))}
         </ul>
@@ -356,7 +356,7 @@ function CotizarFlete({ d }: { d: DatosLogistica }) {
           <div key={a.id} className="rounded-lg border border-[#2a2a2a] bg-[#1c1c1c] p-3 text-center">
             <p className="font-bold text-white">{a.nombre}</p>
             <p className="text-[12px] text-[#a1a1aa]">Flete promedio</p>
-            <p className="text-lg font-bold text-[#ff8a3d]">{a.fletePromedio ? soles(a.fletePromedio) : "-"}</p>
+            <p className="text-lg font-bold text-[#ff5252]">{a.fletePromedio ? soles(a.fletePromedio) : "-"}</p>
           </div>
         ))}
       </div>
@@ -369,7 +369,7 @@ function CotizarFlete({ d }: { d: DatosLogistica }) {
               <td className={`${td} font-semibold text-white`}>{x.agencia}</td>
               <td className={td}>{x.destino}</td>
               <td className={td}>{x.n}</td>
-              <td className={`${td} font-semibold text-[#ff8a3d]`}>{soles(x.total / x.n)}</td>
+              <td className={`${td} font-semibold text-[#ff5252]`}>{soles(x.total / x.n)}</td>
               <td className={td}>{fechaPE(x.ultimo)}</td>
             </tr>
           ))}
@@ -444,12 +444,12 @@ export function LogisticaDetalle({ solo }: { solo?: Seccion }) {
         )
       }
     >
-      <Link href="/logistica" className="inline-flex items-center gap-1 text-[12px] text-[#a1a1aa] hover:text-[#ffb27a]">
+      <Link href="/logistica" className="inline-flex items-center gap-1 text-[12px] text-[#a1a1aa] hover:text-[#ff8a80]">
         <ArrowLeft size={13} /> Logística Planta
       </Link>
       <EncabezadoPlanta
         icono={<Truck size={30} />}
-        titulo={solo ? `Comboy Vid ${TITULOS[solo]}` : "Comboy Vid Logística Planta"}
+        titulo={solo ? TITULOS[solo] : "LOGISTICA"}
         subtitulo="Compras y Ventas Nacionales · Sin Flota · Marvisur · Grael · Shalom · Arequipa - Perú"
       />
 

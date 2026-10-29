@@ -79,7 +79,7 @@ export function TarjetasOrdenables({ tarjetas }: { tarjetas: (Tarjeta | false)[]
             }}
             className={cn(
               "group relative cursor-grab rounded-xl border bg-[#141414] transition duration-200 ease-suave active:cursor-grabbing",
-              arrastrada === t.id ? "opacity-40" : "hover:-translate-y-0.5 hover:border-[#ff6b00]",
+              arrastrada === t.id ? "opacity-40" : "hover:-translate-y-0.5 hover:border-[#d50000]",
               sobre === t.id && arrastrada && arrastrada !== t.id ? "border-dashed border-corp bg-rojo-soft" : "border-[#2a2a2a]"
             )}
           >

@@ -102,7 +102,7 @@ export function SucursalShell({ children }: { children: ReactNode }) {
         </>
       }
     >
-      <ModuloContenido key={sedes.actualId} sesion={sesion} sede={sede!.nombre} modulo="SECOCHA" flujo="Venta → Entrega → Requerimiento → Traslado → Caja">
+      <ModuloContenido key={sedes.actualId}>
         {children}
       </ModuloContenido>
     </ModuloLayout>

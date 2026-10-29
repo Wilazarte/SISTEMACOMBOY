@@ -6,16 +6,16 @@ import { cn } from "@/components/ui";
 import { abrirPestana } from "@/lib/logistica";
 import { ErpStatsCard } from "@/components/erp/ErpStatsCard";
 
-// Piezas de Logística Planta: oscuro con acento naranja. Es el diseño de todos los módulos (components/erp).
+// Piezas de las homes de la planta: oscuro con acento rojo #D50000. Es el diseño de todos los módulos (components/erp).
 
-export const NARANJA = "#ff6b00";
+export const NARANJA = "#d50000";
 
 export function Panel({ titulo, icono, accion, children, className, id }: { titulo?: string; icono?: ReactNode; accion?: ReactNode; children: ReactNode; className?: string; id?: string }) {
   return (
     <section id={id} className={cn("rounded-xl border border-[#2a2a2a] bg-[#141414] p-4 text-[#e5e7eb]", className)}>
       {titulo && (
         <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="flex items-center gap-2 text-[15px] font-bold uppercase tracking-wide text-[#ff8a3d]">
+          <h2 className="flex items-center gap-2 text-[15px] font-bold uppercase tracking-wide text-[#ff5252]">
             {icono}
             {titulo}
           </h2>
@@ -33,7 +33,7 @@ export function BotonVer({ href, children }: { href: string; children: ReactNode
     <button
       type="button"
       onClick={() => abrirPestana(href)}
-      className="inline-flex items-center gap-1 rounded-md border border-[#ff6b00]/60 bg-[#ff6b00]/10 px-2.5 py-1 text-[12px] font-semibold text-[#ffb27a] transition hover:bg-[#ff6b00] hover:text-white"
+      className="inline-flex items-center gap-1 rounded-md border border-[#d50000]/60 bg-[#d50000]/10 px-2.5 py-1 text-[12px] font-semibold text-[#ff8a80] transition hover:bg-[#d50000] hover:text-white"
     >
       {children} <ArrowUpRight size={13} />
     </button>
@@ -48,7 +48,7 @@ export function BotonAccion({ href, children, icono, lleno }: { href: string; ch
       onClick={() => abrirPestana(href)}
       className={cn(
         "inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-[13px] font-semibold transition",
-        lleno ? "bg-[#ff6b00] text-white hover:bg-[#e05e00]" : "border border-[#3a3a3a] bg-[#1c1c1c] text-[#e5e7eb] hover:border-[#ff6b00] hover:text-white"
+        lleno ? "bg-[#d50000] text-white hover:bg-[#b00000]" : "border border-[#3a3a3a] bg-[#1c1c1c] text-[#e5e7eb] hover:border-[#d50000] hover:text-white"
       )}
     >
       {icono}
@@ -68,21 +68,21 @@ export function Acceso({ icono, titulo, texto, href }: { icono: ReactNode; titul
       type="button"
       onClick={() => abrirPestana(href)}
       title="Se abre en una pestaña nueva"
-      className="group flex items-center gap-3 rounded-xl border border-[#2a2a2a] bg-[#141414] px-4 py-4 text-left transition hover:border-[#ff6b00]"
+      className="group flex items-center gap-3 rounded-xl border border-[#2a2a2a] bg-[#141414] px-4 py-4 text-left transition hover:border-[#d50000]"
     >
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#ff6b00] text-white">{icono}</span>
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#d50000] text-white">{icono}</span>
       <span className="min-w-0 flex-1">
         <span className="block text-[14px] font-bold uppercase text-white">{titulo}</span>
         <span className="block truncate text-[12px] text-[#a1a1aa]">{texto}</span>
       </span>
-      <ChevronRight size={18} className="shrink-0 text-[#ff6b00] transition group-hover:translate-x-0.5" />
+      <ChevronRight size={18} className="shrink-0 text-[#d50000] transition group-hover:translate-x-0.5" />
     </button>
   );
 }
 
 export function Etiqueta({ children, tono = "naranja" }: { children: ReactNode; tono?: "naranja" | "verde" | "gris" | "azul" }) {
   const cls = {
-    naranja: "bg-[#ff6b00]/15 text-[#ffb27a] ring-[#ff6b00]/40",
+    naranja: "bg-[#d50000]/15 text-[#ff8a80] ring-[#d50000]/40",
     verde: "bg-[#22c55e]/15 text-[#86efac] ring-[#22c55e]/40",
     gris: "bg-white/5 text-[#a1a1aa] ring-white/10",
     azul: "bg-[#3b82f6]/15 text-[#93c5fd] ring-[#3b82f6]/40",
@@ -93,7 +93,7 @@ export function Etiqueta({ children, tono = "naranja" }: { children: ReactNode; 
 export function Barra({ pct }: { pct: number }) {
   return (
     <span className="block h-1.5 w-full overflow-hidden rounded-full bg-white/10" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-      <span className="block h-full rounded-full bg-[#ff6b00]" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
+      <span className="block h-full rounded-full bg-[#d50000]" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
     </span>
   );
 }

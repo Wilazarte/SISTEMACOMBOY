@@ -6,7 +6,7 @@ import { cn } from "./cn";
 
 /**
  * Métrica con icono (COMPRAS ACTIVAS, EN TRÁNSITO, OP ACTIVAS…): tarjeta oscura con borde, título gris en
- * mayúsculas, valor grande en blanco y detalle en naranja. Diseño único de todos los módulos (Logística Planta).
+ * mayúsculas, valor grande en blanco y detalle en rojo claro. Diseño único de todos los módulos (Logística Planta).
  * `href`: navega en la misma pestaña; `onClick`: acción propia (ej. abrir en pestaña nueva).
  */
 export function ErpStatsCard({
@@ -35,16 +35,16 @@ export function ErpStatsCard({
   const cuerpo = (
     <>
       <span className="flex w-full items-center justify-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-[#a1a1aa]">
-        <span className="text-[#ff6b00]">{icono}</span>
+        <span className="text-[#d50000]">{icono}</span>
         {titulo}
         {extra}
       </span>
       <span className={cn("text-3xl font-bold tabular lg:text-4xl", alerta ? "text-[#f87171]" : "text-white")}>{valor}</span>
-      {detalle && <span className="text-[12px] font-medium text-[#ffb27a]">{detalle}</span>}
+      {detalle && <span className="text-[12px] font-medium text-[#ff8a80]">{detalle}</span>}
     </>
   );
   const cls = cn(
-    "flex flex-col items-center gap-1 rounded-xl border border-[#2a2a2a] bg-[#141414] px-4 py-5 text-center transition hover:border-[#ff6b00]",
+    "flex flex-col items-center gap-1 rounded-xl border border-[#2a2a2a] bg-[#141414] px-4 py-5 text-center transition hover:border-[#d50000]",
     className
   );
   if (href && !onClick)

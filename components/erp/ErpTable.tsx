@@ -26,7 +26,7 @@ export function ErpTable({
   return (
     <div className={cn("overflow-x-auto", className)}>
       <table className={cn("w-full min-w-[720px] text-left text-sm", compacto && "[&_td]:px-2 [&_td]:py-2")}>
-        <thead className={cn("border-y border-[#2a2a2a] bg-[#1c1c1c] font-bold uppercase text-[#ffb27a]", compacto ? "text-[10px] tracking-wide" : "text-[11px] tracking-wider")}>
+        <thead className={cn("border-y border-[#2a2a2a] bg-[#1c1c1c] font-bold uppercase text-[#ff8a80]", compacto ? "text-[10px] tracking-wide" : "text-[11px] tracking-wider")}>
           <tr>
             {head.map((h) => (
               <th key={h} className={compacto ? "px-2 py-2 leading-tight" : "whitespace-nowrap px-4 py-2.5"}>

@@ -101,7 +101,7 @@ export function GerenciaDashboard() {
     <div className="space-y-5 text-[#e5e7eb]">
       {/* Fila 1: ticker tipo bolsa */}
       <section aria-label="Indicadores en vivo" className="flex items-stretch overflow-hidden rounded-xl border border-[#2a2a2a] bg-[#141414]">
-        <span className="flex shrink-0 items-center gap-2 bg-[#ff6b00] px-4 text-[13px] font-bold uppercase text-white">
+        <span className="flex shrink-0 items-center gap-2 bg-[#d50000] px-4 text-[13px] font-bold uppercase text-white">
           <Radio size={16} className="animate-pulse" /> En vivo · {hhmm(ahora)}
         </span>
         <div className="relative min-w-0 flex-1 overflow-hidden py-3">
@@ -112,7 +112,7 @@ export function GerenciaDashboard() {
                   <span key={`${copia}-${t.label}`} aria-hidden={copia === 1} className="flex items-center gap-2 text-[15px] lg:text-[17px]">
                     <span className="font-semibold uppercase text-[#a1a1aa]">{t.label}:</span>
                     <span className="font-bold text-white">{t.valor}</span>
-                    <span className="pl-8 text-[#ff6b00]">|</span>
+                    <span className="pl-8 text-[#d50000]">|</span>
                   </span>
                 ))}
               </Fragment>
@@ -130,7 +130,7 @@ export function GerenciaDashboard() {
             const activa = etapa === e.id;
             return (
               <Fragment key={e.id}>
-                {i > 0 && <ChevronRight size={20} className="hidden shrink-0 self-center text-[#ff6b00] xl:block" aria-hidden />}
+                {i > 0 && <ChevronRight size={20} className="hidden shrink-0 self-center text-[#d50000] xl:block" aria-hidden />}
                 <button
                   type="button"
                   aria-pressed={activa}
@@ -153,7 +153,7 @@ export function GerenciaDashboard() {
         </div>
         {seleccion && (
           <div className="mt-4">
-            <p className="mb-2 text-[13px] font-bold uppercase text-[#ff8a3d]">
+            <p className="mb-2 text-[13px] font-bold uppercase text-[#ff5252]">
               Detalle · {seleccion.label} ({g.porEtapa[seleccion.id]}) · solo lectura
             </p>
             <TablaFlujo filas={g.filas.filter((f) => f.etapa === seleccion.id)} ahora={ahora} vacio={`Sin documentos en ${seleccion.label}.`} />

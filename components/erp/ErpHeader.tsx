@@ -2,22 +2,20 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Fragment, useEffect, useState, type ReactNode } from "react";
-import { usePathname } from "next/navigation";
-import { ChevronRight, LogOut, MapPin } from "lucide-react";
-import { cargoDe, nombreDe, type Sesion } from "@/lib/auth";
-import { ETIQUETA_PERFIL, perfilPlanta } from "@/lib/permisosPlanta";
+import type { ReactNode } from "react";
+import { LogOut } from "lucide-react";
 
 const TIMES = '"Times New Roman", Times, serif';
 export const NOMBRE_EMPRESA = "COMBOY VID";
 
 /**
- * Encabezado fijo de todos los módulos: logo COMBOY VID a la izquierda, "ERP COMBOY VID" centrado y a la derecha
- * buscador (Ctrl K) y campana (`extra`), usuario (avatar SO SOPORTE, FI FINANZAS…) y salir.
+ * Barra superior de todos los módulos (pedido de Williams, 2026-10-29): izquierda logo + "ERP COMBOY VID",
+ * centro el nombre del módulo actual en rojo #D50000 (ALMACEN, LOGISTICA, FINANZAS, PRODUCCION…; viene de la ruta),
+ * derecha buscador (Ctrl K), campana (`extra`), usuario (SO SOPORTE…) y salir.
  * No lleva botones a otros módulos: esos van en el dock y en Accesos rápidos, filtrados por permiso.
  */
 export function ErpHeader({
-  titulo = "ERP COMBOY VID",
+  modulo,
   inicio = "/dashboard",
   usuario,
   nombre,
@@ -25,7 +23,8 @@ export function ErpHeader({
   onSalir,
   extra,
 }: {
-  titulo?: string;
+  /** Nombre del módulo actual (centro, en rojo). */
+  modulo?: string;
   inicio?: string;
   usuario?: string;
   nombre?: string;
@@ -36,16 +35,21 @@ export function ErpHeader({
 }) {
   return (
     <header className="fixed inset-x-0 top-0 z-40 flex h-[64px] items-center justify-between gap-3 border-b border-[#2a2a2a] bg-[#0a0a0a]/95 px-4 backdrop-blur print:hidden lg:px-6">
-      <Link href={inicio} className="z-10 flex shrink-0 items-center" aria-label="Inicio">
+      <Link href={inicio} className="z-10 flex shrink-0 items-center gap-3" aria-label="Inicio">
         <Image src="/comboy-logo.png" alt="COMBOY VID" width={110} height={36} priority className="h-9 w-auto bg-transparent object-contain" />
+        <span className="hidden whitespace-nowrap text-[18px] font-extrabold uppercase text-white lg:block" style={{ fontFamily: TIMES }}>
+          ERP COMBOY VID
+        </span>
       </Link>
 
-      <h1
-        className={`pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 whitespace-nowrap font-extrabold uppercase text-white ${titulo.length > 20 ? "text-[15px] lg:block xl:text-[22px]" : "text-[18px] sm:block sm:text-[26px]"}`}
-        style={{ fontFamily: TIMES }}
-      >
-        {titulo}
-      </h1>
+      {modulo && (
+        <h1
+          className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-[20px] font-extrabold uppercase text-[#D50000] sm:block sm:text-[28px]"
+          style={{ fontFamily: TIMES }}
+        >
+          {modulo}
+        </h1>
+      )}
 
       <div className="z-10 flex items-center gap-2">
         {extra}
@@ -65,60 +69,6 @@ export function ErpHeader({
         )}
       </div>
     </header>
-  );
-}
-
-/**
- * Sub-header de todos los módulos: Nombre · Rol · MODULO X · Empresa; a la derecha Sede y fecha;
- * debajo el flujo del módulo como breadcrumb (Compra nacional → Agencia → Almacén → …).
- */
-export function ErpSubHeader({
-  sesion,
-  modulo,
-  flujo,
-  persona,
-  sede,
-}: {
-  sesion: Sesion;
-  modulo?: string;
-  flujo?: string;
-  /** Nombre y cargo fijos del módulo. */
-  persona?: { nombre: string; cargo: string };
-  sede: string;
-}) {
-  const ruta = usePathname();
-  const [fecha, setFecha] = useState("");
-  useEffect(() => {
-    setFecha(new Date().toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric" }));
-  }, [ruta]);
-
-  const perfil = perfilPlanta(sesion);
-  const rol = perfil ? ETIQUETA_PERFIL[perfil].label : (persona?.cargo ?? cargoDe(sesion));
-  const pasos = flujo ? flujo.split("→").map((p) => p.trim()).filter(Boolean) : [];
-  return (
-    <section className="flex w-full flex-col gap-2 rounded-xl border border-[#2a2a2a] bg-[#141414]/90 px-4 py-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="min-w-0 truncate text-[13px] text-[#a1a1aa]">
-          <span className="font-semibold text-white">{persona?.nombre ?? nombreDe(sesion)}</span>
-          <span> · {rol}</span>
-          {modulo && <span className="font-semibold text-[#ff8a3d]"> · MODULO {modulo}</span>}
-          <span> · {NOMBRE_EMPRESA}</span>
-        </p>
-        <span className="inline-flex items-center gap-1 rounded-full border border-[#2a2a2a] bg-[#1c1c1c] px-2.5 py-1 text-xs text-[#d4d4d8]">
-          <MapPin size={12} className="text-[#ff6b00]" /> Sede: {sede} · {fecha}
-        </span>
-      </div>
-      {pasos.length > 1 && (
-        <nav aria-label="Flujo del módulo" className="flex flex-wrap items-center gap-1 text-[11px] text-[#a1a1aa]">
-          {pasos.map((p, i) => (
-            <Fragment key={p + i}>
-              {i > 0 && <ChevronRight size={12} className="text-[#ff6b00]" aria-hidden />}
-              <span className="rounded-md bg-[#1c1c1c] px-2 py-0.5">{p}</span>
-            </Fragment>
-          ))}
-        </nav>
-      )}
-    </section>
   );
 }
 

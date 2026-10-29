@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   Bell,
@@ -17,7 +16,7 @@ import {
   Container,
 } from "lucide-react";
 import { useSesion } from "@/lib/auth";
-import { VERSION_LOGISTICA, useLogistica } from "@/lib/logistica";
+import { useLogistica } from "@/lib/logistica";
 import { useNotificaciones } from "@/lib/notificaciones";
 import { RUTA_MUNDO_VENTAS, permisosPlanta } from "@/lib/permisosPlanta";
 import { soles } from "@/lib/storage";
@@ -30,7 +29,6 @@ import { AccesosRapidos } from "./AccesosRapidos";
 const corto = (n: number): string =>
   n >= 1_000_000 ? `S/${(n / 1_000_000).toLocaleString("es-PE", { maximumFractionDigits: 1 })}M` : n >= 1000 ? `S/${Math.round(n / 1000)}k` : soles(n);
 
-const hora = () => new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", hour12: false });
 
 /**
  * Secciones de Logística: ya no se muestran como accesos rápidos (pedido de Williams, 2026-10-29),
@@ -52,8 +50,6 @@ export function LogisticaHome() {
   const { sesion } = useSesion();
   const d = useLogistica();
   const notifs = useNotificaciones(sesion);
-  const [sync, setSync] = useState("");
-  useEffect(() => setSync(hora()), [d]);
 
   const oc = d.ocActivas[0];
   const enTransito = d.odsTransito.length + d.trasladosCamino.length;
@@ -65,7 +61,7 @@ export function LogisticaHome() {
     <MarcoPlanta>
       <EncabezadoPlanta
         icono={<Truck size={30} />}
-        titulo="Comboy Vid Logística Planta"
+        titulo="LOGISTICA"
         subtitulo="Compras y Ventas Nacionales · Sin Flota · Marvisur · Grael · Shalom · Arequipa · Perú"
         accion={
           <div className="flex flex-wrap gap-2">
@@ -124,7 +120,7 @@ export function LogisticaHome() {
 
       {/* Accesos rápidos del diseño: las secciones de Logística */}
       <section>
-        <h2 className="mb-3 flex items-center gap-2 text-2xl font-bold uppercase text-[#ff8a3d]">
+        <h2 className="mb-3 flex items-center gap-2 text-2xl font-bold uppercase text-[#ff5252]">
           <LayoutGrid size={24} /> Accesos rápidos
         </h2>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -137,9 +133,6 @@ export function LogisticaHome() {
       {/* Funciones de Logística (Crear OC, Emitir Factura, Mundo Ventas…) o, para SOPORTE, la barra de módulos */}
       <AccesosRapidos sesion={sesion} actual="logistica" />
 
-      <footer className="text-[13px] text-[#a1a1aa]">
-        COMBOY VID LOGÍSTICA PLANTA · {VERSION_LOGISTICA} · Última sincronización: Hoy {sync}
-      </footer>
 
     </MarcoPlanta>
   );

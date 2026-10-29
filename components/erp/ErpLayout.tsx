@@ -6,7 +6,7 @@ import { ID_BARRA_PESTANAS } from "@/components/ui";
 import type { Sesion } from "@/lib/auth";
 import { VERSION_LOGISTICA } from "@/lib/logistica";
 import { ETIQUETA_PERFIL, perfilPlanta } from "@/lib/permisosPlanta";
-import { ErpHeader, ErpSubHeader, NOMBRE_EMPRESA } from "./ErpHeader";
+import { ErpHeader, NOMBRE_EMPRESA } from "./ErpHeader";
 
 const horaActual = () => new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", hour12: false });
 
@@ -17,7 +17,6 @@ const horaActual = () => new Date().toLocaleTimeString("es-PE", { hour: "2-digit
  */
 export function ErpLayout({
   moduleName,
-  titulo,
   sede,
   inicio,
   sesion,
@@ -28,8 +27,6 @@ export function ErpLayout({
   children,
 }: {
   moduleName: string;
-  /** Título centrado del header (por defecto "ERP COMBOY VID"). */
-  titulo?: string;
   /** Sede que se muestra en el pie (el sub-header la recibe ErpContenido). */
   sede: string;
   inicio?: string;
@@ -52,7 +49,7 @@ export function ErpLayout({
     <div className="dark tema-planta fondo-grid relative isolate flex min-h-screen flex-col pb-32 text-fg" data-modulo={moduleName}>
 
       <ErpHeader
-        titulo={titulo}
+        modulo={moduleName}
         inicio={inicio}
         // Perfil de la planta: SO SOPORTE, AL ALMACEN, FI FINANZAS, LO LOGISTICA, PR PRODUCCION
         usuario={etiqueta?.label ?? sesion.usuario}
@@ -78,26 +75,10 @@ export function ErpLayout({
   );
 }
 
-/** Contenido del módulo: sub-header (nombre · rol · módulo · empresa, sede y flujo), isla de pestañas y la página. */
-export function ErpContenido({
-  sesion,
-  sede,
-  modulo,
-  flujo,
-  avisos,
-  children,
-}: {
-  sesion: Sesion;
-  sede: string;
-  modulo?: string;
-  flujo?: string;
-  /** Avisos bajo la isla (solo lectura, observaciones de Gerencia…). */
-  avisos?: ReactNode;
-  children: ReactNode;
-}) {
+/** Contenido del módulo: isla de pestañas y la página (sin barra de contexto, pedido de Williams 2026-10-29). */
+export function ErpContenido({ avisos, children }: { /** Avisos bajo la isla (solo lectura, observaciones de Gerencia…). */ avisos?: ReactNode; children: ReactNode }) {
   return (
     <div className="animate-velo space-y-5" /* solo opacidad: un transform rompería los modales fijos */>
-      <ErpSubHeader sesion={sesion} sede={sede} modulo={modulo} flujo={flujo} />
       {/* Menú isla del módulo (components/ui Tabs dibuja aquí su IslandMenu): fijo al hacer scroll */}
       <div id={ID_BARRA_PESTANAS} className="sticky top-16 z-10 empty:hidden" />
       {avisos}

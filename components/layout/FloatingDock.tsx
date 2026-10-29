@@ -66,7 +66,7 @@ export function FloatingDock({ sesion, tab }: { sesion: Sesion; tab?: string }) 
             title={label}
             className={cn(
               "flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-full px-2 py-1.5 text-[11px] sm:px-3 transition-colors duration-200",
-              on ? "bg-[#ff6b00] font-bold text-white" : "font-normal text-[#a1a1aa] hover:bg-white/5 hover:text-white"
+              on ? "bg-[#d50000] font-bold text-white" : "font-normal text-[#a1a1aa] hover:bg-white/5 hover:text-white"
             )}
           >
             <Icon size={18} strokeWidth={2} />

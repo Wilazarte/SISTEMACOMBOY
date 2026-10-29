@@ -16,15 +16,15 @@ import { ErpTable, ErpTd } from "@/components/erp/ErpTable";
 import { BotonAccion, BotonVer, Etiqueta, Panel, SinRegistro } from "./piezas";
 import { BarraAcciones, BarraModulos, EncabezadoPlanta, Filas, MarcoPlanta, PanelLateral, horaActual, montoCorto } from "./planta";
 
-/** Tarjeta KPI del diseño de Finanzas: icono a la izquierda, título, monto y detalle en verde/naranja. */
+/** Tarjeta KPI del diseño de Finanzas: icono a la izquierda, título, monto y detalle en verde/rojo. */
 function KpiFinanzas({ icono, titulo, valor, detalle, href, alerta }: { icono: React.ReactNode; titulo: string; valor: string; detalle: string; href: string; alerta?: boolean }) {
   return (
-    <button type="button" onClick={() => abrirPestana(href)} className="flex items-center gap-3 rounded-xl border border-[#2a2a2a] bg-[#141414] px-4 py-4 text-left transition hover:border-[#ff6b00]">
-      <span className="shrink-0 text-[#ff6b00]">{icono}</span>
+    <button type="button" onClick={() => abrirPestana(href)} className="flex items-center gap-3 rounded-xl border border-[#2a2a2a] bg-[#141414] px-4 py-4 text-left transition hover:border-[#d50000]">
+      <span className="shrink-0 text-[#d50000]">{icono}</span>
       <span className="min-w-0">
         <span className="block text-[15px] font-semibold text-white">{titulo}</span>
         <span className="block text-2xl font-bold text-white">{valor}</span>
-        <span className={`block truncate text-[12px] font-semibold ${alerta ? "text-[#ff8a3d]" : "text-[#4ade80]"}`}>{detalle}</span>
+        <span className={`block truncate text-[12px] font-semibold ${alerta ? "text-[#ff5252]" : "text-[#4ade80]"}`}>{detalle}</span>
       </span>
     </button>
   );
@@ -115,7 +115,7 @@ export function FinanzasHome() {
     <MarcoPlanta lateral={<PanelLateral sesion={sesion} modulo="Finanzas" notifs={notifs} recordatorios={recordatorios} />}>
       <EncabezadoPlanta
         icono={<CircleDollarSign size={30} />}
-        titulo="Comboy Vid Finanzas Planta"
+        titulo="FINANZAS"
         subtitulo={`Tesorería · Pagos · Planilla · Facturación · Contabilidad · Actualizado: Hoy ${sync}`}
         accion={
           <div className="flex gap-2">
@@ -139,7 +139,7 @@ export function FinanzasHome() {
         <div className="space-y-4">
           <Panel titulo="Bancarización" icono={<Landmark size={17} />}>
             <p className="flex items-center gap-2 text-[14px] font-semibold text-white">
-              <FileText size={16} className="text-[#ff6b00]" /> Vouchers del mes: {d.bancarizadasMes} OC bancarizada(s)
+              <FileText size={16} className="text-[#d50000]" /> Vouchers del mes: {d.bancarizadasMes} OC bancarizada(s)
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <BotonAccion href="/dashboard/compras?tab=ordenes" icono={<Upload size={15} />}>
@@ -184,9 +184,9 @@ export function FinanzasHome() {
             <ol className="flex flex-wrap items-center gap-2 text-[14px] font-semibold text-white">
               {["Subir Asistencia", "Sistema Calcula Automático", "Planilla Lista / Pagar"].map((p, i) => (
                 <Fragment key={p}>
-                  {i > 0 && <ArrowRight size={16} className="text-[#ff6b00]" aria-hidden />}
+                  {i > 0 && <ArrowRight size={16} className="text-[#d50000]" aria-hidden />}
                   <li className="flex items-center gap-2 rounded-full border border-[#2a2a2a] bg-[#1c1c1c] px-3 py-1">
-                    {i < 2 ? <span className="flex h-6 w-6 items-center justify-center rounded-full border border-[#ff6b00] text-[12px] text-[#ff6b00]">{i + 1}</span> : <CheckCircle2 size={20} className="text-[#ff6b00]" />}
+                    {i < 2 ? <span className="flex h-6 w-6 items-center justify-center rounded-full border border-[#d50000] text-[12px] text-[#d50000]">{i + 1}</span> : <CheckCircle2 size={20} className="text-[#d50000]" />}
                     {p}
                   </li>
                 </Fragment>
@@ -209,7 +209,7 @@ export function FinanzasHome() {
               <div>
                 <p className="text-[14px] font-bold text-white">Obreros</p>
                 <p className="text-[12px] text-[#a1a1aa]">Pago diario, semanal, quincenal o por hora</p>
-                <p className="text-2xl font-bold text-[#ff6b00]">{obreros}</p>
+                <p className="text-2xl font-bold text-[#d50000]">{obreros}</p>
               </div>
               <div>
                 <p className="text-[14px] font-bold text-white">Empleados admin</p>
@@ -257,7 +257,7 @@ export function FinanzasHome() {
               </div>
               <div>
                 <p className="text-[12px] font-semibold text-[#a1a1aa]">IGV a Pagar</p>
-                <p className="text-xl font-bold text-[#ff8a3d]">{soles(igvPagar)}</p>
+                <p className="text-xl font-bold text-[#ff5252]">{soles(igvPagar)}</p>
               </div>
               <span className="flex items-center gap-2">
                 <span className="font-semibold text-white">PDT 621</span>
@@ -289,7 +289,7 @@ export function FinanzasHome() {
               <ErpTd>{fechaPE(c.fecha)}</ErpTd>
               <ErpTd className="font-semibold text-white">{c.proveedor}</ErpTd>
               <ErpTd>{c.doc}</ErpTd>
-              <ErpTd className="text-right font-semibold text-[#ffb27a]">{soles(c.total)}</ErpTd>
+              <ErpTd className="text-right font-semibold text-[#ff8a80]">{soles(c.total)}</ErpTd>
               <ErpTd>
                 <BotonVer href={c.href}>Ver</BotonVer>
               </ErpTd>
