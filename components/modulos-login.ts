@@ -16,7 +16,7 @@ export const MODULOS_SELECCION: TarjetaModulo[] = [
   { id: "contable", titulo: "Área Contable", desc: "Contabilidad y balances financieros", icon: Calculator },
   { id: "tesoreria", titulo: "Tesorería (Planilla - Compras)", desc: "Finanzas, planilla y compras", icon: Landmark },
   { id: "produccion", titulo: "Inventario", desc: "Producción e inventarios en almacén", icon: Factory },
-  { id: "logistica", titulo: "Logística (Requerimientos - En camino - Entregado)", desc: "Requerimientos • En camino • Entregado", icon: Truck, proximamente: true },
+  { id: "logistica", titulo: "Logística (Requerimientos - En camino - Entregado)", desc: "Requerimientos • En camino • Entregado", icon: Truck },
   { id: "sucursal", titulo: "Secocha", desc: "Sistema aparte de la sede Secocha (Arequipa es la Planta Principal)", icon: Store },
 ];
 
@@ -25,6 +25,9 @@ const ANTERIORES: TarjetaModulo[] = [
   { id: "almacen", titulo: "Almacén", desc: "Inventarios y materiales", icon: Package },
   { id: "planilla", titulo: "Planilla", desc: "Recursos humanos y pagos", icon: Users },
   { id: "gerencia", titulo: "Gerencia", desc: "Reportes y analíticas", icon: BarChart3 },
+  // Del dock del login (pantalla de presentación)
+  { id: "soporte", titulo: "Soporte", desc: "Dueño del sistema", icon: BarChart3 },
+  { id: "finanzas", titulo: "Finanzas", desc: "Tesorería, planilla y compras", icon: Landmark },
 ];
 
 export const tarjetaDe = (id: ModuloLogin): TarjetaModulo => [...MODULOS_SELECCION, ...ANTERIORES].find((t) => t.id === id)!;
@@ -40,6 +43,8 @@ export const ENCARGADOS_LOGIN: Record<ModuloLogin, { nombre: string; cargo: stri
   almacen: { nombre: "JOSE MANUEL ORTIZ ARAPA", cargo: "Jefe de Almacén - Módulo de Almacén" },
   planilla: { nombre: "Encargado de Planilla", cargo: "RRHH - Módulo de Planilla" },
   gerencia: { nombre: "Gerencia General", cargo: "Gerencia - COMBOY VID" },
+  soporte: { nombre: "SOPORTE", cargo: "Dueño del sistema - COMBOY VID" },
+  finanzas: { nombre: "LIZBETH CAHUANA APFATA", cargo: "Tesorera - Módulo de Finanzas" },
 };
 
 /** Ruta para "Realizar requerimiento" (Inventario): Almacén › Nuevo requerimiento. */

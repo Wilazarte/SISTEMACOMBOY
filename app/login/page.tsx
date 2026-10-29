@@ -3,17 +3,17 @@
 import Image from "next/image";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle, BarChart3, Calculator, Eye, EyeOff, Factory, Landmark, Loader2, Lock, LogIn, Store, Truck, User, X, type LucideIcon } from "lucide-react";
+import { AlertCircle, BarChart3, Eye, EyeOff, Factory, Landmark, Loader2, Lock, LogIn, Store, Truck, User, X, type LucideIcon } from "lucide-react";
 import { CLAVE_MODULO, CLAVE_USUARIO, MODULOS_LOGIN, RUTA_LOGIN_SUCURSAL, RUTA_SUCURSAL, soloSecocha, login, logout, moduloGuardado, perteneceAModulo, puedeVer, rutaDeModulo, useSesion, type ModuloLogin } from "@/lib/auth";
 import { CLAVE_SELECCION, ENCARGADOS_LOGIN, tarjetaDe } from "@/components/modulos-login";
 
 /** Botones del dock: `slug` es la ruta /login/<slug> (app/login/[modulo] redirige a /login?modulo=). */
 const DOCK: { id: ModuloLogin; slug: string; titulo: string; icon: LucideIcon }[] = [
-  { id: "ventas", slug: "ventas", titulo: "VENTAS", icon: BarChart3 },
-  { id: "contable", slug: "contable", titulo: "CONTABLE", icon: Calculator },
-  { id: "tesoreria", slug: "tesoreria", titulo: "TESORERIA", icon: Landmark },
-  { id: "produccion", slug: "inventario", titulo: "PRODUCCION", icon: Factory },
+  { id: "soporte", slug: "soporte", titulo: "SOPORTE", icon: BarChart3 },
   { id: "logistica", slug: "logistica", titulo: "LOGISTICA", icon: Truck },
+  { id: "almacen", slug: "almacen", titulo: "ALMACEN", icon: Landmark },
+  { id: "finanzas", slug: "finanzas", titulo: "FINANZAS", icon: Factory },
+  { id: "produccion", slug: "produccion", titulo: "PRODUCCION", icon: Store },
 ];
 
 /**
@@ -47,7 +47,7 @@ function Login() {
   const params = useSearchParams();
   const { sesion } = useSesion();
   const pedido = moduloPedido(params.get("modulo"));
-  // Logística sigue en "próximamente": se marca en el dock pero no abre el formulario
+  // Módulo en "próximamente": se marca en el dock pero no abre el formulario
   const proximamente = pedido !== "" && !!tarjetaDe(pedido).proximamente;
   const modulo = proximamente ? "" : pedido;
   // ?siguiente=/dashboard/... (ej. "Realizar requerimiento" desde /seleccionar-modulo)
@@ -134,8 +134,8 @@ function Login() {
 
       {/* Título + formulario del módulo elegido */}
       <section className="flex flex-col items-center px-4 text-center">
-        <h1 className="mt-12 text-[28px] font-bold uppercase leading-tight text-white md:text-[40px]">BIENVENIDO AL SISTEMA ERP COMBOY VID</h1>
-        <p className="mt-4 text-[20px] text-[#8fb0ff]">{encargado ? `${encargado.nombre} · ${encargado.cargo}` : "Selecciona tu módulo"}</p>
+        <h1 className="mt-10 font-serif text-[28px] font-bold uppercase leading-tight text-white md:text-[40px]">BIENVENIDO AL SISTEMA ERP COMBOY VID</h1>
+        <p className="mt-4 text-[20px] text-[#6B8AFF]">{encargado ? `${encargado.nombre} · ${encargado.cargo}` : "Selecciona tu módulo"}</p>
         {proximamente && (
           <p className="mt-6 animate-aparecer rounded-full border border-white/20 bg-black/40 px-5 py-2 text-sm text-white/80 backdrop-blur-xl">
             {tarjetaDe(pedido as ModuloLogin).titulo.split(" (")[0]} estará disponible próximamente.
@@ -220,7 +220,7 @@ function Login() {
 
       {/* Dock de módulos (scroll horizontal en mobile) */}
       <nav className="mt-10 w-full px-4 pb-10">
-        <div className="mx-auto flex w-full max-w-[1050px] justify-between gap-3 overflow-x-auto rounded-full border border-white/20 bg-black/30 px-6 py-4 backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="mx-auto flex w-full max-w-[1050px] justify-between gap-3 overflow-x-auto rounded-full border border-white/15 bg-black/55 px-6 py-4 backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {DOCK.map(({ id, slug, titulo, icon: Icon }) => {
             const sel = activo === id;
             return (
@@ -230,10 +230,8 @@ function Login() {
                 data-modulo={id}
                 aria-pressed={sel}
                 onClick={() => elegir(id, slug)}
-                className={`flex h-20 min-w-[112px] flex-1 flex-col items-center justify-center gap-1.5 rounded-full border text-[15px] font-bold text-white transition-all duration-200 ${
-                  sel
-                    ? "border-[#ff5a5a] bg-gradient-to-b from-[#e42323] to-[#7a0000] shadow-[0_0_22px_rgba(255,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.35)]"
-                    : "border-white/20 bg-white/10 text-white/85 hover:border-white/40 hover:bg-white/15 hover:text-white"
+                className={`flex h-20 min-w-[112px] flex-1 flex-col items-center justify-center gap-1.5 rounded-full border bg-[#141414]/90 text-[15px] font-bold text-white transition-all duration-200 hover:scale-105 hover:border-[#D50000] hover:shadow-[0_0_20px_rgba(213,0,0,0.75)] ${
+                  sel ? "scale-105 border-[#D50000] shadow-[0_0_22px_rgba(213,0,0,0.9)]" : "border-white/15"
                 }`}
               >
                 <Icon size={24} strokeWidth={2} />
@@ -259,9 +257,9 @@ function Login() {
   );
 }
 
-/** Logo COMBOY VID transparente (/logo.png). */
+/** Logo COMBOY VID transparente (/logo.png), al 150 %. */
 function Logo() {
-  return <Image src="/logo.png" alt="COMBOY VID" width={500} height={160} priority className="h-[160px] w-[500px] max-w-full object-contain drop-shadow-[0_0_18px_rgba(0,0,0,0.6)]" />;
+  return <Image src="/logo.png" alt="COMBOY VID" width={750} height={240} priority className="h-[240px] w-[750px] max-w-full object-contain drop-shadow-[0_0_18px_rgba(0,0,0,0.6)]" />;
 }
 
 /** Fondo: imagen de referencia /login-bg.jpg a pantalla completa con overlay negro 40%. */
