@@ -111,5 +111,5 @@ export function SucursalShell({ children }: { children: ReactNode }) {
 
 
 function Centro({ children }: { children: ReactNode }) {
-  return <div className="dark tema-azul tema-planta flex min-h-screen flex-col items-center justify-center bg-[#0e1219] p-6 text-center text-fg">{children}</div>;
+  return <div className="dark tema-planta fondo-grid flex min-h-screen flex-col items-center justify-center bg-[#0a0a0a] p-6 text-center text-fg">{children}</div>;
 }

@@ -42,12 +42,12 @@ export function ErpAlertList({
   return (
     <div className={className}>
       {titulo && (
-        <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#fb923c]">
+        <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#ff8a3d]">
           {icono} {titulo}
         </p>
       )}
       {items.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-[#2a3445] px-3 py-3 text-center text-[12px] text-[#a1a1aa]">{vacio}</p>
+        <p className="rounded-lg border border-dashed border-[#2a2a2a] px-3 py-3 text-center text-[12px] text-[#a1a1aa]">{vacio}</p>
       ) : (
         <ul className="space-y-1.5">
           {visibles.map((n) => {
@@ -59,12 +59,12 @@ export function ErpAlertList({
                   onClick={accion}
                   disabled={!accion}
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-lg border border-[#2a3445] bg-[#212a3a] px-3 py-2 text-left transition",
-                    accion && "hover:border-[#f97316]"
+                    "flex w-full items-center gap-3 rounded-lg border border-[#2a2a2a] bg-[#1c1c1c] px-3 py-2 text-left transition",
+                    accion && "hover:border-[#ff6b00]"
                   )}
                 >
-                  {n.nuevo !== undefined && <span className={cn("h-2 w-2 shrink-0 rounded-full", n.nuevo ? "bg-[#f97316]" : "bg-[#3a4558]")} />}
-                  {n.icono && <span className="shrink-0 text-[#f97316]">{n.icono}</span>}
+                  {n.nuevo !== undefined && <span className={cn("h-2 w-2 shrink-0 rounded-full", n.nuevo ? "bg-[#ff6b00]" : "bg-[#3a3a3a]")} />}
+                  {n.icono && <span className="shrink-0 text-[#ff6b00]">{n.icono}</span>}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] font-semibold text-white">{n.titulo}</span>
                     {n.detalle && <span className="block truncate text-[12px] text-[#a1a1aa]">{n.detalle}</span>}

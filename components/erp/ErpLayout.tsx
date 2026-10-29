@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { ID_BARRA_PESTANAS } from "@/components/ui";
@@ -12,9 +11,9 @@ import { ErpHeader, ErpSubHeader, NOMBRE_EMPRESA } from "./ErpHeader";
 const horaActual = () => new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", hour12: false });
 
 /**
- * Layout global de todos los módulos (diseño de Logística Planta): fondo #0e1219 con el mapa mundial tenue,
+ * Layout global de todos los módulos (diseño de Logística Planta): fondo #0a0a0a con el mapa mundial tenue,
  * ErpHeader fijo, contenido de 1600 px y pie con versión y última sincronización.
- * Tema: clases .dark .tema-azul .tema-planta (app/globals.css) — los colores de las páginas salen de ahí.
+ * Tema: clases .dark .tema-planta (app/globals.css) — los colores de las páginas salen de ahí.
  */
 export function ErpLayout({
   moduleName,
@@ -49,12 +48,8 @@ export function ErpLayout({
   const perfil = perfilPlanta(sesion);
   const etiqueta = perfil ? ETIQUETA_PERFIL[perfil] : undefined;
   return (
-    <div className="dark tema-azul tema-planta relative isolate flex min-h-screen flex-col pb-32 text-fg" data-modulo={moduleName}>
-      {/* Fondo oscuro con el mapa mundial tenue */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 z-[-1] bg-[#0e1219]">
-        <Image src="/blue-globe.jpg" alt="" fill priority quality={80} sizes="100vw" className="object-cover object-center opacity-[0.16] grayscale" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0e1219]/40 via-transparent to-[#0e1219]/80" />
-      </div>
+    // Fondo negro con grid tenue (fondo-grid, app/globals.css)
+    <div className="dark tema-planta fondo-grid relative isolate flex min-h-screen flex-col pb-32 text-fg" data-modulo={moduleName}>
 
       <ErpHeader
         titulo={titulo}
@@ -70,7 +65,7 @@ export function ErpLayout({
       <main className={`w-full flex-1 transition-[padding] duration-300 ${mainClassName}`}>
         <div className="mx-auto w-full max-w-[1600px] px-4 pt-20 sm:px-6 lg:px-8">{children}</div>
       </main>
-      <footer className="mt-8 flex flex-wrap items-center justify-between gap-2 border-t border-[#2a3445] px-4 py-4 text-xs text-[#a1a1aa] sm:px-6 lg:px-8">
+      <footer className="mt-8 flex flex-wrap items-center justify-between gap-2 border-t border-[#2a2a2a] px-4 py-4 text-xs text-[#a1a1aa] sm:px-6 lg:px-8">
         <span>
           <span className="font-semibold text-white">{NOMBRE_EMPRESA}</span> © 2025 · ERP COMBOY VID · Sede {sede} · Área Informática
         </span>

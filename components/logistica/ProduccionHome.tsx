@@ -1,25 +1,48 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { BadgeCheck, ClipboardList, Cog, Container, Factory, Flame, PackageMinus, Wrench } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { BadgeCheck, ClipboardList, Clock, Cog, Factory, Flame, Gauge, MapPin, PackageMinus, Plus, Truck, Wrench } from "lucide-react";
 import { useSesion } from "@/lib/auth";
 import type { EquipoTerminado } from "@/lib/equipos";
 import { consumosDeChasis } from "@/lib/inventario";
+import { abrirPestana } from "@/lib/logistica";
 import { useNotificaciones } from "@/lib/notificaciones";
 import type { OrdenProduccion } from "@/lib/produccion";
-import { KEYS, fechaPE, hoy, r2, soles, useStore } from "@/lib/storage";
+import { KEYS, fechaPE, r2, soles, useStore } from "@/lib/storage";
 import type { StockItem, ValeProduccion } from "@/lib/types";
-import { BotonAccion, Etiqueta, Kpi, Panel, SinRegistro } from "./piezas";
-import { EncabezadoPlanta, Filas, MarcoPlanta, PanelLateral, horaActual } from "./planta";
-import { AccesosRapidos } from "./AccesosRapidos";
+import { BotonAccion, Etiqueta, Panel, SinRegistro } from "./piezas";
+import { BarraAcciones, BarraModulos, Filas, MarcoPlanta, PanelLateral, TiemposCosto, horaActual } from "./planta";
 
 const ESTACIONES = [
-  { nombre: "Plasma CNC", detalle: "Corte de planchas", icono: <Flame size={18} /> },
-  { nombre: "Torno", detalle: "Mecanizado de ejes / bujes", icono: <Cog size={18} /> },
-  { nombre: "Soldadura", detalle: "Unión de chasis", icono: <Wrench size={18} /> },
+  { nombre: "Plasma CNC", detalle: "Corte de planchas", icono: <Flame size={30} /> },
+  { nombre: "Torno", detalle: "Mecanizado de ejes / bujes", icono: <Cog size={30} /> },
+  { nombre: "Soldadura", detalle: "Unión de chasis", icono: <Wrench size={30} /> },
 ];
 
-/** Home de Producción de la planta: órdenes de producción, QC, consumo de MP y costo de MP por chasis. Solo lectura. */
+/** Tarjeta KPI del diseño de Producción: icono grande arriba, título y detalle. */
+function KpiProduccion({ icono, titulo, valor, detalle, href }: { icono: ReactNode; titulo: string; valor?: string; detalle: string; href: string }) {
+  return (
+    <button type="button" onClick={() => abrirPestana(href)} className="flex flex-col items-center gap-1 rounded-xl border border-[#2a2a2a] border-b-[#ff6b00] bg-[#141414] px-3 py-4 text-center transition hover:border-[#ff6b00]">
+      <span className="text-white">{icono}</span>
+      <span className="text-[15px] font-bold text-white">{titulo}</span>
+      {valor && <span className="text-2xl font-bold text-[#ff6b00]">{valor}</span>}
+      <span className="text-[12px] text-[#a1a1aa]">{detalle}</span>
+    </button>
+  );
+}
+
+function Encargado({ numero, titulo, detalle }: { numero: number; titulo: string; detalle: string }) {
+  return (
+    <div>
+      <h2 className="flex items-center gap-2 text-[17px] font-bold uppercase text-white">
+        <span className="h-4 w-6 rounded-sm bg-[#ff6b00]" aria-hidden /> Encargado {numero} · {titulo}
+      </h2>
+      <p className="text-[13px] text-[#d4d4d8]">{detalle}</p>
+    </div>
+  );
+}
+
+/** Producción Planta (diseño 5 de Williams): OT, estaciones, ensamblaje, QC, consumo de MP y costos. Datos reales; lo demás "sin registro". */
 export function ProduccionHome() {
   const { sesion } = useSesion();
   const notifs = useNotificaciones(sesion);
@@ -27,27 +50,27 @@ export function ProduccionHome() {
   const equipos = useStore<EquipoTerminado[]>(KEYS.EQUIPOS, []);
   const vales = useStore<ValeProduccion[]>(KEYS.VALES_PRODUCCION, []);
   const stock = useStore<StockItem[]>(KEYS.STOCK, []);
-  const [sync, setSync] = useState("");
+  const [ahora, setAhora] = useState("");
 
   const d = useMemo(() => {
-    const mes = hoy().slice(0, 7);
     const costoDe = new Map(stock.map((s) => [s.id, s.costoUnit || 0]));
     const activas = ops
       .filter((o) => o.estado === "EN_FABRICACION")
       .sort((a, b) => b.fecha.localeCompare(a.fecha))
       .map((o) => {
         const consumos = consumosDeChasis(o.codigo_chasis, o.id, vales);
-        const costo = r2(consumos.reduce((a, v) => a + v.cantidad * (costoDe.get(v.stock_id) ?? 0), 0));
-        return { o, consumos: consumos.length, costo };
+        return { o, consumos: consumos.length, costo: r2(consumos.reduce((a, v) => a + v.cantidad * (costoDe.get(v.stock_id) ?? 0), 0)) };
       });
-    const qcMes = ops.filter((o) => o.estado === "QC_APROBADO" && (o.qc?.fecha ?? "").startsWith(mes));
+    const qc = ops.filter((o) => o.estado === "QC_APROBADO" && o.qc).sort((a, b) => (b.qc?.fecha ?? "").localeCompare(a.qc?.fecha ?? "")).slice(0, 4);
     const disponibles = equipos.filter((e) => e.estado === "DISPONIBLE");
-    const valesMes = vales.filter((v) => v.fecha.startsWith(mes));
-    const consumo = [...vales].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 8);
-    return { activas, qcMes, disponibles, valesMes, consumo };
+    const enQc = equipos.filter((e) => e.estado === "EN_QC");
+    const consumo = [...vales].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 5);
+    return { activas, qc, disponibles, enQc, consumo };
   }, [ops, equipos, vales, stock]);
 
-  useEffect(() => setSync(horaActual()), [d]);
+  useEffect(() => {
+    setAhora(`${new Date().toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric" })} ${horaActual()}`);
+  }, [d]);
 
   const recordatorios = d.activas.map(({ o }) => ({
     clave: `op:${o.id}`,
@@ -58,85 +81,127 @@ export function ProduccionHome() {
 
   return (
     <MarcoPlanta lateral={<PanelLateral sesion={sesion} modulo="Producción" notifs={notifs} recordatorios={recordatorios} />}>
-      <EncabezadoPlanta
-        icono={<Factory size={30} />}
-        titulo="Comboy Vid Producción Planta"
-        subtitulo="Fabricación y Ensamblaje · Órdenes de producción · QC · Ingreso PT · Arequipa · Perú"
-        accion={<span className="text-[12px] text-[#a1a1aa]">Actualizado: Hoy {sync}</span>}
-      />
+      {/* Barra de contexto */}
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-[#2a2a2a] bg-[#141414] px-4 py-2 text-[13px] font-semibold text-white">
+        <MapPin size={15} className="text-[#ff6b00]" /> Planta Arequipa - Perú <span className="text-[#3a3a3a]">|</span> Usuario: {sesion?.nombre ?? "-"}
+        <span className="text-[#3a3a3a]">|</span> {ahora} <span className="text-[#3a3a3a]">|</span> <span className="text-[#4ade80]">Conectado</span>
+      </p>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi icono={<ClipboardList size={18} />} titulo="OP activas" valor={String(d.activas.length)} detalle="Órdenes de producción en fabricación" href="/dashboard/produccion" />
-        <Kpi icono={<BadgeCheck size={18} />} titulo="QC del mes" valor={String(d.qcMes.length)} detalle="Equipos con QC aprobado este mes" href="/dashboard/produccion" />
-        <Kpi icono={<Container size={18} />} titulo="PT disponible" valor={String(d.disponibles.length)} detalle="Equipos listos para venta / despacho" href="/dashboard/almacen?tab=stock" />
-        <Kpi icono={<PackageMinus size={18} />} titulo="Vales de MP del mes" valor={String(d.valesMes.length)} detalle="Retiros de almacén para producción" href="/dashboard/almacen?tab=stock" />
+      <header>
+        <h1 className="text-3xl font-bold leading-tight text-white lg:text-4xl">
+          <span className="text-[#ff6b00]">COMBOY VID</span> PRODUCCIÓN PLANTA - Fabricación y Ensamblaje
+        </h1>
+        <p className="text-[15px] font-medium text-[#d4d4d8]">Módulo de Producción · Gestión de OT · Planta Arequipa</p>
+      </header>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <KpiProduccion icono={<ClipboardList size={36} />} titulo="OT Activas" valor={String(d.activas.length)} detalle="En proceso" href="/dashboard/produccion" />
+        <KpiProduccion icono={<Gauge size={36} />} titulo="OEE General" detalle="sin registro" href="/dashboard/produccion" />
+        <KpiProduccion icono={<Truck size={36} />} titulo="Chasis en Fab" valor={String(d.activas.filter(({ o }) => o.codigo_chasis).length)} detalle="En fabricación" href="/dashboard/produccion" />
+        <KpiProduccion icono={<Factory size={36} />} titulo="Avance Ensamblaje" valor={String(d.enQc.length)} detalle="Equipos en QC · % sin registro" href="/dashboard/produccion" />
+        <KpiProduccion icono={<Clock size={36} />} titulo="Horas Hombre Hoy" detalle="sin registro · turno día" href="/dashboard/produccion" />
       </div>
 
-      <Panel titulo="Encargado 1 · Fabricación piezas metalúrgica" icono={<Flame size={17} />}>
-        <div className="grid gap-2 sm:grid-cols-3">
+      <section className="space-y-2">
+        <Encargado numero={1} titulo="Fabricación piezas metalúrgica" detalle="Encargado: Fabricación Piezas (Plasma · Torno · Soldadura) · 3 estaciones" />
+        <div className="grid gap-3 md:grid-cols-3">
           {ESTACIONES.map((e) => (
-            <div key={e.nombre} className="rounded-lg border border-[#2a3445] bg-[#212a3a] p-3">
-              <p className="flex items-center gap-2 text-[14px] font-bold text-white">
-                <span className="text-[#f97316]">{e.icono}</span>
-                {e.nombre}
-              </p>
-              <p className="text-[12px] text-[#a1a1aa]">{e.detalle}</p>
+            <div key={e.nombre} className="flex gap-3 rounded-xl border border-[#2a2a2a] bg-[#141414] p-3">
+              <span className="text-white">{e.icono}</span>
+              <span>
+                <span className="block text-[15px] font-bold text-white">{e.nombre}</span>
+                <span className="block text-[13px] text-[#d4d4d8]">{e.detalle}</span>
+                <span className="mt-1 block text-[12px] italic text-[#a1a1aa]">Horas, tarifa, OEE y mantenimiento: sin registro</span>
+              </span>
             </div>
           ))}
         </div>
-        <div className="mt-3">
-          <SinRegistro>El ERP aún no registra horas, tarifa, OEE ni mantenimiento de cada estación. Cuando se agregue, aparecerá aquí.</SinRegistro>
-        </div>
-      </Panel>
+      </section>
 
       <Panel
-        titulo="Órdenes de producción en fabricación"
+        titulo="OT Fabricación — Lista de Órdenes de Trabajo"
         icono={<ClipboardList size={17} />}
         accion={
-          <BotonAccion href="/dashboard/produccion" lleno>
-            Iniciar OP
+          <BotonAccion href="/dashboard/produccion" lleno icono={<Plus size={15} />}>
+            Iniciar OT
           </BotonAccion>
         }
       >
-        <Filas
-          vacio="No hay órdenes de producción en fabricación."
-          items={d.activas.map(({ o, consumos, costo }) => ({
-            clave: o.id,
-            titulo: `${o.id} · ${o.tipo_equipo} ${o.modelo}`,
-            detalle: `Chasis ${o.codigo_chasis || "-"} · ${fechaPE(o.fecha)} · ${consumos} vale(s) de MP`,
-            derecha: <Etiqueta>{`MP ${soles(costo)}`}</Etiqueta>,
-            href: "/dashboard/produccion",
-          }))}
-        />
-        <p className="mt-2 text-[12px] text-[#a1a1aa]">Costo de MP = vales de producción del chasis × último costo del producto en almacén.</p>
+        {d.activas.length === 0 ? (
+          <SinRegistro>No hay órdenes de producción en fabricación.</SinRegistro>
+        ) : (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {d.activas.slice(0, 6).map(({ o, consumos, costo }) => (
+              <div key={o.id} className="rounded-lg border border-[#2a2a2a] bg-[#1c1c1c] p-3">
+                <div className="flex items-start gap-2">
+                  <Etiqueta tono="azul">EN PROCESO</Etiqueta>
+                  <span className="min-w-0">
+                    <span className="block text-[15px] font-bold text-white">
+                      {o.id} · {o.tipo_equipo} {o.modelo}
+                    </span>
+                    <span className="block text-[12px] text-[#d4d4d8]">
+                      Chasis {o.codigo_chasis || "-"} · desde {fechaPE(o.fecha)} · {consumos} vale(s) de MP · MP {soles(costo)}
+                    </span>
+                  </span>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <BotonAccion href="/dashboard/almacen?tab=stock">Entrega a Almacén Intermedio</BotonAccion>
+                  <BotonAccion href="/dashboard/produccion">Reportar avance a Almacenero</BotonAccion>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </Panel>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Panel titulo="Consumo MP" icono={<PackageMinus size={17} />}>
+      <section className="space-y-2">
+        <Encargado numero={2} titulo="Ensamblaje" detalle="Encargado: Ensamblaje — Ensambla PT: remolcadores, tanques de agua y coches mineros" />
+        <div className="rounded-xl border border-[#2a2a2a] bg-[#141414] p-3">
+          <p className="text-[14px] font-semibold text-white">
+            Equipos en QC: {d.enQc.length} · Listos (PT disponible): {d.disponibles.length}
+          </p>
+          <p className="text-[12px] italic text-[#a1a1aa]">% de avance de la línea de ensamblaje: sin registro.</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <BotonAccion href="/dashboard/produccion">Reportar avance a Almacenero</BotonAccion>
+            <BotonAccion href="/dashboard/produccion">Ver Detalle</BotonAccion>
+            <BotonAccion href="/dashboard/produccion" lleno>
+              Entregar PT a Almacén
+            </BotonAccion>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Panel titulo="Control calidad" icono={<BadgeCheck size={17} />}>
           <Filas
-            vacio="Sin vales de producción."
-            items={d.consumo.map((v) => ({
-              clave: v.id,
-              titulo: `${v.producto}`,
-              detalle: `${v.id} · ${fechaPE(v.fecha)} · ${v.chasis_ot ? `chasis/OT ${v.chasis_ot}` : "consumo de taller"} · ${v.sede}`,
-              derecha: <Etiqueta>{`${v.cantidad} ${v.unidad}`}</Etiqueta>,
-              href: "/dashboard/almacen?tab=stock",
-            }))}
+            max={4}
+            vacio="Sin QC registrados."
+            items={d.qc.map((o) => ({ clave: o.id, titulo: `${o.id} · ${o.tipo_equipo}`, detalle: `QC ${fechaPE(o.qc!.fecha)} · ${o.qc!.supervisor}`, derecha: <Etiqueta tono="verde">OK</Etiqueta>, href: "/dashboard/produccion" }))}
           />
         </Panel>
-        <Panel titulo="Acciones" icono={<Factory size={17} />}>
-          <div className="grid grid-cols-2 gap-2">
-            <BotonAccion href="/dashboard/almacen?tab=nuevo">Solicitar MP a Almacén</BotonAccion>
-            <BotonAccion href="/dashboard/almacen?tab=stock">Retiro para producción</BotonAccion>
-            <BotonAccion href="/dashboard/produccion" lleno>
-              Registrar QC / Entregar PT
-            </BotonAccion>
-            <BotonAccion href="/dashboard/almacen?tab=despacho">Órdenes de despacho</BotonAccion>
-          </div>
+        <Panel titulo="Consumo MP" icono={<PackageMinus size={17} />}>
+          <Filas
+            max={5}
+            vacio="Sin vales de producción."
+            items={d.consumo.map((v) => ({ clave: v.id, titulo: v.producto, detalle: `${fechaPE(v.fecha)} · ${v.chasis_ot ? `chasis/OT ${v.chasis_ot}` : "consumo de taller"}`, derecha: <Etiqueta>{`${v.cantidad} ${v.unidad}`}</Etiqueta>, href: "/dashboard/almacen?tab=stock" }))}
+          />
+        </Panel>
+        <Panel>
+          <TiemposCosto />
         </Panel>
       </div>
 
-      <AccesosRapidos sesion={sesion} actual="produccion" />
+      <BarraAcciones
+        acciones={[
+          { label: "Reportar a Almacén", href: "/dashboard/produccion" },
+          { label: "Entregar Semi a Almacén Intermedio", href: "/dashboard/almacen?tab=stock" },
+          { label: "Entregar PT a Almacén", href: "/dashboard/produccion", tono: "lleno" },
+          { label: "Solicitar MP a Almacén", href: "/dashboard/almacen?tab=nuevo" },
+          { label: "Iniciar OT", href: "/dashboard/produccion", tono: "lleno" },
+        ]}
+      />
+
+      <BarraModulos sesion={sesion} actual="produccion" />
     </MarcoPlanta>
   );
 }

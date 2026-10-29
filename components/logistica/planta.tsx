@@ -9,6 +9,7 @@ import { KEYS, r2, soles, useStore } from "@/lib/storage";
 import type { StockItem, ValeProduccion } from "@/lib/types";
 import { cn } from "@/components/ui";
 import { puedeVer, type Sesion } from "@/lib/auth";
+import { permisosPlanta } from "@/lib/permisosPlanta";
 import { abrirPestana } from "@/lib/logistica";
 import type { Notificacion } from "@/lib/notificaciones";
 import { urlSala, usePresencia } from "@/lib/presencia";
@@ -16,7 +17,7 @@ import { ErpAlertList } from "@/components/erp/ErpAlertList";
 import { Panel } from "./piezas";
 
 // Piezas comunes de las 4 homes de la planta (Logística, Almacén, Finanzas, Producción).
-// Mismo diseño que Logística: fondo #0e1219, tarjetas #1a212e, naranja #f97316.
+// Mismo diseño que Logística: fondo #0a0a0a, tarjetas #141414, naranja #ff6b00.
 
 export type ModuloPlanta = "logistica" | "almacen" | "finanzas" | "produccion";
 
@@ -29,12 +30,12 @@ export const MODULOS_PLANTA: { id: ModuloPlanta; titulo: string; home: string; t
 ];
 
 /** Grilla de la home: contenido a la izquierda y panel derecho fijo en escritorio (fondo y pie: ErpLayout). */
-export function MarcoPlanta({ children, lateral }: { children: ReactNode; lateral: ReactNode }) {
+export function MarcoPlanta({ children, lateral }: { children: ReactNode; /** Sin panel derecho (Logística Dashboard): ancho completo. */ lateral?: ReactNode }) {
   return (
     <div className="w-full text-[#e5e7eb]">
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className={lateral ? "grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]" : "grid gap-5"}>
         <div className="min-w-0 space-y-5">{children}</div>
-        <aside className="min-w-0">{lateral}</aside>
+        {lateral && <aside className="min-w-0">{lateral}</aside>}
       </div>
     </div>
   );
@@ -42,17 +43,57 @@ export function MarcoPlanta({ children, lateral }: { children: ReactNode; latera
 
 export function EncabezadoPlanta({ icono, titulo, subtitulo, accion }: { icono: ReactNode; titulo: string; subtitulo: string; accion?: ReactNode }) {
   return (
-    <header className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#2a3445] bg-[#1a212e] px-5 py-4">
+    <header className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#2a2a2a] bg-[#141414] px-5 py-4">
       <div className="flex items-center gap-4">
-        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border-2 border-[#f97316] text-[#f97316]">{icono}</span>
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border-2 border-[#ff6b00] text-[#ff6b00]">{icono}</span>
         <div>
-          <h1 className="text-2xl font-bold uppercase leading-tight text-white lg:text-3xl">{titulo}</h1>
+          {/* "COMBOY VID" en naranja y el resto en blanco, como en los diseños */}
+          <h1 className="text-2xl font-bold uppercase leading-tight text-white lg:text-3xl">
+            {/^comboy vid /i.test(titulo) ? (
+              <>
+                <span className="text-[#ff6b00]">COMBOY VID</span> {titulo.slice(11)}
+              </>
+            ) : (
+              titulo
+            )}
+          </h1>
           <p className="text-[13px] font-medium text-[#d4d4d8] lg:text-[15px]">{subtitulo}</p>
         </div>
       </div>
       {accion}
     </header>
   );
+}
+
+/** Barra inferior de acciones del módulo (diseños): `tono` lleno (naranja), borde o verde. Abre en pestaña nueva. */
+export function BarraAcciones({ acciones }: { acciones: { label: string; href: string; icono?: ReactNode; tono?: "lleno" | "borde" | "verde" }[] }) {
+  return (
+    <div className="grid grid-cols-2 gap-2 rounded-xl border border-[#2a2a2a] bg-[#141414] p-3 sm:grid-cols-4 xl:flex xl:flex-wrap">
+      {acciones.map((a) => (
+        <button
+          key={a.label}
+          type="button"
+          onClick={() => abrirPestana(a.href)}
+          className={cn(
+            "inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-[14px] font-bold transition",
+            a.tono === "lleno"
+              ? "bg-[#ff6b00] text-white hover:bg-[#e05e00]"
+              : a.tono === "verde"
+                ? "border border-[#22c55e] text-[#4ade80] hover:bg-[#22c55e]/10"
+                : "border border-[#ff6b00]/70 text-white hover:bg-[#ff6b00]/10"
+          )}
+        >
+          {a.icono}
+          {a.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Barra de los 4 módulos: solo para quien puede ver otros módulos (SOPORTE). */
+export function BarraModulos({ sesion, actual }: { sesion: Sesion | null; actual: ModuloPlanta }) {
+  return permisosPlanta(sesion).canViewOtherModules ? <AccesosModulos sesion={sesion} actual={actual} /> : null;
 }
 
 /**
@@ -62,7 +103,7 @@ export function EncabezadoPlanta({ icono, titulo, subtitulo, accion }: { icono: 
 export function AccesosModulos({ sesion, actual }: { sesion: Sesion | null; actual: ModuloPlanta }) {
   return (
     <section>
-      <h2 className="mb-3 text-xl font-bold uppercase text-[#fb923c]">Accesos rápidos</h2>
+      <h2 className="mb-3 text-xl font-bold uppercase text-[#ff8a3d]">Accesos rápidos</h2>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {MODULOS_PLANTA.map((m) => {
           const esActual = m.id === actual;
@@ -75,21 +116,21 @@ export function AccesosModulos({ sesion, actual }: { sesion: Sesion | null; actu
               onClick={() => abrirPestana(esActual ? m.trabajo : m.home)}
               title={permitido ? "Se abre en una pestaña nueva" : "No autorizado - acceso denegado"}
               className={cn(
-                "group relative flex min-h-[170px] flex-col items-center justify-center gap-3 rounded-xl border bg-[#1a212e] px-4 py-6 transition",
-                permitido ? "border-[#2a3445] hover:border-[#f97316]" : "cursor-not-allowed border-[#2a3445] opacity-50"
+                "group relative flex min-h-[170px] flex-col items-center justify-center gap-3 rounded-xl border bg-[#141414] px-4 py-6 transition",
+                permitido ? "border-[#2a2a2a] hover:border-[#ff6b00]" : "cursor-not-allowed border-[#2a2a2a] opacity-50"
               )}
             >
               <span
                 className={
                   esActual
-                    ? "flex h-20 w-20 items-center justify-center rounded-full bg-[#f97316] text-white"
-                    : "flex h-20 w-20 items-center justify-center text-[#f97316] transition group-hover:scale-105"
+                    ? "flex h-20 w-20 items-center justify-center rounded-full bg-[#ff6b00] text-white"
+                    : "flex h-20 w-20 items-center justify-center text-[#ff6b00] transition group-hover:scale-105"
                 }
               >
                 {permitido ? m.icono(esActual) : <Lock size={44} strokeWidth={1.6} />}
               </span>
               <span className={esActual ? "rounded-lg bg-[#2563eb]/25 px-3 py-0.5 text-2xl font-bold text-white" : "text-2xl font-bold text-white"}>{m.titulo}</span>
-              {!permitido && <span className="text-[12px] font-semibold text-[#fdba74]">No autorizado - acceso denegado</span>}
+              {!permitido && <span className="text-[12px] font-semibold text-[#ffb27a]">No autorizado - acceso denegado</span>}
             </button>
           );
         })}
@@ -109,9 +150,17 @@ function Bloque({ titulo, icono, items, vacio }: { titulo: string; icono: ReactN
   return <ErpAlertList titulo={titulo} icono={icono} items={items} vacio={vacio} max={5} />;
 }
 
+const PESTANAS_PANEL = [
+  { id: "notificaciones", label: "Notificaciones" },
+  { id: "alertas", label: "Alertas" },
+  { id: "recordatorios", label: "Recordatorios" },
+  { id: "chat", label: "Chat" },
+  { id: "reunion", label: "Reunión grupal" },
+] as const;
+
 /**
- * Panel derecho de las homes: notificaciones, alertas, recordatorios, reunión grupal (Jitsi Meet) y usuarios conectados.
- * `notifs`: avisos de la campana; las de stock van a Alertas.
+ * Panel derecho de las homes (diseños de Williams): pestañas Notificaciones · Alertas · Recordatorios · Chat ·
+ * Reunión grupal; cada pestaña lleva a su sección. `notifs`: avisos de la campana; las de stock van a Alertas.
  */
 export function PanelLateral({
   sesion,
@@ -126,16 +175,44 @@ export function PanelLateral({
   alertas?: ItemLateral[];
   recordatorios: ItemLateral[];
 }) {
+  const [activa, setActiva] = useState<string>("notificaciones");
+  const ir = (id: string) => {
+    setActiva(id);
+    document.getElementById(`panel-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
   return (
-    <Panel className="space-y-5 xl:sticky xl:top-24">
-      <Bloque titulo="Notificaciones" icono={<Bell size={15} />} items={notifs.filter((n) => n.tipo !== "stock")} vacio="Sin notificaciones nuevas." />
-      <Bloque titulo="Alertas" icono={<AlertTriangle size={15} />} items={[...notifs.filter((n) => n.tipo === "stock"), ...alertas]} vacio="Sin alertas." />
-      <Bloque titulo="Recordatorios" icono={<Clock size={15} />} items={recordatorios} vacio="Sin pendientes." />
-
-      <ReunionGrupal sesion={sesion} modulo={modulo} />
-
-      <ChatGrupal sesion={sesion} modulo={modulo} />
-      <TiemposCosto />
+    <Panel className="space-y-5 xl:sticky xl:top-20">
+      <nav aria-label="Secciones del panel" className="flex flex-wrap gap-1.5">
+        {PESTANAS_PANEL.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => ir(p.id)}
+            aria-current={activa === p.id ? "true" : undefined}
+            className={cn(
+              "rounded-md px-2.5 py-1 text-[11px] font-bold uppercase transition",
+              activa === p.id ? "bg-[#ff6b00] text-white" : "bg-[#2a2a2a] text-[#d4d4d8] hover:bg-[#3a3a3a] hover:text-white"
+            )}
+          >
+            {p.label}
+          </button>
+        ))}
+      </nav>
+      <div id="panel-notificaciones" className="scroll-mt-24">
+        <Bloque titulo="Notificaciones" icono={<Bell size={15} />} items={notifs.filter((n) => n.tipo !== "stock")} vacio="Sin notificaciones nuevas." />
+      </div>
+      <div id="panel-alertas" className="scroll-mt-24">
+        <Bloque titulo="Alertas" icono={<AlertTriangle size={15} />} items={[...notifs.filter((n) => n.tipo === "stock"), ...alertas]} vacio="Sin alertas." />
+      </div>
+      <div id="panel-recordatorios" className="scroll-mt-24">
+        <Bloque titulo="Recordatorios" icono={<Clock size={15} />} items={recordatorios} vacio="Sin pendientes." />
+      </div>
+      <div id="panel-chat" className="scroll-mt-24">
+        <ChatGrupal sesion={sesion} modulo={modulo} />
+      </div>
+      <div id="panel-reunion" className="scroll-mt-24">
+        <ReunionGrupal sesion={sesion} modulo={modulo} />
+      </div>
     </Panel>
   );
 }
@@ -149,14 +226,14 @@ export function ReunionGrupal({ sesion, modulo, otrasSalas = [] }: { sesion: Ses
   };
   return (
     <div>
-      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#fb923c]">
+      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#ff8a3d]">
         <Video size={15} /> Reunión grupal
       </p>
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" onClick={() => abrirPestana(urlSala(`Planta ${modulo}`))} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#f97316] px-2 py-2 text-[13px] font-semibold text-white hover:bg-[#ea580c]">
+        <button type="button" onClick={() => abrirPestana(urlSala(`Planta ${modulo}`))} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#ff6b00] px-2 py-2 text-[13px] font-semibold text-white hover:bg-[#e05e00]">
           <Video size={15} /> Iniciar videollamada
         </button>
-        <button type="button" onClick={crearSala} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#3a4558] bg-[#212a3a] px-2 py-2 text-[13px] font-semibold text-white hover:border-[#f97316]">
+        <button type="button" onClick={crearSala} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#3a3a3a] bg-[#1c1c1c] px-2 py-2 text-[13px] font-semibold text-white hover:border-[#ff6b00]">
           <Plus size={15} /> Crear sala
         </button>
       </div>
@@ -168,7 +245,7 @@ export function ReunionGrupal({ sesion, modulo, otrasSalas = [] }: { sesion: Ses
       {otrasSalas.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
           {otrasSalas.map((m) => (
-            <button key={m} type="button" onClick={() => abrirPestana(urlSala(`Planta ${m}`))} className="inline-flex items-center gap-1.5 rounded-lg border border-[#3a4558] bg-[#212a3a] px-2.5 py-1.5 text-[12px] font-semibold text-white hover:border-[#f97316]">
+            <button key={m} type="button" onClick={() => abrirPestana(urlSala(`Planta ${m}`))} className="inline-flex items-center gap-1.5 rounded-lg border border-[#3a3a3a] bg-[#1c1c1c] px-2.5 py-1.5 text-[12px] font-semibold text-white hover:border-[#ff6b00]">
               <Video size={13} /> Unirse a {m}
             </button>
           ))}
@@ -218,7 +295,7 @@ export function ChatGrupal({ sesion, modulo }: { sesion: Sesion | null; modulo: 
   };
   return (
     <div>
-      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#fb923c]">
+      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#ff8a3d]">
         <MessageSquare size={15} /> Chat grupal
       </p>
       {faltaTabla ? (
@@ -228,9 +305,9 @@ export function ChatGrupal({ sesion, modulo }: { sesion: Sesion | null; modulo: 
           <ul ref={lista} className="max-h-56 space-y-1.5 overflow-y-auto pr-1">
             {mensajes.length === 0 && <li className="text-[12px] text-[#71717a]">Sin mensajes todavía.</li>}
             {mensajes.map((m) => (
-              <li key={m.id} className="rounded-lg bg-[#212a3a] px-3 py-1.5">
+              <li key={m.id} className="rounded-lg bg-[#1c1c1c] px-3 py-1.5">
                 <span className="flex justify-between gap-2 text-[11px] text-[#a1a1aa]">
-                  <span className="truncate font-semibold text-[#fdba74]">
+                  <span className="truncate font-semibold text-[#ffb27a]">
                     {m.usuario}
                     {m.modulo ? ` · ${m.modulo}` : ""}
                   </span>
@@ -247,9 +324,9 @@ export function ChatGrupal({ sesion, modulo }: { sesion: Sesion | null; modulo: 
               maxLength={1000}
               placeholder="Escribir mensaje…"
               aria-label="Mensaje para el chat grupal"
-              className="min-w-0 flex-1 rounded-lg border border-[#3a4558] bg-[#212a3a] px-3 py-1.5 text-[13px] text-white placeholder:text-[#71717a] focus:border-[#f97316] focus:outline-none"
+              className="min-w-0 flex-1 rounded-lg border border-[#3a3a3a] bg-[#1c1c1c] px-3 py-1.5 text-[13px] text-white placeholder:text-[#71717a] focus:border-[#ff6b00] focus:outline-none"
             />
-            <button type="submit" disabled={!texto.trim()} aria-label="Enviar" className="rounded-lg bg-[#f97316] px-3 text-white hover:bg-[#ea580c] disabled:opacity-50">
+            <button type="submit" disabled={!texto.trim()} aria-label="Enviar" className="rounded-lg bg-[#ff6b00] px-3 text-white hover:bg-[#e05e00] disabled:opacity-50">
               <Send size={15} />
             </button>
           </form>
@@ -261,7 +338,7 @@ export function ChatGrupal({ sesion, modulo }: { sesion: Sesion | null; modulo: 
 }
 
 /** Tiempos reales y costo: costo de MP de cada OP en fabricación (vales × último costo). Las horas por estación aún no se registran. */
-function TiemposCosto() {
+export function TiemposCosto() {
   const ops = useStore<OrdenProduccion[]>(KEYS.PRODUCCION, []);
   const vales = useStore<ValeProduccion[]>(KEYS.VALES_PRODUCCION, []);
   const stock = useStore<StockItem[]>(KEYS.STOCK, []);
@@ -273,7 +350,7 @@ function TiemposCosto() {
   }, [ops, vales, stock]);
   return (
     <div>
-      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#fb923c]">
+      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#ff8a3d]">
         <Timer size={15} /> Tiempos reales y costo
       </p>
       {filas.length === 0 ? (
@@ -281,11 +358,11 @@ function TiemposCosto() {
       ) : (
         <ul className="space-y-1.5">
           {filas.slice(0, 4).map(({ o, costo }) => (
-            <li key={o.id} className="flex justify-between gap-2 rounded-lg bg-[#212a3a] px-3 py-2 text-[12px]">
+            <li key={o.id} className="flex justify-between gap-2 rounded-lg bg-[#1c1c1c] px-3 py-2 text-[12px]">
               <span className="truncate text-white">
                 {o.id} · {o.tipo_equipo}
               </span>
-              <span className="whitespace-nowrap font-semibold text-[#fdba74]">MP {soles(costo)}</span>
+              <span className="whitespace-nowrap font-semibold text-[#ffb27a]">MP {soles(costo)}</span>
             </li>
           ))}
         </ul>

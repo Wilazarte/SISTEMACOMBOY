@@ -35,7 +35,7 @@ export function ErpHeader({
   extra?: ReactNode;
 }) {
   return (
-    <header className="fixed inset-x-0 top-0 z-40 flex h-[64px] items-center justify-between gap-3 border-b border-[#2a3445] bg-[#0e1219]/95 px-4 backdrop-blur print:hidden lg:px-6">
+    <header className="fixed inset-x-0 top-0 z-40 flex h-[64px] items-center justify-between gap-3 border-b border-[#2a2a2a] bg-[#0a0a0a]/95 px-4 backdrop-blur print:hidden lg:px-6">
       <Link href={inicio} className="z-10 flex shrink-0 items-center" aria-label="Inicio">
         <Image src="/comboy-logo.png" alt="COMBOY VID" width={110} height={36} priority className="h-9 w-auto bg-transparent object-contain" />
       </Link>
@@ -50,12 +50,12 @@ export function ErpHeader({
       <div className="z-10 flex items-center gap-2">
         {extra}
         {usuario && (
-          <div className="flex items-center gap-3 rounded-full border border-[#2a3445] bg-[#1a212e] py-1 pl-1 pr-3 lg:px-3 lg:py-1.5" title={nombre ?? usuario}>
+          <div className="flex items-center gap-3 rounded-full border border-[#2a2a2a] bg-[#141414] py-1 pl-1 pr-3 lg:px-3 lg:py-1.5" title={nombre ?? usuario}>
             <span className="hidden h-8 w-8 items-center justify-center rounded-full bg-[#3f3f46] uppercase text-white md:flex" style={{ fontFamily: TIMES, fontSize: "14px" }}>
               {usuario.slice(0, 2)}
             </span>
             <span className="hidden max-w-[140px] truncate text-sm font-semibold text-white md:block">{usuario}</span>
-            {badge && <span className="hidden rounded-full bg-[#f97316] px-2 py-0.5 text-[11px] font-semibold text-white lg:inline">{badge}</span>}
+            {badge && <span className="hidden rounded-full bg-[#ff6b00] px-2 py-0.5 text-[11px] font-semibold text-white lg:inline">{badge}</span>}
             {onSalir && (
               <button type="button" onClick={onSalir} className="ml-1 rounded-full p-1 transition hover:bg-white/10" aria-label="Cerrar sesión" title="Cerrar sesión">
                 <LogOut className="h-5 w-5 text-[#d4d4d8]" />
@@ -96,24 +96,24 @@ export function ErpSubHeader({
   const rol = perfil ? ETIQUETA_PERFIL[perfil].label : (persona?.cargo ?? cargoDe(sesion));
   const pasos = flujo ? flujo.split("→").map((p) => p.trim()).filter(Boolean) : [];
   return (
-    <section className="flex w-full flex-col gap-2 rounded-xl border border-[#2a3445] bg-[#1a212e]/90 px-4 py-3">
+    <section className="flex w-full flex-col gap-2 rounded-xl border border-[#2a2a2a] bg-[#141414]/90 px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="min-w-0 truncate text-[13px] text-[#a1a1aa]">
           <span className="font-semibold text-white">{persona?.nombre ?? nombreDe(sesion)}</span>
           <span> · {rol}</span>
-          {modulo && <span className="font-semibold text-[#fb923c]"> · MODULO {modulo}</span>}
+          {modulo && <span className="font-semibold text-[#ff8a3d]"> · MODULO {modulo}</span>}
           <span> · {NOMBRE_EMPRESA}</span>
         </p>
-        <span className="inline-flex items-center gap-1 rounded-full border border-[#2a3445] bg-[#212a3a] px-2.5 py-1 text-xs text-[#d4d4d8]">
-          <MapPin size={12} className="text-[#f97316]" /> Sede: {sede} · {fecha}
+        <span className="inline-flex items-center gap-1 rounded-full border border-[#2a2a2a] bg-[#1c1c1c] px-2.5 py-1 text-xs text-[#d4d4d8]">
+          <MapPin size={12} className="text-[#ff6b00]" /> Sede: {sede} · {fecha}
         </span>
       </div>
       {pasos.length > 1 && (
         <nav aria-label="Flujo del módulo" className="flex flex-wrap items-center gap-1 text-[11px] text-[#a1a1aa]">
           {pasos.map((p, i) => (
             <Fragment key={p + i}>
-              {i > 0 && <ChevronRight size={12} className="text-[#f97316]" aria-hidden />}
-              <span className="rounded-md bg-[#212a3a] px-2 py-0.5">{p}</span>
+              {i > 0 && <ChevronRight size={12} className="text-[#ff6b00]" aria-hidden />}
+              <span className="rounded-md bg-[#1c1c1c] px-2 py-0.5">{p}</span>
             </Fragment>
           ))}
         </nav>
