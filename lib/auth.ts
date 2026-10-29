@@ -229,10 +229,10 @@ export const rolNegocio = (sesion: Sesion | null): Rol => (sesion ? ROL_NEGOCIO[
 // =====================================================================
 
 /**
- * ventas, contable, tesoreria, produccion y logistica: los 5 de /seleccionar-modulo.
- * almacen, planilla y gerencia: los anteriores, siguen válidos en /login?modulo= y en sesiones guardadas.
+ * soporte, logistica, almacen, finanzas y produccion: los 5 del dock del login (pantalla de presentación).
+ * ventas, contable, tesoreria, planilla y gerencia: los anteriores, siguen válidos en /login?modulo= y en sesiones guardadas.
  */
-export type ModuloLogin = "ventas" | "contable" | "tesoreria" | "produccion" | "logistica" | "sucursal" | "almacen" | "planilla" | "gerencia";
+export type ModuloLogin = "ventas" | "contable" | "tesoreria" | "produccion" | "logistica" | "sucursal" | "almacen" | "planilla" | "gerencia" | "soporte" | "finanzas";
 
 /**
  * `ruta`: a dónde entra. `rutas`: rutas del módulo (basta tener asignada una en perfiles.modulos).
@@ -242,12 +242,15 @@ export const MODULOS_LOGIN: Record<ModuloLogin, { nombre: string; ruta: string; 
   ventas: { nombre: "Ventas", ruta: "/dashboard/ventas", rutas: ["/dashboard/ventas"] },
   contable: { nombre: "Área Contable", ruta: "/dashboard/contable", rutas: ["/dashboard/contable"] },
   tesoreria: { nombre: "Tesorería (Planilla - Compras)", ruta: "/dashboard/compras", rutas: ["/dashboard/compras", "/dashboard/planilla"], roles: ["planilla"] },
-  produccion: { nombre: "Producción (Almacén)", ruta: "/dashboard/produccion", rutas: ["/dashboard/produccion", "/dashboard/almacen"], roles: ["almacen"] },
-  logistica: { nombre: "Logística", ruta: "/dashboard/almacen?tab=despacho", rutas: ["/dashboard/almacen"], roles: ["almacen"] },
+  produccion: { nombre: "Producción", ruta: "/produccion", rutas: ["/produccion", "/dashboard/produccion", "/dashboard/almacen"], roles: ["almacen"] },
+  logistica: { nombre: "Logística", ruta: "/logistica", rutas: ["/logistica", "/dashboard/almacen"], roles: ["almacen"] },
   sucursal: { nombre: "Secocha", ruta: RUTA_SUCURSAL, rutas: [RUTA_SUCURSAL, RUTA_SUCURSAL_ANTIGUA] },
-  almacen: { nombre: "Almacén", ruta: "/dashboard/almacen", rutas: ["/dashboard/almacen"] },
+  almacen: { nombre: "Almacén", ruta: "/almacen", rutas: ["/almacen", "/dashboard/almacen"] },
   planilla: { nombre: "Planilla", ruta: "/dashboard/planilla", rutas: ["/dashboard/planilla"] },
   gerencia: { nombre: "Gerencia", ruta: "/dashboard", rutas: [] },
+  // SOPORTE: solo el dueño del sistema (creador / soporte); entra al Dashboard con acceso a todo
+  soporte: { nombre: "Soporte", ruta: "/dashboard", rutas: [] },
+  finanzas: { nombre: "Finanzas", ruta: "/finanzas", rutas: ["/finanzas", "/dashboard/compras", "/dashboard/planilla"], roles: ["tesoreria", "planilla"] },
 };
 
 export const CLAVE_MODULO = "erp_modulo";
