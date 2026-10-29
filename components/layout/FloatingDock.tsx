@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, LayoutDashboard, Receipt, ShoppingCart, Users, Warehouse, type LucideIcon } from "lucide-react";
+import { BarChart3, LayoutDashboard, Receipt, ShoppingCart, Truck, Users, Warehouse, type LucideIcon } from "lucide-react";
 import { EV_IR_PESTANA, cn } from "@/components/ui";
 import { puedeVer, veDashboard, type Sesion } from "@/lib/auth";
 
-type Id = "dashboard" | "tesoreria" | "sucursal" | "planilla" | "ventas" | "inventario" | "reportes";
+type Id = "dashboard" | "logistica" | "tesoreria" | "sucursal" | "planilla" | "ventas" | "inventario" | "reportes";
 
 /**
  * Módulos del dock. `corto` es la etiqueta en móvil. Tesorería y Planilla viven en la misma página
@@ -14,6 +14,7 @@ type Id = "dashboard" | "tesoreria" | "sucursal" | "planilla" | "ventas" | "inve
  */
 const ITEMS: { id: Id; href: string; label: string; corto: string; icon: LucideIcon; tab?: string; permiso: string }[] = [
   { id: "dashboard", href: "/dashboard", label: "Dashboard", corto: "Dashboard", icon: LayoutDashboard, permiso: "/dashboard" },
+  { id: "logistica", href: "/logistica", label: "Logística", corto: "Logística", icon: Truck, permiso: "/logistica" },
   { id: "tesoreria", href: "/dashboard/compras", label: "Tesorería/Compras", corto: "Tesorería", icon: ShoppingCart, tab: "registrar", permiso: "/dashboard/compras" },
   { id: "planilla", href: "/dashboard/compras?tab=planilla", label: "Planilla", corto: "Planilla", icon: Users, tab: "planilla", permiso: "/dashboard/planilla" },
   { id: "ventas", href: "/dashboard/ventas", label: "Ventas", corto: "Ventas", icon: Receipt, permiso: "/dashboard/ventas" },

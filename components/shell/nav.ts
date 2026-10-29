@@ -1,4 +1,4 @@
-import { Calculator, ClipboardList, Factory, KeyRound, LayoutDashboard, PackagePlus, Plus, Receipt, ShoppingCart, Users, Warehouse, type LucideIcon } from "lucide-react";
+import { Calculator, ClipboardList, Factory, Truck, KeyRound, LayoutDashboard, PackagePlus, Plus, Receipt, ShoppingCart, Users, Warehouse, type LucideIcon } from "lucide-react";
 import { puedeVer, veDashboard, type Sesion } from "@/lib/auth";
 
 /** Submenú: abre la pestaña `tab` del módulo (components/ui Tabs lee ?tab=) o una subpágina (`href`). */
@@ -18,7 +18,22 @@ export interface ItemNav {
 
 export const NAV: ItemNav[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, subs: [] },
-  { href: "/dashboard/produccion", label: "Producción", icon: Factory, seccion: "Operaciones", subs: [] },
+  {
+    href: "/logistica",
+    label: "Logística Planta",
+    icon: Truck,
+    seccion: "Operaciones",
+    subs: [
+      { label: "Detalle", href: "/logistica/detalle" },
+      { label: "Agencias", href: "/logistica/agencias" },
+      { label: "Proveedores nacionales", href: "/logistica/proveedores" },
+      { label: "Transferencias", href: "/logistica/transferencias" },
+      { label: "Guía SUNAT", href: "/logistica/guia-sunat" },
+      { label: "Cotizar flete", href: "/logistica/cotizar-flete" },
+      { label: "Historial general", href: "/logistica/historial" },
+    ],
+  },
+  { href: "/dashboard/produccion", label: "Producción", icon: Factory, subs: [] },
   {
     href: "/dashboard/almacen",
     label: "Almacén",
