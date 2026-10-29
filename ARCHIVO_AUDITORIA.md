@@ -40,13 +40,16 @@ El código está **sano**: compila sin errores, no tiene TODOs viejos, casi no t
 | Planilla | pestaña de Tesorería | Trabajadores, asistencia por reloj, liquidación, boletas, contratistas, adelantos | **HCM** | |
 | Creador | `/dashboard/creador` | Administración (usuarios, permisos) | Basis | |
 
-### 3.1 Alerta sobre "Secocha → Calidad/Garantía"
+### 3.1 Secocha (decidido por Williams, 2026-10-29)
 
-Secocha es hoy una **sede que vende y tiene caja y stock** (usuario `sucsecocha@comboyvid.com`, RLS `sede_isolation`). Si la convierto en Calidad/Garantía, la sucursal pierde su pantalla y eso rompe la regla de oro 2. **Recomendación:** mantener Secocha como sucursal y crear **Calidad / Garantía (QM + CS)** como módulo nuevo que se apoya en el QC que ya existe en Producción. Necesito tu confirmación en este punto.
+Secocha **sigue como módulo independiente** (sucursal con su usuario, caja, stock y RLS por sede), pero usará **la misma infraestructura SAP** que Arequipa: documentos con cabecera/posiciones, numeración correlativa, estados, trazabilidad y auditoría. Calidad/Garantía (QM + CS) será un módulo nuevo apoyado en el QC de Producción.
 
-### 3.2 Otro dato a confirmar
+### 3.2 Razón social (confirmado por Williams, 2026-10-29)
 
-Tu mensaje dice **COMBOY VID E.I.R.L.**, pero el sistema emite documentos a nombre de **INVERSIONES GLOBAL COMPANY ROUSVID S.A.C. (RUC 20613238566)** desde el PR #33. No lo cambio sin que me digas cuál es la razón social correcta.
+- Razón social legal: **INVERSIONES GLOBAL COMPANY ROUSVID S.A.C.**, RUC **20613238566** (ya es la que usan los documentos).
+- Nombre comercial: **COMBOY VID**.
+- Lema: **"Soluciones mineras, innovación que impulsa la minería"**.
+- Ajuste pendiente: `components/Header.tsx` muestra "COMBOY VID SOLUCIONES INDUSTRIALES" en la franja de cada módulo; se cambia a "COMBOY VID" en la limpieza (mismo tamaño y fuente).
 
 ## 4. Lista para ELIMINAR (espera "APROBADO")
 
@@ -56,6 +59,7 @@ Tu mensaje dice **COMBOY VID E.I.R.L.**, pero el sistema emite documentos a nomb
 |---|---|---|
 | `components/ui/CardFormal.tsx` | Nadie lo importa. Lo reemplazó `components/ui.tsx`. | Ninguno |
 | `components/ui/TableFormal.tsx` | Nadie lo importa. Lo reemplazó `Table/Td` de `components/ui.tsx`. | Ninguno |
+| `components/Header.tsx` (solo el texto) | Cambiar "COMBOY VID SOLUCIONES INDUSTRIALES" por "COMBOY VID" (nombre comercial confirmado). No es borrado de archivo. | Ninguno |
 | `setup_usuarios.js` (raíz) | Duplica `scripts/crear-usuarios.mjs` y **trae una contraseña escrita en el código** (`Comboy2024*`). | Ninguno para la app. Si esa contraseña todavía se usa en algún usuario, cámbiala. |
 | `scripts/logs/import_stock_repuestos_ALMACEN_saldos_13.log` | Log de una importación ya hecha (20 KB). | Ninguno |
 | Dependencia `dotenv` en `package.json` | Solo la usaba `setup_usuarios.js`. | Ninguno |
