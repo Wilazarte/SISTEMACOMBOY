@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { productoNormalizado, sedeNormalizada } from "@/lib/constantes";
 import { FileDown, FileSpreadsheet, History, PackageMinus, Truck, Upload } from "lucide-react";
-import { Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, cn, ejecutar, toast } from "@/components/ui";
+import { Button, Card, CardHeader, Field, Input, Modal, Select, cn, ejecutar, toast } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { SEDES_STOCK, SEDE_REPUESTOS } from "@/lib/empresa";
 import { AUTORIZA_DEFECTO, ETIQUETA_KARDEX, ETIQUETA_MOTIVO, MOTIVOS_RETIRO, errorChasis, kardexDe, requiereChasis, retiroProduccion, textoChasis, type MotivoRetiro } from "@/lib/inventario";
@@ -15,7 +15,6 @@ import type { EquipoTerminado } from "@/lib/equipos";
 import type { OrdenProduccion } from "@/lib/produccion";
 import type { MovimientoKardex, StockItem } from "@/lib/types";
 
-const fechaCorta = (iso: string) => (iso ? new Date(iso).toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "-");
 const fechaHora = (iso: string) => (iso ? new Date(iso).toLocaleString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-");
 const num = (n: number) => n.toLocaleString("es-PE", { maximumFractionDigits: 2 });
 const FILTROS_SEDE = ["", SEDE_REPUESTOS, "Oficina Lima"];

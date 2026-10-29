@@ -18,7 +18,6 @@ import type {
   ServicioContratista,
   CondicionPago,
   EstadoCivil,
-  AsistenciaPeriodo,
   CuentaOrigenPago,
   Bancarizacion,
   ItemPrecio,
@@ -2083,8 +2082,6 @@ export const normalizarPeriodo = (p: string): string => p.trim().replace(/\s+/g,
 
 export const idAsistencia = (periodo: string, trabajador: string): string => `${normalizarPeriodo(periodo)}|${trabajador.trim()}`;
 
-export const getAsistencia = () => leer<AsistenciaPeriodo[]>(KEYS.ASISTENCIA, []);
-
 function errorAsistencia(error: { code?: string; message: string }): ErpError {
   if (error.code === "PGRST202" || /could not find the function/i.test(error.message))
     return new ErpError("Falta la función de asistencia en Supabase: ejecute supabase/fix_asistencia.sql.");
@@ -2432,13 +2429,6 @@ export function registrarMovimientoCaja(d: Pick<MovimientoCajaManual, "cuenta" |
 
 export function eliminarMovimientoCaja(id: string): void {
   escribir(KEYS.MOV_CAJA, leer<MovimientoCajaManual[]>(KEYS.MOV_CAJA, []).filter((m) => m.id !== id));
-}
-
-/** Registra un gasto / servicio: NO ingresa a stock; queda en Facturas como POR PAGAR. */
-export function registrarGastoTesoreria(d: DatosGasto, rol: Rol): Factura {
-  const f = prepararGasto(d, rol);
-  escribir(KEYS.FACTURAS, [f, ...getFacturas()]);
-  return f;
 }
 
 /** Línea de la OS del gasto: servicio en texto libre (no es producto del catálogo ni pasa por almacén). */

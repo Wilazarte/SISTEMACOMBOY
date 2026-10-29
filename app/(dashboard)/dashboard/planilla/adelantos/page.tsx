@@ -5,12 +5,12 @@ import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, HandCoins, Lock, Pencil, Plus, Save, Trash2, X } from "lucide-react";
-import { Badge, Button, Card, CardHeader, Empty, Field, Input, Select, Table, Td, Textarea, cn, ejecutarAsync } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, Empty, Field, Input, Select, Textarea, cn, ejecutarAsync } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { SelectorCaja } from "@/components/SelectorCaja";
 import { CAJA_POR_DEFECTO } from "@/lib/cajas";
 import { ESTADOS_ADELANTO, ESTADOS_EDITABLES, MEDIOS_PAGO, crearAdelanto, editarAdelanto, eliminarAdelanto, listarAdelantos, type Adelanto, type DatosAdelanto, type EstadoAdelanto } from "@/lib/adelantos";
-import { fechaPE, hoy, r2, soles, useTrabajadores } from "@/lib/storage";
+import { hoy, r2, soles, useTrabajadores } from "@/lib/storage";
 import { createClient } from "@/lib/supabase/client";
 
 const vacio = (): DatosAdelanto => ({ trabajador_nombre: "", dni: "", fecha: hoy(), monto: 0, motivo: "", estado: "PENDIENTE" });

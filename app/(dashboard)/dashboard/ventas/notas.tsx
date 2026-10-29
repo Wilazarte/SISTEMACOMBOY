@@ -9,7 +9,7 @@ import { getSesion } from "@/lib/auth";
 import { pdfNotaPedido } from "@/lib/pdf";
 import { codigoDesdeNumero } from "@/lib/utils/codigos";
 import { KEYS, fechaPE, hoy, puede, soles, useRol, useStore } from "@/lib/storage";
-import { TIPOS_COMPROBANTE_EXTERNO, npPorCobrar, saldoNP, costosDeNP, guardarCostosNP, totalCostos, anularNP, aprobarNP, despachoVacio, faltaDespacho, estadoOD, generarDespachoNP, odDeNP, clienteVacio, clonarNP, crearNotaPedido, editarNotaPedido, permisoEditarNP, getCondicionesPago, guardarCliente, guardarCondicion, lineaVacia, pideDias, sumarDias, type DatosNP } from "@/lib/ventas";
+import { TIPOS_COMPROBANTE_EXTERNO, npPorCobrar, saldoNP, costosDeNP, guardarCostosNP, totalCostos, anularNP, aprobarNP, despachoVacio, faltaDespacho, generarDespachoNP, odDeNP, clienteVacio, clonarNP, crearNotaPedido, editarNotaPedido, permisoEditarNP, getCondicionesPago, guardarCliente, guardarCondicion, lineaVacia, pideDias, sumarDias, type DatosNP } from "@/lib/ventas";
 import type { Cliente, CondicionPago, CostosNP, DatosDespacho, NotaPedido, OrdenDespacho } from "@/lib/types";
 import { AvisoCondiciones, DatosDespachoForm, FormCliente, LineasEditor, SelectorCliente, TotalesVenta, useCargaCondiciones, useVentas } from "./comun";
 import { FormCondicion, condVacia } from "./maestros";

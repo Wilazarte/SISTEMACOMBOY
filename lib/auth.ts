@@ -134,7 +134,6 @@ export function useSesion(): { sesion: Sesion | null; listo: boolean } {
  * Permiso "editar_asistencia_creador": edición manual de DÍAS / TARD. en el Módulo Creador.
  * Roles: creador y admin (ADMINISTRADORA). La base aplica la misma regla en editar_asistencia_creador().
  */
-export const PERMISO_EDITAR_ASISTENCIA = "editar_asistencia_creador";
 const ROLES_EDITAR_ASISTENCIA = ["creador", "admin"];
 export const RUTA_CREADOR = "/dashboard/creador";
 

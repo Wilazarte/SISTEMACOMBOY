@@ -69,6 +69,3 @@ export function similitud(a: string, b: string): number {
 export const UMBRAL_DUPLICADO = 0.8;
 /** Umbral para sugerencias al escribir y en "Posibles duplicados". */
 export const UMBRAL_SUGERENCIA = 0.45;
-
-export const etiquetaProducto = (p: Pick<ProductoMaestro, "nombre_normalizado" | "sku" | "unidad" | "marca">) =>
-  `${p.nombre_normalizado} - ${p.sku}${p.marca ? ` - ${p.marca}` : ""} - ${p.unidad}`;

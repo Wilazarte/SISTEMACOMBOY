@@ -7,8 +7,6 @@ import { guardarPrefs } from "@/lib/preferencias";
 import { useIr } from "@/components/shell/ir";
 
 const TIMES = '"Times New Roman", Times, serif';
-/** Ancho de la barra: el layout deja este margen a la derecha (lg) mientras está abierta. */
-export const ANCHO_NOTIF = 320;
 /** Aquí se dibujan secciones propias de un módulo (p. ej. "Requerimientos por revisar" de Tesorería). */
 export const ID_NOTIF_EXTRA = "erp-notif-extra";
 /** Avisos que se ven antes de "Ver todas las notificaciones". */

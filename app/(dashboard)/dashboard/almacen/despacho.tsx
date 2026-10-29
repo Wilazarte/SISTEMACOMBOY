@@ -3,7 +3,7 @@
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, ArrowRightLeft, Pencil, Building2, Camera, CheckCircle2, ClipboardCheck, FileText, MapPin, PackageCheck, Save, Truck } from "lucide-react";
-import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, Textarea, Timeline, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Textarea, Timeline, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { FirmaPad } from "@/components/FirmaPad";
 import { ArchivoImg } from "@/components/ArchivoRef";

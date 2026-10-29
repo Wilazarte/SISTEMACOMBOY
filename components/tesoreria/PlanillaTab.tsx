@@ -12,7 +12,6 @@ import {
   MSG_ASISTENCIA_BLOQUEADA,
   TIPOS_SUELDO,
   detectarDuplicados,
-  edad,
   esContratista,
   eliminarTrabajador,
   fechaPE,
@@ -370,7 +369,6 @@ export default function PlanillaTab() {
     // Periodo: el que escribió el usuario; si no, la semana ISO de la primera fecha del reloj
     const per = periodoManual && normalizarPeriodo(periodo) ? normalizarPeriodo(periodo) : periodoDeFecha(desde || leidas.desde);
     if (per && per !== normalizarPeriodo(periodo)) setPeriodoEstado(per);
-    console.info("[planilla] importar asistencia", { periodo: per, desde, hasta, huellas: leidas.asistencia.size, unidos: emp.porNombre.length, sinVincular: emp.noEncontrados.length });
     if (mapa.size === 0) {
       if (!emp.noEncontrados.length) toast("No se encontraron marcaciones. Verifique las columnas N° / Nombre / Tiempo (DD/MM/YYYY HH:mm:ss).", "error");
       setTab("planilla");
@@ -406,7 +404,6 @@ export default function PlanillaTab() {
         const suelto = getTrabajadores().find((t) => t.id === x.huella && t.id !== trabajadorId && !t.fechaIngreso);
         if (suelto) unirDuplicado(x.huella, trabajadorId);
         else vincularHuella(x.huella, trabajadorId);
-        console.info("[planilla] huella vinculada", { huella: x.huella, trabajador: trabajadorId, fusion: !!suelto });
       }
       else registrarDesdeAsistencia([{ id: x.huella, nombre: x.nombre }]);
       if (ultimasFilas) await procesarAsistencia(ultimasFilas);

@@ -1,8 +1,8 @@
 # ARCHIVO_AUDITORIA · Fase 0 · ERP COMBOY VID
 
-Fecha: 2026-10-28 · Base: `main` en `056a9f4` (después del PR #37) · Estado: **ESPERANDO "APROBADO"** para borrar.
+Fecha: 2026-10-28 · Base: `main` en `056a9f4` (después del PR #37) · Estado: **APROBADO por Williams (2026-10-29) y limpieza ejecutada** (ver punto 10).
 
-En esta fase **no se borró ni cambió nada**. Este archivo es el único cambio del PR.
+El primer commit del PR solo trae este reporte; la limpieza va en el commit siguiente, después del "APROBADO".
 
 ## 1. Cómo se auditó
 
@@ -262,3 +262,35 @@ Resumen: **118 MANTENER · 19 OPTIMIZAR · 2 ELIMINAR**.
 2. Seguridad del punto 7 (middleware, contraseñas, rate limit).
 3. **Módulo IMPORTACIÓN (MM-IM)**: Requerimiento de Importación → Orden de Importación (China/USA) → Embarque (nave, Callao, aduana) → Costeo (FOB + Flete + Seguro = CIF, + Ad Valorem + IGV + IPM + Percepción + Almacenaje + Transporte) → Liquidación → ingreso a Almacén con costo landed → margen de venta. Tablas relacionales nuevas con `sede_id` y RLS, sin tocar datos existentes.
 4. Luego, en el orden que prefieras: CRM de minas, Flota/Alquiler, Taller (OT sobre Producción), Calidad/Garantía, CO por centro de costo.
+
+## 10. Limpieza ejecutada (2026-10-29)
+
+**Archivos eliminados**
+- `components/ui/CardFormal.tsx`
+- `components/ui/TableFormal.tsx`
+- `setup_usuarios.js`
+- `scripts/logs/import_stock_repuestos_ALMACEN_saldos_13.log`
+- Dependencia `dotenv` (`package.json` y `package-lock.json`)
+
+**Código muerto quitado:** `ANCHO_NOTIF`, `PAGO_POR_DIA`, `PERMISO_EDITAR_ASISTENCIA`, `etiquetaProducto`, `recargarCatalogo`, `getCatalogo`, `productoPorId`, `getAsistencia`, `registrarGastoTesoreria`, `JEFE_SUCURSAL`, `guardarSucursal`, `prepararDespacho` y la función `verVoucher` sin uso de Compras.
+
+**Imports y variables sin uso:** 23 quitados en 12 archivos (los 22 del reporte y el tipo `AsistenciaPeriodo`, que quedó sin uso).
+
+**console.info:** se quitaron los 2 de Planilla. Se deja la medición de `iniciarDatos` (tiempo de carga al iniciar sesión) porque sirve para medir rendimiento.
+
+**Texto:** la franja de cada módulo dice "COMBOY VID" en lugar de "COMBOY VID SOLUCIONES INDUSTRIALES".
+
+**Se conservó a propósito:** en Ventas › Comprobantes la variable `ods` no se leía, pero su `useStore` mantiene cargada la lista de despachos, que se usa al emitir un comprobante (genera la OD). Se dejó la suscripción y se le agregó un comentario.
+
+**Verificación**
+- `tsc --noEmit`: sin errores.
+- `tsc --noUnusedLocals`: 0 avisos (antes eran 22).
+- `next build`: compila; están las mismas 25 rutas de antes.
+
+| Métrica | Antes | Después |
+|---|---:|---:|
+| Archivos .ts/.tsx | 139 | 137 |
+| Imports/variables sin uso | 22 | 0 |
+| Funciones exportadas muertas | 13 | 0 |
+| Dependencias sin uso | 1 | 0 |
+| Líneas borradas | | 89 |

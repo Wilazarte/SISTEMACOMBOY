@@ -31,8 +31,6 @@ export const SUCURSAL_DEFECTO: Sucursal = {
   cajaChicaActual: 0,
 };
 
-export const JEFE_SUCURSAL = { nombre: "LIZBETH CAHUANA APFATA", cargo: "Jefe de Sucursal - Módulo de Sucursal Beta" };
-
 export type EstadoVenta = "registrada" | "entregada" | "derivada" | "cerrada";
 export type TipoDocVenta = "FA" | "BV";
 export type FormaPagoSuc = "CONTADO" | "CREDITO";
