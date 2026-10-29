@@ -12,7 +12,7 @@ const nextConfig = {
       { source: "/logistica/ventas", destination: "/dashboard/ventas", permanent: false },
       { source: "/logistica/compras", destination: "/dashboard/compras?tab=ordenes", permanent: false },
       { source: "/logistica/almacen", destination: "/dashboard/almacen", permanent: false },
-      { source: "/logistica/finanzas", destination: "/dashboard/contable", permanent: false },
+      { source: "/logistica/finanzas", destination: "/dashboard/compras", permanent: false },
       { source: "/logistica/produccion", destination: "/dashboard/produccion", permanent: false },
       { source: "/logistica/planilla", destination: "/dashboard/compras?tab=planilla", permanent: false },
     ];

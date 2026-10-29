@@ -41,7 +41,7 @@ function Tabla({ head, children }: { head: string[]; children: ReactNode }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[560px] border-collapse">
-        <thead className="border-b border-[#2b2f38]">
+        <thead className="border-b border-[#2a3445]">
           <tr>
             {head.map((h) => (
               <th key={h} className={th}>
@@ -50,7 +50,7 @@ function Tabla({ head, children }: { head: string[]; children: ReactNode }) {
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#2b2f38]">{children}</tbody>
+        <tbody className="divide-y divide-[#2a3445]">{children}</tbody>
       </table>
     </div>
   );
@@ -103,7 +103,7 @@ function Ventas({ d }: { d: DatosLogistica }) {
           ) : (
             <ul className="space-y-1.5">
               {d.ptPorTipo.map(([tipo, n]) => (
-                <li key={tipo} className="flex items-center justify-between rounded-lg bg-[#1b1e24] px-3 py-2 text-[13px]">
+                <li key={tipo} className="flex items-center justify-between rounded-lg bg-[#212a3a] px-3 py-2 text-[13px]">
                   <span className="font-semibold text-white">{tipo}</span>
                   <Etiqueta tono="verde">{n} disponible(s)</Etiqueta>
                 </li>
@@ -112,7 +112,7 @@ function Ventas({ d }: { d: DatosLogistica }) {
           )}
           <div className="mt-3 grid grid-cols-3 gap-2">
             {d.agencias.slice(0, 3).map((a) => (
-              <div key={a.id} className="rounded-lg border border-[#2b2f38] bg-[#1b1e24] px-2 py-2 text-center">
+              <div key={a.id} className="rounded-lg border border-[#2a3445] bg-[#212a3a] px-2 py-2 text-center">
                 <span className="block text-[14px] font-bold text-white">{a.nombre}</span>
                 <span className="block text-[11px] text-[#a1a1aa]">{a.detalle}</span>
               </div>
@@ -146,7 +146,7 @@ function Agencias({ d, completo }: { d: DatosLogistica; completo?: boolean }) {
     <Panel titulo="Agencias de transporte" icono={<Building2 size={17} />} accion={<BotonVer href="/dashboard/almacen?tab=despacho">Órdenes de despacho</BotonVer>}>
       <div className="grid gap-3 md:grid-cols-3">
         {d.agencias.map((a) => (
-          <div key={a.id} className="rounded-lg border border-[#2b2f38] bg-[#1b1e24] p-3">
+          <div key={a.id} className="rounded-lg border border-[#2a3445] bg-[#212a3a] p-3">
             <p className="text-[16px] font-bold text-white">{a.nombre}</p>
             {a.detalle && <p className="text-[12px] text-[#a1a1aa]">{a.detalle}</p>}
             <dl className="mt-2 grid grid-cols-2 gap-1 text-[12px]">
@@ -248,7 +248,7 @@ function Infraestructura({ d }: { d: DatosLogistica }) {
     <Panel titulo="Infraestructura planta" icono={<Wrench size={17} />} accion={<BotonVer href="/logistica/produccion">Ver Producción</BotonVer>}>
       <div className="grid gap-2 sm:grid-cols-3">
         {ESTACIONES.map((e) => (
-          <div key={e.nombre} className="rounded-lg border border-[#2b2f38] bg-[#1b1e24] p-3">
+          <div key={e.nombre} className="rounded-lg border border-[#2a3445] bg-[#212a3a] p-3">
             <p className="text-[14px] font-bold text-white">{e.nombre}</p>
             <p className="text-[12px] text-[#a1a1aa]">{e.detalle}</p>
             <p className="mt-1 text-[11px] italic text-[#71717a]">Estado / OEE / mantenimiento: sin registro</p>
@@ -261,7 +261,7 @@ function Infraestructura({ d }: { d: DatosLogistica }) {
       ) : (
         <ul className="space-y-1.5 text-[13px]">
           {d.opsActivas.map((o) => (
-            <li key={o.id} className="flex flex-wrap justify-between gap-2 rounded-lg bg-[#1b1e24] px-3 py-2">
+            <li key={o.id} className="flex flex-wrap justify-between gap-2 rounded-lg bg-[#212a3a] px-3 py-2">
               <span>
                 <span className="font-semibold text-white">{o.id}</span> · {o.tipo_equipo} {o.modelo} · chasis {o.codigo_chasis || "-"}
               </span>
@@ -347,7 +347,7 @@ function CotizarFlete({ d }: { d: DatosLogistica }) {
       <p className="mb-3 text-[12px] text-[#a1a1aa]">Referencia de fletes pagados por agencia y destino (costo de envío registrado en las órdenes de despacho).</p>
       <div className="mb-4 grid gap-2 sm:grid-cols-3">
         {d.agencias.slice(0, 3).map((a) => (
-          <div key={a.id} className="rounded-lg border border-[#2b2f38] bg-[#1b1e24] p-3 text-center">
+          <div key={a.id} className="rounded-lg border border-[#2a3445] bg-[#212a3a] p-3 text-center">
             <p className="font-bold text-white">{a.nombre}</p>
             <p className="text-[12px] text-[#a1a1aa]">Flete promedio</p>
             <p className="text-lg font-bold text-[#fb923c]">{a.fletePromedio ? soles(a.fletePromedio) : "-"}</p>
@@ -410,7 +410,7 @@ function Lista({ titulo, icono, items, vacio }: { titulo: string; icono: ReactNo
       ) : (
         <ul className="space-y-1.5">
           {items.slice(0, 5).map((n) => (
-            <li key={n.clave} className="rounded-lg bg-[#1b1e24] px-3 py-2">
+            <li key={n.clave} className="rounded-lg bg-[#212a3a] px-3 py-2">
               <Link href={n.href} target="_blank" className="block hover:text-white">
                 <span className="block text-[13px] font-semibold text-white">{n.titulo}</span>
                 <span className="block text-[12px] text-[#a1a1aa]">{n.detalle}</span>
@@ -441,8 +441,8 @@ export function LogisticaDetalle({ solo }: { solo?: Seccion }) {
   const notifs = useNotificaciones(sesion);
 
   return (
-    <div className="w-full space-y-4 rounded-2xl bg-[#0f1013] p-3 text-[#e5e7eb] sm:p-5">
-      <header className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#2b2f38] bg-[#16181d] px-5 py-3">
+    <div className="w-full space-y-4 rounded-2xl bg-[#0e1219] p-3 text-[#e5e7eb] sm:p-5">
+      <header className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#2a3445] bg-[#1a212e] px-5 py-3">
         <div>
           <Link href="/logistica" className="mb-1 inline-flex items-center gap-1 text-[12px] text-[#a1a1aa] hover:text-[#fdba74]">
             <ArrowLeft size={13} /> Logística Planta

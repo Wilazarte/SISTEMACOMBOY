@@ -2,39 +2,46 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, LayoutDashboard, Receipt, ShoppingCart, Truck, Users, Warehouse, type LucideIcon } from "lucide-react";
+import { BarChart3, Factory, LayoutDashboard, Landmark, Receipt, ShoppingCart, Truck, Users, Warehouse, type LucideIcon } from "lucide-react";
 import { EV_IR_PESTANA, cn } from "@/components/ui";
-import { puedeVer, veDashboard, type Sesion } from "@/lib/auth";
+import { puedeVer, veDashboard, veTesoreria, type Sesion } from "@/lib/auth";
 
-type Id = "dashboard" | "logistica" | "tesoreria" | "sucursal" | "planilla" | "ventas" | "inventario" | "reportes";
+type Id = "dashboard" | "logistica" | "finanzas" | "produccion" | "tesoreria" | "sucursal" | "planilla" | "ventas" | "inventario" | "reportes";
 
 /**
  * Módulos del dock. `corto` es la etiqueta en móvil. Tesorería y Planilla viven en la misma página
  * (/dashboard/compras): `tab` es la pestaña que abre cada botón (ver fueraDeIsla en Tabs).
+ * `oculto`: el módulo sigue existiendo (ruta, permisos y datos) pero no se muestra en el dock.
+ * Visibles (pedido de Williams, 2026-10-29): Logística, Almacén, Finanzas y Producción.
  */
-const ITEMS: { id: Id; href: string; label: string; corto: string; icon: LucideIcon; tab?: string; permiso: string }[] = [
-  { id: "dashboard", href: "/dashboard", label: "Dashboard", corto: "Dashboard", icon: LayoutDashboard, permiso: "/dashboard" },
+const ITEMS: { id: Id; href: string; label: string; corto: string; icon: LucideIcon; tab?: string; permiso: string; oculto?: boolean }[] = [
+  { id: "dashboard", href: "/dashboard", label: "Dashboard", corto: "Dashboard", icon: LayoutDashboard, permiso: "/dashboard", oculto: true },
   { id: "logistica", href: "/logistica", label: "Logística", corto: "Logística", icon: Truck, permiso: "/logistica" },
-  { id: "tesoreria", href: "/dashboard/compras", label: "Tesorería/Compras", corto: "Tesorería", icon: ShoppingCart, tab: "registrar", permiso: "/dashboard/compras" },
-  { id: "planilla", href: "/dashboard/compras?tab=planilla", label: "Planilla", corto: "Planilla", icon: Users, tab: "planilla", permiso: "/dashboard/planilla" },
-  { id: "ventas", href: "/dashboard/ventas", label: "Ventas", corto: "Ventas", icon: Receipt, permiso: "/dashboard/ventas" },
-  { id: "inventario", href: "/dashboard/almacen", label: "Inventario", corto: "Inventario", icon: Warehouse, permiso: "/dashboard/almacen" },
+  { id: "inventario", href: "/dashboard/almacen", label: "Almacén", corto: "Almacén", icon: Warehouse, permiso: "/dashboard/almacen" },
+  // Finanzas = Tesorería (pagos, cajas, planilla); Contable sigue en /dashboard/contable
+  { id: "finanzas", href: "/dashboard/compras", label: "Finanzas", corto: "Finanzas", icon: Landmark, tab: "registrar", permiso: "/dashboard/compras" },
+  { id: "produccion", href: "/dashboard/produccion", label: "Producción", corto: "Producción", icon: Factory, permiso: "/dashboard/produccion" },
+  { id: "tesoreria", href: "/dashboard/compras", label: "Tesorería/Compras", corto: "Tesorería", icon: ShoppingCart, tab: "registrar", permiso: "/dashboard/compras", oculto: true },
+  { id: "planilla", href: "/dashboard/compras?tab=planilla", label: "Planilla", corto: "Planilla", icon: Users, tab: "planilla", permiso: "/dashboard/planilla", oculto: true },
+  { id: "ventas", href: "/dashboard/ventas", label: "Ventas", corto: "Ventas", icon: Receipt, permiso: "/dashboard/ventas", oculto: true },
   // Reportes = libros, balance y EEFF del módulo contable
-  { id: "reportes", href: "/dashboard/contable", label: "Reportes", corto: "Reportes", icon: BarChart3, permiso: "/dashboard/contable" },
+  { id: "reportes", href: "/dashboard/contable", label: "Reportes", corto: "Reportes", icon: BarChart3, permiso: "/dashboard/contable", oculto: true },
 ];
 
 /** Botón activo según la ruta y, en /dashboard/compras, la pestaña abierta (Planilla o Tesorería). */
 function activoDe(ruta: string, tab: string | undefined): Id | undefined {
   if (ruta === "/dashboard") return "dashboard";
-  if (ruta.startsWith("/dashboard/planilla")) return "planilla";
-  if (ruta === "/dashboard/compras") return tab === "planilla" ? "planilla" : "tesoreria";
-  return ITEMS.find((i) => i.id !== "dashboard" && (ruta === i.href || ruta.startsWith(`${i.href}/`)))?.id;
+  // Tesorería, Planilla y Contable se muestran bajo Finanzas
+  if (ruta === "/dashboard/compras" || ruta.startsWith("/dashboard/planilla") || ruta.startsWith("/dashboard/contable")) return "finanzas";
+  return ITEMS.find((i) => !i.oculto && i.id !== "dashboard" && (ruta === i.href || ruta.startsWith(`${i.href}/`)))?.id;
 }
 
 /** Dock flotante: cápsula centrada con los módulos. Solo muestra los que el usuario puede abrir (ver puedeVer en lib/auth.ts). */
 export function FloatingDock({ sesion, tab }: { sesion: Sesion; tab?: string }) {
   const ruta = usePathname();
-  const items = ITEMS.filter((i) => (i.id === "dashboard" ? veDashboard(sesion) : puedeVer(sesion, i.permiso)));
+  const items = ITEMS.filter(
+    (i) => !i.oculto && (i.id === "dashboard" ? veDashboard(sesion) : i.id === "finanzas" ? veTesoreria(sesion) : puedeVer(sesion, i.permiso))
+  );
   if (items.length === 0) return null;
   const activo = activoDe(ruta, tab);
 

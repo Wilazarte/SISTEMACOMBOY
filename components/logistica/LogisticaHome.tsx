@@ -15,6 +15,8 @@ import {
   Truck,
   Wrench,
   Container,
+  Landmark,
+  Warehouse,
 } from "lucide-react";
 import { useSesion } from "@/lib/auth";
 import { VERSION_LOGISTICA, abrirPestana, useLogistica } from "@/lib/logistica";
@@ -28,8 +30,11 @@ const corto = (n: number): string =>
 
 const hora = () => new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", hour12: false });
 
-/** Accesos rápidos: cada uno abre su destino en una pestaña nueva. Compras y Ventas son los módulos actuales intactos. */
-const ACCESOS = [
+/**
+ * Secciones de Logística: ya no se muestran como accesos rápidos (pedido de Williams, 2026-10-29),
+ * pero siguen en /logistica/detalle, /logistica/<seccion> y el buscador Ctrl+K.
+ */
+export const SECCIONES_LOGISTICA = [
   { titulo: "Compras Nacionales Perú", texto: "Gestión de compras nacionales · OC y proveedores", href: "/logistica/compras", icono: <ShoppingCart size={20} /> },
   { titulo: "Ventas Nacionales PT", texto: "Remolcador · Chasis CV-300 · Tanque Agua · Coche Minero", href: "/logistica/ventas", icono: <Truck size={20} /> },
   { titulo: "Agencias", texto: "Marvisur · Grael · Shalom", href: "/logistica/agencias", icono: <Building2 size={20} /> },
@@ -39,6 +44,14 @@ const ACCESOS = [
   { titulo: "Guía SUNAT", texto: "Validar y emitir guía de remisión", href: "/logistica/guia-sunat", icono: <FileText size={20} /> },
   { titulo: "Cotizar Flete", texto: "Fletes por agencia y destino", href: "/logistica/cotizar-flete", icono: <Container size={20} /> },
   { titulo: "Historial General", texto: "Registro de movimientos y operaciones", href: "/logistica/historial", icono: <Clock size={20} /> },
+];
+
+/** Accesos rápidos visibles: los 4 módulos de la planta, cada uno en una pestaña nueva. */
+const MODULOS = [
+  { titulo: "Logística", texto: "Compras y ventas nacionales · Agencias · Transferencias", href: "/logistica/detalle", icono: <Truck size={20} /> },
+  { titulo: "Almacén", texto: "Requerimientos · Ingresos · Stock · Despachos", href: "/logistica/almacen", icono: <Warehouse size={20} /> },
+  { titulo: "Finanzas", texto: "Tesorería · Pagos · Planilla", href: "/logistica/finanzas", icono: <Landmark size={20} /> },
+  { titulo: "Producción", texto: "Órdenes de producción · QC · Ingreso PT", href: "/logistica/produccion", icono: <Factory size={20} /> },
 ];
 
 export function LogisticaHome() {
@@ -54,8 +67,8 @@ export function LogisticaHome() {
   const pt = d.ptPorTipo.map(([t, n]) => `${n} ${t}`).join(" · ");
 
   return (
-    <div className="w-full space-y-5 rounded-2xl bg-[#0f1013] p-3 text-[#e5e7eb] sm:p-5">
-      <header className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#2b2f38] bg-[#16181d] px-5 py-4">
+    <div className="w-full space-y-5 rounded-2xl bg-[#0e1219] p-3 text-[#e5e7eb] sm:p-5">
+      <header className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#2a3445] bg-[#1a212e] px-5 py-4">
         <div className="flex items-center gap-4">
           <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border-2 border-[#f97316] text-[#f97316]">
             <Truck size={30} />
@@ -105,7 +118,7 @@ export function LogisticaHome() {
                   <button
                     type="button"
                     onClick={() => abrirPestana(p.href)}
-                    className="flex w-full items-center gap-3 rounded-lg border border-[#2b2f38] bg-[#1b1e24] px-3 py-2 text-left transition hover:border-[#f97316]"
+                    className="flex w-full items-center gap-3 rounded-lg border border-[#2a3445] bg-[#212a3a] px-3 py-2 text-left transition hover:border-[#f97316]"
                   >
                     <AlertTriangle size={16} className="shrink-0 text-[#f97316]" />
                     <span className="min-w-0 flex-1">
@@ -131,7 +144,7 @@ export function LogisticaHome() {
                   <button
                     type="button"
                     onClick={() => abrirPestana(n.href)}
-                    className="flex h-full w-full gap-2 rounded-lg border border-[#2b2f38] bg-[#1b1e24] px-3 py-2 text-left transition hover:border-[#f97316]"
+                    className="flex h-full w-full gap-2 rounded-lg border border-[#2a3445] bg-[#212a3a] px-3 py-2 text-left transition hover:border-[#f97316]"
                   >
                     <Bell size={15} className="mt-0.5 shrink-0 text-[#f97316]" />
                     <span className="min-w-0">
@@ -151,8 +164,8 @@ export function LogisticaHome() {
         <h2 className="mb-3 flex items-center gap-2 text-xl font-bold uppercase text-[#fb923c]">
           <LayoutGrid size={20} /> Accesos rápidos
         </h2>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {ACCESOS.map((a) => (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {MODULOS.map((a) => (
             <Acceso key={a.href} {...a} />
           ))}
         </div>

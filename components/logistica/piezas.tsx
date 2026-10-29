@@ -12,7 +12,7 @@ export const NARANJA = "#f97316";
 
 export function Panel({ titulo, icono, accion, children, className }: { titulo?: string; icono?: ReactNode; accion?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={cn("rounded-xl border border-[#2b2f38] bg-[#16181d] p-4 text-[#e5e7eb]", className)}>
+    <section className={cn("rounded-xl border border-[#2a3445] bg-[#1a212e] p-4 text-[#e5e7eb]", className)}>
       {titulo && (
         <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="flex items-center gap-2 text-[15px] font-bold uppercase tracking-wide text-[#fb923c]">
@@ -48,7 +48,7 @@ export function BotonAccion({ href, children, icono, lleno }: { href: string; ch
       onClick={() => abrirPestana(href)}
       className={cn(
         "inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-[13px] font-semibold transition",
-        lleno ? "bg-[#f97316] text-white hover:bg-[#ea580c]" : "border border-[#3a3f4a] bg-[#1d2027] text-[#e5e7eb] hover:border-[#f97316] hover:text-white"
+        lleno ? "bg-[#f97316] text-white hover:bg-[#ea580c]" : "border border-[#3a4558] bg-[#212a3a] text-[#e5e7eb] hover:border-[#f97316] hover:text-white"
       )}
     >
       {icono}
@@ -62,7 +62,7 @@ export function Kpi({ icono, titulo, valor, detalle, href }: { icono: ReactNode;
     <button
       type="button"
       onClick={() => abrirPestana(href)}
-      className="flex flex-col items-center gap-1 rounded-xl border border-[#2b2f38] bg-[#16181d] px-4 py-5 text-center transition hover:border-[#f97316]"
+      className="flex flex-col items-center gap-1 rounded-xl border border-[#2a3445] bg-[#1a212e] px-4 py-5 text-center transition hover:border-[#f97316]"
     >
       <span className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-[#a1a1aa]">
         <span className="text-[#f97316]">{icono}</span>
@@ -80,7 +80,7 @@ export function Acceso({ icono, titulo, texto, href }: { icono: ReactNode; titul
       type="button"
       onClick={() => abrirPestana(href)}
       title="Se abre en una pestaña nueva"
-      className="group flex items-center gap-3 rounded-xl border border-[#2b2f38] bg-[#16181d] px-4 py-4 text-left transition hover:border-[#f97316]"
+      className="group flex items-center gap-3 rounded-xl border border-[#2a3445] bg-[#1a212e] px-4 py-4 text-left transition hover:border-[#f97316]"
     >
       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#f97316] text-white">{icono}</span>
       <span className="min-w-0 flex-1">
@@ -111,7 +111,7 @@ export function Barra({ pct }: { pct: number }) {
 }
 
 export function Vacio({ children }: { children: ReactNode }) {
-  return <p className="rounded-lg border border-dashed border-[#2b2f38] px-3 py-4 text-center text-[13px] text-[#a1a1aa]">{children}</p>;
+  return <p className="rounded-lg border border-dashed border-[#2a3445] px-3 py-4 text-center text-[13px] text-[#a1a1aa]">{children}</p>;
 }
 
 /** Aviso de dato que el ERP todavía no registra (no se inventan cifras). */
