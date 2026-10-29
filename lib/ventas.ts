@@ -1465,9 +1465,6 @@ export function marcarAlistado(id: string, usuario: string, observacion: string,
   });
 }
 
-/** @deprecated usar marcarAlistado */
-export const prepararDespacho = (id: string, rol: Rol) => marcarAlistado(id, "", "", rol);
-
 /**
  * Cierre de Almacén: descuenta stock de lo pendiente (registrarDespacho) y deja la orden en
  * PEDIDO_ENTREGADO (con firma del cliente) o DEJADO_EN_AGENCIA (foto de la guía opcional).

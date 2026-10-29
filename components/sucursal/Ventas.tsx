@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRightLeft, Ban, CheckCircle2, ClipboardCheck, FileText, HandCoins, PackageCheck, Truck, Wrench } from "lucide-react";
-import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, Textarea, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
+import { Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, Textarea, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { BotonNuevo } from "@/components/ui/BotonFiltros";
 import { FirmaPad } from "@/components/FirmaPad";

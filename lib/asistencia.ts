@@ -6,7 +6,6 @@ export type AsistenciaMap = Map<string, Map<string, string[]>>;
 
 /** PAGO POR DÍA ACTIVADO: El bruto = DÍAS * sueldo diario. 9h es solo referencia para el reporte. */
 export const HORAS_DIA = 9;
-export const PAGO_POR_DIA = true;
 /** Entrada después de esta hora = tardanza. */
 export const HORA_TARDANZA = "08:20";
 

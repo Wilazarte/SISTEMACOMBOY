@@ -105,9 +105,6 @@ export async function detenerCatalogo(): Promise<void> {
   porNombre = new Map();
 }
 
-export const recargarCatalogo = () => leerCatalogo();
-export const getCatalogo = (): Estado => estado;
-
 export function useCatalogo(): Estado {
   const [e, setE] = useState<Estado>(estado);
   useEffect(() => {
@@ -122,7 +119,6 @@ export function useCatalogo(): Estado {
 
 /** Producto oficial de un nombre (exacto, normalizado o alias). */
 export const buscarProducto = (nombre: string): ProductoMaestro | undefined => porNombre.get(normalizarNombre(nombre));
-export const productoPorId = (id?: string): ProductoMaestro | undefined => (id ? estado.productos.find((p) => p.id === id) : undefined);
 
 /** Productos parecidos (para "¿Quisiste decir…?"). */
 export function sugerencias(nombre: string, n = 3, umbral = UMBRAL_SUGERENCIA): { p: ProductoMaestro; sim: number }[] {

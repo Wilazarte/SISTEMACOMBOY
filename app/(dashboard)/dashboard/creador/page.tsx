@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { KeyRound, Save, ShieldAlert } from "lucide-react";
 import { Button, Card, CardHeader, Empty, Field, Input, Table, Td, cn, ejecutarAsync } from "@/components/ui";
 import { getSesion, puedeEditarAsistencia } from "@/lib/auth";
-import { KEYS, editarAsistenciaCreador, idAsistencia, normalizarPeriodo, useStore, useTrabajadores } from "@/lib/storage";
+import { KEYS, editarAsistenciaCreador, idAsistencia, useStore, useTrabajadores } from "@/lib/storage";
 import type { AsistenciaPeriodo } from "@/lib/types";
 
 type Borrador = Record<string, { dias: string; tardanzas: string }>;

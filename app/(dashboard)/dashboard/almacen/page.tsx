@@ -4,7 +4,7 @@ import { BotonNuevo } from "@/components/ui/BotonFiltros";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useCallback, useEffect, useState } from "react";
-import { Boxes, CheckCircle2, Factory, Truck, ClipboardList, Eye, FilePlus2, FileText, MessageSquareWarning, PackageCheck, Pencil, Plus, Trash2 } from "lucide-react";
+import { Boxes, CheckCircle2, Truck, ClipboardList, Eye, FilePlus2, FileText, MessageSquareWarning, PackageCheck, Pencil, Plus, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
 import { EditarReq, permisoEditarReq } from "@/components/compras/EditarReq";
@@ -17,7 +17,6 @@ import {
   KEYS,
   crearRequerimiento,
   darVistoBueno,
-  fechaPE,
   observarIngreso,
   puede,
   registrarIngresoAlmacen,

@@ -135,19 +135,6 @@ const oficial = (nombre: string) => {
 const norm = (t: string) => t.trim().toUpperCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 // ---------------------------------------------------------------------
-// Sucursal
-// ---------------------------------------------------------------------
-
-export function guardarSucursal(d: Omit<Sucursal, "cajaChicaActual">): void {
-  exigir(operaSucursal(), "Su usuario no puede editar la sucursal.");
-  exigir(!!d.nombre.trim(), "Ingrese el nombre de la sucursal.");
-  const actual = getSucursal();
-  const lista = deSede(leer<Sucursal[]>(KEYS.SUC_SUCURSALES, []));
-  const nueva: Sucursal = { ...actual, ...d, nombre: d.nombre.trim() };
-  escribirSede(KEYS.SUC_SUCURSALES, lista.some((s) => s.id === nueva.id) ? lista.map((s) => (s.id === nueva.id ? nueva : s)) : [nueva, ...lista]);
-}
-
-// ---------------------------------------------------------------------
 // 1. Registrar venta
 // ---------------------------------------------------------------------
 

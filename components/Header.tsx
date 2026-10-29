@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { MapPin } from "lucide-react";
 import { cargoDe, nombreDe, type Sesion } from "@/lib/auth";
 
-const NOMBRE_EMPRESA = "COMBOY VID SOLUCIONES INDUSTRIALES";
+const NOMBRE_EMPRESA = "COMBOY VID";
 const SEDE = "Arequipa - Planta Principal";
 
 /** Franja de contexto de cada módulo: usuario | cargo | empresa, sede y flujo de trabajo (subtítulo). Sin línea de encargada. */

@@ -3,7 +3,7 @@
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useEffect, useState } from "react";
 import { Ban, FilePlus2, FileText, Printer, Send, Trash2, Truck } from "lucide-react";
-import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, Textarea, cn, ejecutar, ejecutarAsync } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Textarea, cn, ejecutar, ejecutarAsync } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { pdfComprobanteVenta, pdfTicketVenta } from "@/lib/pdf";
 import { KEYS, fechaPE, hoy, previewNumero, puede, r2, soles, useRol, useStore } from "@/lib/storage";
@@ -13,7 +13,6 @@ import {
   anularComprobante,
   eliminarBorrador,
   emitirComprobante,
-  estadoEntrega,
   formaDeCondicion,
   guardarBorrador,
   lineaVacia,
@@ -47,7 +46,8 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
   const [rol] = useRol();
   const comprobantes = useStore<ComprobanteVenta[]>(KEYS.COMPROBANTES, []);
   const notas = useStore<NotaPedido[]>(KEYS.NOTAS_PEDIDO, []);
-  const ods = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, []);
+  // Se suscribe a los despachos: al emitir se genera la OD y su lista debe estar cargada
+  useStore<OrdenDespacho[]>(KEYS.DESPACHOS, []);
   const { clientes, condiciones, stock } = useVentas();
   const [filtro, setFiltro] = useState<Filtro>("TODOS");
   const [form, setForm] = useState<DatosComprobante | null>(null);

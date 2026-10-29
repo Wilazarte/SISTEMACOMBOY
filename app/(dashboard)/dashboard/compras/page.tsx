@@ -5,7 +5,6 @@ import { ProductoInput } from "@/components/productos/ProductoInput";
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   AlertTriangle,
-  Bell,
   Check,
   Eye,
   FileCheck2,
@@ -38,12 +37,10 @@ import {
   IGV,
   COMPROBANTES_GASTO,
   docCompra,
-  CUENTAS_ORIGEN_PAGO,
   cuentaOrigenDeCaja,
   bancarizarOC,
   requiereBancarizacion,
   TOPE_BANCARIZACION,
-  TIPOS_GASTO,
   KEYS,
   esContratista,
   esDeclaracionJurada,
@@ -80,7 +77,6 @@ import {
   soles,
   totalesCompra,
   uid,
-  urlVoucher,
   useRol,
   useStore,
   validarVoucher,
@@ -1306,18 +1302,6 @@ function Ordenes({
       return;
     }
     setVoucher({ file, url: URL.createObjectURL(file) });
-  };
-
-  const verVoucher = async (ruta: string) => {
-    const w = window.open("", "_blank");
-    try {
-      const url = await urlVoucher(ruta);
-      if (w) w.location.href = url;
-      else window.open(url, "_blank");
-    } catch (e) {
-      w?.close();
-      toast(e instanceof Error ? e.message : "No se pudo abrir el baucher", "error");
-    }
   };
 
   const competidoras = coti ? todasCotis.filter((c) => c.reqId === coti.reqId) : [];
