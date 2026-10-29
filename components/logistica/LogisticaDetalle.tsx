@@ -6,6 +6,7 @@ import { AlertTriangle, ArrowLeft, ArrowLeftRight, Bell, Building2, Clock, Conta
 import { useSesion } from "@/lib/auth";
 import { avanceOC, useLogistica, type DatosLogistica } from "@/lib/logistica";
 import { useNotificaciones, type Notificacion } from "@/lib/notificaciones";
+import { permisosPlanta } from "@/lib/permisosPlanta";
 import { fechaPE, soles } from "@/lib/storage";
 import { ESTADOS_OD, estadoOD, resumenEntrega } from "@/lib/ventas";
 import { Barra, BotonAccion, BotonVer, Etiqueta, Panel, SinRegistro, Vacio } from "./piezas";
@@ -93,6 +94,8 @@ function Compras({ d }: { d: DatosLogistica }) {
 }
 
 function Ventas({ d }: { d: DatosLogistica }) {
+  const { sesion } = useSesion();
+  const permisos = permisosPlanta(sesion);
   return (
     <Panel titulo="Ventas nacionales" icono={<Truck size={17} />} accion={<BotonVer href="/logistica/agencias">Ver Agencias</BotonVer>}>
       <div className="grid gap-4 lg:grid-cols-2">
@@ -120,15 +123,17 @@ function Ventas({ d }: { d: DatosLogistica }) {
           </div>
         </div>
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <BotonAccion href="/dashboard/ventas?tab=notas" lleno>
-              Cotizar Venta
-            </BotonAccion>
-            <BotonAccion href="/dashboard/ventas?tab=comprobantes">Generar Comprobante</BotonAccion>
-          </div>
+          {permisos.canEmitFactura && (
+            <div className="grid grid-cols-2 gap-2">
+              <BotonAccion href="/dashboard/ventas?tab=notas" lleno>
+                Cotizar Venta
+              </BotonAccion>
+              <BotonAccion href="/dashboard/ventas?tab=comprobantes">Generar Comprobante</BotonAccion>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <BotonAccion href="/logistica/cotizar-flete">Cotizar Envío</BotonAccion>
-            <BotonAccion href="/logistica/guia-sunat">Generar Guía SUNAT</BotonAccion>
+            {permisos.canEmitGuia && <BotonAccion href="/logistica/guia-sunat">Generar Guía SUNAT</BotonAccion>}
             <BotonAccion href="/logistica/agencias">Rastrear Tracking Agencia</BotonAccion>
             <BotonAccion href="/logistica/cotizar-flete">Liquidar Flete</BotonAccion>
           </div>

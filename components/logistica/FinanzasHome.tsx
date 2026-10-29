@@ -5,6 +5,7 @@ import { Banknote, BookOpen, CircleDollarSign, FileText, HandCoins, Landmark, Re
 import { useSesion } from "@/lib/auth";
 import { listarCajas, type Caja } from "@/lib/cajas";
 import { useNotificaciones } from "@/lib/notificaciones";
+import { permisosPlanta } from "@/lib/permisosPlanta";
 import { KEYS, fechaPE, hoy, r2, soles, useStore } from "@/lib/storage";
 import type { ComprobanteVenta, Factura, NotaPedido, OrdenCompra, OrdenDespacho } from "@/lib/types";
 import { npPorCobrar, saldoNP, vencimientoNP } from "@/lib/ventas";
@@ -16,6 +17,7 @@ import { AccesosRapidos } from "./AccesosRapidos";
 export function FinanzasHome() {
   const { sesion } = useSesion();
   const notifs = useNotificaciones(sesion);
+  const permisos = permisosPlanta(sesion);
   const facturas = useStore<Factura[]>(KEYS.FACTURAS, []);
   const ordenes = useStore<OrdenCompra[]>(KEYS.ORDENES, []);
   const notas = useStore<NotaPedido[]>(KEYS.NOTAS_PEDIDO, []);
@@ -110,8 +112,8 @@ export function FinanzasHome() {
         </Panel>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Panel titulo="Facturación emitida" icono={<FileText size={17} />}>
+      <div id="facturacion" className="grid scroll-mt-24 gap-4 lg:grid-cols-2">
+        <Panel titulo={permisos.canEmitFactura ? "Facturación emitida" : "Facturación emitida · solo lectura"} icono={<FileText size={17} />}>
           <Filas
             vacio="Aún no hay comprobantes emitidos."
             items={d.ultimosEmitidos.map((c) => ({ clave: c.id, titulo: `${c.numero} · ${c.cliente}`, detalle: fechaPE(c.fecha), derecha: <Etiqueta tono="verde">{soles(c.total)}</Etiqueta>, href: "/dashboard/ventas?tab=comprobantes" }))}

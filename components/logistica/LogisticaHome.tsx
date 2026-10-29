@@ -17,6 +17,7 @@ import {
 import { useSesion } from "@/lib/auth";
 import { VERSION_LOGISTICA, abrirPestana, useLogistica } from "@/lib/logistica";
 import { useNotificaciones } from "@/lib/notificaciones";
+import { RUTA_MUNDO_VENTAS, permisosPlanta } from "@/lib/permisosPlanta";
 import { soles } from "@/lib/storage";
 import { BotonVer, Etiqueta, Kpi, Panel, Vacio } from "./piezas";
 import { EncabezadoPlanta, MarcoPlanta, PanelLateral } from "./planta";
@@ -71,7 +72,12 @@ export function LogisticaHome() {
         icono={<Truck size={30} />}
         titulo="Comboy Vid Logística Planta"
         subtitulo="Compras y Ventas Nacionales · Sin Flota · Marvisur · Grael · Shalom · Arequipa · Perú"
-        accion={<BotonVer href="/logistica/detalle">Ver Detalle</BotonVer>}
+        accion={
+          <div className="flex flex-wrap gap-2">
+            {permisosPlanta(sesion).canAccessMundoVentas && <BotonVer href={RUTA_MUNDO_VENTAS}>Mundo Ventas</BotonVer>}
+            <BotonVer href="/logistica/detalle">Ver Detalle</BotonVer>
+          </div>
+        }
       />
 
       {/* Resumen de operaciones */}
