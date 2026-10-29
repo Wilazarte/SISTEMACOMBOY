@@ -6,6 +6,7 @@ import { ID_BARRA_PESTANAS } from "@/components/ui";
 import { Header } from "@/components/Header";
 import { ModuleHeader } from "@/components/layout/ModuleHeader";
 import type { Sesion } from "@/lib/auth";
+import { ETIQUETA_PERFIL, perfilPlanta } from "@/lib/permisosPlanta";
 import { SEDE_PLANTA_PRINCIPAL } from "@/lib/plantillasDocumentos";
 
 /** Sede del ERP (Arequipa): referencia del diseño de todos los módulos. */
@@ -39,6 +40,8 @@ export function ModuloLayout({
   overlays?: ReactNode;
   children: ReactNode;
 }) {
+  const perfil = perfilPlanta(sesion);
+  const etiqueta = perfil ? ETIQUETA_PERFIL[perfil] : undefined;
   return (
     // Tema azul oscuro COMBOY VID: siempre oscuro (.dark + .tema-azul, app/globals.css) sobre el mapa azul
     <div className="dark tema-azul relative isolate flex min-h-screen flex-col pb-32 text-fg">
@@ -49,7 +52,16 @@ export function ModuloLayout({
       </div>
 
       {/* Encabezado: logo · MODULO X centrado · buscador, campana y usuario */}
-      <ModuleHeader moduleName={moduleName} inicio={inicio} usuario={sesion.usuario} nombre={sesion.nombre} onSalir={onSalir} extra={extra} />
+      <ModuleHeader
+        moduleName={moduleName}
+        inicio={inicio}
+        // Perfil de la planta: SO SOPORTE, AL ALMACEN, FI FINANZAS, LO LOGISTICA, PR PRODUCCION
+        usuario={etiqueta?.label ?? sesion.usuario}
+        nombre={etiqueta ? `${etiqueta.titulo} (${sesion.usuario})` : sesion.nombre}
+        badge={etiqueta?.badge}
+        onSalir={onSalir}
+        extra={extra}
+      />
 
       <main className={`w-full flex-1 transition-[padding] duration-300 ${mainClassName}`}>
         <div className="mx-auto w-full max-w-[1600px] px-4 pt-24 sm:px-6 lg:px-8">{children}</div>

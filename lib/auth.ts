@@ -11,6 +11,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "./supabase/client";
 import type { Rol } from "./types";
+import { HOME_PERFIL, RUTA_NO_AUTORIZADO, homePlantaDe, perfilPlanta } from "./permisosPlanta";
 
 /** Roles con permisos definidos en el ERP. Cualquier otro rol de la tabla perfiles se trata como solo lectura. */
 export type RolAuth = "creador" | "tesoreria" | "almacen" | "planilla" | "gerencia" | "sucursal";
@@ -152,6 +153,14 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
   if (ruta === RUTA_CREADOR || ruta.startsWith(`${RUTA_CREADOR}/`)) return puedeEditarAsistencia(sesion);
   // Producción: también Almacén (registra las órdenes de producción y el QC)
   if (ruta === RUTA_PRODUCCION || ruta.startsWith(`${RUTA_PRODUCCION}/`)) if (sesion.rol === "almacen") return true;
+  if (ruta === RUTA_NO_AUTORIZADO) return true;
+  // Homes de la planta: cada perfil (Logística, Almacén, Finanzas, Producción) entra solo a la suya; SOPORTE a todas
+  const homePlanta = homePlantaDe(ruta);
+  const perfil = perfilPlanta(sesion);
+  if (homePlanta && perfil && perfil !== "soporte") return homePlanta === HOME_PERFIL[perfil];
+  // Homes de la planta (/almacen, /finanzas, /produccion): quien puede abrir el módulo de trabajo
+  const home = Object.keys(HOMES_PLANTA).find((h) => ruta === h || ruta.startsWith(`${h}/`));
+  if (home) return HOMES_PLANTA[home].some((r) => puedeVer(sesion, r));
   // Logística Planta (/logistica): los roles con Dashboard, o quien lo tenga en perfiles.modulos
   if (ruta === RUTA_LOGISTICA || ruta.startsWith(`${RUTA_LOGISTICA}/`)) if (veDashboard(sesion)) return true;
   // Secocha (sistema aparte, /secocha): solo quien tiene /secocha en perfiles.modulos (o "*", o es creador)
@@ -165,6 +174,12 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
 export const RUTA_PRODUCCION = "/dashboard/produccion";
 /** Logística Planta: home de compras / ventas nacionales y agencias (solo lectura de los demás módulos). */
 export const RUTA_LOGISTICA = "/logistica";
+/** Homes de la planta -> módulos de trabajo que habilitan verlas. */
+const HOMES_PLANTA: Record<string, string[]> = {
+  "/almacen": ["/dashboard/almacen"],
+  "/finanzas": ["/dashboard/compras", "/dashboard/planilla", "/dashboard/contable"],
+  "/produccion": ["/dashboard/produccion"],
+};
 /** Módulo Secocha (sucursal): app aparte con su propio login (/secocha/login). Arequipa es la Planta Principal (el ERP). */
 export const RUTA_SUCURSAL = "/secocha";
 export const RUTA_LOGIN_SUCURSAL = "/secocha/login";
@@ -256,18 +271,22 @@ export function moduloGuardado(): ModuloLogin | null {
 }
 
 const CARGOS: Record<RolAuth, string> = {
-  creador: "Administrador del sistema",
+  creador: "Soporte Unificado Dueño del sistema",
   tesoreria: "Tesorera - Módulo de Compras",
   almacen: "Jefe de Almacén",
   planilla: "Jefe de RRHH",
   gerencia: "Gerente General",
   sucursal: "Jefe de Sucursal - COMBOY VID SUCURSAL",
 };
-export const cargoDe = (s: Sesion): string => s.cargo?.trim() || CARGOS[s.rol] || s.rol;
+export const cargoDe = (s: Sesion): string => (s.rol === "creador" ? CARGOS.creador : s.cargo?.trim() || CARGOS[s.rol] || s.rol);
 
 /** Responsables reales por rol, si perfiles.nombre_completo aún no está cargado. */
 const NOMBRES: Partial<Record<RolAuth, string>> = {
   tesoreria: "LIZBETH CAHUANA APFATA",
   almacen: "JOSE MANUEL ORTIZ ARAPA",
 };
-export const nombreDe = (s: Sesion): string => s.nombreCompleto?.trim() || NOMBRES[s.rol] || s.nombre;
+export const nombreDe = (s: Sesion): string => (esSoporte(s) ? ETIQUETA_SOPORTE : s.nombreCompleto?.trim() || NOMBRES[s.rol] || s.nombre);
+
+/** El rol creador se muestra como SOPORTE (Dueño): solo cambia lo que se ve, el rol en la base sigue siendo "creador". */
+export const esSoporte = (s: Sesion | null): boolean => s?.rol === "creador";
+export const ETIQUETA_SOPORTE = "SOPORTE (Dueño)";

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BarChart3, Factory, LayoutDashboard, Landmark, Receipt, ShoppingCart, Truck, Users, Warehouse, type LucideIcon } from "lucide-react";
 import { EV_IR_PESTANA, cn } from "@/components/ui";
-import { puedeVer, veDashboard, veTesoreria, type Sesion } from "@/lib/auth";
+import { puedeVer, veDashboard, type Sesion } from "@/lib/auth";
 
 type Id = "dashboard" | "logistica" | "finanzas" | "produccion" | "tesoreria" | "sucursal" | "planilla" | "ventas" | "inventario" | "reportes";
 
@@ -17,10 +17,10 @@ type Id = "dashboard" | "logistica" | "finanzas" | "produccion" | "tesoreria" | 
 const ITEMS: { id: Id; href: string; label: string; corto: string; icon: LucideIcon; tab?: string; permiso: string; oculto?: boolean }[] = [
   { id: "dashboard", href: "/dashboard", label: "Dashboard", corto: "Dashboard", icon: LayoutDashboard, permiso: "/dashboard", oculto: true },
   { id: "logistica", href: "/logistica", label: "Logística", corto: "Logística", icon: Truck, permiso: "/logistica" },
-  { id: "inventario", href: "/dashboard/almacen", label: "Almacén", corto: "Almacén", icon: Warehouse, permiso: "/dashboard/almacen" },
-  // Finanzas = Tesorería (pagos, cajas, planilla); Contable sigue en /dashboard/contable
-  { id: "finanzas", href: "/dashboard/compras", label: "Finanzas", corto: "Finanzas", icon: Landmark, tab: "registrar", permiso: "/dashboard/compras" },
-  { id: "produccion", href: "/dashboard/produccion", label: "Producción", corto: "Producción", icon: Factory, permiso: "/dashboard/produccion" },
+  { id: "inventario", href: "/almacen", label: "Almacén", corto: "Almacén", icon: Warehouse, permiso: "/almacen" },
+  // Almacén, Finanzas y Producción abren su home (/almacen, /finanzas, /produccion); desde ahí se abre el módulo de trabajo
+  { id: "finanzas", href: "/finanzas", label: "Finanzas", corto: "Finanzas", icon: Landmark, permiso: "/finanzas" },
+  { id: "produccion", href: "/produccion", label: "Producción", corto: "Producción", icon: Factory, permiso: "/produccion" },
   { id: "tesoreria", href: "/dashboard/compras", label: "Tesorería/Compras", corto: "Tesorería", icon: ShoppingCart, tab: "registrar", permiso: "/dashboard/compras", oculto: true },
   { id: "planilla", href: "/dashboard/compras?tab=planilla", label: "Planilla", corto: "Planilla", icon: Users, tab: "planilla", permiso: "/dashboard/planilla", oculto: true },
   { id: "ventas", href: "/dashboard/ventas", label: "Ventas", corto: "Ventas", icon: Receipt, permiso: "/dashboard/ventas", oculto: true },
@@ -32,7 +32,9 @@ const ITEMS: { id: Id; href: string; label: string; corto: string; icon: LucideI
 function activoDe(ruta: string, tab: string | undefined): Id | undefined {
   if (ruta === "/dashboard") return "dashboard";
   // Tesorería, Planilla y Contable se muestran bajo Finanzas
-  if (ruta === "/dashboard/compras" || ruta.startsWith("/dashboard/planilla") || ruta.startsWith("/dashboard/contable")) return "finanzas";
+  if (ruta === "/finanzas" || ruta === "/dashboard/compras" || ruta.startsWith("/dashboard/planilla") || ruta.startsWith("/dashboard/contable")) return "finanzas";
+  if (ruta.startsWith("/dashboard/almacen")) return "inventario";
+  if (ruta.startsWith("/dashboard/produccion")) return "produccion";
   return ITEMS.find((i) => !i.oculto && i.id !== "dashboard" && (ruta === i.href || ruta.startsWith(`${i.href}/`)))?.id;
 }
 
@@ -40,7 +42,7 @@ function activoDe(ruta: string, tab: string | undefined): Id | undefined {
 export function FloatingDock({ sesion, tab }: { sesion: Sesion; tab?: string }) {
   const ruta = usePathname();
   const items = ITEMS.filter(
-    (i) => !i.oculto && (i.id === "dashboard" ? veDashboard(sesion) : i.id === "finanzas" ? veTesoreria(sesion) : puedeVer(sesion, i.permiso))
+    (i) => !i.oculto && (i.id === "dashboard" ? veDashboard(sesion) : puedeVer(sesion, i.permiso))
   );
   if (items.length === 0) return null;
   const activo = activoDe(ruta, tab);

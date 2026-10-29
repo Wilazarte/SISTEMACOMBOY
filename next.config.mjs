@@ -10,6 +10,8 @@ const nextConfig = {
       { source: "/dashboard/productos", destination: "/dashboard/ventas?tab=productos", permanent: false },
       // Logística Planta: los accesos abren los módulos actuales tal cual (sin cambiar su diseño)
       { source: "/logistica/ventas", destination: "/dashboard/ventas", permanent: false },
+      // Botón "Mundo Ventas" (perfil Logística / Soporte)
+      { source: "/mundo-ventas", destination: "/dashboard/ventas", permanent: false },
       { source: "/logistica/compras", destination: "/dashboard/compras?tab=ordenes", permanent: false },
       { source: "/logistica/almacen", destination: "/dashboard/almacen", permanent: false },
       { source: "/logistica/finanzas", destination: "/dashboard/compras", permanent: false },
