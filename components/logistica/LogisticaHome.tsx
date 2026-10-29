@@ -15,14 +15,15 @@ import {
   Truck,
   Wrench,
   Container,
-  Landmark,
-  Warehouse,
+  CircleDollarSign,
+  Cog,
+  Package,
 } from "lucide-react";
 import { useSesion } from "@/lib/auth";
 import { VERSION_LOGISTICA, abrirPestana, useLogistica } from "@/lib/logistica";
 import { useNotificaciones } from "@/lib/notificaciones";
 import { soles } from "@/lib/storage";
-import { Acceso, BotonVer, Etiqueta, Kpi, Panel, Vacio } from "./piezas";
+import { BotonVer, Etiqueta, Kpi, Panel, Vacio } from "./piezas";
 
 /** Monto corto para los KPI: S/130k, S/1.2M. */
 const corto = (n: number): string =>
@@ -46,12 +47,12 @@ export const SECCIONES_LOGISTICA = [
   { titulo: "Historial General", texto: "Registro de movimientos y operaciones", href: "/logistica/historial", icono: <Clock size={20} /> },
 ];
 
-/** Accesos rápidos visibles: los 4 módulos de la planta, cada uno en una pestaña nueva. */
+/** Accesos rápidos visibles: los 4 módulos de la planta, cada uno en una pestaña nueva. Logística es el módulo actual. */
 const MODULOS = [
-  { titulo: "Logística", texto: "Compras y ventas nacionales · Agencias · Transferencias", href: "/logistica/detalle", icono: <Truck size={20} /> },
-  { titulo: "Almacén", texto: "Requerimientos · Ingresos · Stock · Despachos", href: "/logistica/almacen", icono: <Warehouse size={20} /> },
-  { titulo: "Finanzas", texto: "Tesorería · Pagos · Planilla", href: "/logistica/finanzas", icono: <Landmark size={20} /> },
-  { titulo: "Producción", texto: "Órdenes de producción · QC · Ingreso PT", href: "/logistica/produccion", icono: <Factory size={20} /> },
+  { titulo: "Logística", texto: "Compras y ventas nacionales · Agencias · Transferencias", href: "/logistica/detalle", icono: <Truck size={40} strokeWidth={1.8} />, actual: true },
+  { titulo: "Almacén", texto: "Requerimientos · Ingresos · Stock · Despachos", href: "/logistica/almacen", icono: <Package size={56} strokeWidth={1.6} /> },
+  { titulo: "Finanzas", texto: "Tesorería · Pagos · Planilla", href: "/logistica/finanzas", icono: <CircleDollarSign size={56} strokeWidth={1.6} /> },
+  { titulo: "Producción", texto: "Órdenes de producción · QC · Ingreso PT", href: "/logistica/produccion", icono: <Cog size={56} strokeWidth={1.6} /> },
 ];
 
 export function LogisticaHome() {
@@ -166,7 +167,7 @@ export function LogisticaHome() {
         </h2>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {MODULOS.map((a) => (
-            <Acceso key={a.href} {...a} />
+            <ModuloCard key={a.href} {...a} />
           ))}
         </div>
       </section>
@@ -175,6 +176,29 @@ export function LogisticaHome() {
         COMBOY VID LOGÍSTICA PLANTA · {VERSION_LOGISTICA} · Última sincronización: Hoy {sync}
       </footer>
     </div>
+  );
+}
+
+/** Tarjeta de módulo: ícono grande y nombre debajo (abre en pestaña nueva). */
+function ModuloCard({ titulo, texto, href, icono, actual }: { titulo: string; texto: string; href: string; icono: React.ReactNode; actual?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={() => abrirPestana(href)}
+      title={`${texto} (se abre en una pestaña nueva)`}
+      className="group flex min-h-[170px] flex-col items-center justify-center gap-3 rounded-xl border border-[#2a3445] bg-[#1a212e] px-4 py-6 transition hover:border-[#f97316]"
+    >
+      <span
+        className={
+          actual
+            ? "flex h-20 w-20 items-center justify-center rounded-full bg-[#f97316] text-white"
+            : "flex h-20 w-20 items-center justify-center text-[#f97316] transition group-hover:scale-105"
+        }
+      >
+        {icono}
+      </span>
+      <span className={actual ? "rounded-lg bg-[#2563eb]/25 px-3 py-0.5 text-2xl font-bold text-white" : "text-2xl font-bold text-white"}>{titulo}</span>
+    </button>
   );
 }
 
