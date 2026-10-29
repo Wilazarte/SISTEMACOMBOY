@@ -6,9 +6,9 @@ import { ErpAlertList, type ErpAlerta } from "@/components/erp/ErpAlertList";
 import { ErpTable, ErpTd } from "@/components/erp/ErpTable";
 import { cn } from "@/components/erp/cn";
 import { Barra, Etiqueta, Panel } from "@/components/logistica/piezas";
+import { ChatGrupal, ReunionGrupal } from "@/components/logistica/planta";
 import { useSesion } from "@/lib/auth";
 import { ETAPAS, LIMITE_ETAPA_MS, MODULOS_GERENCIA, criticidad, msDe, useAhora, useGerencia, type Etapa, type FilaFlujo } from "@/lib/gerencia";
-import { useNotificaciones } from "@/lib/notificaciones";
 import { fechaPE, soles } from "@/lib/storage";
 
 const COLOR = {
@@ -70,7 +70,6 @@ function TablaFlujo({ filas, ahora, vacio }: { filas: FilaFlujo[]; ahora: number
  */
 export function GerenciaDashboard() {
   const { sesion } = useSesion();
-  const notifs = useNotificaciones(sesion);
   const g = useGerencia();
   const ahora = useAhora();
   const [etapa, setEtapa] = useState<Etapa | null>(null);
@@ -88,11 +87,11 @@ export function GerenciaDashboard() {
   // Alertas críticas: stock crítico, facturas de proveedor vencidas y cobranzas vencidas (sin enlaces: solo lectura)
   const alertas: ErpAlerta[] = useMemo(
     () => [
-      ...notifs.filter((n) => n.tipo === "stock").map((n) => ({ clave: n.clave, titulo: n.titulo, detalle: n.detalle, icono: <AlertTriangle size={15} /> })),
+      ...g.stockCritico.map((s) => ({ clave: `st:${s.id}`, titulo: `Stock crítico · ${s.nombre}`, detalle: s.sede, icono: <AlertTriangle size={15} />, derecha: <Etiqueta>{`${s.cantidad} ${s.unidad}`}</Etiqueta> })),
       ...g.cxpVencidas.map((f) => ({ clave: `cxp:${f.id}`, titulo: `Factura vencida ${f.numero} · ${f.proveedor}`, detalle: `Venció ${fechaPE(f.fechaVencimiento)}`, derecha: <Etiqueta>{soles(f.netoPagar ?? f.total)}</Etiqueta> })),
       ...g.cxcVencidas.map((n) => ({ clave: `cxc:${n.id}`, titulo: `Cobranza vencida ${n.numero} · ${n.cliente}`, detalle: "Nota de pedido por cobrar", derecha: <Etiqueta>{soles(n.total)}</Etiqueta> })),
     ],
-    [notifs, g.cxpVencidas, g.cxcVencidas]
+    [g.stockCritico, g.cxpVencidas, g.cxcVencidas]
   );
   const recordatorios: ErpAlerta[] = g.recordatorios.map((p) => ({ clave: p.clave, titulo: p.titulo, detalle: p.detalle, derecha: <Etiqueta tono="gris">{p.etiqueta}</Etiqueta> }));
 
@@ -184,6 +183,16 @@ export function GerenciaDashboard() {
         <Panel titulo="Alertas críticas y recordatorios" icono={<AlertTriangle size={17} />} className="space-y-5">
           <ErpAlertList titulo="Alertas críticas" icono={<AlertTriangle size={15} />} items={alertas} vacio="Sin alertas críticas." max={6} />
           <ErpAlertList titulo="Recordatorios" icono={<Clock size={15} />} items={recordatorios} vacio="Sin recordatorios." max={6} />
+        </Panel>
+      </div>
+
+      {/* Reuniones y chat: GERENCIA no entra a los módulos, pero sí a las reuniones y al chat grupal */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Panel>
+          <ReunionGrupal sesion={sesion} modulo="Gerencia" otrasSalas={["Logística", "Almacén", "Finanzas", "Producción"]} />
+        </Panel>
+        <Panel>
+          <ChatGrupal sesion={sesion} modulo="Gerencia" />
         </Panel>
       </div>
 

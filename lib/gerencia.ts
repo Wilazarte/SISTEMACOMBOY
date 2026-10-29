@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLogistica } from "./logistica";
 import type { OrdenProduccion } from "./produccion";
 import { KEYS, hoy, r2, useStore } from "./storage";
-import type { ComprobanteVenta, EventoHistorial, Factura, Guia, NotaPedido, OrdenCompra, OrdenDespacho, Requerimiento } from "./types";
+import type { ComprobanteVenta, EventoHistorial, Factura, Guia, NotaPedido, OrdenCompra, OrdenDespacho, Requerimiento, StockItem } from "./types";
 import { estadoOD, npPorCobrar, saldoNP, vencimientoNP } from "./ventas";
 
 export type Etapa = "req" | "cot" | "oc" | "agencia" | "almacen" | "produccion" | "despacho" | "factura";
@@ -28,6 +28,9 @@ export const MODULOS_GERENCIA: ModuloGerencia[] = ["Logística", "Finanzas", "Al
 
 /** Criticidad de una etapa: rojo si hay más de 5 pendientes, amarillo de 3 a 5, verde de 0 a 2. */
 export const criticidad = (n: number): "rojo" | "amarillo" | "verde" => (n > 5 ? "rojo" : n >= 3 ? "amarillo" : "verde");
+
+/** Stock crítico: 5 unidades o menos. */
+const STOCK_CRITICO = 5;
 
 /** Más de 2 horas en la misma etapa: se marca en rojo. */
 export const LIMITE_ETAPA_MS = 2 * 60 * 60 * 1000;
@@ -69,6 +72,7 @@ export function useGerencia() {
   const notas = useStore<NotaPedido[]>(KEYS.NOTAS_PEDIDO, []);
   const comprobantes = useStore<ComprobanteVenta[]>(KEYS.COMPROBANTES, []);
   const facturas = useStore<Factura[]>(KEYS.FACTURAS, []);
+  const stock = useStore<StockItem[]>(KEYS.STOCK, []);
 
   return useMemo(() => {
     const hoyStr = hoy();
@@ -122,8 +126,12 @@ export function useGerencia() {
     const cxcVencidas = notas.filter((n) => npPorCobrar(n) && saldoNP(n) > 0 && vencimientoNP(n) < hoyStr);
     const cxpVencidas = facturas.filter((f) => f.estadoPago === "POR_PAGAR" && f.fechaVencimiento && f.fechaVencimiento.slice(0, 10) < hoyStr);
 
+    // Stock crítico: 5 unidades o menos (igual que el Dashboard)
+    const stockCritico = stock.filter((s) => s.cantidad <= STOCK_CRITICO).sort((a, b) => a.cantidad - b.cantidad);
+
     return {
       filas,
+      stockCritico,
       porEtapa,
       porModulo,
       ticker: {
@@ -137,5 +145,5 @@ export function useGerencia() {
       cxpVencidas,
       recordatorios: log.pendientes,
     };
-  }, [log, pendientesReq, procesados, ordenes, guias, ops, ods, notas, comprobantes, facturas]);
+  }, [log, pendientesReq, procesados, ordenes, guias, ops, ods, notas, comprobantes, facturas, stock]);
 }

@@ -126,39 +126,55 @@ export function PanelLateral({
   alertas?: ItemLateral[];
   recordatorios: ItemLateral[];
 }) {
-  const conectados = usePresencia(sesion, modulo);
-  const crearSala = () => {
-    const nombre = window.prompt("Nombre de la sala (ej. Reunión Producción 15:00):", `${modulo} ${new Date().toLocaleDateString("es-PE")}`);
-    if (nombre?.trim()) abrirPestana(urlSala(nombre));
-  };
   return (
     <Panel className="space-y-5 xl:sticky xl:top-24">
       <Bloque titulo="Notificaciones" icono={<Bell size={15} />} items={notifs.filter((n) => n.tipo !== "stock")} vacio="Sin notificaciones nuevas." />
       <Bloque titulo="Alertas" icono={<AlertTriangle size={15} />} items={[...notifs.filter((n) => n.tipo === "stock"), ...alertas]} vacio="Sin alertas." />
       <Bloque titulo="Recordatorios" icono={<Clock size={15} />} items={recordatorios} vacio="Sin pendientes." />
 
-      <div>
-        <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#fb923c]">
-          <Video size={15} /> Reunión grupal
-        </p>
-        <div className="grid grid-cols-2 gap-2">
-          <button type="button" onClick={() => abrirPestana(urlSala(`Planta ${modulo}`))} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#f97316] px-2 py-2 text-[13px] font-semibold text-white hover:bg-[#ea580c]">
-            <Video size={15} /> Iniciar videollamada
-          </button>
-          <button type="button" onClick={crearSala} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#3a4558] bg-[#212a3a] px-2 py-2 text-[13px] font-semibold text-white hover:border-[#f97316]">
-            <Plus size={15} /> Crear sala
-          </button>
-        </div>
-        <p className="mt-2 flex items-center gap-1.5 text-[12px] text-[#a1a1aa]">
-          <span className="h-2 w-2 rounded-full bg-[#22c55e]" aria-hidden />
-          <Users size={13} /> Usuarios activos: {conectados.length}
-        </p>
-        {conectados.length > 0 && <p className="mt-1 text-[11px] text-[#71717a]">{conectados.map((c) => c.usuario).join(" · ")}</p>}
-      </div>
+      <ReunionGrupal sesion={sesion} modulo={modulo} />
 
       <ChatGrupal sesion={sesion} modulo={modulo} />
       <TiemposCosto />
     </Panel>
+  );
+}
+
+/** Reunión grupal (Jitsi Meet): iniciar videollamada, crear sala y usuarios activos. También en el Dashboard Gerencia. */
+export function ReunionGrupal({ sesion, modulo, otrasSalas = [] }: { sesion: Sesion | null; modulo: string; /** Salas de otros módulos a las que puede unirse (Gerencia). */ otrasSalas?: string[] }) {
+  const conectados = usePresencia(sesion, modulo);
+  const crearSala = () => {
+    const nombre = window.prompt("Nombre de la sala (ej. Reunión Producción 15:00):", `${modulo} ${new Date().toLocaleDateString("es-PE")}`);
+    if (nombre?.trim()) abrirPestana(urlSala(nombre));
+  };
+  return (
+    <div>
+      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#fb923c]">
+        <Video size={15} /> Reunión grupal
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" onClick={() => abrirPestana(urlSala(`Planta ${modulo}`))} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#f97316] px-2 py-2 text-[13px] font-semibold text-white hover:bg-[#ea580c]">
+          <Video size={15} /> Iniciar videollamada
+        </button>
+        <button type="button" onClick={crearSala} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#3a4558] bg-[#212a3a] px-2 py-2 text-[13px] font-semibold text-white hover:border-[#f97316]">
+          <Plus size={15} /> Crear sala
+        </button>
+      </div>
+      <p className="mt-2 flex items-center gap-1.5 text-[12px] text-[#a1a1aa]">
+        <span className="h-2 w-2 rounded-full bg-[#22c55e]" aria-hidden />
+        <Users size={13} /> Usuarios activos: {conectados.length}
+      </p>
+      {conectados.length > 0 && <p className="mt-1 text-[11px] text-[#71717a]">{conectados.map((c) => c.usuario).join(" · ")}</p>}
+      {otrasSalas.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {otrasSalas.map((m) => (
+            <button key={m} type="button" onClick={() => abrirPestana(urlSala(`Planta ${m}`))} className="inline-flex items-center gap-1.5 rounded-lg border border-[#3a4558] bg-[#212a3a] px-2.5 py-1.5 text-[12px] font-semibold text-white hover:border-[#f97316]">
+              <Video size={13} /> Unirse a {m}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -186,7 +202,7 @@ export const montoCorto = (n: number): string =>
 export const horaActual = () => new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", hour12: false });
 
 /** Chat grupal en vivo (tabla chat_mensajes). Si aún no se corrió el SQL, lo indica. */
-function ChatGrupal({ sesion, modulo }: { sesion: Sesion | null; modulo: string }) {
+export function ChatGrupal({ sesion, modulo }: { sesion: Sesion | null; modulo: string }) {
   const { mensajes, enviar, faltaTabla } = useChat(sesion, modulo);
   const [texto, setTexto] = useState("");
   const [error, setError] = useState("");
