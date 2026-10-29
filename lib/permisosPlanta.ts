@@ -52,3 +52,26 @@ export const permisosPlanta = (sesion: Sesion | null): PermisosPlanta => {
 
 /** Ruta del botón Mundo Ventas (redirige a /dashboard/ventas, ver next.config.mjs). */
 export const RUTA_MUNDO_VENTAS = "/mundo-ventas";
+
+/** Cómo se muestra cada perfil en el encabezado: avatar = 2 primeras letras de `label`. */
+export const ETIQUETA_PERFIL: Record<PerfilPlanta, { label: string; titulo: string; badge?: string }> = {
+  soporte: { label: "SOPORTE", titulo: "SOPORTE (Dueño) · acceso a todos los módulos", badge: "Soporte Dueño" },
+  logistica: { label: "LOGISTICA", titulo: "Logística · dueña de ventas", badge: "Dueño de Ventas" },
+  almacen: { label: "ALMACEN", titulo: "Almacén · acceso solo a su módulo" },
+  finanzas: { label: "FINANZAS", titulo: "Finanzas · acceso solo a su módulo" },
+  produccion: { label: "PRODUCCION", titulo: "Producción · acceso solo a su módulo" },
+};
+
+/** Home de cada perfil de la planta (SOPORTE entra a las 4). */
+export const HOME_PERFIL: Record<Exclude<PerfilPlanta, "soporte">, string> = {
+  logistica: "/logistica",
+  almacen: "/almacen",
+  finanzas: "/finanzas",
+  produccion: "/produccion",
+};
+
+/** Home de la planta a la que pertenece una ruta (/logistica/agencias → /logistica). */
+export const homePlantaDe = (ruta: string): string | undefined =>
+  Object.values(HOME_PERFIL).find((h) => ruta === h || ruta.startsWith(`${h}/`));
+
+export const RUTA_NO_AUTORIZADO = "/no-autorizado";

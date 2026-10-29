@@ -69,7 +69,7 @@ export function FinanzasHome() {
         accion={<span className="text-[12px] text-[#a1a1aa]">Actualizado: Hoy {sync}</span>}
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div id="cuentas" className="grid scroll-mt-24 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi icono={<Wallet size={18} />} titulo="Saldo en cajas" valor={montoCorto(saldoCajas)} detalle={`${cajas.length} caja(s) · saldo registrado`} href="/dashboard/compras?tab=registrar" />
         <Kpi icono={<HandCoins size={18} />} titulo="CxC" valor={montoCorto(d.cxc)} detalle={`${d.porCobrar.length} pendiente(s)${d.cxcVencidas ? ` · ${d.cxcVencidas} vencida(s)` : ""}`} href="/dashboard/ventas?tab=cobrar" />
         <Kpi icono={<Banknote size={18} />} titulo="CxP" valor={montoCorto(d.cxp)} detalle={`${d.porPagar.length} factura(s) por pagar${d.cxpVencidas ? ` · ${d.cxpVencidas} vencida(s)` : ""}`} href="/dashboard/compras?tab=facturas" />
@@ -133,12 +133,14 @@ export function FinanzasHome() {
         </Panel>
       </div>
 
+      <div id="fletes" className="scroll-mt-24">
       <Panel titulo={`Fletes de agencia · ${nombreMes}`} icono={<HandCoins size={17} />}>
         <Filas
           vacio="Sin fletes registrados este mes."
           items={d.fletesMes.map((o) => ({ clave: o.id, titulo: `${o.numero} · ${o.agenciaNombre ?? "Agencia"}`, detalle: `${o.cliente}${o.guiaNro ? ` · guía ${o.guiaNro}` : ""}`, derecha: <Etiqueta>{soles(o.costoEnvio ?? 0)}</Etiqueta>, href: "/logistica/cotizar-flete" }))}
         />
       </Panel>
+      </div>
 
       <AccesosRapidos sesion={sesion} actual="finanzas" />
     </MarcoPlanta>

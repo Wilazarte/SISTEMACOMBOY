@@ -19,6 +19,7 @@ import { DatalistCatalogo } from "@/components/productos/ProductoInput";
 import { detenerCatalogo, iniciarCatalogo } from "@/lib/productos";
 import { olvidarSedes } from "@/lib/sedes";
 import { RUTA_SUCURSAL, inicioDe, soloSecocha, logout, puedeVer, useSesion, veTesoreria } from "@/lib/auth";
+import { RUTA_NO_AUTORIZADO, homePlantaDe } from "@/lib/permisosPlanta";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
 import { useNotificaciones } from "@/lib/notificaciones";
 import { limpiarPrefs, usePrefs } from "@/lib/preferencias";
@@ -72,6 +73,7 @@ const NOMBRE_MODULO: [string, string][] = [
   ["/almacen", "ALMACEN"],
   ["/finanzas", "FINANZAS"],
   ["/produccion", "PRODUCCION"],
+  ["/no-autorizado", "NO AUTORIZADO"],
 ];
 const flujoDe = (ruta: string) => FLUJOS.find(([r]) => ruta === r || ruta.startsWith(`${r}/`))?.[1] ?? "";
 
@@ -119,6 +121,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     // Usuario solo de Secocha (modulos = ["/secocha"]): no usa el ERP
     if (soloSecocha(sesion)) router.replace(RUTA_SUCURSAL);
   }, [listo, sesion, router]);
+
+  // RBAC de la planta: la home de otro perfil (ej. Almacén entrando a /finanzas) va a /no-autorizado
+  useEffect(() => {
+    if (sesion && homePlantaDe(path) && !puedeVer(sesion, path)) router.replace(RUTA_NO_AUTORIZADO);
+  }, [sesion, path, router]);
 
   // Almacén: aviso con detalle cuando Ventas genera una orden de despacho (en vivo)
   const odsAvisadas = useRef<Set<string> | null>(null);

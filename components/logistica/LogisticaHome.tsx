@@ -134,9 +134,6 @@ export function LogisticaHome() {
 
       <AccesosRapidos sesion={sesion} actual="logistica" />
 
-      <footer className="pt-1 text-[12px] text-[#a1a1aa]">
-        COMBOY VID LOGÍSTICA PLANTA · {VERSION_LOGISTICA} · Última sincronización: Hoy {sync}
-      </footer>
     </MarcoPlanta>
   );
 }

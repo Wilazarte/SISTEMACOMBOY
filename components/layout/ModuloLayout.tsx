@@ -5,7 +5,8 @@ import type { ReactNode } from "react";
 import { ID_BARRA_PESTANAS } from "@/components/ui";
 import { Header } from "@/components/Header";
 import { ModuleHeader } from "@/components/layout/ModuleHeader";
-import { esSoporte, type Sesion } from "@/lib/auth";
+import type { Sesion } from "@/lib/auth";
+import { ETIQUETA_PERFIL, perfilPlanta } from "@/lib/permisosPlanta";
 import { SEDE_PLANTA_PRINCIPAL } from "@/lib/plantillasDocumentos";
 
 /** Sede del ERP (Arequipa): referencia del diseño de todos los módulos. */
@@ -39,6 +40,8 @@ export function ModuloLayout({
   overlays?: ReactNode;
   children: ReactNode;
 }) {
+  const perfil = perfilPlanta(sesion);
+  const etiqueta = perfil ? ETIQUETA_PERFIL[perfil] : undefined;
   return (
     // Tema azul oscuro COMBOY VID: siempre oscuro (.dark + .tema-azul, app/globals.css) sobre el mapa azul
     <div className="dark tema-azul relative isolate flex min-h-screen flex-col pb-32 text-fg">
@@ -52,10 +55,10 @@ export function ModuloLayout({
       <ModuleHeader
         moduleName={moduleName}
         inicio={inicio}
-        // El creador se muestra como SOPORTE (Dueño)
-        usuario={esSoporte(sesion) ? "SOPORTE" : sesion.usuario}
-        nombre={esSoporte(sesion) ? "SOPORTE (Dueño) · acceso a todos los módulos" : sesion.nombre}
-        badge={esSoporte(sesion) ? "Soporte Dueño" : undefined}
+        // Perfil de la planta: SO SOPORTE, AL ALMACEN, FI FINANZAS, LO LOGISTICA, PR PRODUCCION
+        usuario={etiqueta?.label ?? sesion.usuario}
+        nombre={etiqueta ? `${etiqueta.titulo} (${sesion.usuario})` : sesion.nombre}
+        badge={etiqueta?.badge}
         onSalir={onSalir}
         extra={extra}
       />

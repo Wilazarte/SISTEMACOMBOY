@@ -1,7 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { AlertTriangle, Bell, CircleDollarSign, Clock, Cog, Lock, MessageSquare, Package, Plus, Truck, Users, Video } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { AlertTriangle, Bell, CircleDollarSign, Clock, Cog, Lock, MessageSquare, Package, Plus, Send, Timer, Truck, Users, Video } from "lucide-react";
+import { useChat } from "@/lib/chat";
+import { consumosDeChasis } from "@/lib/inventario";
+import { VERSION_LOGISTICA } from "@/lib/logistica";
+import type { OrdenProduccion } from "@/lib/produccion";
+import { KEYS, r2, soles, useStore } from "@/lib/storage";
+import type { StockItem, ValeProduccion } from "@/lib/types";
 import { cn } from "@/components/ui";
 import { puedeVer, type Sesion } from "@/lib/auth";
 import { abrirPestana } from "@/lib/logistica";
@@ -24,12 +30,17 @@ export const MODULOS_PLANTA: { id: ModuloPlanta; titulo: string; home: string; t
 
 /** Fondo y grilla de la home: contenido a la izquierda y panel derecho fijo en escritorio. */
 export function MarcoPlanta({ children, lateral }: { children: ReactNode; lateral: ReactNode }) {
+  const [sync, setSync] = useState("");
+  useEffect(() => setSync(horaActual()), []);
   return (
     <div className="w-full rounded-2xl bg-[#0e1219] p-3 text-[#e5e7eb] sm:p-5">
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-5">{children}</div>
         <aside className="min-w-0">{lateral}</aside>
       </div>
+      <footer className="pt-4 text-[12px] text-[#a1a1aa]">
+        COMBOY VID PLANTA AREQUIPA · {VERSION_LOGISTICA} · Última sincronización: Hoy {sync}
+      </footer>
     </div>
   );
 }
@@ -171,12 +182,8 @@ export function PanelLateral({
         {conectados.length > 0 && <p className="mt-1 text-[11px] text-[#71717a]">{conectados.map((c) => c.usuario).join(" · ")}</p>}
       </div>
 
-      <div>
-        <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#fb923c]">
-          <MessageSquare size={15} /> Chat grupal
-        </p>
-        <p className="rounded-lg bg-white/[0.03] px-3 py-2 text-[12px] italic text-[#a1a1aa]">Próximamente: el chat necesita su tabla en Supabase (siguiente etapa).</p>
-      </div>
+      <ChatGrupal sesion={sesion} modulo={modulo} />
+      <TiemposCosto />
     </Panel>
   );
 }
@@ -224,3 +231,97 @@ export const montoCorto = (n: number): string =>
       : `S/${n.toLocaleString("es-PE", { maximumFractionDigits: 2 })}`;
 
 export const horaActual = () => new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+/** Chat grupal en vivo (tabla chat_mensajes). Si aún no se corrió el SQL, lo indica. */
+function ChatGrupal({ sesion, modulo }: { sesion: Sesion | null; modulo: string }) {
+  const { mensajes, enviar, faltaTabla } = useChat(sesion, modulo);
+  const [texto, setTexto] = useState("");
+  const [error, setError] = useState("");
+  const lista = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    lista.current?.scrollTo({ top: lista.current.scrollHeight });
+  }, [mensajes]);
+  const mandar = async (e: FormEvent) => {
+    e.preventDefault();
+    const err = await enviar(texto);
+    setError(err ?? "");
+    if (!err) setTexto("");
+  };
+  return (
+    <div>
+      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#fb923c]">
+        <MessageSquare size={15} /> Chat grupal
+      </p>
+      {faltaTabla ? (
+        <p className="rounded-lg bg-white/[0.03] px-3 py-2 text-[12px] italic text-[#a1a1aa]">Falta activar el chat: ejecute supabase/migrations/20261104_chat_grupal.sql en Supabase.</p>
+      ) : (
+        <>
+          <ul ref={lista} className="max-h-56 space-y-1.5 overflow-y-auto pr-1">
+            {mensajes.length === 0 && <li className="text-[12px] text-[#71717a]">Sin mensajes todavía.</li>}
+            {mensajes.map((m) => (
+              <li key={m.id} className="rounded-lg bg-[#212a3a] px-3 py-1.5">
+                <span className="flex justify-between gap-2 text-[11px] text-[#a1a1aa]">
+                  <span className="truncate font-semibold text-[#fdba74]">
+                    {m.usuario}
+                    {m.modulo ? ` · ${m.modulo}` : ""}
+                  </span>
+                  <span>{new Date(m.creado).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", hour12: false })}</span>
+                </span>
+                <span className="block break-words text-[13px] text-white">{m.texto}</span>
+              </li>
+            ))}
+          </ul>
+          <form onSubmit={mandar} className="mt-2 flex gap-2">
+            <input
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              maxLength={1000}
+              placeholder="Escribir mensaje…"
+              aria-label="Mensaje para el chat grupal"
+              className="min-w-0 flex-1 rounded-lg border border-[#3a4558] bg-[#212a3a] px-3 py-1.5 text-[13px] text-white placeholder:text-[#71717a] focus:border-[#f97316] focus:outline-none"
+            />
+            <button type="submit" disabled={!texto.trim()} aria-label="Enviar" className="rounded-lg bg-[#f97316] px-3 text-white hover:bg-[#ea580c] disabled:opacity-50">
+              <Send size={15} />
+            </button>
+          </form>
+          {error && <p className="mt-1 text-[11px] text-[#fca5a5]">{error}</p>}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Tiempos reales y costo: costo de MP de cada OP en fabricación (vales × último costo). Las horas por estación aún no se registran. */
+function TiemposCosto() {
+  const ops = useStore<OrdenProduccion[]>(KEYS.PRODUCCION, []);
+  const vales = useStore<ValeProduccion[]>(KEYS.VALES_PRODUCCION, []);
+  const stock = useStore<StockItem[]>(KEYS.STOCK, []);
+  const filas = useMemo(() => {
+    const costoDe = new Map(stock.map((s) => [s.id, s.costoUnit || 0]));
+    return ops
+      .filter((o) => o.estado === "EN_FABRICACION")
+      .map((o) => ({ o, costo: r2(consumosDeChasis(o.codigo_chasis, o.id, vales).reduce((a, v) => a + v.cantidad * (costoDe.get(v.stock_id) ?? 0), 0)) }));
+  }, [ops, vales, stock]);
+  return (
+    <div>
+      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#fb923c]">
+        <Timer size={15} /> Tiempos reales y costo
+      </p>
+      {filas.length === 0 ? (
+        <p className="text-[12px] text-[#71717a]">Sin órdenes de producción en fabricación.</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {filas.slice(0, 4).map(({ o, costo }) => (
+            <li key={o.id} className="flex justify-between gap-2 rounded-lg bg-[#212a3a] px-3 py-2 text-[12px]">
+              <span className="truncate text-white">
+                {o.id} · {o.tipo_equipo}
+              </span>
+              <span className="whitespace-nowrap font-semibold text-[#fdba74]">MP {soles(costo)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-1 text-[11px] italic text-[#71717a]">Horas de Plasma, Torno y Soldadura: sin registro en el ERP.</p>
+    </div>
+  );
+}
