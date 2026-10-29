@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Factory, LayoutDashboard, Landmark, Receipt, ShoppingCart, Truck, Users, Warehouse, type LucideIcon } from "lucide-react";
+import { BarChart3, Factory, Gauge, LayoutDashboard, Landmark, Receipt, ShoppingCart, Truck, Users, Warehouse, type LucideIcon } from "lucide-react";
 import { EV_IR_PESTANA, cn } from "@/components/ui";
 import { puedeVer, veDashboard, type Sesion } from "@/lib/auth";
 
-type Id = "dashboard" | "logistica" | "finanzas" | "produccion" | "tesoreria" | "sucursal" | "planilla" | "ventas" | "inventario" | "reportes";
+type Id = "dashboard" | "gerencia" | "logistica" | "finanzas" | "produccion" | "tesoreria" | "sucursal" | "planilla" | "ventas" | "inventario" | "reportes";
 
 /**
  * Módulos del dock. `corto` es la etiqueta en móvil. Tesorería y Planilla viven en la misma página
@@ -16,6 +16,8 @@ type Id = "dashboard" | "logistica" | "finanzas" | "produccion" | "tesoreria" | 
  */
 const ITEMS: { id: Id; href: string; label: string; corto: string; icon: LucideIcon; tab?: string; permiso: string; oculto?: boolean }[] = [
   { id: "dashboard", href: "/dashboard", label: "Dashboard", corto: "Dashboard", icon: LayoutDashboard, permiso: "/dashboard", oculto: true },
+  // Dashboard Gerencia: solo lo ven GERENCIA y SOPORTE (puedeVer)
+  { id: "gerencia", href: "/gerencia", label: "Gerencia", corto: "Gerencia", icon: Gauge, permiso: "/gerencia" },
   { id: "logistica", href: "/logistica", label: "Logística", corto: "Logística", icon: Truck, permiso: "/logistica" },
   { id: "inventario", href: "/almacen", label: "Almacén", corto: "Almacén", icon: Warehouse, permiso: "/almacen" },
   // Almacén, Finanzas y Producción abren su home (/almacen, /finanzas, /produccion); desde ahí se abre el módulo de trabajo
@@ -50,7 +52,7 @@ export function FloatingDock({ sesion, tab }: { sesion: Sesion; tab?: string }) 
   return (
     <nav
       aria-label="Módulos"
-      className="fixed bottom-3 left-1/2 z-50 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 gap-1 rounded-full border border-slate-800 bg-[#1e293b] px-2 py-2 backdrop-blur sm:gap-3 sm:px-4 print:hidden"
+      className="fixed bottom-3 left-1/2 z-50 flex max-w-[calc(100vw-1rem)] -translate-x-1/2 gap-1 rounded-full border border-[#2a3445] bg-[#1a212e] px-2 py-2 backdrop-blur sm:gap-3 sm:px-4 print:hidden"
     >
       {items.map(({ id, href, label, corto, icon: Icon, tab: destino }) => {
         const on = activo === id;
@@ -64,7 +66,7 @@ export function FloatingDock({ sesion, tab }: { sesion: Sesion; tab?: string }) 
             title={label}
             className={cn(
               "flex min-w-0 flex-col items-center justify-center gap-0.5 rounded-full px-2 py-1.5 text-[11px] sm:px-3 transition-colors duration-200",
-              on ? "bg-[#2563eb] font-bold text-white" : "font-normal text-gray-400 hover:bg-white/5 hover:text-white"
+              on ? "bg-[#f97316] font-bold text-white" : "font-normal text-[#a1a1aa] hover:bg-white/5 hover:text-white"
             )}
           >
             <Icon size={18} strokeWidth={2} />

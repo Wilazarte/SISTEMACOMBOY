@@ -54,7 +54,7 @@ export function CardHeader({ title, subtitle, action }: { title: string; subtitl
   return (
     <div className="flex flex-wrap items-start justify-between gap-3 border-b border-plomo-100 px-5 py-4">
       <div>
-        <h3 className="text-sm font-semibold text-fg">{title}</h3>
+        <h3 className="text-[15px] font-bold uppercase tracking-wide text-[#fb923c]">{title}</h3>
         {subtitle && <p className="mt-0.5 text-[13px] text-plomo-500">{subtitle}</p>}
       </div>
       {action}
@@ -335,30 +335,8 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
 }
 
 // ---------------------------------------------------------------- Table
-/** `compacto`: menos relleno y cabeceras que pueden partirse (tablas anchas, ej. planilla del periodo). */
-export function Table({ head, children, empty, compacto }: { head: string[]; children: ReactNode; empty?: boolean; compacto?: boolean }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className={cn("w-full min-w-[720px] text-left text-sm", compacto && "[&_td]:px-2 [&_td]:py-2")}>
-        <thead className={cn("border-y border-plomo-200 bg-plomo-50 font-medium uppercase text-plomo-500", compacto ? "text-[10px] tracking-wide" : "text-[11px] tracking-wider")}>
-          <tr>
-            {head.map((h) => (
-              <th key={h} className={compacto ? "px-2 py-2 font-medium leading-tight" : "whitespace-nowrap px-4 py-2.5 font-medium"}>
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="bg-surface [&>tr:hover]:bg-plomo-50 [&>tr]:border-b [&>tr]:border-plomo-100 [&>tr]:transition-colors">{children}</tbody>
-      </table>
-      {empty && <p className="py-10 text-center text-sm text-plomo-500">Sin registros</p>}
-    </div>
-  );
-}
-
-export const Td = ({ children, className }: { children: ReactNode; className?: string }) => (
-  <td className={cn("whitespace-nowrap px-4 py-2.5 text-fg-2", className)}>{children}</td>
-);
+/** Tabla de todos los módulos: es la ErpTable del layout global (components/erp/ErpTable). */
+export { ErpTable as Table, ErpTd as Td } from "@/components/erp/ErpTable";
 
 // ---------------------------------------------------------------- Timeline
 export function Timeline({ eventos }: { eventos: EventoHistorial[] }) {

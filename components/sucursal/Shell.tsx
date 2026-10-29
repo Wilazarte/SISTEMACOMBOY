@@ -102,7 +102,7 @@ export function SucursalShell({ children }: { children: ReactNode }) {
         </>
       }
     >
-      <ModuloContenido key={sedes.actualId} sesion={sesion} sede={sede!.nombre} flujo="Venta → Entrega → Requerimiento → Traslado → Caja">
+      <ModuloContenido key={sedes.actualId} sesion={sesion} sede={sede!.nombre} modulo="SECOCHA" flujo="Venta → Entrega → Requerimiento → Traslado → Caja">
         {children}
       </ModuloContenido>
     </ModuloLayout>
@@ -111,5 +111,5 @@ export function SucursalShell({ children }: { children: ReactNode }) {
 
 
 function Centro({ children }: { children: ReactNode }) {
-  return <div className="dark tema-azul flex min-h-screen flex-col items-center justify-center bg-[#070b14] p-6 text-center text-fg">{children}</div>;
+  return <div className="dark tema-azul tema-planta flex min-h-screen flex-col items-center justify-center bg-[#0e1219] p-6 text-center text-fg">{children}</div>;
 }

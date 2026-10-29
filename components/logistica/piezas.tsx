@@ -4,9 +4,9 @@ import type { ReactNode } from "react";
 import { ArrowUpRight, ChevronRight } from "lucide-react";
 import { cn } from "@/components/ui";
 import { abrirPestana } from "@/lib/logistica";
+import { ErpStatsCard } from "@/components/erp/ErpStatsCard";
 
-// Diseño propio de Logística Planta (solo se usa en /logistica): oscuro con acento naranja.
-// No usa ni cambia los tokens de los demás módulos.
+// Piezas de Logística Planta: oscuro con acento naranja. Es el diseño de todos los módulos (components/erp).
 
 export const NARANJA = "#f97316";
 
@@ -57,21 +57,9 @@ export function BotonAccion({ href, children, icono, lleno }: { href: string; ch
   );
 }
 
+/** Métrica de las homes: ErpStatsCard del layout global, abre el destino en una pestaña nueva. */
 export function Kpi({ icono, titulo, valor, detalle, href }: { icono: ReactNode; titulo: string; valor: string; detalle: string; href: string }) {
-  return (
-    <button
-      type="button"
-      onClick={() => abrirPestana(href)}
-      className="flex flex-col items-center gap-1 rounded-xl border border-[#2a3445] bg-[#1a212e] px-4 py-5 text-center transition hover:border-[#f97316]"
-    >
-      <span className="flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-[#a1a1aa]">
-        <span className="text-[#f97316]">{icono}</span>
-        {titulo}
-      </span>
-      <span className="text-3xl font-bold text-white lg:text-4xl">{valor}</span>
-      <span className="text-[12px] font-medium text-[#fdba74]">{detalle}</span>
-    </button>
-  );
+  return <ErpStatsCard icono={icono} titulo={titulo} valor={valor} detalle={detalle} onClick={() => abrirPestana(href)} />;
 }
 
 export function Acceso({ icono, titulo, texto, href }: { icono: ReactNode; titulo: string; texto: string; href: string }) {

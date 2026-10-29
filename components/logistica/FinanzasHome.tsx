@@ -9,7 +9,8 @@ import { permisosPlanta } from "@/lib/permisosPlanta";
 import { KEYS, fechaPE, hoy, r2, soles, useStore } from "@/lib/storage";
 import type { ComprobanteVenta, Factura, NotaPedido, OrdenCompra, OrdenDespacho } from "@/lib/types";
 import { npPorCobrar, saldoNP, vencimientoNP } from "@/lib/ventas";
-import { BotonAccion, Etiqueta, Kpi, Panel } from "./piezas";
+import { ErpTable, ErpTd } from "@/components/erp/ErpTable";
+import { BotonAccion, BotonVer, Etiqueta, Kpi, Panel } from "./piezas";
 import { EncabezadoPlanta, Filas, MarcoPlanta, PanelLateral, horaActual, montoCorto } from "./planta";
 import { AccesosRapidos } from "./AccesosRapidos";
 
@@ -46,7 +47,14 @@ export function FinanzasHome() {
     const fletesMes = ods.filter((o) => o.lugar === "ENVIO_AGENCIA" && (o.costoEnvio ?? 0) > 0 && o.fecha.startsWith(mes));
     const ultimosEmitidos = [...comprobantes.filter((c) => c.estado === "EMITIDO")].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.numero.localeCompare(a.numero)).slice(0, 5);
     const ultimasRecibidas = [...facturas].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 5);
-    return { porPagar, cxp, cxpVencidas, porCobrar, cxc, cxcVencidas, igvVentas, igvCompras, ocPorPagar, fletesMes, ultimosEmitidos, ultimasRecibidas, mes };
+    // Tabla Tesorería / Compras: últimas OC y facturas de proveedores
+    const compras = [
+      ...ordenes.map((o) => ({ clave: `oc:${o.id}`, fecha: o.fecha, proveedor: o.proveedor, doc: `${o.numero}${o.reqNumero ? ` · ${o.reqNumero}` : ""}`, total: o.total, href: "/dashboard/compras?tab=ordenes" })),
+      ...facturas.map((f) => ({ clave: `f:${f.id}`, fecha: f.fecha, proveedor: f.proveedor, doc: `Factura ${f.numero}${f.ocNumero ? ` · ${f.ocNumero}` : ""}`, total: f.netoPagar ?? f.total, href: "/dashboard/compras?tab=facturas" })),
+    ]
+      .sort((a, b) => b.fecha.localeCompare(a.fecha))
+      .slice(0, 10);
+    return { compras, porPagar, cxp, cxpVencidas, porCobrar, cxc, cxcVencidas, igvVentas, igvCompras, ocPorPagar, fletesMes, ultimosEmitidos, ultimasRecibidas, mes };
   }, [facturas, ordenes, notas, comprobantes, ods]);
 
   useEffect(() => setSync(horaActual()), [d]);
@@ -141,6 +149,22 @@ export function FinanzasHome() {
         />
       </Panel>
       </div>
+
+      <Panel titulo="Tesorería / Compras" icono={<Wallet size={17} />} accion={<BotonVer href="/dashboard/compras?tab=ordenes">Ver todo</BotonVer>}>
+        <ErpTable head={["Fecha", "Proveedor", "Doc. referencia", "Total", "Acciones"]} empty={d.compras.length === 0} vacio="Aún no hay compras registradas.">
+          {d.compras.map((c) => (
+            <tr key={c.clave}>
+              <ErpTd>{fechaPE(c.fecha)}</ErpTd>
+              <ErpTd className="font-semibold text-white">{c.proveedor}</ErpTd>
+              <ErpTd>{c.doc}</ErpTd>
+              <ErpTd className="text-right font-semibold text-[#fdba74]">{soles(c.total)}</ErpTd>
+              <ErpTd>
+                <BotonVer href={c.href}>Ver</BotonVer>
+              </ErpTd>
+            </tr>
+          ))}
+        </ErpTable>
+      </Panel>
 
       <AccesosRapidos sesion={sesion} actual="finanzas" />
     </MarcoPlanta>

@@ -33,7 +33,7 @@ const config: Config = {
       boxShadow: {
         card: "0 1px 2px rgb(10 10 11 / 0.05)",
         pop: "0 16px 48px rgb(10 10 11 / 0.16), 0 2px 6px rgb(10 10 11 / 0.06)",
-        rojo: "0 1px 2px rgb(227 6 19 / 0.3), inset 0 1px 0 rgb(255 255 255 / 0.15)",
+        rojo: "0 1px 2px rgb(var(--corp) / 0.3), inset 0 1px 0 rgb(255 255 255 / 0.15)",
         fab: "0 10px 30px rgb(227 6 19 / 0.4), inset 0 1px 0 rgb(255 255 255 / 0.2)",
       },
       keyframes: {

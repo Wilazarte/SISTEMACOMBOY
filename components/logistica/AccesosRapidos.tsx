@@ -132,8 +132,9 @@ function GrillaAcciones({ acciones }: { acciones: Accion[] }) {
 }
 
 /**
- * Accesos rápidos según el perfil: solo SOPORTE navega entre los 4 módulos (y tiene funciones globales);
- * los demás ven únicamente las funciones de su módulo. Cada acción abre el módulo de siempre en otra pestaña.
+ * Accesos rápidos según el perfil. La barra de los 4 módulos solo la ve SOPORTE (canViewOtherModules);
+ * los moduladores (Finanzas, Logística, Almacén, Producción) ven únicamente las funciones de su módulo.
+ * SOPORTE además tiene las funciones globales. Cada acción abre el módulo de siempre en otra pestaña.
  */
 export function AccesosRapidos({ sesion, actual }: { sesion: Sesion | null; actual: ModuloPlanta }) {
   const perfil = perfilPlanta(sesion);
@@ -141,13 +142,15 @@ export function AccesosRapidos({ sesion, actual }: { sesion: Sesion | null; actu
   const activo = perfil !== "soporte" && perfil !== null;
   const guias = useStore<Guia[]>(KEYS.GUIAS, [], activo);
   const ops = useStore<OrdenProduccion[]>(KEYS.PRODUCCION, [], perfil === "produccion");
-  if (!sesion || perfil === null) return null;
+  // GERENCIA es solo visor: sin accesos a módulos operativos
+  if (!sesion || perfil === null || perfil === "gerencia") return null;
   const visible = (a: Accion) => (!a.requiere || permisos[a.requiere]) && puedeVer(sesion, a.permiso ?? a.href.split(/[?#]/)[0]);
+  const barraModulos = permisos.canViewOtherModules && <AccesosModulos sesion={sesion} actual={actual} />;
 
-  if (perfil === "soporte" || permisos.canNavegarModulos)
+  if (perfil === "soporte")
     return (
       <div className="space-y-4">
-        <AccesosModulos sesion={sesion} actual={actual} />
+        {barraModulos}
         <div>
           <h3 className="mb-2 text-[13px] font-bold uppercase text-[#fb923c]">Funciones globales</h3>
           <GrillaAcciones acciones={GLOBALES.filter(visible)} />
@@ -163,10 +166,15 @@ export function AccesosRapidos({ sesion, actual }: { sesion: Sesion | null; actu
     .filter(visible);
 
   return (
-    <section>
-      <h2 className="mb-3 text-xl font-bold uppercase text-[#fb923c]">Accesos rápidos</h2>
-      <GrillaAcciones acciones={acciones} />
-    </section>
+    <div className="space-y-4">
+      {barraModulos}
+      <section>
+        <h2 className={barraModulos ? "mb-2 text-[13px] font-bold uppercase text-[#fb923c]" : "mb-3 text-xl font-bold uppercase text-[#fb923c]"}>
+          {barraModulos ? "Funciones del módulo" : "Accesos rápidos"}
+        </h2>
+        <GrillaAcciones acciones={acciones} />
+      </section>
+    </div>
   );
 }
 

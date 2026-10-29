@@ -11,7 +11,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "./supabase/client";
 import type { Rol } from "./types";
-import { HOME_PERFIL, RUTA_NO_AUTORIZADO, homePlantaDe, perfilPlanta } from "./permisosPlanta";
+import { HOME_PERFIL, RUTA_NO_AUTORIZADO, homePlantaDe, isAdmin, perfilPlanta, permisosPlanta } from "./permisosPlanta";
 
 /** Roles con permisos definidos en el ERP. Cualquier otro rol de la tabla perfiles se trata como solo lectura. */
 export type RolAuth = "creador" | "tesoreria" | "almacen" | "planilla" | "gerencia" | "sucursal";
@@ -154,10 +154,15 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
   // Producción: también Almacén (registra las órdenes de producción y el QC)
   if (ruta === RUTA_PRODUCCION || ruta.startsWith(`${RUTA_PRODUCCION}/`)) if (sesion.rol === "almacen") return true;
   if (ruta === RUTA_NO_AUTORIZADO) return true;
-  // Homes de la planta: cada perfil (Logística, Almacén, Finanzas, Producción) entra solo a la suya; SOPORTE a todas
+  // GERENCIA es visor (pedido de Williams, 2026-10-29): solo su Dashboard Gerencia, ningún módulo;
+  // las reuniones y el chat grupal están dentro de /gerencia
+  if (sesion.rol === "gerencia") return ruta === RUTA_GERENCIA || ruta.startsWith(`${RUTA_GERENCIA}/`);
+  // Dashboard Gerencia: además de GERENCIA (arriba), solo SOPORTE
+  if (ruta === RUTA_GERENCIA || ruta.startsWith(`${RUTA_GERENCIA}/`)) return isAdmin(sesion);
+  // Homes de la planta: solo SOPORTE entra a las 4; los moduladores (Finanzas, Logística, Almacén, Producción) solo a la suya
   const homePlanta = homePlantaDe(ruta);
   const perfil = perfilPlanta(sesion);
-  if (homePlanta && perfil && perfil !== "soporte") return homePlanta === HOME_PERFIL[perfil];
+  if (homePlanta && perfil && perfil !== "soporte") return permisosPlanta(sesion).canViewOtherModules || homePlanta === HOME_PERFIL[perfil];
   // Homes de la planta (/almacen, /finanzas, /produccion): quien puede abrir el módulo de trabajo
   const home = Object.keys(HOMES_PLANTA).find((h) => ruta === h || ruta.startsWith(`${h}/`));
   if (home) return HOMES_PLANTA[home].some((r) => puedeVer(sesion, r));
@@ -172,6 +177,8 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
 }
 
 export const RUTA_PRODUCCION = "/dashboard/produccion";
+/** Dashboard Gerencia (War Room): GERENCIA y SOPORTE. */
+export const RUTA_GERENCIA = "/gerencia";
 /** Logística Planta: home de compras / ventas nacionales y agencias (solo lectura de los demás módulos). */
 export const RUTA_LOGISTICA = "/logistica";
 /** Homes de la planta -> módulos de trabajo que habilitan verlas. */
@@ -207,6 +214,8 @@ export const soloSecocha = (sesion: Sesion | null): boolean => {
 export function inicioDe(sesion: Sesion): string {
   // El usuario solo de Secocha no entra al ERP: su sistema es /secocha
   if (soloSecocha(sesion)) return RUTA_SUCURSAL;
+  // GERENCIA: su único inicio es el Dashboard Gerencia (visor general, solo lectura)
+  if (sesion.rol === "gerencia") return RUTA_GERENCIA;
   if (sesion.modulos.includes("*") || veDashboard(sesion)) return "/dashboard";
   // Sin módulos asignados se queda en /dashboard (el layout muestra el aviso; evita el bucle con /login)
   return sesion.modulos.find((m) => m.startsWith("/dashboard/")) ?? "/dashboard";
@@ -288,5 +297,5 @@ const NOMBRES: Partial<Record<RolAuth, string>> = {
 export const nombreDe = (s: Sesion): string => (esSoporte(s) ? ETIQUETA_SOPORTE : s.nombreCompleto?.trim() || NOMBRES[s.rol] || s.nombre);
 
 /** El rol creador se muestra como SOPORTE (Dueño): solo cambia lo que se ve, el rol en la base sigue siendo "creador". */
-export const esSoporte = (s: Sesion | null): boolean => s?.rol === "creador";
+export const esSoporte = (s: Sesion | null): boolean => isAdmin(s);
 export const ETIQUETA_SOPORTE = "SOPORTE (Dueño)";

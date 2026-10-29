@@ -116,6 +116,41 @@ html, body, button, input, select, textarea, table, th, td, div, span, p, h1, h2
   --slate-100: 17 26 47; --slate-200: 30 42 69; --slate-300: 30 58 95;
   --sb-activo: 42 123 255;
 }
+/* Tema PLANTA (diseño único de todos los módulos, igual que Logística Planta): va después de .tema-azul.
+   Fondo #0e1219, tarjetas #1a212e, bordes #2a3445, primario naranja #f97316, texto blanco. */
+.tema-planta {
+  --canvas: 14 18 25;
+  --surface: 26 33 46;
+  --fg: 255 255 255;
+  --fg-2: 229 231 235;
+  --corp: 249 115 22;
+  --vino-900: 234 88 12;
+  --vino: 251 146 60;
+  --rojo: 251 146 60;
+  --rojo-soft: 58 36 20;
+  --rojo-tenue: 124 58 18;
+  --azul-900: 33 42 58;
+  --azul-700: 212 212 216;
+  --azul-500: 161 161 170;
+  --plomo-50: 33 42 58;
+  --plomo-100: 38 48 67;
+  --plomo-200: 42 52 69;
+  --plomo-500: 161 161 170;
+  --plomo-600: 212 212 216;
+  --slate-100: 33 42 58; --slate-200: 42 52 69; --slate-300: 58 69 88;
+  --sb: 14 18 25;
+  --sb-borde: 42 52 69;
+  --sb-activo: 249 115 22;
+}
+.tema-azul.tema-planta :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea):not(.bg-transparent) {
+  background-color: #212a3a;
+  border-color: #2a3445;
+  color: #fff;
+}
+.tema-azul.tema-planta :is(input, select, textarea):not(.bg-transparent):focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgb(249 115 22 / 0.3);
+}
 /* COMBOY VID SUCURSAL (app/(sucursal)): siempre claro, header blanco, aunque el ERP esté en oscuro */
 .tema-claro {
   color-scheme: light;
@@ -180,4 +215,15 @@ table, .tabular { font-variant-numeric: tabular-nums; }
   .tip:hover::after, .tip:focus-visible::after { @apply translate-y-0 opacity-100; }
   .tip-arriba::after { @apply bottom-[calc(100%+8px)] top-auto; }
   .kbd { @apply inline-flex h-5 min-w-[20px] items-center justify-center rounded-[5px] border border-plomo-200 bg-plomo-50 px-1 text-[11px] font-medium text-plomo-500; }
+}
+
+/* Ticker del Dashboard Gerencia (components/gerencia/GerenciaDashboard.tsx): el contenido va duplicado y corre en bucle */
+@keyframes ticker-correr {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.ticker-pista { animation: ticker-correr 45s linear infinite; }
+.ticker-pista:hover { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .ticker-pista { animation: none; }
 }

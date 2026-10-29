@@ -18,7 +18,7 @@ import { NotificationSidebar } from "@/components/layout/NotificationSidebar";
 import { DatalistCatalogo } from "@/components/productos/ProductoInput";
 import { detenerCatalogo, iniciarCatalogo } from "@/lib/productos";
 import { olvidarSedes } from "@/lib/sedes";
-import { RUTA_SUCURSAL, inicioDe, soloSecocha, logout, puedeVer, useSesion, veTesoreria } from "@/lib/auth";
+import { RUTA_GERENCIA, RUTA_SUCURSAL, inicioDe, soloSecocha, logout, puedeVer, useSesion, veTesoreria } from "@/lib/auth";
 import { RUTA_NO_AUTORIZADO, homePlantaDe } from "@/lib/permisosPlanta";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
 import { useNotificaciones } from "@/lib/notificaciones";
@@ -58,6 +58,7 @@ const FLUJOS: [string, string][] = [
   ["/almacen", "Requerimiento → Ingreso → Stock → Entrega a Producción → PT → Despacho"],
   ["/finanzas", "Compra → Pago a proveedor → Facturación → Cobranza → Planilla → Contabilidad"],
   ["/produccion", "Solicitud de MP → Fabricación → Ensamblaje → QC → Ingreso PT"],
+  ["/gerencia", "Requerimiento → Cotización → OC → Agencia → Almacén → Producción → Despacho → Factura"],
   ["/logistica", "Compra nacional → Agencia → Almacén → Producción → PT → Venta → Guía → Agencia → Cliente"],
   ["/dashboard", "Resumen → Compras → Almacén → Ventas → Contable"],
 ];
@@ -69,6 +70,7 @@ const NOMBRE_MODULO: [string, string][] = [
   ["/dashboard/contable", "REPORTES"],
   ["/dashboard/produccion", "PRODUCCION"],
   ["/dashboard/creador", "CREADOR"],
+  ["/gerencia", "GERENCIA"],
   ["/logistica", "LOGISTICA"],
   ["/almacen", "ALMACEN"],
   ["/finanzas", "FINANZAS"],
@@ -122,9 +124,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     if (soloSecocha(sesion)) router.replace(RUTA_SUCURSAL);
   }, [listo, sesion, router]);
 
-  // RBAC de la planta: la home de otro perfil (ej. Almacén entrando a /finanzas) va a /no-autorizado
+  // RBAC de la planta: la home de otro perfil (ej. Almacén entrando a /finanzas) va a /no-autorizado.
+  // GERENCIA (visor) entra siempre por /gerencia.
   useEffect(() => {
-    if (sesion && homePlantaDe(path) && !puedeVer(sesion, path)) router.replace(RUTA_NO_AUTORIZADO);
+    if (sesion?.rol === "gerencia" && path === "/dashboard") router.replace(RUTA_GERENCIA);
+    else if (sesion && homePlantaDe(path) && !puedeVer(sesion, path)) router.replace(RUTA_NO_AUTORIZADO);
   }, [sesion, path, router]);
 
   // Almacén: aviso con detalle cuando Ventas genera una orden de despacho (en vivo)
@@ -277,6 +281,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <ModuloLayout
       moduleName={nombreModulo}
+      titulo={path === RUTA_GERENCIA ? "ERP COMBOY VID - DASHBOARD GERENCIA - Tiempo real" : undefined}
       sede={SEDE_PLANTA_PRINCIPAL}
       inicio={inicioDe(sesion)}
       sesion={sesion}
@@ -287,7 +292,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <>
           <button
             onClick={() => setPaleta(true)}
-            className="flex h-9 items-center gap-2.5 rounded-lg border border-gray-700 bg-[#1e293b] px-2.5 text-[13px] text-gray-300 transition hover:text-white 2xl:w-72"
+            className="flex h-9 items-center gap-2.5 rounded-lg border border-[#2a3445] bg-[#1a212e] px-2.5 text-[13px] text-[#d4d4d8] transition hover:border-[#f97316] hover:text-white 2xl:w-72"
             aria-label="Abrir buscador global (Ctrl K)"
             title={buscador ? "Buscar REQ, OC, factura… (Ctrl K)" : "Buscar o ir a… (Ctrl K)"}
           >
@@ -316,7 +321,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <>
           <NotificationSidebar notifs={notifs} vistas={prefs.notifVistas ?? []} abierta={notifAbierta} onToggle={alternarNotif} enSeccion={path === "/dashboard/compras" && veCompras ? ["requerimiento"] : []} />
           <FloatingDock sesion={sesion} tab={tabActiva?.id} />
-          <AccionRapida acciones={acciones} />
+          {/* GERENCIA solo mira métricas: sin botón de acciones rápidas */}
+          {sesion.rol !== "gerencia" && <AccionRapida acciones={acciones} />}
           <CommandPalette abierto={paleta} onCerrar={() => setPaleta(false)} comandos={comandos} documentos={documentos} />
           <DocViewerHost />
           <DatalistCatalogo />
@@ -344,6 +350,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           key={path}
           sesion={sesion}
           sede={SEDE_PLANTA_PRINCIPAL}
+          modulo={nombreModulo}
           flujo={flujoDe(path === "/dashboard/compras" && tabActiva?.id === "planilla" ? "/dashboard/planilla" : path)}
           avisos={
             <>
