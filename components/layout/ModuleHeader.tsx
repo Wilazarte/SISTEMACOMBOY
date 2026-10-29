@@ -16,6 +16,7 @@ export function ModuleHeader({
   inicio = "/dashboard",
   usuario,
   nombre,
+  badge,
   onSalir,
   extra,
 }: {
@@ -23,6 +24,8 @@ export function ModuleHeader({
   inicio?: string;
   usuario?: string;
   nombre?: string;
+  /** Distintivo junto al usuario (ej. "Soporte Dueño"). */
+  badge?: string;
   onSalir?: () => void;
   /** Buscador global (Ctrl K), campana y avisos: van antes de la cápsula del usuario. */
   extra?: ReactNode;
@@ -53,6 +56,11 @@ export function ModuleHeader({
             <span className="hidden max-w-[140px] truncate text-sm text-white md:block" style={{ fontFamily: TIMES }}>
               {usuario}
             </span>
+            {badge && (
+              <span className="hidden rounded-full bg-[#f97316] px-2 py-0.5 text-[11px] font-semibold text-white lg:inline" style={{ fontFamily: TIMES }}>
+                {badge}
+              </span>
+            )}
             {onSalir && (
               <button type="button" onClick={onSalir} className="ml-1 rounded-full p-1 transition hover:bg-white/10 md:ml-2" aria-label="Cerrar sesión" title="Cerrar sesión">
                 <LogOut className="h-5 w-5 text-gray-300" />

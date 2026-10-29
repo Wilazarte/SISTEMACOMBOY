@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { ID_BARRA_PESTANAS } from "@/components/ui";
 import { Header } from "@/components/Header";
 import { ModuleHeader } from "@/components/layout/ModuleHeader";
-import type { Sesion } from "@/lib/auth";
+import { esSoporte, type Sesion } from "@/lib/auth";
 import { SEDE_PLANTA_PRINCIPAL } from "@/lib/plantillasDocumentos";
 
 /** Sede del ERP (Arequipa): referencia del diseño de todos los módulos. */
@@ -49,7 +49,16 @@ export function ModuloLayout({
       </div>
 
       {/* Encabezado: logo · MODULO X centrado · buscador, campana y usuario */}
-      <ModuleHeader moduleName={moduleName} inicio={inicio} usuario={sesion.usuario} nombre={sesion.nombre} onSalir={onSalir} extra={extra} />
+      <ModuleHeader
+        moduleName={moduleName}
+        inicio={inicio}
+        // El creador se muestra como SOPORTE (Dueño)
+        usuario={esSoporte(sesion) ? "SOPORTE" : sesion.usuario}
+        nombre={esSoporte(sesion) ? "SOPORTE (Dueño) · acceso a todos los módulos" : sesion.nombre}
+        badge={esSoporte(sesion) ? "Soporte Dueño" : undefined}
+        onSalir={onSalir}
+        extra={extra}
+      />
 
       <main className={`w-full flex-1 transition-[padding] duration-300 ${mainClassName}`}>
         <div className="mx-auto w-full max-w-[1600px] px-4 pt-24 sm:px-6 lg:px-8">{children}</div>
