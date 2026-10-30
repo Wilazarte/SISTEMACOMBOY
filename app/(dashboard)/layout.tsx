@@ -292,6 +292,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <ModuloLayout
       moduleName={nombreModulo}
+      sinMapa={esInicio}
       sede={SEDE_PLANTA_PRINCIPAL}
       // El logo vuelve al INICIO del módulo actual
       inicio={pestanaAccion ? RUTA_INICIO[pestanaAccion.modulo] : (homePlantaDe(path) ?? inicioDe(sesion))}
