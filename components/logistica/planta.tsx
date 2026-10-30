@@ -57,7 +57,7 @@ export function EncabezadoPlanta({ icono, titulo, subtitulo, accion }: { icono: 
   );
 }
 
-/** Barra inferior de acciones del módulo (diseños): `tono` lleno (naranja), borde o verde. Abre en pestaña nueva. */
+/** Barra inferior de acciones del módulo (diseños): `tono` lleno (naranja), borde o verde. Abre en la misma ventana. */
 export function BarraAcciones({ acciones }: { acciones: { label: string; href: string; icono?: ReactNode; tono?: "lleno" | "borde" | "verde" }[] }) {
   return (
     <div className="grid grid-cols-2 gap-2 rounded-xl border border-[#2a3445] bg-[#1a212e] p-3 sm:grid-cols-4 xl:flex xl:flex-wrap">
@@ -90,7 +90,7 @@ export function BarraModulos({ sesion, actual }: { sesion: Sesion | null; actual
 
 /**
  * Accesos rápidos: los 4 módulos en 4 columnas. El actual va resaltado y abre su módulo de trabajo;
- * los demás abren su home en una pestaña nueva. Sin permiso: candado y "No autorizado".
+ * los demás abren su home en la misma ventana. Sin permiso: candado y "No autorizado".
  */
 export function AccesosModulos({ sesion, actual }: { sesion: Sesion | null; /** Módulo resaltado (sin él, ninguno: INICIO SOPORTE). */ actual?: ModuloPlanta }) {
   return (
@@ -106,7 +106,7 @@ export function AccesosModulos({ sesion, actual }: { sesion: Sesion | null; /** 
               type="button"
               disabled={!permitido}
               onClick={() => abrirPestana(esActual ? m.trabajo : m.home)}
-              title={permitido ? "Se abre en una pestaña nueva" : "No autorizado - acceso denegado"}
+              title={permitido ? "Se abre en la misma ventana" : "No autorizado - acceso denegado"}
               className={cn(
                 "group relative flex min-h-[170px] flex-col items-center justify-center gap-3 rounded-xl border bg-[#1a212e] px-4 py-6 transition",
                 permitido ? "border-[#2a3445] hover:border-[#2a7bff]" : "cursor-not-allowed border-[#2a3445] opacity-50"
@@ -255,7 +255,7 @@ export interface Fila {
   href?: string;
 }
 
-/** Lista de filas clicables (abren en pestaña nueva): ErpAlertList del layout global. */
+/** Lista de filas clicables (abren en la misma ventana): ErpAlertList del layout global. */
 export function Filas({ items, vacio, max = 8 }: { items: Fila[]; vacio: string; max?: number }) {
   return <ErpAlertList items={items} vacio={vacio} max={max} />;
 }

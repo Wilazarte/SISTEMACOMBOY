@@ -1,5 +1,5 @@
 // INICIO de cada módulo (ERP v3.0, pedido de Williams 2026-10-30): sin menús, cada función del sistema es un
-// botón que abre /{modulo}/{accion}?doc=26W-XXX en una pestaña nueva. Este catálogo es la única lista de botones:
+// botón que abre /{modulo}/{accion}?doc=26W-XXX en la misma ventana. Este catálogo es la única lista de botones:
 // cada acción apunta a una pantalla que YA existe (pestaña ?tab= de los módulos de trabajo, secciones de Logística
 // o el expediente 26W). No hay acciones inventadas: si algo aún no existe en el ERP, no tiene botón.
 
@@ -177,7 +177,7 @@ export function accionesPermitidas(sesion: Sesion | null, modulo: ModuloInicio):
   });
 }
 
-/** URL del botón (lo que se abre en la pestaña nueva): /{modulo}/{accion}?doc=26W-XXX. */
+/** URL del botón (lo que abre el botón, en la misma ventana): /{modulo}/{accion}?doc=26W-XXX. */
 export function urlBoton(modulo: ModuloInicio, a: AccionInicio, doc?: string): string {
   if (a.externo) return a.destino;
   const base = modulo === "soporte" ? `/soporte/${a.slug}` : `${RUTA_INICIO[modulo]}/${a.slug}`;

@@ -27,7 +27,7 @@ export function Panel({ titulo, icono, accion, children, className, id }: { titu
   );
 }
 
-/** Botón "↗ Ver …": abre el destino en una pestaña nueva. */
+/** Botón "↗ Ver …": abre el destino en la misma ventana. */
 export function BotonVer({ href, children }: { href: string; children: ReactNode }) {
   return (
     <button
@@ -40,7 +40,7 @@ export function BotonVer({ href, children }: { href: string; children: ReactNode
   );
 }
 
-/** Botón de acción (lleno o con borde) que abre en una pestaña nueva. */
+/** Botón de acción (lleno o con borde) que abre en la misma ventana. */
 export function BotonAccion({ href, children, icono, lleno }: { href: string; children: ReactNode; icono?: ReactNode; lleno?: boolean }) {
   return (
     <button
@@ -57,7 +57,7 @@ export function BotonAccion({ href, children, icono, lleno }: { href: string; ch
   );
 }
 
-/** Métrica de las homes: ErpStatsCard del layout global, abre el destino en una pestaña nueva. */
+/** Métrica de las homes: ErpStatsCard del layout global, abre el destino en la misma ventana. */
 export function Kpi({ icono, titulo, valor, detalle, href }: { icono: ReactNode; titulo: string; valor: string; detalle: string; href: string }) {
   return <ErpStatsCard icono={icono} titulo={titulo} valor={valor} detalle={detalle} onClick={() => abrirPestana(href)} />;
 }
@@ -67,7 +67,7 @@ export function Acceso({ icono, titulo, texto, href }: { icono: ReactNode; titul
     <button
       type="button"
       onClick={() => abrirPestana(href)}
-      title="Se abre en una pestaña nueva"
+      title="Abrir"
       className="group flex items-center gap-3 rounded-xl border border-[#2a3445] bg-[#1a212e] px-4 py-4 text-left transition hover:border-[#2a7bff]"
     >
       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#2a7bff] text-white">{icono}</span>

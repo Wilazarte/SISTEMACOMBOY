@@ -18,7 +18,7 @@ export interface KpiInicio {
   titulo: string;
   valor: string;
   detalle: string;
-  /** Pantalla que abre la tarjeta (pestaña nueva). */
+  /** Pantalla que abre la tarjeta (misma ventana). */
   href: string;
   alerta?: boolean;
 }
