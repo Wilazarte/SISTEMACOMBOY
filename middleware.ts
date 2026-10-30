@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { RUTA_CREADOR, RUTA_LOGIN_SUCURSAL, RUTA_SUCURSAL, puedeVer, veTesoreria, type RolAuth, type Sesion } from "@/lib/permisos";
-import { RUTA_NO_AUTORIZADO } from "@/lib/permisosPlanta";
+import { RUTA_NO_AUTORIZADO, homeAsignado } from "@/lib/permisosPlanta";
 
 // =====================================================================
 // ERP privado: sin sesión no se sirve ninguna página, se va al login.
@@ -51,14 +51,21 @@ export async function middleware(req: NextRequest) {
     return ir(enSecocha ? RUTA_LOGIN_SUCURSAL : LOGIN, !enSecocha && ruta.startsWith("/dashboard/"));
   }
 
-  // /dashboard solo redirige al primer módulo permitido; las páginas sueltas (/, /seleccionar-modulo, /api…) solo piden sesión
-  if (ruta === "/dashboard" || ruta === RUTA_NO_AUTORIZADO || !enModulo(ruta)) return res;
+  // Las páginas sueltas (/, /seleccionar-modulo, /api…) solo piden sesión
+  if (ruta === RUTA_NO_AUTORIZADO || !enModulo(ruta)) return res;
 
-  const { data: p } = await sb.from("perfiles").select("usuario,rol,nombre,modulos,solo_lectura").eq("id", uid).maybeSingle();
-  if (!p) return ir(enSecocha ? RUTA_LOGIN_SUCURSAL : LOGIN);
-  const sesion: Sesion = { usuario: p.usuario, rol: p.rol as RolAuth, nombre: p.nombre, modulos: p.modulos ?? [], soloLectura: !!p.solo_lectura };
+  // "*": modulo_asignado y activo (20261106_perfiles_asignacion.sql) son opcionales hasta correr su SQL
+  const { data: p } = await sb.from("perfiles").select("*").eq("id", uid).maybeSingle();
+  if (!p || p.activo === false) return ir(enSecocha ? RUTA_LOGIN_SUCURSAL : LOGIN);
+  const sesion: Sesion = { usuario: p.usuario, rol: p.rol as RolAuth, nombre: p.nombre, modulos: p.modulos ?? [], soloLectura: !!p.solo_lectura, moduloAsignado: p.modulo_asignado ?? undefined };
+
+  // Perfiles asignados (pedido de Williams, 2026-10-30): quien no es SOPORTE entra solo a su módulo;
+  // /dashboard y cualquier ruta sin permiso lo llevan a su INICIO (/almacen, /finanzas, /logistica, /produccion)
+  const asignado = enSecocha ? null : homeAsignado(sesion);
+  if (ruta === "/dashboard") return asignado ? ir(asignado) : res;
 
   const permitido = ruta === "/dashboard/compras" ? veTesoreria(sesion) : puedeVer(sesion, ruta);
+  if (!permitido && asignado) return ir(asignado);
   // Sin módulos asignados se deja pasar: el layout muestra el aviso (evita el bucle con /login)
   if (!permitido && (sesion.modulos.length > 0 || ruta.startsWith(RUTA_CREADOR))) return ir(enSecocha ? RUTA_LOGIN_SUCURSAL : RUTA_NO_AUTORIZADO);
   return res;

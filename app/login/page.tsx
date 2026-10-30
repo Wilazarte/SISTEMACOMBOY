@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, BarChart3, Eye, EyeOff, Factory, Landmark, Loader2, Lock, LogIn, Store, Truck, User, X, type LucideIcon } from "lucide-react";
 import { CLAVE_MODULO, CLAVE_USUARIO, MODULOS_LOGIN, RUTA_LOGIN_SUCURSAL, RUTA_SUCURSAL, soloSecocha, login, logout, moduloGuardado, perteneceAModulo, puedeVer, rutaDeModulo, useSesion, type ModuloLogin } from "@/lib/auth";
 import { CLAVE_SELECCION, ENCARGADOS_LOGIN, tarjetaDe } from "@/components/modulos-login";
+import { homeAsignado } from "@/lib/permisosPlanta";
 
 /** Botones del dock: `slug` es la ruta /login/<slug> (app/login/[modulo] redirige a /login?modulo=). */
 const DOCK: { id: ModuloLogin; slug: string; titulo: string; icon: LucideIcon }[] = [
@@ -70,6 +71,7 @@ function Login() {
   useEffect(() => {
     const m = moduloGuardado();
     if (sesion && !enviando && soloSecocha(sesion)) router.replace(RUTA_SUCURSAL);
+    else if (sesion && !enviando && homeAsignado(sesion)) router.replace(homeAsignado(sesion)!);
     else if (sesion && m && !enviando) router.replace(rutaDeModulo(sesion, m));
   }, [sesion, router, enviando]);
 
@@ -89,7 +91,7 @@ function Login() {
     setError("");
     if (!modulo) return;
     if (!usuario.trim() || !pass) {
-      setError("Ingrese usuario y contraseña.");
+      setError("Ingrese su nombre, usuario o correo y la contraseña.");
       return;
     }
     setEnviando(true);
@@ -104,6 +106,17 @@ function Login() {
     // Usuario solo de Secocha (modulos = ["/secocha"]): directo a su módulo
     if (soloSecocha(r.sesion)) {
       router.replace(RUTA_SUCURSAL);
+      return;
+    }
+    // Perfil asignado (Finanzas, Almacén, Logística, Producción): siempre a su INICIO, elija el módulo que elija
+    const asignado = homeAsignado(r.sesion);
+    if (asignado) {
+      try {
+        window.localStorage.setItem(CLAVE_USUARIO, r.sesion.usuario);
+      } catch {
+        /* almacenamiento bloqueado */
+      }
+      router.replace(siguiente && puedeVer(r.sesion, siguiente.split("?")[0]) ? siguiente : asignado);
       return;
     }
     if (!perteneceAModulo(r.sesion, modulo)) {
@@ -172,7 +185,7 @@ function Login() {
                   autoCapitalize="none"
                   spellCheck={false}
                   autoFocus
-                  placeholder="ej. almacen"
+                  placeholder="Nombre, usuario o correo"
                   className={`${CAMPO} pr-3`}
                 />
               </span>

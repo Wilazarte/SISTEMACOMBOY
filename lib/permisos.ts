@@ -22,6 +22,10 @@ export interface Sesion {
   cargo?: string;
   /** Nombre completo real (columna opcional perfiles.nombre_completo). */
   nombreCompleto?: string;
+  /** Iniciales del avatar (perfiles.avatar_iniciales: AD, LC, JO, WL, MC). */
+  iniciales?: string;
+  /** Módulo asignado (perfiles.modulo_asignado: TODOS, FINANZAS, ALMACEN, LOGISTICA, PRODUCCION). */
+  moduloAsignado?: string;
 }
 
 /**

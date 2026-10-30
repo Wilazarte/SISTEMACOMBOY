@@ -36,6 +36,22 @@ export function perfilPlanta(sesion: Sesion | null): PerfilPlanta | null {
   return null;
 }
 
+/**
+ * INICIO asignado a un modulador (perfiles.modulo_asignado / rol): /logistica, /almacen, /finanzas, /produccion o /gerencia.
+ * SOPORTE no tiene uno fijo (entra a todo): null. El middleware y el login llevan ahí a cada usuario.
+ */
+export function homeAsignado(sesion: Sesion | null): string | null {
+  const p = perfilPlanta(sesion);
+  return p && p !== "soporte" ? HOME_PERFIL[p] : null;
+}
+
+/** Iniciales del avatar: perfiles.avatar_iniciales, o la primera letra de las dos primeras palabras del nombre. */
+export function inicialesDe(nombre: string, iniciales?: string): string {
+  if (iniciales?.trim()) return iniciales.trim().toUpperCase().slice(0, 3);
+  const p = nombre.trim().split(/\s+/).filter(Boolean);
+  return (p.length > 1 ? p[0][0] + p[1][0] : (p[0] ?? "").slice(0, 2)).toUpperCase();
+}
+
 export interface PermisosPlanta {
   /** Emitir factura / boleta (Ventas › Comprobantes). */
   canEmitFactura: boolean;
