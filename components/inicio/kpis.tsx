@@ -103,7 +103,7 @@ function useKpisProduccion(activo: boolean): KpiInicio[] {
     return [
       { titulo: "OT activas", valor: String(enFab.length), detalle: "Órdenes de producción en fabricación", href: "/dashboard/produccion" },
       { titulo: "QC aprobados (mes)", valor: String(qcMes), detalle: "Equipos con control de calidad firmado", href: "/dashboard/produccion" },
-      { titulo: "PT disponible", valor: String(disponibles), detalle: "Equipos terminados en almacén", href: "/dashboard/almacen?tab=stock" },
+      { titulo: "PT disponible", valor: String(disponibles), detalle: "Equipos terminados en almacén", href: "/erp/lotes" },
       { titulo: "Expedientes 26W", valor: exp.faltaTabla ? "—" : String(abiertos.length), detalle: exp.faltaTabla ? "Falta correr el SQL de expedientes" : "Lotes abiertos en el flujo", href: "/erp/lotes" },
     ];
   }, [activo, ops, equipos, exp]);

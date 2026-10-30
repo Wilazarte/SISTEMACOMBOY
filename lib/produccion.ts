@@ -8,6 +8,8 @@
 
 import { ALMACEN_DEFECTO } from "./empresa";
 import { ingresarEquipoProduccion, getEquipos, nuevoCodigo, type EquipoTerminado } from "./equipos";
+import { getSesion } from "./auth";
+import { puedeEmitirOP } from "./permisosPlanta";
 import { ErpError, KEYS, escribir, hoy, leer } from "./storage";
 import type { ArchivoAdjunto } from "./types";
 
@@ -50,6 +52,7 @@ export const getOrdenesProduccion = () => leer<OrdenProduccion[]>(KEYS.PRODUCCIO
 const norm = (s?: string) => (s ?? "").replace(/\s+/g, "").toUpperCase();
 
 export async function crearOrdenProduccion(d: DatosOP, usuario: string): Promise<OrdenProduccion> {
+  if (!puedeEmitirOP(getSesion())) throw new ErpError("Solo Logística puede emitir OP.");
   const codigo_chasis = d.codigo_chasis.trim().toUpperCase();
   if (!d.tipo_equipo.trim()) throw new ErpError("Seleccione el tipo de equipo.");
   if (!d.modelo.trim()) throw new ErpError("Indique el modelo (ej. CV-300).");

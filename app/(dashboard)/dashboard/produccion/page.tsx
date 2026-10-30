@@ -7,6 +7,7 @@ import { Ban, CheckCircle2, ClipboardCheck, Factory, Plus } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, Textarea, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { FirmaPad } from "@/components/FirmaPad";
 import { getSesion } from "@/lib/auth";
+import { puedeEmitirOP } from "@/lib/permisosPlanta";
 import { ALMACENES, ALMACEN_DEFECTO } from "@/lib/empresa";
 import { MARCAS_MOTOR, TIPOS_EQUIPO } from "@/lib/equipos";
 import { anularOrdenProduccion, aprobarQC, crearOrdenProduccion, opVacia, type DatosOP, type OrdenProduccion } from "@/lib/produccion";
@@ -21,14 +22,16 @@ export default function ProduccionPage() {
   const [qcDe, setQcDe] = useState<OrdenProduccion | null>(null);
   const [filtro, setFiltro] = useState("");
   const habilitado = puede(rol, "req.crear") && !getSesion()?.soloLectura; // Almacén / producción y creador
+  // Nueva OP: solo Logística y Soporte (Producción ejecuta y firma el QC, no emite)
+  const emiteOP = habilitado && puedeEmitirOP(getSesion());
 
   // Botones del INICIO Producción: ?nueva=1 abre "Nueva orden de producción"; ?estado= filtra la lista (Control de calidad)
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     const estado = q.get("estado");
     if (estado && ["EN_FABRICACION", "QC_APROBADO", "ANULADA"].includes(estado)) setFiltro(estado);
-    if (q.get("nueva") === "1" && habilitado) setForm(opVacia());
-  }, [habilitado]);
+    if (q.get("nueva") === "1" && emiteOP) setForm(opVacia());
+  }, [emiteOP]);
   const lista = [...ops].filter((o) => !filtro || o.estado === filtro).sort((a, b) => b.id.localeCompare(a.id));
   const enFab = ops.filter((o) => o.estado === "EN_FABRICACION").length;
 
@@ -39,7 +42,7 @@ export default function ProduccionPage() {
           <h1 className="font-serif tracking-tight text-2xl font-semibold leading-tight text-fg lg:text-[28px]">Producción</h1>
           <p className="mt-1 text-[13px] text-plomo-600">Orden de producción → control de calidad firmado → ingreso automático a Almacén (equipo terminado DISPONIBLE)</p>
         </div>
-        {habilitado && (
+        {emiteOP && (
           <Button onClick={() => setForm(opVacia())}>
             <Plus size={16} /> Nueva orden de producción
           </Button>

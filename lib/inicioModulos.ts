@@ -139,20 +139,18 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
 
     { slug: "panel", label: "Panel Finanzas (CxC, CxP, IGV, cajas, costeo)", grupo: "Seguimiento", destino: "/finanzas/panel" },
   ],
+  // PRODUCCION (permisos limitados, Williams 2026-10-30): no emite OP (solo Logística), no ve Finanzas ni Gerencia;
+  // en Almacén solo entrega PT. Solo Panel, sus OPs, Control de calidad y Entregar PT (Fase 8), más su flujo 26W.
   produccion: [
     { slug: "expedientes", label: "Expedientes 26W · Tablero de lotes", grupo: EXP, destino: LOTES },
     { slug: "aceptar-op", label: "Aceptar OP y Solicitud de Materiales · Fase 2", grupo: EXP, destino: LOTES, fase: 2 },
     { slug: "reportar-avance", label: "Reportar avance y horas máquina", grupo: EXP, destino: LOTES },
     { slug: "cierre-pt", label: "N° de serie, QC y Acta de Entrega PT · Fase 8", grupo: EXP, destino: LOTES, fase: 8 },
 
-    { slug: "ordenes-produccion", label: "Órdenes de producción (OT)", grupo: "Producción", destino: P },
-    { slug: "nueva-op", label: "Nueva orden de producción", grupo: "Producción", destino: `${P}?nueva=1` },
-    { slug: "control-calidad", label: "Control de calidad (QC con firma)", grupo: "Producción", destino: `${P}?estado=EN_FABRICACION` },
-
-    { slug: "solicitar-mp", label: "Solicitar MP a Almacén (Nuevo requerimiento)", grupo: "Materiales", destino: `${A}?tab=nuevo` },
-    { slug: "stock", label: "Stock y consumo MP (Kardex)", grupo: "Materiales", destino: `${A}?tab=stock` },
-
-    { slug: "panel", label: "Panel Producción (OT, estaciones, consumo)", grupo: "Seguimiento", destino: "/produccion/panel" },
+    { slug: "panel", label: "Panel Producción (OT, estaciones, consumo)", grupo: "Producción", destino: "/produccion/panel" },
+    { slug: "ordenes", label: "Mis OPs asignadas", grupo: "Producción", destino: P },
+    { slug: "calidad", label: "Control de calidad (QC con firma)", grupo: "Producción", destino: `${P}?estado=EN_FABRICACION` },
+    { slug: "entregar-pt", label: "Entregar PT a Almacén (chasis y serie de motor)", grupo: "Producción", destino: LOTES, fase: 8 },
   ],
 };
 
@@ -216,7 +214,8 @@ export const fasePrincipal = (modulo: ModuloInicio): Fase | undefined => FASES.f
 export const GRUPO_EXPEDIENTE = EXP;
 
 export const buscarAccion = (modulo: ModuloInicio, slug: string): AccionInicio | undefined => {
-  const a = accionesDe(modulo).find((x) => x.slug === slug);
+  // /logistica/crear-op: alias de "Crear OP · Fase 1"
+  const a = accionesDe(modulo).find((x) => x.slug === (slug === "crear-op" ? "orden-produccion" : slug));
   if (a) return a;
   const f = Number(/^fase-([1-8])$/.exec(slug)?.[1]) as Fase;
   return f ? accionFase(f) : undefined;

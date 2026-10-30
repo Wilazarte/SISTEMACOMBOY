@@ -65,6 +65,15 @@ export async function middleware(req: NextRequest) {
   if (ruta === "/dashboard") return asignado ? ir(asignado) : res;
 
   const permitido = ruta === "/dashboard/compras" ? veTesoreria(sesion) : puedeVer(sesion, ruta);
+  // Emitir OP es solo de Logística: quien no lo es ve "Solo Logística puede emitir OP"
+  if (!permitido && /^\/logistica\/(crear-op|orden-produccion)(\/|$)/.test(ruta)) {
+    const url = req.nextUrl.clone();
+    url.pathname = RUTA_NO_AUTORIZADO;
+    url.search = "?motivo=op";
+    const r = NextResponse.redirect(url);
+    res.cookies.getAll().forEach((c) => r.cookies.set(c));
+    return r;
+  }
   if (!permitido && asignado) return ir(asignado);
   // Sin módulos asignados se deja pasar: el layout muestra el aviso (evita el bucle con /login)
   if (!permitido && (sesion.modulos.length > 0 || ruta.startsWith(RUTA_CREADOR))) return ir(enSecocha ? RUTA_LOGIN_SUCURSAL : RUTA_NO_AUTORIZADO);

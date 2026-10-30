@@ -45,6 +45,12 @@ export function homeAsignado(sesion: Sesion | null): string | null {
   return p && p !== "soporte" ? HOME_PERFIL[p] : null;
 }
 
+/** Emitir Orden de Producción: solo LOGISTICA y SOPORTE (Williams, 2026-10-30). Producción ejecuta, no emite. */
+export const puedeEmitirOP = (sesion: Sesion | null): boolean => {
+  const p = perfilPlanta(sesion);
+  return !!sesion && !sesion.soloLectura && (p === "soporte" || p === "logistica");
+};
+
 /** Iniciales del avatar: perfiles.avatar_iniciales, o la primera letra de las dos primeras palabras del nombre. */
 export function inicialesDe(nombre: string, iniciales?: string): string {
   if (iniciales?.trim()) return iniciales.trim().toUpperCase().slice(0, 3);
