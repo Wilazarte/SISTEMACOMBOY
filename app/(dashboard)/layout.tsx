@@ -7,19 +7,18 @@ import { AlertTriangle, CloudUpload, Eye, Loader2, Search, ShieldAlert } from "l
 import { EV_PESTANA, Kbd, Toaster, toast, type PestanaActiva } from "@/components/ui";
 import { DocViewerHost, abrirDoc, type DocRef } from "@/components/doc-viewer";
 import { ObservacionesGerencia } from "@/components/ObservacionesGerencia";
-import { AccionRapida } from "@/components/shell/AccionRapida";
 import { Campana } from "@/components/shell/Campana";
 import { CommandPalette, IconoDoc, type Comando } from "@/components/shell/CommandPalette";
 import { useIr } from "@/components/shell/ir";
 import { accionesDe, hrefSub, moduloDe, navDe } from "@/components/shell/nav";
-import { FloatingDock } from "@/components/layout/FloatingDock";
 import { ModuloContenido, ModuloLayout, SEDE_PLANTA_PRINCIPAL } from "@/components/layout/ModuloLayout";
-import { NotificationSidebar } from "@/components/layout/NotificationSidebar";
+import { EncabezadoPestana, PiePestana } from "@/components/inicio/ModoPestana";
 import { DatalistCatalogo } from "@/components/productos/ProductoInput";
 import { detenerCatalogo, iniciarCatalogo } from "@/lib/productos";
 import { olvidarSedes } from "@/lib/sedes";
 import { RUTA_GERENCIA, RUTA_SUCURSAL, inicioDe, soloSecocha, logout, puedeVer, useSesion, veTesoreria } from "@/lib/auth";
-import { RUTA_NO_AUTORIZADO, homePlantaDe } from "@/lib/permisosPlanta";
+import { RUTA_NO_AUTORIZADO, homePlantaDe, isAdmin } from "@/lib/permisosPlanta";
+import { RUTA_INICIO, buscarAccion, esModuloInicio, type ModuloInicio } from "@/lib/inicioModulos";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
 import { useNotificaciones } from "@/lib/notificaciones";
 import { limpiarPrefs, usePrefs } from "@/lib/preferencias";
@@ -63,7 +62,24 @@ const NOMBRE_MODULO: [string, string][] = [
   ["/no-autorizado", "NO AUTORIZADO"],
 ];
 
-const CLAVE_NOTIF = "erp-notificaciones-abierta";
+/**
+ * Pestaña de una acción del INICIO (ERP v3.0): ?pestana=<módulo> (la pone /{modulo}/{accion}) o una sub-ruta de
+ * la home de un módulo (/logistica/agencias, /almacen/panel…). Lleva "Volver a INICIO" y Cancelar / Guardar y Cerrar.
+ */
+function pestanaDe(path: string, search: string): { modulo: ModuloInicio; titulo?: string } | null {
+  const q = new URLSearchParams(search);
+  const p = q.get("pestana");
+  let modulo: ModuloInicio | null = esModuloInicio(p) ? p : null;
+  let slug = q.get("accion");
+  if (!modulo) {
+    const home = homePlantaDe(path);
+    const m = (Object.keys(RUTA_INICIO) as ModuloInicio[]).find((k) => RUTA_INICIO[k] === home);
+    if (!m || path === home) return null;
+    modulo = m;
+    slug = path.slice(home!.length + 1).split("/")[0];
+  }
+  return { modulo, titulo: slug ? buscarAccion(modulo, slug)?.label : undefined };
+}
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const path = usePathname();
@@ -79,25 +95,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [pestana, setPestana] = useState<PestanaActiva | null>(null);
   const [locales, setLocales] = useState(0);
   const [subiendo, setSubiendo] = useState(false);
-  // Barra derecha de notificaciones: abierta por defecto en escritorio, cerrada en celular; se recuerda (por navegador)
-  const [notifAbierta, setNotifAbierta] = useState(false);
-  useEffect(() => {
-    try {
-      const g = window.localStorage.getItem(CLAVE_NOTIF);
-      setNotifAbierta(g ? g === "1" : window.matchMedia("(min-width: 1024px)").matches);
-    } catch {
-      setNotifAbierta(window.matchMedia("(min-width: 1024px)").matches);
-    }
-  }, []);
-  const alternarNotif = () =>
-    setNotifAbierta((a) => {
-      try {
-        window.localStorage.setItem(CLAVE_NOTIF, a ? "0" : "1");
-      } catch {
-        /* almacenamiento bloqueado */
-      }
-      return !a;
-    });
+  // Pestaña de una acción del INICIO (se lee de la URL al cambiar de ruta)
+  const [pestanaAccion, setPestanaAccion] = useState<ReturnType<typeof pestanaDe>>(null);
+  useEffect(() => setPestanaAccion(pestanaDe(path, window.location.search)), [path]);
 
   useEffect(() => {
     if (listo && !sesion) {
@@ -260,17 +260,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const actual = moduloDe(path);
   const modulo = actual && actual.href !== "/dashboard" ? actual.href : undefined;
   const enPlanilla = path.startsWith("/dashboard/planilla") || (path === "/dashboard/compras" && tabActiva?.id === "planilla");
-  const nombreModulo = enPlanilla ? "PLANILLA" : (NOMBRE_MODULO.find(([r]) => path === r || path.startsWith(`${r}/`))?.[1] ?? "DASHBOARD");
+  const nombreModulo = enPlanilla ? "PLANILLA" : (NOMBRE_MODULO.find(([r]) => path === r || path.startsWith(`${r}/`))?.[1] ?? (path === "/dashboard" && isAdmin(sesion) ? "SOPORTE" : "DASHBOARD"));
 
   return (
     <ModuloLayout
       moduleName={nombreModulo}
       sede={SEDE_PLANTA_PRINCIPAL}
-      inicio={inicioDe(sesion)}
+      // El logo vuelve al INICIO del módulo actual
+      inicio={pestanaAccion ? RUTA_INICIO[pestanaAccion.modulo] : (homePlantaDe(path) ?? inicioDe(sesion))}
       sesion={sesion}
       onSalir={salir}
-      // Con la barra de notificaciones abierta, en escritorio el contenido deja 320px a la derecha
-      mainClassName={notifAbierta ? "lg:pr-[320px]" : ""}
       extra={
         <>
           <button
@@ -302,10 +301,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       }
       overlays={
         <>
-          <NotificationSidebar notifs={notifs} vistas={prefs.notifVistas ?? []} abierta={notifAbierta} onToggle={alternarNotif} enSeccion={path === "/dashboard/compras" && veCompras ? ["requerimiento"] : []} />
-          <FloatingDock sesion={sesion} tab={tabActiva?.id} />
-          {/* GERENCIA solo mira métricas: sin botón de acciones rápidas */}
-          {sesion.rol !== "gerencia" && <AccionRapida acciones={acciones} />}
+          {/* ERP v3.0: sin dock, sin barra lateral ni botón de acciones; la navegación son los botones del INICIO.
+              Avisos: la campana del encabezado. En la pestaña de una acción, el pie Cancelar / Guardar y Cerrar. */}
+          {pestanaAccion && <PiePestana modulo={pestanaAccion.modulo} />}
           <CommandPalette abierto={paleta} onCerrar={() => setPaleta(false)} comandos={comandos} documentos={documentos} />
           <DocViewerHost />
           <DatalistCatalogo />
@@ -331,6 +329,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       ) : (
         <ModuloContenido
           key={path}
+          encabezado={pestanaAccion && <EncabezadoPestana modulo={pestanaAccion.modulo} titulo={pestanaAccion.titulo} />}
           avisos={
             <>
               {sesion.soloLectura && (
@@ -339,7 +338,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 </div>
               )}
               {modulo && (
-                <div className="w-full">
+                <div className="w-full" data-sin-guardar>
                   <ObservacionesGerencia modulo={modulo} sesion={sesion} />
                 </div>
               )}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowRight, ClipboardList, PackageSearch, Receipt, ShoppingCart, TrendingUp, Warehouse } from "lucide-react";
@@ -8,6 +8,8 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { Badge, Card, CardHeader, Empty, Table, Td, cn } from "@/components/ui";
 import { TarjetasOrdenables } from "@/components/dashboard/TarjetasOrdenables";
 import { inicioDe, puedeVer, useSesion, veDashboard } from "@/lib/auth";
+import { InicioModulo } from "@/components/inicio/InicioModulo";
+import { isAdmin } from "@/lib/permisosPlanta";
 import { KEYS, fechaPE, hoy, r2, soles, useStore } from "@/lib/storage";
 import type { ComprobanteVenta, NotaPedido, OrdenCompra, StockItem } from "@/lib/types";
 
@@ -25,7 +27,17 @@ const ultimos7 = (): string[] => {
 };
 const DIAS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 
-export default function DashboardHome() {
+/** SOPORTE entra a su INICIO (botones a los 4 módulos); el resumen general sigue en /dashboard?vista=resumen. */
+export default function DashboardPage() {
+  const { sesion } = useSesion();
+  const [vista, setVista] = useState<string | null>(null);
+  useEffect(() => setVista(new URLSearchParams(window.location.search).get("vista") ?? ""), []);
+  if (vista === null || !sesion) return null;
+  if (isAdmin(sesion) && vista !== "resumen") return <InicioModulo modulo="soporte" />;
+  return <DashboardHome />;
+}
+
+function DashboardHome() {
   const router = useRouter();
   const { sesion } = useSesion();
   const comprobantes = useStore<ComprobanteVenta[]>(KEYS.COMPROBANTES, []);

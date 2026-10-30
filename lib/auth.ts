@@ -149,6 +149,8 @@ export const veDashboard = (sesion: Sesion | null): boolean => !!sesion && ROLES
 export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
   if (!sesion) return false;
   if (ruta === "/dashboard") return true; // solo redirige al primer módulo permitido
+  // Pestañas de los botones del INICIO SOPORTE (/soporte/{accion}): solo SOPORTE
+  if (ruta === "/soporte" || ruta.startsWith("/soporte/")) return isAdmin(sesion);
   // Módulo Creador: por rol, no por módulos (gerencia tiene "*" pero no debe entrar)
   if (ruta === RUTA_CREADOR || ruta.startsWith(`${RUTA_CREADOR}/`)) return puedeEditarAsistencia(sesion);
   // Producción: también Almacén (registra las órdenes de producción y el QC)

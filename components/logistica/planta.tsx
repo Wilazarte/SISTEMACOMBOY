@@ -199,7 +199,7 @@ export function PanelLateral({
       <div id="panel-recordatorios" className="scroll-mt-24">
         <Bloque titulo="Recordatorios" icono={<Clock size={15} />} items={recordatorios} vacio="Sin pendientes." />
       </div>
-      <div id="panel-chat" className="scroll-mt-24">
+      <div id="panel-chat" className="scroll-mt-24" data-sin-guardar>
         <ChatGrupal sesion={sesion} modulo={modulo} />
       </div>
       <div id="panel-reunion" className="scroll-mt-24">

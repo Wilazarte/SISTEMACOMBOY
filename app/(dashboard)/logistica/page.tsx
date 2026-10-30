@@ -1,8 +1,8 @@
 "use client";
 
-import { LogisticaHome } from "@/components/logistica/LogisticaHome";
+import { InicioModulo } from "@/components/inicio/InicioModulo";
 
-/** Logística Planta (Arequipa): home con resumen y accesos rápidos a los módulos actuales. */
+/** INICIO LOGISTICA: primera pantalla del módulo (KPIs, mensajes del grupo y un botón por función). */
 export default function LogisticaPage() {
-  return <LogisticaHome />;
+  return <InicioModulo modulo="logistica" />;
 }

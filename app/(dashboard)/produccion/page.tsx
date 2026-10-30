@@ -1,7 +1,8 @@
 "use client";
 
-import { ProduccionHome } from "@/components/logistica/ProduccionHome";
+import { InicioModulo } from "@/components/inicio/InicioModulo";
 
+/** INICIO PRODUCCION: primera pantalla del módulo (KPIs, mensajes del grupo y un botón por función). */
 export default function Page() {
-  return <ProduccionHome />;
+  return <InicioModulo modulo="produccion" />;
 }
