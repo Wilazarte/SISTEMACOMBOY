@@ -133,7 +133,7 @@ export function FormNuevaOP({ onClose, onCreado }: { onClose: () => void; onCrea
             <Input type="number" min="0" step="0.01" value={precio} onChange={(e) => setPrecio(e.target.value)} />
           </Field>
         </Grid>
-        <h3 className="text-[13px] font-bold uppercase text-[#ff5252]">Datos legales de la OP</h3>
+        <h3 className="text-[13px] font-bold uppercase text-[#60a5fa]">Datos legales de la OP</h3>
         <Grid>
           <Field label="Cliente">
             <Input value={legal.cliente} onChange={(e) => setLegal({ ...legal, cliente: e.target.value })} />
@@ -192,7 +192,7 @@ export function FormFase2({ x, onClose }: { x: Expediente; onClose: () => void }
             <Field label="Cantidad">
               <Input type="number" min="0" step="any" value={l.cantidad} onChange={(e) => setLineas(lineas.map((y, j) => (j === i ? { ...y, cantidad: Number(e.target.value) } : y)))} />
             </Field>
-            <button type="button" aria-label="Quitar" className="mb-2 text-[#a1a1aa] hover:text-[#ff5252]" onClick={() => setLineas(lineas.filter((_, j) => j !== i))}>
+            <button type="button" aria-label="Quitar" className="mb-2 text-[#a1a1aa] hover:text-[#60a5fa]" onClick={() => setLineas(lineas.filter((_, j) => j !== i))}>
               <Trash2 size={16} />
             </button>
           </div>
@@ -251,7 +251,7 @@ export function FormFase3({ x, onClose }: { x: Expediente; onClose: () => void }
                   <td>
                     {m.cantidad} {m.unidad}
                   </td>
-                  <td className={hay < m.cantidad ? "text-[#ff8a80]" : "text-[#86efac]"}>{hay}</td>
+                  <td className={hay < m.cantidad ? "text-[#93c5fd]" : "text-[#86efac]"}>{hay}</td>
                   <td className="w-28">
                     <Input type="number" min="0" max={Math.min(m.cantidad, hay)} step="any" value={entregas[m.id] ?? 0} onChange={(e) => setEntregas({ ...entregas, [m.id]: Number(e.target.value) })} />
                   </td>
@@ -260,7 +260,7 @@ export function FormFase3({ x, onClose }: { x: Expediente; onClose: () => void }
             })}
           </tbody>
         </table>
-        <p className={faltan.length ? "text-[13px] font-semibold text-[#ff8a80]" : "text-[13px] font-semibold text-[#86efac]"}>
+        <p className={faltan.length ? "text-[13px] font-semibold text-[#93c5fd]" : "text-[13px] font-semibold text-[#86efac]"}>
           {faltan.length ? `Ruta 2 · No stock: entrega parcial y requerimiento a Logística por ${faltan.length} material(es).` : "Ruta 1 · Stock suficiente: entrega completa a Producción."}
         </p>
         <Grid>
@@ -415,9 +415,9 @@ export function FormCotizacion({ x, onClose }: { x: Expediente; onClose: () => v
           onDragOver={(e) => (e.preventDefault(), setSobre(true))}
           onDragLeave={() => setSobre(false)}
           onDrop={soltar}
-          className={`flex cursor-pointer flex-col items-center gap-1 rounded-xl border-2 border-dashed px-4 py-6 text-center text-[13px] ${sobre ? "border-[#d50000] bg-[#d50000]/10" : "border-[#3a3a3a] bg-[#141414]"}`}
+          className={`flex cursor-pointer flex-col items-center gap-1 rounded-xl border-2 border-dashed px-4 py-6 text-center text-[13px] ${sobre ? "border-[#2a7bff] bg-[#2a7bff]/10" : "border-[#3a4558] bg-[#1a212e]"}`}
         >
-          <FileUp size={26} className="text-[#ff5252]" />
+          <FileUp size={26} className="text-[#60a5fa]" />
           <span className="font-semibold text-white">{archivo ? archivo.name : "Arrastre aquí la cotización o haga clic"}</span>
           <span className="text-[#a1a1aa]">PDF, imagen o Excel · máx. 10 MB · se guarda en cotizaciones/{x.codigo_expediente}/</span>
           <input type="file" className="hidden" accept={Object.keys(TIPOS_ARCHIVO_COTI).join(",")} onChange={(e) => tomar(e.target.files?.[0])} />
@@ -432,7 +432,7 @@ export function FormCotizacion({ x, onClose }: { x: Expediente; onClose: () => v
           </Boton>
         </div>
         {sunat && (
-          <p className={`flex items-center gap-2 text-[13px] font-semibold ${sunat.validado ? "text-[#86efac]" : "text-[#ff8a80]"}`}>
+          <p className={`flex items-center gap-2 text-[13px] font-semibold ${sunat.validado ? "text-[#86efac]" : "text-[#93c5fd]"}`}>
             {sunat.validado ? <CheckCircle2 size={16} /> : <XCircle size={16} />} {sunat.razon_social} · {sunat.estado} / {sunat.condicion}
             {!sunat.validado && " · no se podrá emitir OC"}
           </p>
@@ -495,7 +495,7 @@ export function FormCotizacion({ x, onClose }: { x: Expediente; onClose: () => v
 export function TarjetaProveedor({ c }: { c: CotizacionExp | Record<string, string | null> }) {
   const v = (k: string) => (c as Record<string, unknown>)[k] as string | null | undefined;
   return (
-    <div className="rounded-lg border border-[#2a2a2a] bg-[#141414] p-3">
+    <div className="rounded-lg border border-[#2a3445] bg-[#1a212e] p-3">
       <Dato k="RUC" v={v("ruc")} />
       <Dato k="Razón social" v={v("razon_social_sunat") || v("razon_social")} />
       <Dato k="Dirección" v={v("direccion_fiscal") || v("direccion")} />
@@ -523,7 +523,7 @@ export function FormOC({ x, c, onClose }: { x: Expediente; c: CotizacionExp; onC
         <p className="text-[13px] text-white">
           Subtotal {Number(c.subtotal).toFixed(2)} · IGV {Number(c.igv).toFixed(2)} · Total <b>{Number(c.total).toFixed(2)}</b> {c.moneda}
         </p>
-        {!apta && <p className="text-[13px] font-semibold text-[#ff8a80]">{c.ruc_validado ? `Proveedor ${c.ruc_estado} / ${c.condicion_habido}: no se puede emitir OC.` : "Valide primero el RUC con Decolecta."}</p>}
+        {!apta && <p className="text-[13px] font-semibold text-[#93c5fd]">{c.ruc_validado ? `Proveedor ${c.ruc_estado} / ${c.condicion_habido}: no se puede emitir OC.` : "Valide primero el RUC con Decolecta."}</p>}
         <Field label="Motivo de compra sustentado">
           <Textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} />
         </Field>
@@ -727,7 +727,7 @@ export function FormCierre({ x, onClose }: { x: Expediente; onClose: () => void 
           </Field>
         </Grid>
         <fieldset className="grid gap-1 sm:grid-cols-2">
-          <legend className="mb-1 text-[12px] font-semibold uppercase text-[#ff5252]">Control de calidad</legend>
+          <legend className="mb-1 text-[12px] font-semibold uppercase text-[#60a5fa]">Control de calidad</legend>
           {CHECKLIST_QC.map((c) => (
             <label key={c} className="flex items-center gap-2 text-[13px] text-white">
               <input type="checkbox" checked={check[c]} onChange={(e) => setCheck({ ...check, [c]: e.target.checked })} /> {c}

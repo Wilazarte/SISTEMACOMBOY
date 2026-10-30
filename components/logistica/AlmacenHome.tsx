@@ -90,13 +90,13 @@ export function AlmacenHome() {
       <EncabezadoPlanta icono={<Package size={30} />} titulo="ALMACEN" subtitulo="Almacenero · Arequipa · Perú" />
 
       {/* Stock MP valorizado */}
-      <section className="flex flex-wrap items-center gap-4 rounded-xl border border-[#2a2a2a] bg-[#141414] px-5 py-4">
-        <span className="flex items-center gap-2 rounded-lg border border-[#d50000] px-3 py-1.5 text-[13px] font-bold uppercase leading-tight text-[#ff5252]">
+      <section className="flex flex-wrap items-center gap-4 rounded-xl border border-[#2a3445] bg-[#1a212e] px-5 py-4">
+        <span className="flex items-center gap-2 rounded-lg border border-[#2a7bff] px-3 py-1.5 text-[13px] font-bold uppercase leading-tight text-[#60a5fa]">
           <Warehouse size={20} /> Almacén · Planta
           <br />
           Arequipa
         </span>
-        <button type="button" onClick={() => abrirPestana("/dashboard/almacen?tab=stock")} className="text-3xl font-bold text-white hover:text-[#ff8a80] lg:text-4xl">
+        <button type="button" onClick={() => abrirPestana("/dashboard/almacen?tab=stock")} className="text-3xl font-bold text-white hover:text-[#93c5fd] lg:text-4xl">
           Stock MP {montoCorto(d.valor)}
         </button>
         <Etiqueta tono="verde">{`${stock.filter((s) => s.cantidad > 0).length} productos con stock`}</Etiqueta>
@@ -112,9 +112,9 @@ export function AlmacenHome() {
               key={sede}
               type="button"
               onClick={() => abrirPestana("/dashboard/almacen?tab=stock")}
-              className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition hover:border-[#d50000] ${i === 0 ? "border-[#d50000] bg-[#d50000]/10" : "border-[#2a2a2a] bg-[#1c1c1c]"}`}
+              className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition hover:border-[#2a7bff] ${i === 0 ? "border-[#2a7bff] bg-[#2a7bff]/10" : "border-[#2a3445] bg-[#212a3a]"}`}
             >
-              <Warehouse size={26} className="shrink-0 text-[#d50000]" />
+              <Warehouse size={26} className="shrink-0 text-[#2a7bff]" />
               <span className="min-w-0">
                 <span className="block truncate text-[14px] font-bold text-white">{sede}</span>
                 <span className="block text-[12px] text-[#d4d4d8]">
@@ -132,7 +132,7 @@ export function AlmacenHome() {
             <span className="text-[13px] font-semibold text-white">Validación Stock: SÍ / NO</span>
             <span className="mt-1 flex items-center justify-between gap-2">
               <span className={`text-[16px] font-bold ${validado ? "text-[#4ade80]" : "text-[#f87171]"}`}>Validación Stock: {validado ? "SÍ" : "NO"}</span>
-              <span role="switch" aria-checked={validado} className={`relative h-6 w-11 shrink-0 rounded-full ${validado ? "bg-[#22c55e]" : "bg-[#3a3a3a]"}`}>
+              <span role="switch" aria-checked={validado} className={`relative h-6 w-11 shrink-0 rounded-full ${validado ? "bg-[#22c55e]" : "bg-[#3a4558]"}`}>
                 <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${validado ? "left-[22px]" : "left-0.5"}`} />
               </span>
             </span>
@@ -148,8 +148,8 @@ export function AlmacenHome() {
             { label: "Foto Guía", icono: <Camera size={16} />, href: "/dashboard/almacen?tab=ingresos" },
             { label: "Capturar Foto", icono: <Camera size={16} />, href: "/dashboard/almacen?tab=ingresos" },
           ].map((b) => (
-            <button key={b.label} type="button" onClick={() => abrirPestana(b.href)} className="inline-flex min-w-[170px] items-center justify-center gap-2 rounded-lg border border-[#d50000]/70 px-4 py-2 text-[14px] font-bold text-white hover:bg-[#d50000]/10">
-              <span className="text-[#d50000]">{b.icono}</span>
+            <button key={b.label} type="button" onClick={() => abrirPestana(b.href)} className="inline-flex min-w-[170px] items-center justify-center gap-2 rounded-lg border border-[#2a7bff]/70 px-4 py-2 text-[14px] font-bold text-white hover:bg-[#2a7bff]/10">
+              <span className="text-[#2a7bff]">{b.icono}</span>
               {b.label}
             </button>
           ))}
@@ -160,13 +160,13 @@ export function AlmacenHome() {
         {/* Entrega a producción */}
         <Panel titulo="Entrega a producción" icono={<Factory size={17} />}>
           <p className="text-[13px] text-[#d4d4d8]">{d.valesMes.length} vale(s) de MP entregados este mes</p>
-          <p className="mt-2 text-[15px] font-bold text-[#ff5252]">Fabricación - Piezas Metalúrgica</p>
+          <p className="mt-2 text-[15px] font-bold text-[#60a5fa]">Fabricación - Piezas Metalúrgica</p>
           <ul className="mt-1 space-y-1">
             {ESTACIONES.map((e) => (
               <li key={e} className="flex items-center justify-between text-[14px]">
                 <span className="text-white">• {e}</span>
                 <span className="flex items-center gap-1 text-[#a1a1aa]">
-                  <ArrowRight size={13} className="text-[#d50000]" /> sin registro
+                  <ArrowRight size={13} className="text-[#2a7bff]" /> sin registro
                 </span>
               </li>
             ))}
@@ -184,7 +184,7 @@ export function AlmacenHome() {
           <Panel titulo="Ingreso PT" icono={<Container size={17} />}>
             <div className="flex flex-wrap gap-2">
               {d.pt.map((t) => (
-                <button key={t.label} type="button" onClick={() => abrirPestana("/dashboard/produccion")} className="inline-flex items-center gap-2 rounded-lg border border-[#d50000]/60 px-3 py-1.5 text-[14px] font-semibold text-white hover:bg-[#d50000]/10">
+                <button key={t.label} type="button" onClick={() => abrirPestana("/dashboard/produccion")} className="inline-flex items-center gap-2 rounded-lg border border-[#2a7bff]/60 px-3 py-1.5 text-[14px] font-semibold text-white hover:bg-[#2a7bff]/10">
                   {t.label} <Etiqueta tono={t.n ? "verde" : "gris"}>{String(t.n)}</Etiqueta>
                 </button>
               ))}

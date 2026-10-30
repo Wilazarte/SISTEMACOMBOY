@@ -19,7 +19,7 @@ export default function TesoreriaLeftDrawer({ cantidad, acciones, children }: { 
     <section className="border-t border-[#1f2937] pt-5">
       <h3 className="flex items-center gap-2 text-[16px] font-bold text-white">
         <ClipboardList size={16} className="text-amber-400" /> Requerimientos por revisar
-        <span className="rounded-full bg-[#d50000] px-2 py-0.5 text-xs">{cantidad}</span>
+        <span className="rounded-full bg-[#2a7bff] px-2 py-0.5 text-xs">{cantidad}</span>
       </h3>
       {acciones && <div className="mt-3 flex flex-wrap gap-2">{acciones}</div>}
       <div className="mt-3 space-y-2">{children}</div>

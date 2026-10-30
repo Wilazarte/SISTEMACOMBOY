@@ -121,7 +121,7 @@ export function LogisticaHome() {
 
       {/* Accesos rápidos del diseño: las secciones de Logística */}
       <section>
-        <h2 className="mb-3 flex items-center gap-2 text-2xl font-bold uppercase text-[#ff5252]">
+        <h2 className="mb-3 flex items-center gap-2 text-2xl font-bold uppercase text-[#60a5fa]">
           <LayoutGrid size={24} /> Accesos rápidos
         </h2>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">

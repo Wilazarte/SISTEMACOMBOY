@@ -17,7 +17,7 @@ import { ErpAlertList } from "@/components/erp/ErpAlertList";
 import { Panel } from "./piezas";
 
 // Piezas comunes de las 4 homes de la planta (Logística, Almacén, Finanzas, Producción).
-// Mismo diseño que Logística: fondo #0a0a0a, tarjetas #141414, naranja #d50000.
+// Mismo diseño que Logística: fondo #0e1219, tarjetas #1a212e, naranja #2a7bff.
 
 export type ModuloPlanta = "logistica" | "almacen" | "finanzas" | "produccion";
 
@@ -43,9 +43,9 @@ export function MarcoPlanta({ children, lateral }: { children: ReactNode; /** Si
 
 export function EncabezadoPlanta({ icono, titulo, subtitulo, accion }: { icono: ReactNode; titulo: string; subtitulo: string; accion?: ReactNode }) {
   return (
-    <header className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#2a2a2a] bg-[#141414] px-5 py-4">
+    <header className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#2a3445] bg-[#1a212e] px-5 py-4">
       <div className="flex items-center gap-4">
-        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border-2 border-[#d50000] text-[#d50000]">{icono}</span>
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border-2 border-[#2a7bff] text-[#2a7bff]">{icono}</span>
         <div>
           {/* Solo el nombre del módulo: un h1 blanco grande (pedido de Williams, 2026-10-29) */}
           <h1 className="text-3xl font-bold uppercase leading-tight text-white lg:text-4xl">{titulo}</h1>
@@ -60,7 +60,7 @@ export function EncabezadoPlanta({ icono, titulo, subtitulo, accion }: { icono: 
 /** Barra inferior de acciones del módulo (diseños): `tono` lleno (naranja), borde o verde. Abre en pestaña nueva. */
 export function BarraAcciones({ acciones }: { acciones: { label: string; href: string; icono?: ReactNode; tono?: "lleno" | "borde" | "verde" }[] }) {
   return (
-    <div className="grid grid-cols-2 gap-2 rounded-xl border border-[#2a2a2a] bg-[#141414] p-3 sm:grid-cols-4 xl:flex xl:flex-wrap">
+    <div className="grid grid-cols-2 gap-2 rounded-xl border border-[#2a3445] bg-[#1a212e] p-3 sm:grid-cols-4 xl:flex xl:flex-wrap">
       {acciones.map((a) => (
         <button
           key={a.label}
@@ -69,10 +69,10 @@ export function BarraAcciones({ acciones }: { acciones: { label: string; href: s
           className={cn(
             "inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-[14px] font-bold transition",
             a.tono === "lleno"
-              ? "bg-[#d50000] text-white hover:bg-[#b00000]"
+              ? "bg-[#2a7bff] text-white hover:bg-[#1e64e6]"
               : a.tono === "verde"
                 ? "border border-[#22c55e] text-[#4ade80] hover:bg-[#22c55e]/10"
-                : "border border-[#d50000]/70 text-white hover:bg-[#d50000]/10"
+                : "border border-[#2a7bff]/70 text-white hover:bg-[#2a7bff]/10"
           )}
         >
           {a.icono}
@@ -95,7 +95,7 @@ export function BarraModulos({ sesion, actual }: { sesion: Sesion | null; actual
 export function AccesosModulos({ sesion, actual }: { sesion: Sesion | null; actual: ModuloPlanta }) {
   return (
     <section>
-      <h2 className="mb-3 text-xl font-bold uppercase text-[#ff5252]">Accesos rápidos</h2>
+      <h2 className="mb-3 text-xl font-bold uppercase text-[#60a5fa]">Accesos rápidos</h2>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {MODULOS_PLANTA.map((m) => {
           const esActual = m.id === actual;
@@ -108,21 +108,21 @@ export function AccesosModulos({ sesion, actual }: { sesion: Sesion | null; actu
               onClick={() => abrirPestana(esActual ? m.trabajo : m.home)}
               title={permitido ? "Se abre en una pestaña nueva" : "No autorizado - acceso denegado"}
               className={cn(
-                "group relative flex min-h-[170px] flex-col items-center justify-center gap-3 rounded-xl border bg-[#141414] px-4 py-6 transition",
-                permitido ? "border-[#2a2a2a] hover:border-[#d50000]" : "cursor-not-allowed border-[#2a2a2a] opacity-50"
+                "group relative flex min-h-[170px] flex-col items-center justify-center gap-3 rounded-xl border bg-[#1a212e] px-4 py-6 transition",
+                permitido ? "border-[#2a3445] hover:border-[#2a7bff]" : "cursor-not-allowed border-[#2a3445] opacity-50"
               )}
             >
               <span
                 className={
                   esActual
-                    ? "flex h-20 w-20 items-center justify-center rounded-full bg-[#d50000] text-white"
-                    : "flex h-20 w-20 items-center justify-center text-[#d50000] transition group-hover:scale-105"
+                    ? "flex h-20 w-20 items-center justify-center rounded-full bg-[#2a7bff] text-white"
+                    : "flex h-20 w-20 items-center justify-center text-[#2a7bff] transition group-hover:scale-105"
                 }
               >
                 {permitido ? m.icono(esActual) : <Lock size={44} strokeWidth={1.6} />}
               </span>
               <span className={esActual ? "rounded-lg bg-[#2563eb]/25 px-3 py-0.5 text-2xl font-bold text-white" : "text-2xl font-bold text-white"}>{m.titulo}</span>
-              {!permitido && <span className="text-[12px] font-semibold text-[#ff8a80]">No autorizado - acceso denegado</span>}
+              {!permitido && <span className="text-[12px] font-semibold text-[#93c5fd]">No autorizado - acceso denegado</span>}
             </button>
           );
         })}
@@ -183,7 +183,7 @@ export function PanelLateral({
             aria-current={activa === p.id ? "true" : undefined}
             className={cn(
               "rounded-md px-2.5 py-1 text-[11px] font-bold uppercase transition",
-              activa === p.id ? "bg-[#d50000] text-white" : "bg-[#2a2a2a] text-[#d4d4d8] hover:bg-[#3a3a3a] hover:text-white"
+              activa === p.id ? "bg-[#2a7bff] text-white" : "bg-[#2a3445] text-[#d4d4d8] hover:bg-[#3a4558] hover:text-white"
             )}
           >
             {p.label}
@@ -218,14 +218,14 @@ export function ReunionGrupal({ sesion, modulo, otrasSalas = [] }: { sesion: Ses
   };
   return (
     <div>
-      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#ff5252]">
+      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#60a5fa]">
         <Video size={15} /> Reunión grupal
       </p>
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" onClick={() => abrirPestana(urlSala(`Planta ${modulo}`))} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#d50000] px-2 py-2 text-[13px] font-semibold text-white hover:bg-[#b00000]">
+        <button type="button" onClick={() => abrirPestana(urlSala(`Planta ${modulo}`))} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#2a7bff] px-2 py-2 text-[13px] font-semibold text-white hover:bg-[#1e64e6]">
           <Video size={15} /> Iniciar videollamada
         </button>
-        <button type="button" onClick={crearSala} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#3a3a3a] bg-[#1c1c1c] px-2 py-2 text-[13px] font-semibold text-white hover:border-[#d50000]">
+        <button type="button" onClick={crearSala} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#3a4558] bg-[#212a3a] px-2 py-2 text-[13px] font-semibold text-white hover:border-[#2a7bff]">
           <Plus size={15} /> Crear sala
         </button>
       </div>
@@ -237,7 +237,7 @@ export function ReunionGrupal({ sesion, modulo, otrasSalas = [] }: { sesion: Ses
       {otrasSalas.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
           {otrasSalas.map((m) => (
-            <button key={m} type="button" onClick={() => abrirPestana(urlSala(`Planta ${m}`))} className="inline-flex items-center gap-1.5 rounded-lg border border-[#3a3a3a] bg-[#1c1c1c] px-2.5 py-1.5 text-[12px] font-semibold text-white hover:border-[#d50000]">
+            <button key={m} type="button" onClick={() => abrirPestana(urlSala(`Planta ${m}`))} className="inline-flex items-center gap-1.5 rounded-lg border border-[#3a4558] bg-[#212a3a] px-2.5 py-1.5 text-[12px] font-semibold text-white hover:border-[#2a7bff]">
               <Video size={13} /> Unirse a {m}
             </button>
           ))}
@@ -287,7 +287,7 @@ export function ChatGrupal({ sesion, modulo }: { sesion: Sesion | null; modulo: 
   };
   return (
     <div>
-      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#ff5252]">
+      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#60a5fa]">
         <MessageSquare size={15} /> Chat grupal
       </p>
       {faltaTabla ? (
@@ -297,9 +297,9 @@ export function ChatGrupal({ sesion, modulo }: { sesion: Sesion | null; modulo: 
           <ul ref={lista} className="max-h-56 space-y-1.5 overflow-y-auto pr-1">
             {mensajes.length === 0 && <li className="text-[12px] text-[#71717a]">Sin mensajes todavía.</li>}
             {mensajes.map((m) => (
-              <li key={m.id} className="rounded-lg bg-[#1c1c1c] px-3 py-1.5">
+              <li key={m.id} className="rounded-lg bg-[#212a3a] px-3 py-1.5">
                 <span className="flex justify-between gap-2 text-[11px] text-[#a1a1aa]">
-                  <span className="truncate font-semibold text-[#ff8a80]">
+                  <span className="truncate font-semibold text-[#93c5fd]">
                     {m.usuario}
                     {m.modulo ? ` · ${m.modulo}` : ""}
                   </span>
@@ -316,9 +316,9 @@ export function ChatGrupal({ sesion, modulo }: { sesion: Sesion | null; modulo: 
               maxLength={1000}
               placeholder="Escribir mensaje…"
               aria-label="Mensaje para el chat grupal"
-              className="min-w-0 flex-1 rounded-lg border border-[#3a3a3a] bg-[#1c1c1c] px-3 py-1.5 text-[13px] text-white placeholder:text-[#71717a] focus:border-[#d50000] focus:outline-none"
+              className="min-w-0 flex-1 rounded-lg border border-[#3a4558] bg-[#212a3a] px-3 py-1.5 text-[13px] text-white placeholder:text-[#71717a] focus:border-[#2a7bff] focus:outline-none"
             />
-            <button type="submit" disabled={!texto.trim()} aria-label="Enviar" className="rounded-lg bg-[#d50000] px-3 text-white hover:bg-[#b00000] disabled:opacity-50">
+            <button type="submit" disabled={!texto.trim()} aria-label="Enviar" className="rounded-lg bg-[#2a7bff] px-3 text-white hover:bg-[#1e64e6] disabled:opacity-50">
               <Send size={15} />
             </button>
           </form>
@@ -342,7 +342,7 @@ export function TiemposCosto() {
   }, [ops, vales, stock]);
   return (
     <div>
-      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#ff5252]">
+      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#60a5fa]">
         <Timer size={15} /> Tiempos reales y costo
       </p>
       {filas.length === 0 ? (
@@ -350,11 +350,11 @@ export function TiemposCosto() {
       ) : (
         <ul className="space-y-1.5">
           {filas.slice(0, 4).map(({ o, costo }) => (
-            <li key={o.id} className="flex justify-between gap-2 rounded-lg bg-[#1c1c1c] px-3 py-2 text-[12px]">
+            <li key={o.id} className="flex justify-between gap-2 rounded-lg bg-[#212a3a] px-3 py-2 text-[12px]">
               <span className="truncate text-white">
                 {o.id} · {o.tipo_equipo}
               </span>
-              <span className="whitespace-nowrap font-semibold text-[#ff8a80]">MP {soles(costo)}</span>
+              <span className="whitespace-nowrap font-semibold text-[#93c5fd]">MP {soles(costo)}</span>
             </li>
           ))}
         </ul>

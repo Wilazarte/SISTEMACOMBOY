@@ -35,16 +35,16 @@ export function ErpStatsCard({
   const cuerpo = (
     <>
       <span className="flex w-full items-center justify-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-[#a1a1aa]">
-        <span className="text-[#d50000]">{icono}</span>
+        <span className="text-[#2a7bff]">{icono}</span>
         {titulo}
         {extra}
       </span>
       <span className={cn("text-3xl font-bold tabular lg:text-4xl", alerta ? "text-[#f87171]" : "text-white")}>{valor}</span>
-      {detalle && <span className="text-[12px] font-medium text-[#ff8a80]">{detalle}</span>}
+      {detalle && <span className="text-[12px] font-medium text-[#93c5fd]">{detalle}</span>}
     </>
   );
   const cls = cn(
-    "flex flex-col items-center gap-1 rounded-xl border border-[#2a2a2a] bg-[#141414] px-4 py-5 text-center transition hover:border-[#d50000]",
+    "flex flex-col items-center gap-1 rounded-xl border border-[#2a3445] bg-[#1a212e] px-4 py-5 text-center transition hover:border-[#2a7bff]",
     className
   );
   if (href && !onClick)

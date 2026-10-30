@@ -43,7 +43,7 @@ function Tabla({ head, children }: { head: string[]; children: ReactNode }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[560px] border-collapse">
-        <thead className="border-b border-[#2a2a2a]">
+        <thead className="border-b border-[#2a3445]">
           <tr>
             {head.map((h) => (
               <th key={h} className={th}>
@@ -52,7 +52,7 @@ function Tabla({ head, children }: { head: string[]; children: ReactNode }) {
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#2a2a2a]">{children}</tbody>
+        <tbody className="divide-y divide-[#2a3445]">{children}</tbody>
       </table>
     </div>
   );
@@ -71,15 +71,15 @@ function Compras({ d }: { d: DatosLogistica }) {
             <tr key={o.id}>
               <td className={`${td} font-semibold text-white`}>{o.numero}</td>
               <td className={td}>
-                <span className="block font-semibold text-[#ff8a80]">{o.proveedor}</span>
+                <span className="block font-semibold text-[#93c5fd]">{o.proveedor}</span>
                 <span className="block text-[11px] text-[#a1a1aa]">{o.items.map((i) => i.nombre).filter(Boolean).slice(0, 2).join(" · ") || o.reqNumero}</span>
               </td>
-              <td className={`${td} whitespace-nowrap font-semibold text-[#ff5252]`}>{soles(o.total)}</td>
+              <td className={`${td} whitespace-nowrap font-semibold text-[#60a5fa]`}>{soles(o.total)}</td>
               <td className={td}>
                 <Etiqueta tono={o.estado === "BANCARIZADA" || o.estado === "APROBADA" ? "verde" : "naranja"}>{ESTADO_OC[o.estado] ?? o.estado}</Etiqueta>
               </td>
               <td className={`${td} w-40`}>
-                <span className="mb-1 block text-right text-[11px] font-semibold text-[#ff8a80]">{avanceOC(o)}%</span>
+                <span className="mb-1 block text-right text-[11px] font-semibold text-[#93c5fd]">{avanceOC(o)}%</span>
                 <Barra pct={avanceOC(o)} />
                 {o.lugarEntrega && <span className="mt-1 block truncate text-[11px] text-[#a1a1aa]">Entrega: {o.lugarEntrega}</span>}
               </td>
@@ -107,7 +107,7 @@ function Ventas({ d }: { d: DatosLogistica }) {
           ) : (
             <ul className="space-y-1.5">
               {d.ptPorTipo.map(([tipo, n]) => (
-                <li key={tipo} className="flex items-center justify-between rounded-lg bg-[#1c1c1c] px-3 py-2 text-[13px]">
+                <li key={tipo} className="flex items-center justify-between rounded-lg bg-[#212a3a] px-3 py-2 text-[13px]">
                   <span className="font-semibold text-white">{tipo}</span>
                   <Etiqueta tono="verde">{n} disponible(s)</Etiqueta>
                 </li>
@@ -116,7 +116,7 @@ function Ventas({ d }: { d: DatosLogistica }) {
           )}
           <div className="mt-3 grid grid-cols-3 gap-2">
             {d.agencias.slice(0, 3).map((a) => (
-              <div key={a.id} className="rounded-lg border border-[#2a2a2a] bg-[#1c1c1c] px-2 py-2 text-center">
+              <div key={a.id} className="rounded-lg border border-[#2a3445] bg-[#212a3a] px-2 py-2 text-center">
                 <span className="block text-[14px] font-bold text-white">{a.nombre}</span>
                 <span className="block text-[11px] text-[#a1a1aa]">{a.detalle}</span>
               </div>
@@ -152,14 +152,14 @@ function Agencias({ d, completo }: { d: DatosLogistica; completo?: boolean }) {
     <Panel titulo="Agencias de transporte" icono={<Building2 size={17} />} accion={<BotonVer href="/dashboard/almacen?tab=despacho">Órdenes de despacho</BotonVer>}>
       <div className="grid gap-3 md:grid-cols-3">
         {d.agencias.map((a) => (
-          <div key={a.id} className="rounded-lg border border-[#2a2a2a] bg-[#1c1c1c] p-3">
+          <div key={a.id} className="rounded-lg border border-[#2a3445] bg-[#212a3a] p-3">
             <p className="text-[16px] font-bold text-white">{a.nombre}</p>
             {a.detalle && <p className="text-[12px] text-[#a1a1aa]">{a.detalle}</p>}
             <dl className="mt-2 grid grid-cols-2 gap-1 text-[12px]">
               <dt className="text-[#a1a1aa]">Envíos</dt>
               <dd className="text-right font-semibold text-white">{a.envios}</dd>
               <dt className="text-[#a1a1aa]">En tránsito</dt>
-              <dd className="text-right font-semibold text-[#ff8a80]">{a.enTransito}</dd>
+              <dd className="text-right font-semibold text-[#93c5fd]">{a.enTransito}</dd>
               <dt className="text-[#a1a1aa]">Flete total</dt>
               <dd className="text-right font-semibold text-white">{soles(a.flete)}</dd>
             </dl>
@@ -219,7 +219,7 @@ function Proveedores({ d, completo }: { d: DatosLogistica; completo?: boolean })
               <td className={td}>{p.ruc || "-"}</td>
               <td className={td}>{p.ocs}</td>
               <td className={td}>{p.activas ? <Etiqueta>{p.activas}</Etiqueta> : "-"}</td>
-              <td className={`${td} font-semibold text-[#ff5252]`}>{soles(p.total)}</td>
+              <td className={`${td} font-semibold text-[#60a5fa]`}>{soles(p.total)}</td>
               <td className={td}>
                 {p.ultima.numero} · {fechaPE(p.ultima.fecha)}
               </td>
@@ -231,10 +231,10 @@ function Proveedores({ d, completo }: { d: DatosLogistica; completo?: boolean })
           {lista.map((p) => (
             <li key={p.ruc || p.proveedor} className="flex justify-between gap-3">
               <span className="truncate">
-                <span className="text-[#d50000]">• </span>
+                <span className="text-[#2a7bff]">• </span>
                 <span className="font-semibold text-white">{p.proveedor}</span> <span className="text-[#a1a1aa]">· {p.ocs} OC</span>
               </span>
-              <span className="whitespace-nowrap font-semibold text-[#ff8a80]">{soles(p.total)}</span>
+              <span className="whitespace-nowrap font-semibold text-[#93c5fd]">{soles(p.total)}</span>
             </li>
           ))}
         </ul>
@@ -254,7 +254,7 @@ function Infraestructura({ d }: { d: DatosLogistica }) {
     <Panel titulo="Infraestructura planta" icono={<Wrench size={17} />} accion={<BotonVer href="/logistica/produccion">Ver Producción</BotonVer>}>
       <div className="grid gap-2 sm:grid-cols-3">
         {ESTACIONES.map((e) => (
-          <div key={e.nombre} className="rounded-lg border border-[#2a2a2a] bg-[#1c1c1c] p-3">
+          <div key={e.nombre} className="rounded-lg border border-[#2a3445] bg-[#212a3a] p-3">
             <p className="text-[14px] font-bold text-white">{e.nombre}</p>
             <p className="text-[12px] text-[#a1a1aa]">{e.detalle}</p>
             <p className="mt-1 text-[11px] italic text-[#71717a]">Estado / OEE / mantenimiento: sin registro</p>
@@ -267,7 +267,7 @@ function Infraestructura({ d }: { d: DatosLogistica }) {
       ) : (
         <ul className="space-y-1.5 text-[13px]">
           {d.opsActivas.map((o) => (
-            <li key={o.id} className="flex flex-wrap justify-between gap-2 rounded-lg bg-[#1c1c1c] px-3 py-2">
+            <li key={o.id} className="flex flex-wrap justify-between gap-2 rounded-lg bg-[#212a3a] px-3 py-2">
               <span>
                 <span className="font-semibold text-white">{o.id}</span> · {o.tipo_equipo} {o.modelo} · chasis {o.codigo_chasis || "-"}
               </span>
@@ -353,10 +353,10 @@ function CotizarFlete({ d }: { d: DatosLogistica }) {
       <p className="mb-3 text-[12px] text-[#a1a1aa]">Referencia de fletes pagados por agencia y destino (costo de envío registrado en las órdenes de despacho).</p>
       <div className="mb-4 grid gap-2 sm:grid-cols-3">
         {d.agencias.slice(0, 3).map((a) => (
-          <div key={a.id} className="rounded-lg border border-[#2a2a2a] bg-[#1c1c1c] p-3 text-center">
+          <div key={a.id} className="rounded-lg border border-[#2a3445] bg-[#212a3a] p-3 text-center">
             <p className="font-bold text-white">{a.nombre}</p>
             <p className="text-[12px] text-[#a1a1aa]">Flete promedio</p>
-            <p className="text-lg font-bold text-[#ff5252]">{a.fletePromedio ? soles(a.fletePromedio) : "-"}</p>
+            <p className="text-lg font-bold text-[#60a5fa]">{a.fletePromedio ? soles(a.fletePromedio) : "-"}</p>
           </div>
         ))}
       </div>
@@ -369,7 +369,7 @@ function CotizarFlete({ d }: { d: DatosLogistica }) {
               <td className={`${td} font-semibold text-white`}>{x.agencia}</td>
               <td className={td}>{x.destino}</td>
               <td className={td}>{x.n}</td>
-              <td className={`${td} font-semibold text-[#ff5252]`}>{soles(x.total / x.n)}</td>
+              <td className={`${td} font-semibold text-[#60a5fa]`}>{soles(x.total / x.n)}</td>
               <td className={td}>{fechaPE(x.ultimo)}</td>
             </tr>
           ))}
@@ -444,7 +444,7 @@ export function LogisticaDetalle({ solo }: { solo?: Seccion }) {
         )
       }
     >
-      <Link href="/logistica" className="inline-flex items-center gap-1 text-[12px] text-[#a1a1aa] hover:text-[#ff8a80]">
+      <Link href="/logistica" className="inline-flex items-center gap-1 text-[12px] text-[#a1a1aa] hover:text-[#93c5fd]">
         <ArrowLeft size={13} /> Logística Planta
       </Link>
       <EncabezadoPlanta

@@ -19,12 +19,12 @@ import { BarraAcciones, BarraModulos, EncabezadoPlanta, Filas, MarcoPlanta, Pane
 /** Tarjeta KPI del diseño de Finanzas: icono a la izquierda, título, monto y detalle en verde/rojo. */
 function KpiFinanzas({ icono, titulo, valor, detalle, href, alerta }: { icono: React.ReactNode; titulo: string; valor: string; detalle: string; href: string; alerta?: boolean }) {
   return (
-    <button type="button" onClick={() => abrirPestana(href)} className="flex items-center gap-3 rounded-xl border border-[#2a2a2a] bg-[#141414] px-4 py-4 text-left transition hover:border-[#d50000]">
-      <span className="shrink-0 text-[#d50000]">{icono}</span>
+    <button type="button" onClick={() => abrirPestana(href)} className="flex items-center gap-3 rounded-xl border border-[#2a3445] bg-[#1a212e] px-4 py-4 text-left transition hover:border-[#2a7bff]">
+      <span className="shrink-0 text-[#2a7bff]">{icono}</span>
       <span className="min-w-0">
         <span className="block text-[15px] font-semibold text-white">{titulo}</span>
         <span className="block text-2xl font-bold text-white">{valor}</span>
-        <span className={`block truncate text-[12px] font-semibold ${alerta ? "text-[#ff5252]" : "text-[#4ade80]"}`}>{detalle}</span>
+        <span className={`block truncate text-[12px] font-semibold ${alerta ? "text-[#60a5fa]" : "text-[#4ade80]"}`}>{detalle}</span>
       </span>
     </button>
   );
@@ -139,7 +139,7 @@ export function FinanzasHome() {
         <div className="space-y-4">
           <Panel titulo="Bancarización" icono={<Landmark size={17} />}>
             <p className="flex items-center gap-2 text-[14px] font-semibold text-white">
-              <FileText size={16} className="text-[#d50000]" /> Vouchers del mes: {d.bancarizadasMes} OC bancarizada(s)
+              <FileText size={16} className="text-[#2a7bff]" /> Vouchers del mes: {d.bancarizadasMes} OC bancarizada(s)
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <BotonAccion href="/dashboard/compras?tab=ordenes" icono={<Upload size={15} />}>
@@ -158,7 +158,7 @@ export function FinanzasHome() {
                 ...d.porPagar.map((f) => ({ clave: f.id, titulo: `${f.proveedor} · ${f.numero}`, detalle: f.fechaVencimiento ? `Vence ${fechaPE(f.fechaVencimiento)}` : undefined, derecha: <Etiqueta>{soles(f.netoPagar ?? f.total)}</Etiqueta>, href: "/dashboard/compras?tab=facturas" })),
               ]}
             />
-            <div id="fletes" className="mt-2 flex scroll-mt-24 items-center justify-between rounded-lg border border-[#2a2a2a] bg-[#1c1c1c] px-3 py-2">
+            <div id="fletes" className="mt-2 flex scroll-mt-24 items-center justify-between rounded-lg border border-[#2a3445] bg-[#212a3a] px-3 py-2">
               <span className="text-[13px] font-semibold text-white">Liquidar Flete Marvisur · Grael · Shalom ({d.fletesMes.length})</span>
               <span className="flex items-center gap-2">
                 <span className="font-bold text-white">{soles(d.totalFletes)}</span>
@@ -184,9 +184,9 @@ export function FinanzasHome() {
             <ol className="flex flex-wrap items-center gap-2 text-[14px] font-semibold text-white">
               {["Subir Asistencia", "Sistema Calcula Automático", "Planilla Lista / Pagar"].map((p, i) => (
                 <Fragment key={p}>
-                  {i > 0 && <ArrowRight size={16} className="text-[#d50000]" aria-hidden />}
-                  <li className="flex items-center gap-2 rounded-full border border-[#2a2a2a] bg-[#1c1c1c] px-3 py-1">
-                    {i < 2 ? <span className="flex h-6 w-6 items-center justify-center rounded-full border border-[#d50000] text-[12px] text-[#d50000]">{i + 1}</span> : <CheckCircle2 size={20} className="text-[#d50000]" />}
+                  {i > 0 && <ArrowRight size={16} className="text-[#2a7bff]" aria-hidden />}
+                  <li className="flex items-center gap-2 rounded-full border border-[#2a3445] bg-[#212a3a] px-3 py-1">
+                    {i < 2 ? <span className="flex h-6 w-6 items-center justify-center rounded-full border border-[#2a7bff] text-[12px] text-[#2a7bff]">{i + 1}</span> : <CheckCircle2 size={20} className="text-[#2a7bff]" />}
                     {p}
                   </li>
                 </Fragment>
@@ -205,11 +205,11 @@ export function FinanzasHome() {
                 Generar Boletas de Pago
               </BotonAccion>
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-3 rounded-lg border border-[#2a2a2a] bg-[#1c1c1c] p-3">
+            <div className="mt-3 grid grid-cols-2 gap-3 rounded-lg border border-[#2a3445] bg-[#212a3a] p-3">
               <div>
                 <p className="text-[14px] font-bold text-white">Obreros</p>
                 <p className="text-[12px] text-[#a1a1aa]">Pago diario, semanal, quincenal o por hora</p>
-                <p className="text-2xl font-bold text-[#d50000]">{obreros}</p>
+                <p className="text-2xl font-bold text-[#2a7bff]">{obreros}</p>
               </div>
               <div>
                 <p className="text-[14px] font-bold text-white">Empleados admin</p>
@@ -246,7 +246,7 @@ export function FinanzasHome() {
                 <Filas max={4} vacio="Aún no hay facturas de proveedores." items={d.ultimasRecibidas.map((f) => ({ clave: f.id, titulo: `${f.numero} · ${f.proveedor}`, derecha: <Etiqueta tono={f.estadoPago === "PAGADA" ? "verde" : "naranja"}>{f.estadoPago === "PAGADA" ? "Pagada" : "Por pagar"}</Etiqueta>, href: "/dashboard/compras?tab=facturas" }))} />
               </div>
             </div>
-            <div className="mt-3 flex flex-wrap items-end justify-between gap-3 rounded-lg border border-[#2a2a2a] bg-[#1c1c1c] p-3">
+            <div className="mt-3 flex flex-wrap items-end justify-between gap-3 rounded-lg border border-[#2a3445] bg-[#212a3a] p-3">
               <div>
                 <p className="text-[12px] font-semibold text-[#a1a1aa]">IGV Ventas</p>
                 <p className="text-xl font-bold text-[#4ade80]">{soles(d.igvVentas)}</p>
@@ -257,7 +257,7 @@ export function FinanzasHome() {
               </div>
               <div>
                 <p className="text-[12px] font-semibold text-[#a1a1aa]">IGV a Pagar</p>
-                <p className="text-xl font-bold text-[#ff5252]">{soles(igvPagar)}</p>
+                <p className="text-xl font-bold text-[#60a5fa]">{soles(igvPagar)}</p>
               </div>
               <span className="flex items-center gap-2">
                 <span className="font-semibold text-white">PDT 621</span>
@@ -290,7 +290,7 @@ export function FinanzasHome() {
               <ErpTd>{fechaPE(c.fecha)}</ErpTd>
               <ErpTd className="font-semibold text-white">{c.proveedor}</ErpTd>
               <ErpTd>{c.doc}</ErpTd>
-              <ErpTd className="text-right font-semibold text-[#ff8a80]">{soles(c.total)}</ErpTd>
+              <ErpTd className="text-right font-semibold text-[#93c5fd]">{soles(c.total)}</ErpTd>
               <ErpTd>
                 <BotonVer href={c.href}>Ver</BotonVer>
               </ErpTd>
