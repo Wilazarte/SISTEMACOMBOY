@@ -191,6 +191,7 @@ export function ProduccionHome() {
 
       <BarraAcciones
         acciones={[
+          { label: "Expedientes 26W", href: "/erp/lotes", tono: "lleno" },
           { label: "Reportar a Almacén", href: "/dashboard/produccion" },
           { label: "Entregar Semi a Almacén Intermedio", href: "/dashboard/almacen?tab=stock" },
           { label: "Entregar PT a Almacén", href: "/dashboard/produccion", tono: "lleno" },

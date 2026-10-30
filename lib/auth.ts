@@ -159,6 +159,11 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
   if (sesion.rol === "gerencia") return ruta === RUTA_GERENCIA || ruta.startsWith(`${RUTA_GERENCIA}/`);
   // Dashboard Gerencia: además de GERENCIA (arriba), solo SOPORTE
   if (ruta === RUTA_GERENCIA || ruta.startsWith(`${RUTA_GERENCIA}/`)) return isAdmin(sesion);
+  // Expedientes 26W (/erp/lotes, /erp/expediente/…): el flujo pasa por las 4 áreas de la planta; cada una actúa solo en sus fases
+  if (ruta === RUTA_ERP || ruta.startsWith(`${RUTA_ERP}/`)) {
+    const p = perfilPlanta(sesion);
+    return !!p && p !== "gerencia";
+  }
   // Homes de la planta: solo SOPORTE entra a las 4; los moduladores (Finanzas, Logística, Almacén, Producción) solo a la suya
   const homePlanta = homePlantaDe(ruta);
   const perfil = perfilPlanta(sesion);
@@ -177,6 +182,8 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
 }
 
 export const RUTA_PRODUCCION = "/dashboard/produccion";
+/** Flujo v3.0: tablero de expedientes 26W y expediente por código. */
+export const RUTA_ERP = "/erp";
 /** Dashboard Gerencia (War Room): GERENCIA y SOPORTE. */
 export const RUTA_GERENCIA = "/gerencia";
 /** Logística Planta: home de compras / ventas nacionales y agencias (solo lectura de los demás módulos). */

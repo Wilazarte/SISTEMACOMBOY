@@ -14,8 +14,10 @@ import type { Factura, OrdenDespacho, Requerimiento, StockItem } from "./types";
 import { esAdminProductos, useCatalogo } from "./productos";
 import type { CierreCaja, Derivacion, ReqSucursal, StockLocal, Traslado, VentaSucursal } from "./sucursal-modelos";
 import { avisoOD, odsNuevas } from "./ventas";
+import { avisosExpedientes, useExpedientes } from "./expedientes";
+import { perfilPlanta } from "./permisosPlanta";
 
-export type TipoNotif = "despacho" | "requerimiento" | "factura" | "qc" | "stock" | "sucursal" | "producto";
+export type TipoNotif = "despacho" | "requerimiento" | "factura" | "qc" | "stock" | "sucursal" | "producto" | "expediente";
 
 export interface Notificacion {
   /** Identifica el aviso para marcarlo como visto; cambia si cambia su contenido. */
@@ -59,6 +61,9 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
   const stockSuc = useStore<StockLocal[]>(KEYS.SUC_STOCK, [], opera);
   const cierres = useStore<CierreCaja[]>(KEYS.SUC_CIERRES, [], veSuc && ["creador", "tesoreria"].includes(rol));
   const { solicitudes } = useCatalogo();
+  // Expedientes 26W: cada área recibe solo el aviso de su fase (Gerencia no opera)
+  const perfil = perfilPlanta(sesion);
+  const exp = useExpedientes(!!perfil && perfil !== "gerencia");
 
   return useMemo(() => {
     if (!sesion) return [];
@@ -171,8 +176,10 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
         out.push({ clave: `solr:${s.id}:${s.estado}`, tipo: "producto", titulo: `Solicitud ${s.estado}: ${s.nombre}`, detalle: s.respuesta ?? (s.estado === "aprobada" ? "Ya está en el catálogo" : "Revise con el administrador"), modulo: "Catálogo de productos", href: puedeVer(sesion, "/dashboard/ventas") ? "/dashboard/ventas?tab=productos&sub=solicitudes" : "/dashboard", prioridad: 6 });
     }
 
+    out.push(...avisosExpedientes(perfil, exp));
+
     return out.sort((a, b) => a.prioridad - b.prioridad);
     // equiposRaw: getEquipos() lee la misma caché; se usa para recalcular cuando cambia
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sesion, ods, reqs, facturas, stock, equiposRaw, derivaciones, reqsSec, traslados, ventasSuc, stockSuc, cierres, solicitudes]);
+  }, [sesion, ods, reqs, facturas, stock, equiposRaw, derivaciones, reqsSec, traslados, ventasSuc, stockSuc, cierres, solicitudes, exp, perfil]);
 }

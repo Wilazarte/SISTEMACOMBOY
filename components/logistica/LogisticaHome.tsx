@@ -35,6 +35,7 @@ const corto = (n: number): string =>
  * pero siguen en /logistica/detalle, /logistica/<seccion> y el buscador Ctrl+K.
  */
 export const SECCIONES_LOGISTICA = [
+  { titulo: "Expedientes 26W", texto: "OP → expediente · 8 fases · cotización y OC", href: "/erp/lotes", icono: <ClipboardList size={20} /> },
   { titulo: "Compras Nacionales Perú", texto: "Gestión de compras nacionales · OC y proveedores", href: "/logistica/compras", icono: <ShoppingCart size={20} /> },
   { titulo: "Ventas Nacionales PT", texto: "Remolcador · Chasis CV-300 · Tanque Agua · Coche Minero", href: "/logistica/ventas", icono: <Truck size={20} /> },
   { titulo: "Agencias", texto: "Marvisur · Grael · Shalom", href: "/logistica/agencias", icono: <Building2 size={20} /> },
