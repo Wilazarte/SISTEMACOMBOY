@@ -9,7 +9,6 @@ import type { OrdenProduccion } from "@/lib/produccion";
 import { KEYS, soles, useStore } from "@/lib/storage";
 import type { Requerimiento, StockItem, ValeProduccion } from "@/lib/types";
 import { Avance, AvisoSql, Boton, Seccion, pct } from "./comun";
-import { FormNuevaOP } from "./FormulariosFase";
 
 interface Fila {
   x: Expediente;
@@ -30,7 +29,6 @@ export function DashboardLotes() {
   const reqsP = useStore<Requerimiento[]>(KEYS.REQS_PENDIENTES, []);
   const reqsH = useStore<Requerimiento[]>(KEYS.REQS_PROCESADOS, []);
   const [q, setQ] = useState("");
-  const [nueva, setNueva] = useState(false);
   const [verCerrados, setVerCerrados] = useState(false);
 
   const filas = useMemo<Fila[]>(
@@ -68,8 +66,8 @@ export function DashboardLotes() {
           <p className="text-[14px] text-[#d4d4d8]">Orden de Producción → Expediente · 8 fases · código de seguimiento 26W</p>
         </div>
         {puedeActuar(sesion, 1) && (
-          <Boton lleno onClick={() => setNueva(true)}>
-            <Plus size={15} /> Nueva OP (fase 1)
+          <Boton lleno onClick={() => router.push("/logistica/crear-op")}>
+            <Plus size={15} /> Crear OP · lote mixto (fase 1)
           </Boton>
         )}
       </header>
@@ -105,7 +103,7 @@ export function DashboardLotes() {
         </div>
       </Seccion>
 
-      {s.listo && !s.faltaTabla && filas.length === 0 && <p className="rounded-lg border border-dashed border-[#333333] p-6 text-center text-[13px] text-[#a1a1aa]">Sin expedientes registrados. El primero nace con la Nueva OP de Logística.</p>}
+      {s.listo && !s.faltaTabla && filas.length === 0 && <p className="rounded-lg border border-dashed border-[#333333] p-6 text-center text-[13px] text-[#a1a1aa]">Sin expedientes registrados. El primero nace con la OP de lote mixto que crea Logística.</p>}
 
       <div className="flex gap-3 overflow-x-auto pb-2">
         {[...FASES, ...(verCerrados ? (["CERRADO"] as const) : [])].map((n) => {
@@ -125,8 +123,7 @@ export function DashboardLotes() {
                     </span>
                     <span className="block truncate text-[13px] font-semibold text-white">{x.datos.producto}</span>
                     <span className="block text-[11px] text-[#a1a1aa]">
-                      {x.op_id}
-                      {x.lote ? ` · lote ${x.lote}` : ""} · plazo {x.plazo ?? "—"}
+                      {[x.op_id, x.lote && `lote ${x.lote}`, x.total_unidades ? `${x.total_unidades} u.` : null, `plazo ${x.plazo ?? "—"}`].filter(Boolean).join(" · ")}
                     </span>
                     <span className="mt-1.5 block">
                       <Avance pct={r.avance} />
@@ -151,7 +148,6 @@ export function DashboardLotes() {
         <FolderOpen size={14} /> Cada tarjeta abre su expediente con los 15 documentos; desde allí cualquier documento queda a un clic.
       </p>
 
-      {nueva && <FormNuevaOP onClose={() => setNueva(false)} onCreado={(c) => (setNueva(false), abrir(c))} />}
     </div>
   );
 }

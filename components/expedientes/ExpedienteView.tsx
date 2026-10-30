@@ -134,8 +134,10 @@ export function ExpedienteView({ codigo }: { codigo: string }) {
           <p className="text-[12px] font-semibold uppercase tracking-widest text-[#a1a1aa]">Código de seguimiento</p>
           <h1 className="text-5xl font-black leading-none text-[#FF6D00]">{x.codigo_expediente}</h1>
           <p className="mt-1 text-[15px] font-semibold text-white">
-            {D.producto} · {x.op_id}
+            {D.producto}
+            {x.op_id ? ` · ${x.op_id}` : ""}
             {x.lote ? ` · lote ${x.lote}` : ""}
+            {x.almacen_destino ? ` · destino ${x.almacen_destino}` : ""}
           </p>
           <p className="text-[13px] text-[#d4d4d8]">
             Cliente {D.legal.cliente || "—"} · contrato {D.legal.contrato || "—"} · garantía {D.legal.garantiaMeses} meses · prioridad {D.prioridad} · plazo {x.plazo ?? "—"}
@@ -155,6 +157,35 @@ export function ExpedienteView({ codigo }: { codigo: string }) {
           </div>
         </div>
       </header>
+
+      {x.es_lote_mixto && calc.d.detalles.length > 0 && (
+        <Seccion titulo={`Equipos del lote mixto · ${calc.d.detalles.reduce((a, e) => a + e.cantidad, 0)} unidad(es)`}>
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="text-left text-[12px] uppercase text-[#a1a1aa]">
+                <th className="py-1">Tipo de equipo</th>
+                <th className="py-1">Marca motor</th>
+                <th className="py-1">Modelo</th>
+                <th className="py-1 text-right">Cantidad</th>
+                <th className="py-1 text-right">Costo BOM</th>
+                <th className="py-1 pl-3">Chasis / serie (fase 8)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {calc.d.detalles.map((e) => (
+                <tr key={e.id} className="border-t border-[#333333]">
+                  <td className="py-1.5 text-white">{e.tipo_equipo}</td>
+                  <td className="py-1.5">{e.marca_motor}</td>
+                  <td className="py-1.5 font-semibold text-white">{e.modelo}</td>
+                  <td className="py-1.5 text-right">{e.cantidad}</td>
+                  <td className="py-1.5 text-right">{e.costo_bom ? soles(e.costo_bom) : "—"}</td>
+                  <td className="py-1.5 pl-3 text-[12px] text-[#d4d4d8]">{e.unidades.length ? e.unidades.map((u) => `${u.chasis} / ${u.serie}`).join(" · ") : "Pendiente"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Seccion>
+      )}
 
       {alertas.length > 0 && (
         <Seccion titulo={`Alertas de auditoría (${alertas.length})`}>

@@ -4,7 +4,6 @@ import { useMemo, useState, type DragEvent, type ReactNode } from "react";
 import { CheckCircle2, FileUp, Plus, ShieldCheck, Trash2, XCircle } from "lucide-react";
 import { Field, Input, Modal, Select, Textarea, ejecutarAsync, toast } from "@/components/ui";
 import { ALMACENES, ALMACEN_DEFECTO } from "@/lib/empresa";
-import { MARCAS_MOTOR, TIPOS_EQUIPO } from "@/lib/equipos";
 import {
   BANCOS_PE,
   CHECKLIST_QC,
@@ -14,10 +13,14 @@ import {
   TIPOS_COMPROBANTE_COMPRA,
   ZONAS_PT,
   aceptarProduccion,
+  bomDe,
+  costoBomLote,
+  docsDe,
+  guardarBom,
+  useExpedientes,
   actaEntregaCompleta,
   cerrarExpediente,
   cotizacionApta,
-  crearExpediente,
   disponibleDe,
   generarOC,
   registrarComprobante,
@@ -32,12 +35,13 @@ import {
   type CotizacionExp,
   type DatosCotizacion,
   type Expediente,
+  type LineaBom,
   type LineaMaterial,
+  type UnidadPT,
   type OrdenCompraExp,
   type RespuestaRuc,
 } from "@/lib/expedientes";
 import { MOTIVOS_RETIRO, requiereChasis, type MotivoRetiro } from "@/lib/inventario";
-import { opVacia } from "@/lib/produccion";
 import { IGV, getStock, hoy, r2, rucValido, soles } from "@/lib/storage";
 import { Boton, Dato } from "./comun";
 
@@ -68,105 +72,14 @@ function useEnvio(onClose: () => void) {
 
 const Grid = ({ children }: { children: ReactNode }) => <div className="grid gap-3 sm:grid-cols-2">{children}</div>;
 
-// ---------------------------------------------------------------- FASE 1 · Nueva OP
-export function FormNuevaOP({ onClose, onCreado }: { onClose: () => void; onCreado: (codigo: string) => void }) {
-  const [op, setOp] = useState(opVacia());
-  const [lote, setLote] = useState("");
-  const [plazo, setPlazo] = useState("");
-  const [prioridad, setPrioridad] = useState<"NORMAL" | "ALTA" | "URGENTE">("NORMAL");
-  const [estimado, setEstimado] = useState("");
-  const [precio, setPrecio] = useState("");
-  const [legal, setLegal] = useState({ cliente: "", contrato: "", garantiaMeses: 12, penalidad: "", clausulas: "", responsableFirma: "" });
-  const [ocupado, setOcupado] = useState(false);
-  const set = (k: keyof typeof op, v: string) => setOp({ ...op, [k]: v });
-  return (
-    <Modal open onClose={onClose} title="Fase 1 · Nueva Orden de Producción" wide>
-      <form
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setOcupado(true);
-          try {
-            const x = await crearExpediente({ op, lote, plazo, prioridad, costoEstimado: num(estimado), precioVenta: num(precio), legal });
-            toast(`Expediente ${x.codigo_expediente} creado · se avisó a Producción`);
-            onCreado(x.codigo_expediente);
-          } catch (err) {
-            toast((err as Error).message, "error");
-          } finally {
-            setOcupado(false);
-          }
-        }}
-        className="space-y-4"
-      >
-        <p className="text-[12px] text-[#a1a1aa]">El código de seguimiento (26W-001, 26W-002…) lo asigna Supabase al guardar.</p>
-        <Grid>
-          <Field label="Tipo de equipo">
-            <Select value={op.tipo_equipo} onChange={(e) => set("tipo_equipo", e.target.value)} placeholder="Elegir" options={opciones(TIPOS_EQUIPO)} />
-          </Field>
-          <Field label="Modelo">
-            <Input value={op.modelo} onChange={(e) => set("modelo", e.target.value)} placeholder="CV-300" />
-          </Field>
-          <Field label="Marca de motor">
-            <Select value={op.marca_motor} onChange={(e) => set("marca_motor", e.target.value)} placeholder="Elegir" options={opciones(MARCAS_MOTOR)} />
-          </Field>
-          <Field label="Código de chasis">
-            <Input value={op.codigo_chasis} onChange={(e) => set("codigo_chasis", e.target.value)} />
-          </Field>
-          <Field label="Serie de motor">
-            <Input value={op.serie_motor} onChange={(e) => set("serie_motor", e.target.value)} />
-          </Field>
-          <Field label="Almacén destino del PT">
-            <Select value={op.ubicacion_sede} onChange={(e) => set("ubicacion_sede", e.target.value)} options={opciones(ALMACENES)} />
-          </Field>
-          <Field label="Lote de fabricación (opcional)">
-            <Input value={lote} onChange={(e) => setLote(e.target.value)} placeholder="Texto libre" />
-          </Field>
-          <Field label="Plazo de finalización">
-            <Input type="date" min={hoy()} value={plazo} onChange={(e) => setPlazo(e.target.value)} />
-          </Field>
-          <Field label="Prioridad">
-            <Select value={prioridad} onChange={(e) => setPrioridad(e.target.value as typeof prioridad)} options={opciones(["NORMAL", "ALTA", "URGENTE"])} />
-          </Field>
-          <Field label="Costo estimado S/ (sin IGV)">
-            <Input type="number" min="0" step="0.01" value={estimado} onChange={(e) => setEstimado(e.target.value)} />
-          </Field>
-          <Field label="Precio de venta S/ (sin IGV, opcional)" hint="Para el margen bruto del expediente.">
-            <Input type="number" min="0" step="0.01" value={precio} onChange={(e) => setPrecio(e.target.value)} />
-          </Field>
-        </Grid>
-        <h3 className="text-[13px] font-bold uppercase text-[#FF9A4D]">Datos legales de la OP</h3>
-        <Grid>
-          <Field label="Cliente">
-            <Input value={legal.cliente} onChange={(e) => setLegal({ ...legal, cliente: e.target.value })} />
-          </Field>
-          <Field label="Contrato / orden del cliente">
-            <Input value={legal.contrato} onChange={(e) => setLegal({ ...legal, contrato: e.target.value })} />
-          </Field>
-          <Field label="Garantía (meses)">
-            <Input type="number" min="0" value={legal.garantiaMeses} onChange={(e) => setLegal({ ...legal, garantiaMeses: Number(e.target.value) })} />
-          </Field>
-          <Field label="Responsable de firma">
-            <Input value={legal.responsableFirma} onChange={(e) => setLegal({ ...legal, responsableFirma: e.target.value })} />
-          </Field>
-          <Field label="Penalidad por retraso" className="sm:col-span-2">
-            <Input value={legal.penalidad} onChange={(e) => setLegal({ ...legal, penalidad: e.target.value })} placeholder="Ej.: % del precio por día de retraso y tope" />
-          </Field>
-          <Field label="Cláusulas" className="sm:col-span-2">
-            <Textarea value={legal.clausulas} onChange={(e) => setLegal({ ...legal, clausulas: e.target.value })} />
-          </Field>
-        </Grid>
-        <Field label="Observaciones">
-          <Textarea value={op.observaciones} onChange={(e) => set("observaciones", e.target.value)} />
-        </Field>
-        <Pie onClose={onClose} ocupado={ocupado} texto="Generar OP y avisar a Producción" />
-      </form>
-    </Modal>
-  );
-}
-
 // ---------------------------------------------------------------- FASE 2 · Producción acepta
 export function FormFase2({ x, onClose }: { x: Expediente; onClose: () => void }) {
   const stock = useMemo(() => getStock().sort((a, b) => a.nombre.localeCompare(b.nombre)), []);
-  const [lineas, setLineas] = useState<Omit<LineaMaterial, "id">[]>([{ nombre: "", unidad: "UND", cantidad: 1 }]);
+  const s = useExpedientes();
+  // Lote mixto: BOM de cada modelo × cantidad = materiales y costo estimado
+  const lote = x.es_lote_mixto ? costoBomLote(docsDe(x, s).detalles, s.bom) : null;
+  const [lineas, setLineas] = useState<Omit<LineaMaterial, "id">[]>(() => (lote?.materiales.length ? lote.materiales : [{ nombre: "", unidad: "UND", cantidad: 1 }]));
+  const [bomDeModelo, setBomDeModelo] = useState<string | null>(null);
   const [ayudante, setAyudante] = useState("");
   const [validado, setValidado] = useState(false);
   const [obs, setObs] = useState("");
@@ -178,6 +91,35 @@ export function FormFase2({ x, onClose }: { x: Expediente; onClose: () => void }
   return (
     <Modal open onClose={onClose} title={`Fase 2 · ${x.codigo_expediente} · aceptar OP y pedir materiales`} wide>
       <form onSubmit={(e) => (e.preventDefault(), enviar(() => aceptarProduccion(x, { materiales: lineas, ayudante, ayudanteValidado: validado, observaciones: obs }), "Solicitud de materiales enviada a Almacén"))} className="space-y-3">
+        {lote && (
+          <section className="rounded-lg border border-[#333333] bg-[#1A1A1A] p-3">
+            <h3 className="mb-2 text-[12px] font-bold uppercase text-[#FF9A4D]">Equipos del lote · BOM y costo estimado</h3>
+            <table className="w-full text-[13px]">
+              <tbody>
+                {lote.porDetalle.map((p) => (
+                  <tr key={p.detalleId} className="border-b border-[#333333] last:border-0">
+                    <td className="py-1.5 text-white">
+                      {p.cantidad} × {p.modelo}
+                    </td>
+                    <td className="py-1.5 text-[#a1a1aa]">{p.sinBom ? "Sin BOM: cárguelo para calcular el costo" : `${bomDe(p.modelo, s.bom).length} material(es) por unidad${p.sinCosto.length ? ` · sin costo en stock: ${p.sinCosto.join(", ")}` : ""}`}</td>
+                    <td className="py-1.5 text-right text-white">{soles(p.costo)}</td>
+                    <td className="py-1.5 pl-2 text-right">
+                      <Boton onClick={() => setBomDeModelo(p.modelo)}>{p.sinBom ? "Cargar BOM" : "Editar BOM"}</Boton>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[13px] text-white">
+                Costo estimado del lote: <b>{soles(lote.total)}</b> <span className="text-[#a1a1aa]">(se guarda en la OP al aceptar)</span>
+              </p>
+              <Boton onClick={() => setLineas(lote.materiales.length ? lote.materiales : lineas)} disabled={!lote.materiales.length}>
+                Llenar materiales con el BOM
+              </Boton>
+            </div>
+          </section>
+        )}
         {lineas.map((l, i) => (
           <div key={i} className="grid items-end gap-2 sm:grid-cols-[1fr_1fr_90px_90px_auto]">
             <Field label="Del stock">
@@ -212,6 +154,52 @@ export function FormFase2({ x, onClose }: { x: Expediente; onClose: () => void }
           <Textarea value={obs} onChange={(e) => setObs(e.target.value)} />
         </Field>
         <Pie onClose={onClose} ocupado={ocupado} texto="Aceptar y enviar a Almacén" />
+      </form>
+      {bomDeModelo && <FormBom modelo={bomDeModelo} actual={bomDe(bomDeModelo, s.bom)} onClose={() => setBomDeModelo(null)} />}
+    </Modal>
+  );
+}
+
+/** BOM de un modelo: materiales y cantidad por UNA unidad (Producción). */
+export function FormBom({ modelo, actual, onClose }: { modelo: string; actual: LineaBom[]; onClose: () => void }) {
+  const stock = useMemo(() => getStock().sort((a, b) => a.nombre.localeCompare(b.nombre)), []);
+  const [lineas, setLineas] = useState<Omit<LineaBom, "modelo">[]>(() => (actual.length ? actual.map(({ modelo: _m, ...l }) => l) : [{ material: "", unidad: "UND", cantidad: 1, stock_id: null }]));
+  const { ocupado, enviar } = useEnvio(onClose);
+  const set = (i: number, cambio: Partial<Omit<LineaBom, "modelo">>) => setLineas(lineas.map((l, j) => (j === i ? { ...l, ...cambio } : l)));
+  return (
+    <Modal open onClose={onClose} title={`BOM · ${modelo} · materiales por unidad`} wide>
+      <form onSubmit={(e) => (e.preventDefault(), enviar(() => guardarBom(modelo, lineas), `BOM de ${modelo} guardado`))} className="space-y-3">
+        {lineas.map((l, i) => (
+          <div key={i} className="grid items-end gap-2 sm:grid-cols-[1fr_1fr_90px_110px_auto]">
+            <Field label="Del stock">
+              <Select
+                value={l.stock_id ?? ""}
+                onChange={(e) => {
+                  const it = stock.find((x) => x.id === e.target.value);
+                  set(i, it ? { stock_id: it.id, material: it.nombre, unidad: it.unidad } : { stock_id: null });
+                }}
+                placeholder="Material sin stock"
+                options={stock.map((x) => ({ value: x.id, label: `${x.nombre} · ${x.sede} · ${soles(x.costoUnit || 0)}` }))}
+              />
+            </Field>
+            <Field label="Material">
+              <Input value={l.material} disabled={!!l.stock_id} onChange={(e) => set(i, { material: e.target.value })} />
+            </Field>
+            <Field label="Unidad">
+              <Input value={l.unidad} disabled={!!l.stock_id} onChange={(e) => set(i, { unidad: e.target.value.toUpperCase() })} />
+            </Field>
+            <Field label="Cant. por unidad">
+              <Input type="number" min="0" step="any" value={l.cantidad} onChange={(e) => set(i, { cantidad: Number(e.target.value) })} />
+            </Field>
+            <button type="button" aria-label="Quitar" className="mb-2 text-[#a1a1aa] hover:text-[#FF9A4D]" onClick={() => setLineas(lineas.filter((_, j) => j !== i))}>
+              <Trash2 size={16} />
+            </button>
+          </div>
+        ))}
+        <Boton onClick={() => setLineas([...lineas, { material: "", unidad: "UND", cantidad: 1, stock_id: null }])}>
+          <Plus size={14} /> Agregar material
+        </Boton>
+        <Pie onClose={onClose} ocupado={ocupado} texto="Guardar BOM" />
       </form>
     </Modal>
   );
@@ -706,6 +694,11 @@ export function FormActaCompleta({ x, onClose }: { x: Expediente; onClose: () =>
 
 // ---------------------------------------------------------------- FASE 8 · Producción cierra
 export function FormCierre({ x, onClose }: { x: Expediente; onClose: () => void }) {
+  const s = useExpedientes();
+  const detalles = x.es_lote_mixto ? docsDe(x, s).detalles : [];
+  // Lote mixto: una fila por unidad (chasis y N° de serie), agrupadas por equipo del lote
+  const [unidades, setUnidades] = useState<UnidadPT[]>(() => detalles.flatMap((e) => Array.from({ length: e.cantidad }, (_, k) => ({ detalleId: e.id, modelo: e.modelo, chasis: e.unidades[k]?.chasis ?? "", serie: e.unidades[k]?.serie ?? "" }))));
+  const setUnidad = (i: number, k: "chasis" | "serie", v: string) => setUnidades(unidades.map((u, j) => (j === i ? { ...u, [k]: v.toUpperCase() } : u)));
   const [serie, setSerie] = useState("");
   const [zona, setZona] = useState<(typeof ZONAS_PT)[number]>("A1");
   const [check, setCheck] = useState<Record<string, boolean>>(() => Object.fromEntries(CHECKLIST_QC.map((c) => [c, false])));
@@ -714,11 +707,29 @@ export function FormCierre({ x, onClose }: { x: Expediente; onClose: () => void 
   const { ocupado, enviar } = useEnvio(onClose);
   return (
     <Modal open onClose={onClose} title={`Fase 8 · ${x.codigo_expediente} · Acta de Entrega PT a Almacén`} wide>
-      <form onSubmit={(e) => (e.preventDefault(), enviar(() => cerrarExpediente(x, { numeroSerie: serie, zona, checklist: check, recibe, observaciones: obs }), "Acta PT registrada"))} className="space-y-3">
+      <form onSubmit={(e) => (e.preventDefault(), enviar(() => cerrarExpediente(x, { numeroSerie: serie, zona, checklist: check, recibe, observaciones: obs, unidades }), "Acta PT registrada"))} className="space-y-3">
+        {x.es_lote_mixto && (
+          <fieldset className="space-y-1">
+            <legend className="mb-1 text-[12px] font-semibold uppercase text-[#FF9A4D]">Chasis y N° de serie por unidad ({unidades.length})</legend>
+            <div className="max-h-[320px] space-y-1 overflow-y-auto pr-1">
+              {unidades.map((u, i) => (
+                <div key={i} className="grid items-center gap-2 sm:grid-cols-[150px_1fr_1fr]">
+                  <span className="text-[13px] text-[#d4d4d8]">
+                    {u.modelo} · unidad {unidades.slice(0, i + 1).filter((v) => v.detalleId === u.detalleId).length}
+                  </span>
+                  <Input value={u.chasis} onChange={(e) => setUnidad(i, "chasis", e.target.value)} placeholder="Código de chasis" aria-label={`Chasis ${u.modelo} ${i + 1}`} />
+                  <Input value={u.serie} onChange={(e) => setUnidad(i, "serie", e.target.value)} placeholder="N° de serie" aria-label={`Serie ${u.modelo} ${i + 1}`} />
+                </div>
+              ))}
+            </div>
+          </fieldset>
+        )}
         <Grid>
-          <Field label="N° de serie del equipo">
-            <Input value={serie} onChange={(e) => setSerie(e.target.value)} />
-          </Field>
+          {!x.es_lote_mixto && (
+            <Field label="N° de serie del equipo">
+              <Input value={serie} onChange={(e) => setSerie(e.target.value)} />
+            </Field>
+          )}
           <Field label="Zona de almacén PT">
             <Select value={zona} onChange={(e) => setZona(e.target.value as typeof zona)} options={opciones(ZONAS_PT)} />
           </Field>
@@ -737,7 +748,11 @@ export function FormCierre({ x, onClose }: { x: Expediente; onClose: () => void 
         <Field label="Observaciones">
           <Textarea value={obs} onChange={(e) => setObs(e.target.value)} />
         </Field>
-        <p className="text-[12px] text-[#a1a1aa]">El QC firmado del supervisor se hace en Producción › QC: crea el equipo terminado en almacén y cierra el expediente.</p>
+        <p className="text-[12px] text-[#a1a1aa]">
+          {x.es_lote_mixto
+            ? "Lote mixto: con todas las series y el control de calidad completo, el acta PT cierra el expediente."
+            : "El QC firmado del supervisor se hace en Producción › QC: crea el equipo terminado en almacén y cierra el expediente."}
+        </p>
         <Pie onClose={onClose} ocupado={ocupado} texto="Registrar acta PT" />
       </form>
     </Modal>
