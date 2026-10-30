@@ -90,7 +90,7 @@ export function ExpedienteView({ codigo }: { codigo: string }) {
 
   if (s.faltaTabla) return <AvisoSql />;
   if (!s.listo) return <p className="text-[13px] text-[#a1a1aa]">Cargando expediente…</p>;
-  if (!x || !calc) return <p className="text-[14px] text-[#93c5fd]">No existe el expediente {decodeURIComponent(codigo)}. <Link href="/erp/lotes" className="underline">Volver al tablero</Link></p>;
+  if (!x || !calc) return <p className="text-[14px] text-[#FFB27A]">No existe el expediente {decodeURIComponent(codigo)}. <Link href="/erp/lotes" className="underline">Volver al tablero</Link></p>;
 
   const { d, r, c, docs } = calc;
   const D = x.datos;
@@ -129,17 +129,17 @@ export function ExpedienteView({ codigo }: { codigo: string }) {
         › <span className="text-white">{x.codigo_expediente}</span>
       </nav>
 
-      <header className="flex flex-wrap items-start justify-between gap-4 rounded-xl border border-[#2a7bff]/50 bg-[#0e1219] p-4">
+      <header className="flex flex-wrap items-start justify-between gap-4 rounded-xl border border-[#FF6D00]/50 bg-[#1A1A1A] p-4">
         <div>
           <p className="text-[12px] font-semibold uppercase tracking-widest text-[#a1a1aa]">Código de seguimiento</p>
-          <h1 className="text-5xl font-black leading-none text-[#2a7bff]">{x.codigo_expediente}</h1>
+          <h1 className="text-5xl font-black leading-none text-[#FF6D00]">{x.codigo_expediente}</h1>
           <p className="mt-1 text-[15px] font-semibold text-white">
             {D.producto} · {x.op_id}
             {x.lote ? ` · lote ${x.lote}` : ""}
           </p>
           <p className="text-[13px] text-[#d4d4d8]">
             Cliente {D.legal.cliente || "—"} · contrato {D.legal.contrato || "—"} · garantía {D.legal.garantiaMeses} meses · prioridad {D.prioridad} · plazo {x.plazo ?? "—"}
-            {r.diasPlazo !== null && x.estado === "ABIERTO" && <b className={r.vencido ? " text-[#93c5fd]" : " text-[#86efac]"}> ({r.vencido ? `${-r.diasPlazo} día(s) de retraso` : `faltan ${r.diasPlazo} día(s)`})</b>}
+            {r.diasPlazo !== null && x.estado === "ABIERTO" && <b className={r.vencido ? " text-[#FFB27A]" : " text-[#86efac]"}> ({r.vencido ? `${-r.diasPlazo} día(s) de retraso` : `faltan ${r.diasPlazo} día(s)`})</b>}
           </p>
           {x.is_demo && <p className="mt-1 text-[12px] font-bold text-[#fcd34d]">DATOS DE PRUEBA (is_demo)</p>}
         </div>
@@ -171,10 +171,10 @@ export function ExpedienteView({ codigo }: { codigo: string }) {
       <Seccion titulo="Flujo · 8 fases">
         <ol className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
           {FASES.map((n) => (
-            <li key={n} className={`rounded-lg border p-3 ${r.actual === n ? "border-[#2a7bff] bg-[#2a7bff]/5" : "border-[#2a3445] bg-[#1a212e]"}`}>
+            <li key={n} className={`rounded-lg border p-3 ${r.actual === n ? "border-[#FF6D00] bg-[#FF6D00]/5" : "border-[#333333] bg-[#222222]"}`}>
               <p className="flex items-center justify-between gap-2">
                 <span className="text-[13px] font-bold text-white">
-                  <span className="mr-1 text-[#2a7bff]">{String(n).padStart(2, "0")}</span> {TITULO_FASE[n]}
+                  <span className="mr-1 text-[#FF6D00]">{String(n).padStart(2, "0")}</span> {TITULO_FASE[n]}
                 </span>
                 <ChipFase estado={r.fases[n]} />
               </p>
@@ -195,7 +195,7 @@ export function ExpedienteView({ codigo }: { codigo: string }) {
                 <div key={q.id} className="space-y-2">
                   <p className="flex flex-wrap items-center gap-2 text-[13px] font-semibold text-white">
                     Cotización {q.nro_cotizacion ?? "s/n"} · {Number(q.total).toFixed(2)} {q.moneda}
-                    {cotizacionApta(q) ? <span className="text-[#86efac]">RUC validado</span> : <span className="text-[#93c5fd]">{q.ruc_validado ? `${q.ruc_estado} / ${q.condicion_habido}` : "RUC sin validar"}</span>}
+                    {cotizacionApta(q) ? <span className="text-[#86efac]">RUC validado</span> : <span className="text-[#FFB27A]">{q.ruc_validado ? `${q.ruc_estado} / ${q.condicion_habido}` : "RUC sin validar"}</span>}
                   </p>
                   <TarjetaProveedor c={q} />
                   <div className="flex flex-wrap gap-2">
@@ -248,7 +248,7 @@ export function ExpedienteView({ codigo }: { codigo: string }) {
             <tbody>
               {docs.map((doc) => (
                 <tr key={doc.n} className="border-t border-white/5 align-top">
-                  <td className="py-1.5 font-bold text-[#2a7bff]">{doc.n}</td>
+                  <td className="py-1.5 font-bold text-[#FF6D00]">{doc.n}</td>
                   <td className="font-semibold text-white">{doc.titulo}</td>
                   <td className="font-mono text-[12px]">{doc.numero}</td>
                   <td>
@@ -264,12 +264,12 @@ export function ExpedienteView({ codigo }: { codigo: string }) {
                   </td>
                   <td className="whitespace-nowrap print:hidden">
                     {doc.reqId && (
-                      <button type="button" className="text-[#93c5fd] hover:underline" onClick={() => abrirDoc({ tipo: "REQ", id: doc.reqId! })}>
+                      <button type="button" className="text-[#FFB27A] hover:underline" onClick={() => abrirDoc({ tipo: "REQ", id: doc.reqId! })}>
                         Ver
                       </button>
                     )}
                     {doc.archivo && (
-                      <button type="button" className="inline-flex items-center gap-1 text-[#93c5fd] hover:underline" onClick={() => void abrirArchivoExp(doc.archivo!).catch((e) => toast((e as Error).message, "error"))}>
+                      <button type="button" className="inline-flex items-center gap-1 text-[#FFB27A] hover:underline" onClick={() => void abrirArchivoExp(doc.archivo!).catch((e) => toast((e as Error).message, "error"))}>
                         Archivo <ExternalLink size={12} />
                       </button>
                     )}
@@ -287,7 +287,7 @@ export function ExpedienteView({ codigo }: { codigo: string }) {
           <Dato k="Flete" v={soles(c.flete)} />
           <Dato k="Mano de obra" v={soles(c.manoObra)} />
           <Dato k="Horas máquina" v={soles(c.maquina)} />
-          <Dato k="Costo real" v={<b className="text-[#60a5fa]">{soles(c.real)}</b>} />
+          <Dato k="Costo real" v={<b className="text-[#FF9A4D]">{soles(c.real)}</b>} />
           <Dato k="Costo estimado" v={soles(c.presupuesto)} />
           <Dato k="Variación" v={pct(c.variacion)} />
           <Dato k="Margen bruto" v={<span className={c.alertaMargen ? "text-[#fcd34d]" : undefined}>{pct(c.margen)}</span>} />
@@ -299,7 +299,7 @@ export function ExpedienteView({ codigo }: { codigo: string }) {
           ) : (
             c.porRecurso.map((h) => <Dato key={`${h.tipo}${h.recurso}`} k={`${h.recurso} · ${h.horas} h`} v={`${soles(h.costo)} (${soles(h.horas ? h.costo / h.horas : 0)}/h)`} />)
           )}
-          <h3 className="mt-3 text-[12px] font-bold uppercase text-[#60a5fa]">Reportes de avance</h3>
+          <h3 className="mt-3 text-[12px] font-bold uppercase text-[#FF9A4D]">Reportes de avance</h3>
           {D.avances.length === 0 ? <p className="text-[13px] text-[#a1a1aa]">Sin reportes.</p> : [...D.avances].reverse().slice(0, 5).map((a) => <Dato key={a.fecha} k={`${fechaHora(a.fecha)} · ${a.usuario}`} v={`${a.porcentaje} % · ${a.nota}`} />)}
         </Seccion>
         <Seccion titulo="Historial (auditoría)">

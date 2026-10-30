@@ -16,6 +16,7 @@ import type { CierreCaja, Derivacion, ReqSucursal, StockLocal, Traslado, VentaSu
 import { avisoOD, odsNuevas } from "./ventas";
 import { avisosExpedientes, useExpedientes } from "./expedientes";
 import { perfilPlanta } from "./permisosPlanta";
+import { useNotifFlujo } from "./notificacionesFlujo";
 
 export type TipoNotif = "despacho" | "requerimiento" | "factura" | "qc" | "stock" | "sucursal" | "producto" | "expediente";
 
@@ -64,6 +65,8 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
   // Expedientes 26W: cada área recibe solo el aviso de su fase (Gerencia no opera)
   const perfil = perfilPlanta(sesion);
   const exp = useExpedientes(!!perfil && perfil !== "gerencia");
+  // Con la tabla notificaciones (SQL 20261107) los pasos del flujo los avisa la base: aquí queda solo "plazo vencido"
+  const flujo = useNotifFlujo(!!perfil && perfil !== "gerencia");
 
   return useMemo(() => {
     if (!sesion) return [];
@@ -176,10 +179,10 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
         out.push({ clave: `solr:${s.id}:${s.estado}`, tipo: "producto", titulo: `Solicitud ${s.estado}: ${s.nombre}`, detalle: s.respuesta ?? (s.estado === "aprobada" ? "Ya está en el catálogo" : "Revise con el administrador"), modulo: "Catálogo de productos", href: puedeVer(sesion, "/dashboard/ventas") ? "/dashboard/ventas?tab=productos&sub=solicitudes" : "/dashboard", prioridad: 6 });
     }
 
-    out.push(...avisosExpedientes(perfil, exp));
+    out.push(...avisosExpedientes(perfil, exp).filter((a) => !flujo.disponible || a.clave.includes(":vencido:")));
 
     return out.sort((a, b) => a.prioridad - b.prioridad);
     // equiposRaw: getEquipos() lee la misma caché; se usa para recalcular cuando cambia
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sesion, ods, reqs, facturas, stock, equiposRaw, derivaciones, reqsSec, traslados, ventasSuc, stockSuc, cierres, solicitudes, exp, perfil]);
+  }, [sesion, ods, reqs, facturas, stock, equiposRaw, derivaciones, reqsSec, traslados, ventasSuc, stockSuc, cierres, solicitudes, exp, perfil, flujo.disponible]);
 }

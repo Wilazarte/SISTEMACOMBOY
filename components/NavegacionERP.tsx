@@ -1,13 +1,47 @@
 "use client";
 
-import { Fragment } from "react";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, ChevronRight, X } from "lucide-react";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft, ArrowRight, ChevronRight, History, X } from "lucide-react";
 
 export interface MigaERP {
   label: string;
   /** Ruta al hacer clic (la última miga, la pantalla actual, no lleva). */
   href?: string;
+}
+
+interface Reciente {
+  href: string;
+  label: string;
+}
+
+const CLAVE_RECIENTES = "erp-recientes";
+const MAX_RECIENTES = 5;
+
+const leerRecientes = (): Reciente[] => {
+  try {
+    return JSON.parse(sessionStorage.getItem(CLAVE_RECIENTES) ?? "[]") as Reciente[];
+  } catch {
+    return [];
+  }
+};
+
+/** Anota la pantalla actual y devuelve las últimas 5 visitadas antes (más reciente primero). */
+function useRecientes(label: string): Reciente[] {
+  const path = usePathname();
+  const qs = useSearchParams().toString();
+  const [lista, setLista] = useState<Reciente[]>([]);
+  useEffect(() => {
+    const href = qs ? `${path}?${qs}` : path;
+    const previas = leerRecientes().filter((r) => r.href !== href);
+    setLista(previas.slice(0, MAX_RECIENTES));
+    try {
+      sessionStorage.setItem(CLAVE_RECIENTES, JSON.stringify([{ href, label }, ...previas].slice(0, MAX_RECIENTES + 1)));
+    } catch {
+      /* sin almacenamiento: solo no hay historial */
+    }
+  }, [path, qs, label]);
+  return lista;
 }
 
 /**
@@ -16,6 +50,15 @@ export interface MigaERP {
  */
 export function NavegacionERP({ migas, inicio }: { migas: MigaERP[]; inicio: string }) {
   const router = useRouter();
+  const recientes = useRecientes(migas.map((m) => m.label).join(" › "));
+  const [verRecientes, setVerRecientes] = useState(false);
+  const caja = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!verRecientes) return;
+    const fuera = (e: MouseEvent) => !caja.current?.contains(e.target as Node) && setVerRecientes(false);
+    document.addEventListener("mousedown", fuera);
+    return () => document.removeEventListener("mousedown", fuera);
+  }, [verRecientes]);
   return (
     <div
       className="sticky top-16 z-30 -mx-4 mb-4 flex items-center justify-between gap-3 border-b border-[#2a3445] bg-[#0e1219]/95 px-4 py-2.5 backdrop-blur print:hidden sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
@@ -30,6 +73,38 @@ export function NavegacionERP({ migas, inicio }: { migas: MigaERP[]; inicio: str
             <ArrowRight size={18} />
           </button>
         </div>
+        {recientes.length > 0 && (
+          <div ref={caja} className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => setVerRecientes(!verRecientes)}
+              className="rounded-full border border-[#3a4558] bg-[#1a212e] p-2 text-white transition hover:bg-[#2a3445]"
+              title="Últimas pantallas"
+              aria-label="Últimas pantallas"
+              aria-expanded={verRecientes}
+            >
+              <History size={18} />
+            </button>
+            {verRecientes && (
+              <div className="absolute left-0 top-11 z-40 w-72 overflow-hidden rounded-xl border border-[#2a3445] bg-[#141a24] shadow-pop">
+                <p className="border-b border-[#2a3445] px-3 py-2 text-[11px] font-bold uppercase text-[#a1a1aa]">Últimas {recientes.length} pantallas</p>
+                {recientes.map((r) => (
+                  <button
+                    key={r.href}
+                    type="button"
+                    onClick={() => {
+                      setVerRecientes(false);
+                      router.push(r.href);
+                    }}
+                    className="block w-full truncate px-3 py-2 text-left text-[13px] text-white transition hover:bg-[#2a3445]"
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <nav aria-label="Ruta" className="flex min-w-0 flex-wrap items-center gap-1 text-[13px] text-[#a1a1aa]">
           {migas.map((m, i) => {
             const ultima = i === migas.length - 1;

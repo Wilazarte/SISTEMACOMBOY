@@ -1,21 +1,38 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bell, BellOff, Boxes, ClipboardList, FolderOpen, PackageCheck, PackagePlus, Receipt, Store, Truck, type LucideIcon } from "lucide-react";
+import { Bell, BellOff, Boxes, ClipboardList, Factory, FolderOpen, PackageCheck, PackagePlus, Receipt, Store, Truck, Wallet, type LucideIcon } from "lucide-react";
 import { cn } from "@/components/ui";
+import { useSesion } from "@/lib/auth";
 import type { Notificacion, TipoNotif } from "@/lib/notificaciones";
+import { MODULOS_NOTIF, NOMBRE_MODULO_NOTIF, marcarLeidas, useNotifFlujo, type NotifFlujo } from "@/lib/notificacionesFlujo";
+import { perfilPlanta } from "@/lib/permisosPlanta";
 import { guardarPrefs } from "@/lib/preferencias";
 import { useIr } from "./ir";
 
 const ICONO: Record<TipoNotif, LucideIcon> = { despacho: Truck, requerimiento: ClipboardList, factura: Receipt, qc: PackageCheck, stock: Boxes, sucursal: Store, producto: PackagePlus, expediente: FolderOpen };
+const ICONO_MODULO: Record<string, LucideIcon> = { LOGISTICA: Truck, PRODUCCION: Factory, ALMACEN: Boxes, FINANZAS: Wallet };
 
-/** Campana roja: avisos en vivo; "vistas" se guardan en las preferencias del usuario. */
+type Pestana = "TODOS" | (typeof MODULOS_NOTIF)[number];
+
+/**
+ * Campana: avisos calculados en vivo ("vistas" en las preferencias) + avisos del flujo v3.0 guardados en la tabla
+ * notificaciones (leída en la base). Cuenta lo no leído asignado al usuario o a su módulo; SOPORTE ve todo, por pestañas.
+ */
 export function Campana({ notifs, vistas }: { notifs: Notificacion[]; vistas: string[] }) {
   const ir = useIr();
+  const { sesion } = useSesion();
+  const perfil = perfilPlanta(sesion);
+  const soporte = perfil === "soporte";
+  const flujo = useNotifFlujo(!!perfil && perfil !== "gerencia");
   const [abierta, setAbierta] = useState(false);
+  const [pestana, setPestana] = useState<Pestana>("TODOS");
   const caja = useRef<HTMLDivElement>(null);
   const visto = new Set(vistas);
-  const nuevas = notifs.filter((n) => !visto.has(n.clave)).length;
+  const sinLeer = flujo.items.filter((n) => !n.leida);
+  const nuevas = notifs.filter((n) => !visto.has(n.clave)).length + sinLeer.length;
+  const delFlujo = pestana === "TODOS" ? flujo.items : flujo.items.filter((n) => n.modulo === pestana);
+  const calculados = pestana === "TODOS" ? notifs : [];
 
   useEffect(() => {
     if (!abierta) return;
@@ -56,18 +73,54 @@ export function Campana({ notifs, vistas }: { notifs: Notificacion[]; vistas: st
           <div className="flex items-center justify-between border-b border-plomo-200 px-4 py-3">
             <p className="text-sm font-semibold text-fg">Notificaciones</p>
             {nuevas > 0 && (
-              <button onClick={() => marcar(notifs.map((n) => n.clave))} className="rounded-md px-1.5 py-1 text-xs font-medium text-rojo hover:bg-rojo-soft">
+              <button
+                onClick={() => {
+                  marcar(notifs.map((n) => n.clave));
+                  void marcarLeidas(delFlujo.filter((n) => !n.leida).map((n) => n.id));
+                }}
+                className="rounded-md px-1.5 py-1 text-xs font-medium text-rojo hover:bg-rojo-soft"
+              >
                 Marcar todo como leído
               </button>
             )}
           </div>
+          {soporte && flujo.disponible && (
+            <div className="flex gap-1 overflow-x-auto border-b border-plomo-200 px-3 py-2" role="tablist" aria-label="Notificaciones por módulo">
+              {(["TODOS", ...MODULOS_NOTIF] as Pestana[]).map((m) => {
+                const n = m === "TODOS" ? sinLeer.length : sinLeer.filter((x) => x.modulo === m).length;
+                return (
+                  <button
+                    key={m}
+                    role="tab"
+                    aria-selected={pestana === m}
+                    onClick={() => setPestana(m)}
+                    className={cn("shrink-0 rounded-md px-2 py-1 text-[12px] font-semibold transition", pestana === m ? "bg-[#FF6D00] text-white" : "text-fg-2 hover:bg-plomo-50")}
+                  >
+                    {m === "TODOS" ? "Todos" : NOMBRE_MODULO_NOTIF[m]}
+                    {n > 0 && <span className="ml-1 opacity-80">({n})</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <div className="max-h-[420px] overflow-y-auto">
-            {notifs.length === 0 ? (
+            {delFlujo.map((n) => (
+              <ItemFlujo
+                key={n.id}
+                n={n}
+                onAbrir={() => {
+                  if (!n.leida) void marcarLeidas([n.id]);
+                  setAbierta(false);
+                  if (n.href) ir(n.href);
+                }}
+              />
+            ))}
+            {delFlujo.length === 0 && calculados.length === 0 ? (
               <div className="flex flex-col items-center gap-2 px-4 py-10 text-sm text-plomo-500">
                 <BellOff size={22} /> Todo al día
               </div>
             ) : (
-              notifs.map((n) => {
+              calculados.map((n) => {
                 const Icon = ICONO[n.tipo];
                 const nueva = !visto.has(n.clave);
                 return (
@@ -97,5 +150,25 @@ export function Campana({ notifs, vistas }: { notifs: Notificacion[]; vistas: st
         </div>
       )}
     </div>
+  );
+}
+
+/** Aviso del flujo v3.0 (tabla notificaciones): fase, módulo destino y fecha. Naranja #FF6D00 del flujo oficial. */
+function ItemFlujo({ n, onAbrir }: { n: NotifFlujo; onAbrir: () => void }) {
+  const Icon = ICONO_MODULO[n.modulo] ?? FolderOpen;
+  return (
+    <button onClick={onAbrir} className="flex w-full gap-3 border-b border-plomo-100 px-4 py-3 text-left transition-colors hover:bg-plomo-50">
+      <span className={cn("mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", n.leida ? "bg-plomo-100 text-plomo-500" : "bg-[#FF6D00]/15 text-[#FF6D00]")}>
+        <Icon size={15} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className={cn("block text-[13px] leading-snug", n.leida ? "font-medium text-fg-2" : "font-semibold text-fg")}>{n.titulo}</span>
+        {n.mensaje && <span className="mt-0.5 block truncate text-xs text-plomo-500">{n.mensaje}</span>}
+        <span className="mt-0.5 block text-[11px] text-plomo-500">
+          <span className="font-semibold text-[#FF6D00]">Flujo v3.0</span>{n.fase ? ` · fase ${n.fase}` : ""} · para {NOMBRE_MODULO_NOTIF[n.modulo] ?? n.modulo} · {new Date(n.created_at).toLocaleString("es-PE", { timeZone: "America/Lima", dateStyle: "short", timeStyle: "short" })}
+        </span>
+      </span>
+      {!n.leida && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[#FF6D00] ring-[3px] ring-[#FF6D00]/20" aria-label="Sin leer" />}
+    </button>
   );
 }
