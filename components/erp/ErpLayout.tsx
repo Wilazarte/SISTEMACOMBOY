@@ -76,9 +76,20 @@ export function ErpLayout({
 }
 
 /** Contenido del módulo: isla de pestañas y la página (sin barra de contexto, pedido de Williams 2026-10-29). */
-export function ErpContenido({ avisos, children }: { /** Avisos bajo la isla (solo lectura, observaciones de Gerencia…). */ avisos?: ReactNode; children: ReactNode }) {
+export function ErpContenido({
+  avisos,
+  encabezado,
+  children,
+}: {
+  /** Avisos bajo la isla (solo lectura, observaciones de Gerencia…). */
+  avisos?: ReactNode;
+  /** Pestaña de una acción del INICIO: "Volver a INICIO [MÓDULO]". */
+  encabezado?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <div className="animate-velo space-y-5" /* solo opacidad: un transform rompería los modales fijos */>
+      {encabezado}
       {/* Menú isla del módulo (components/ui Tabs dibuja aquí su IslandMenu): fijo al hacer scroll */}
       <div id={ID_BARRA_PESTANAS} className="sticky top-16 z-10 empty:hidden" />
       {avisos}

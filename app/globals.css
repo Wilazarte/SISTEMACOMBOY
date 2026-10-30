@@ -104,7 +104,7 @@ html, body, button, input, select, textarea, table, th, td, div, span, p, h1, h2
    Fondo negro #0A0A0A con grid, tarjetas #141414, bordes #2A2A2A, primario naranja #d50000, texto blanco. */
 .tema-planta {
   color-scheme: dark;
-  --canvas: 10 10 10;
+  --canvas: 26 26 26;
   --surface: 20 20 20;
   --fg: 255 255 255;
   --fg-2: 229 229 229;
@@ -204,7 +204,7 @@ table, .tabular { font-variant-numeric: tabular-nums; }
 
 /* Fondo de los módulos: negro con grid tenue (ErpLayout) */
 .fondo-grid {
-  background-color: #0a0a0a;
+  background-color: #1a1a1a; /* ERP v3.0: fondo #1A1A1A (Williams, 2026-10-30) */
   background-image:
     linear-gradient(rgb(213 0 0 / 0.05) 1px, transparent 1px),
     linear-gradient(90deg, rgb(213 0 0 / 0.05) 1px, transparent 1px);

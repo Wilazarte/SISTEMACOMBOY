@@ -1,7 +1,7 @@
 "use client";
 
 import { FiltrosPlegables } from "@/components/ui/BotonFiltros";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Ban, CheckCircle2, ClipboardCheck, Factory, Plus } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, Textarea, ejecutar, ejecutarAsync, toast } from "@/components/ui";
@@ -21,6 +21,14 @@ export default function ProduccionPage() {
   const [qcDe, setQcDe] = useState<OrdenProduccion | null>(null);
   const [filtro, setFiltro] = useState("");
   const habilitado = puede(rol, "req.crear") && !getSesion()?.soloLectura; // Almacén / producción y creador
+
+  // Botones del INICIO Producción: ?nueva=1 abre "Nueva orden de producción"; ?estado= filtra la lista (Control de calidad)
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const estado = q.get("estado");
+    if (estado && ["EN_FABRICACION", "QC_APROBADO", "ANULADA"].includes(estado)) setFiltro(estado);
+    if (q.get("nueva") === "1" && habilitado) setForm(opVacia());
+  }, [habilitado]);
   const lista = [...ops].filter((o) => !filtro || o.estado === filtro).sort((a, b) => b.id.localeCompare(a.id));
   const enFab = ops.filter((o) => o.estado === "EN_FABRICACION").length;
 

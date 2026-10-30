@@ -238,6 +238,9 @@ export interface PestanaActiva {
   ruta: string;
 }
 
+/** Sin barras de pestañas: la navegación es por los botones del INICIO de cada módulo. */
+const SIN_MENUS = true;
+
 export function Tabs<T extends string>({
   tabs,
   value,
@@ -269,11 +272,15 @@ export function Tabs<T extends string>({
   const ref = useRef({ tabs, value, onChange });
   ref.current = { tabs, value, onChange };
   useEffect(() => {
-    if (enLinea) return;
     const abrir = (id: string | null) => {
       const { tabs: ts, value: v, onChange: cambiar } = ref.current;
       if (id && id !== v && ts.some((t) => t.id === id)) cambiar(id as T);
     };
+    // Sub-pestañas (Planilla, Catálogo): ?sub=<id> las abre desde un botón del INICIO
+    if (enLinea) {
+      abrir(new URLSearchParams(window.location.search).get("sub"));
+      return;
+    }
     abrir(new URLSearchParams(window.location.search).get("tab"));
     const ir = (e: Event) => abrir((e as CustomEvent<string>).detail);
     window.addEventListener(EV_IR_PESTANA, ir);
@@ -293,9 +300,12 @@ export function Tabs<T extends string>({
     }
   };
 
-  // Menú isla flotante (components/layout/IslandMenu): una sola cápsula con acciones + pestañas
+  // Menú isla flotante (components/layout/IslandMenu): una sola cápsula con acciones + pestañas.
+  // ERP v3.0 (Williams, 2026-10-30): sin menús. Cada pestaña es un botón del INICIO del módulo que la abre en una
+  // pestaña nueva (?tab= / ?sub=), así que la isla solo conserva sus acciones (Buscar, Nuevo…), si las tiene.
   if (fueraDeIsla.includes(value)) return null;
-  const items = tabs.filter((t) => !fueraDeIsla.includes(t.id));
+  if (SIN_MENUS && !acciones?.length) return null;
+  const items = SIN_MENUS ? [] : tabs.filter((t) => !fueraDeIsla.includes(t.id));
   const barra = <IslandMenu items={items} activo={value} onElegir={(id) => elegir(id as T)} acciones={acciones} className={enLinea && !enBarra ? "mx-0 mt-0" : undefined} />;
   return destino ? createPortal(barra, destino) : barra;
 }

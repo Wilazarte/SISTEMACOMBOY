@@ -17,7 +17,8 @@ export interface MensajeChat {
 
 const ULTIMOS = 30;
 
-export function useChat(sesion: Sesion | null, modulo: string) {
+/** `soloModulo`: solo los mensajes del grupo de este módulo (INICIO de cada módulo); sin él, todos (Gerencia). */
+export function useChat(sesion: Sesion | null, modulo: string, soloModulo = false) {
   const [mensajes, setMensajes] = useState<MensajeChat[]>([]);
   const [faltaTabla, setFaltaTabla] = useState(false);
 
@@ -25,9 +26,9 @@ export function useChat(sesion: Sesion | null, modulo: string) {
     if (!sesion) return;
     const sb = createClient();
     let vivo = true;
-    void sb
-      .from("chat_mensajes")
-      .select("id,creado,usuario,nombre,modulo,texto")
+    let consulta = sb.from("chat_mensajes").select("id,creado,usuario,nombre,modulo,texto");
+    if (soloModulo) consulta = consulta.eq("modulo", modulo);
+    void consulta
       .order("creado", { ascending: false })
       .limit(ULTIMOS)
       .then(({ data, error }) => {
@@ -40,8 +41,8 @@ export function useChat(sesion: Sesion | null, modulo: string) {
         setMensajes(((data ?? []) as MensajeChat[]).reverse());
       });
     const canal = sb
-      .channel("erp-chat")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_mensajes" }, (p) => {
+      .channel(soloModulo ? `erp-chat-${modulo}` : "erp-chat")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "chat_mensajes", ...(soloModulo ? { filter: `modulo=eq.${modulo}` } : {}) }, (p) => {
         const m = p.new as MensajeChat;
         setMensajes((l) => (l.some((x) => x.id === m.id) ? l : [...l, m].slice(-ULTIMOS)));
       })
@@ -50,7 +51,7 @@ export function useChat(sesion: Sesion | null, modulo: string) {
       vivo = false;
       void sb.removeChannel(canal);
     };
-  }, [sesion]);
+  }, [sesion, modulo, soloModulo]);
 
   const enviar = useCallback(
     async (texto: string): Promise<string | null> => {

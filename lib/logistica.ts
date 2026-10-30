@@ -181,7 +181,8 @@ export function useLogistica() {
 
 export type DatosLogistica = ReturnType<typeof useLogistica>;
 
-/** Abre un módulo en una pestaña nueva (igual que VENTAS). */
+/** Abre un módulo en una pestaña nueva (igual que VENTAS). Las rutas del ERP conservan window.opener para avisar al guardar. */
 export const abrirPestana = (href: string): void => {
-  window.open(href, "_blank", "noopener");
+  if (href.startsWith("/")) window.open(href, "_blank");
+  else window.open(href, "_blank", "noopener");
 };
