@@ -94,7 +94,7 @@ export function Campana({ notifs, vistas }: { notifs: Notificacion[]; vistas: st
                     role="tab"
                     aria-selected={pestana === m}
                     onClick={() => setPestana(m)}
-                    className={cn("shrink-0 rounded-md px-2 py-1 text-[12px] font-semibold transition", pestana === m ? "bg-corp text-white" : "text-fg-2 hover:bg-plomo-50")}
+                    className={cn("shrink-0 rounded-md px-2 py-1 text-[12px] font-semibold transition", pestana === m ? "bg-[#FF6D00] text-white" : "text-fg-2 hover:bg-plomo-50")}
                   >
                     {m === "TODOS" ? "Todos" : NOMBRE_MODULO_NOTIF[m]}
                     {n > 0 && <span className="ml-1 opacity-80">({n})</span>}
@@ -153,22 +153,22 @@ export function Campana({ notifs, vistas }: { notifs: Notificacion[]; vistas: st
   );
 }
 
-/** Aviso del flujo v3.0 (tabla notificaciones): fase, módulo destino y fecha. */
+/** Aviso del flujo v3.0 (tabla notificaciones): fase, módulo destino y fecha. Naranja #FF6D00 del flujo oficial. */
 function ItemFlujo({ n, onAbrir }: { n: NotifFlujo; onAbrir: () => void }) {
   const Icon = ICONO_MODULO[n.modulo] ?? FolderOpen;
   return (
     <button onClick={onAbrir} className="flex w-full gap-3 border-b border-plomo-100 px-4 py-3 text-left transition-colors hover:bg-plomo-50">
-      <span className={cn("mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", n.leida ? "bg-plomo-100 text-plomo-500" : "bg-rojo-soft text-rojo")}>
+      <span className={cn("mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", n.leida ? "bg-plomo-100 text-plomo-500" : "bg-[#FF6D00]/15 text-[#FF6D00]")}>
         <Icon size={15} />
       </span>
       <span className="min-w-0 flex-1">
         <span className={cn("block text-[13px] leading-snug", n.leida ? "font-medium text-fg-2" : "font-semibold text-fg")}>{n.titulo}</span>
         {n.mensaje && <span className="mt-0.5 block truncate text-xs text-plomo-500">{n.mensaje}</span>}
         <span className="mt-0.5 block text-[11px] text-plomo-500">
-          Flujo v3.0{n.fase ? ` · fase ${n.fase}` : ""} · para {NOMBRE_MODULO_NOTIF[n.modulo] ?? n.modulo} · {new Date(n.created_at).toLocaleString("es-PE", { timeZone: "America/Lima", dateStyle: "short", timeStyle: "short" })}
+          <span className="font-semibold text-[#FF6D00]">Flujo v3.0</span>{n.fase ? ` · fase ${n.fase}` : ""} · para {NOMBRE_MODULO_NOTIF[n.modulo] ?? n.modulo} · {new Date(n.created_at).toLocaleString("es-PE", { timeZone: "America/Lima", dateStyle: "short", timeStyle: "short" })}
         </span>
       </span>
-      {!n.leida && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-corp ring-[3px] ring-rojo-soft" aria-label="Sin leer" />}
+      {!n.leida && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-[#FF6D00] ring-[3px] ring-[#FF6D00]/20" aria-label="Sin leer" />}
     </button>
   );
 }

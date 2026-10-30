@@ -75,7 +75,7 @@ export function DashboardLotes() {
       </header>
 
       {s.faltaTabla && <AvisoSql />}
-      {s.error && <p className="text-[13px] text-[#93c5fd]">{s.error}</p>}
+      {s.error && <p className="text-[13px] text-[#FFB27A]">{s.error}</p>}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         {[
@@ -86,7 +86,7 @@ export function DashboardLotes() {
           ["Costo estimado", soles(kpi.estimado)],
           ["Margen < 22 %", String(kpi.margenBajo)],
         ].map(([k, v]) => (
-          <div key={k} className="rounded-xl border border-[#2a3445] border-b-[#2a7bff] bg-[#0e1219] px-3 py-3">
+          <div key={k} className="rounded-xl border border-[#333333] border-b-[#FF6D00] bg-[#1A1A1A] px-3 py-3">
             <p className="text-[12px] uppercase text-[#a1a1aa]">{k}</p>
             <p className="text-xl font-bold text-white">{v}</p>
           </div>
@@ -95,8 +95,8 @@ export function DashboardLotes() {
 
       <Seccion>
         <div className="flex flex-wrap items-center gap-3">
-          <label className="flex min-w-[260px] flex-1 items-center gap-2 rounded-lg border border-[#3a4558] bg-[#1a212e] px-3 py-2">
-            <Search size={16} className="text-[#60a5fa]" />
+          <label className="flex min-w-[260px] flex-1 items-center gap-2 rounded-lg border border-[#444444] bg-[#222222] px-3 py-2">
+            <Search size={16} className="text-[#FF9A4D]" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por código 26W, N° de serie, RUC, OC, OP, chasis, guía…" className="w-full bg-transparent text-[14px] text-white outline-none placeholder:text-[#71717a]" />
           </label>
           <label className="flex items-center gap-2 text-[13px]">
@@ -105,22 +105,22 @@ export function DashboardLotes() {
         </div>
       </Seccion>
 
-      {s.listo && !s.faltaTabla && filas.length === 0 && <p className="rounded-lg border border-dashed border-[#2a3445] p-6 text-center text-[13px] text-[#a1a1aa]">Sin expedientes registrados. El primero nace con la Nueva OP de Logística.</p>}
+      {s.listo && !s.faltaTabla && filas.length === 0 && <p className="rounded-lg border border-dashed border-[#333333] p-6 text-center text-[13px] text-[#a1a1aa]">Sin expedientes registrados. El primero nace con la Nueva OP de Logística.</p>}
 
       <div className="flex gap-3 overflow-x-auto pb-2">
         {[...FASES, ...(verCerrados ? (["CERRADO"] as const) : [])].map((n) => {
           const items = columna(n);
           return (
-            <div key={n} className="w-64 shrink-0 rounded-xl border border-[#2a3445] bg-[#111] p-2">
-              <h3 className="mb-2 px-1 text-[12px] font-bold uppercase text-[#60a5fa]">
+            <div key={n} className="w-64 shrink-0 rounded-xl border border-[#333333] bg-[#111] p-2">
+              <h3 className="mb-2 px-1 text-[12px] font-bold uppercase text-[#FF9A4D]">
                 {n === "CERRADO" ? "Cerrados" : `${n}. ${TITULO_FASE[n]}`}
                 <span className="block text-[11px] font-normal normal-case text-[#a1a1aa]">{n === "CERRADO" ? "Expediente completo" : NOMBRE_PERFIL[RESPONSABLE[n]]} · {items.length}</span>
               </h3>
               <div className="space-y-2">
                 {items.map(({ x, r, c }) => (
-                  <button key={x.id} type="button" onClick={() => abrir(x.codigo_expediente)} className="block w-full rounded-lg border border-[#2a3445] bg-[#0e1219] p-2.5 text-left transition hover:border-[#2a7bff]">
+                  <button key={x.id} type="button" onClick={() => abrir(x.codigo_expediente)} className="block w-full rounded-lg border border-[#333333] bg-[#1A1A1A] p-2.5 text-left transition hover:border-[#FF6D00]">
                     <span className="flex items-center justify-between gap-2">
-                      <span className="text-[17px] font-black text-[#2a7bff]">{x.codigo_expediente}</span>
+                      <span className="text-[17px] font-black text-[#FF6D00]">{x.codigo_expediente}</span>
                       {x.is_demo && <span className="rounded bg-white/10 px-1.5 text-[10px] text-[#a1a1aa]">DEMO</span>}
                     </span>
                     <span className="block truncate text-[13px] font-semibold text-white">{x.datos.producto}</span>

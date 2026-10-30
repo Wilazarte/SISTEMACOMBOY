@@ -4,16 +4,27 @@ import type { ReactNode } from "react";
 import { cn } from "@/components/ui";
 import type { EstadoFase } from "@/lib/expedientes";
 
-// Piezas de las pantallas de expedientes 26W: oscuro #0e1219 con acento rojo #2a7bff (diseño de los módulos).
+// Piezas de las pantallas de expedientes 26W: oscuro #1A1A1A con el naranja #FF6D00 del flujo oficial v3.0
+// (Williams 2026-10-30: el naranja va solo en el flujo y sus avisos; el resto del ERP sigue negro-azul).
 
-export const ROJO = "#2a7bff";
+export const NARANJA = "#FF6D00";
+
+/** Fondo del flujo v3.0: mapa mundi de puntos, tenue, detrás del contenido. */
+export function FondoFlujo({ children }: { children: ReactNode }) {
+  return (
+    <div className="relative isolate">
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[520px] bg-[url('/assets/world-map-dots.svg')] bg-contain bg-top bg-no-repeat opacity-[0.08] print:hidden" />
+      {children}
+    </div>
+  );
+}
 
 export function Seccion({ titulo, accion, children, className }: { titulo?: string; accion?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={cn("rounded-xl border border-[#2a3445] bg-[#0e1219] p-4 text-[#e5e7eb]", className)}>
+    <section className={cn("rounded-xl border border-[#333333] bg-[#1A1A1A] p-4 text-[#e5e7eb]", className)}>
       {titulo && (
         <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-[14px] font-bold uppercase tracking-wide text-[#60a5fa]">{titulo}</h2>
+          <h2 className="text-[14px] font-bold uppercase tracking-wide text-[#FF9A4D]">{titulo}</h2>
           {accion}
         </header>
       )}
@@ -31,7 +42,7 @@ export function Boton({ children, onClick, lleno, disabled, title, type = "butto
       title={title}
       className={cn(
         "inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-40",
-        lleno ? "bg-[#2a7bff] text-white hover:bg-[#1e64e6]" : "border border-[#3a4558] bg-[#1a212e] text-[#e5e7eb] hover:border-[#2a7bff] hover:text-white"
+        lleno ? "bg-[#FF6D00] text-white hover:bg-[#E65C00]" : "border border-[#444444] bg-[#222222] text-[#e5e7eb] hover:border-[#FF6D00] hover:text-white"
       )}
     >
       {children}
@@ -41,7 +52,7 @@ export function Boton({ children, onClick, lleno, disabled, title, type = "butto
 
 const TONO_FASE: Record<EstadoFase, string> = {
   HECHA: "bg-[#22c55e]/15 text-[#86efac] ring-[#22c55e]/40",
-  PENDIENTE: "bg-[#2a7bff]/20 text-[#93c5fd] ring-[#2a7bff]/60",
+  PENDIENTE: "bg-[#FF6D00]/20 text-[#FFB27A] ring-[#FF6D00]/60",
   NO_APLICA: "bg-white/5 text-[#a1a1aa] ring-white/10",
   BLOQUEADA: "bg-white/5 text-[#71717a] ring-white/10",
 };
@@ -60,7 +71,7 @@ export function Avance({ pct }: { pct: number }) {
   return (
     <span className="flex items-center gap-2">
       <span className="block h-2 w-full overflow-hidden rounded-full bg-white/10" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-        <span className="block h-full rounded-full bg-[#2a7bff]" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
+        <span className="block h-full rounded-full bg-[#FF6D00]" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
       </span>
       <span className="w-10 text-right text-[12px] font-bold text-white">{pct}%</span>
     </span>
