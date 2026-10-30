@@ -92,7 +92,7 @@ export function BarraModulos({ sesion, actual }: { sesion: Sesion | null; actual
  * Accesos rápidos: los 4 módulos en 4 columnas. El actual va resaltado y abre su módulo de trabajo;
  * los demás abren su home en una pestaña nueva. Sin permiso: candado y "No autorizado".
  */
-export function AccesosModulos({ sesion, actual }: { sesion: Sesion | null; actual: ModuloPlanta }) {
+export function AccesosModulos({ sesion, actual }: { sesion: Sesion | null; /** Módulo resaltado (sin él, ninguno: INICIO SOPORTE). */ actual?: ModuloPlanta }) {
   return (
     <section>
       <h2 className="mb-3 text-xl font-bold uppercase text-[#60a5fa]">Accesos rápidos</h2>

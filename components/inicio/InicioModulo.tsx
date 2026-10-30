@@ -8,6 +8,8 @@ import { recargarExpedientes, useExpedientes } from "@/lib/expedientes";
 import { SALA_MODULO, TITULO_INICIO, accionesPermitidas, urlBoton, type AccionInicio, type ModuloInicio } from "@/lib/inicioModulos";
 import { urlSala } from "@/lib/presencia";
 import { recargarDatos, type StoreKey, KEYS } from "@/lib/storage";
+import { AccesosModulos, type ModuloPlanta } from "@/components/logistica/planta";
+import { permisosPlanta } from "@/lib/permisosPlanta";
 import { HOOK_KPIS, type KpiInicio } from "./kpis";
 
 // INICIO de cada módulo (ERP v3.0): encabezado INICIO [MÓDULO] + código 26W, 4 KPIs reales, a la izquierda (30 %)
@@ -91,6 +93,9 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
           </label>
         )}
       </header>
+
+      {/* Acceso rápido a los 4 módulos (solo SOPORTE): estaba en los paneles, ahora va en el INICIO */}
+      {permisosPlanta(sesion).canViewOtherModules && <AccesosModulos sesion={sesion} actual={modulo === "soporte" ? undefined : (modulo as ModuloPlanta)} />}
 
       <FilaKpis key={modulo} modulo={modulo} />
 
