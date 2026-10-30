@@ -201,7 +201,8 @@ export const MODULOS_LOGIN: Record<ModuloLogin, { nombre: string; ruta: string; 
   sucursal: { nombre: "Secocha", ruta: RUTA_SUCURSAL, rutas: [RUTA_SUCURSAL, RUTA_SUCURSAL_ANTIGUA] },
   almacen: { nombre: "Almacén", ruta: "/almacen", rutas: ["/almacen", "/dashboard/almacen"] },
   planilla: { nombre: "Planilla", ruta: "/dashboard/planilla", rutas: ["/dashboard/planilla"] },
-  gerencia: { nombre: "Gerencia", ruta: "/dashboard", rutas: [] },
+  // GERENCIA (visor de solo lectura): su Dashboard Gerencia
+  gerencia: { nombre: "Gerencia General", ruta: RUTA_GERENCIA, rutas: [RUTA_GERENCIA] },
   // SOPORTE: solo el dueño del sistema (creador / soporte); entra al Dashboard con acceso a todo
   soporte: { nombre: "Soporte", ruta: "/dashboard", rutas: [] },
   finanzas: { nombre: "Finanzas", ruta: "/finanzas", rutas: ["/finanzas", "/dashboard/compras", "/dashboard/planilla"], roles: ["tesoreria", "planilla"] },

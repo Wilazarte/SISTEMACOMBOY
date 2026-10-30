@@ -8,13 +8,17 @@ import { CLAVE_MODULO, CLAVE_USUARIO, MODULOS_LOGIN, RUTA_LOGIN_SUCURSAL, RUTA_S
 import { CLAVE_SELECCION, ENCARGADOS_LOGIN, tarjetaDe } from "@/components/modulos-login";
 import { homeAsignado } from "@/lib/permisosPlanta";
 
-/** Botones del dock: `slug` es la ruta /login/<slug> (app/login/[modulo] redirige a /login?modulo=). */
-const DOCK: { id: ModuloLogin; slug: string; titulo: string; icon: LucideIcon }[] = [
-  { id: "soporte", slug: "soporte", titulo: "SOPORTE", icon: BarChart3 },
-  { id: "logistica", slug: "logistica", titulo: "LOGISTICA", icon: Truck },
-  { id: "almacen", slug: "almacen", titulo: "ALMACEN", icon: Landmark },
-  { id: "finanzas", slug: "finanzas", titulo: "FINANZAS", icon: Factory },
-  { id: "produccion", slug: "produccion", titulo: "PRODUCCION", icon: Store },
+/**
+ * Tarjetas de perfil (matriz de Williams, 2026-10-30): iniciales, persona y perfil. `slug` es la ruta /login/<slug>
+ * (app/login/[modulo] redirige a /login?modulo=). GERENCIA es nuevo y de solo lectura; PRODUCCION, permisos limitados.
+ */
+const DOCK: { id: ModuloLogin; slug: string; titulo: string; iniciales: string; persona: string; icon: LucideIcon; badge?: { texto: string; clase: string } }[] = [
+  { id: "soporte", slug: "soporte", titulo: "SOPORTE", iniciales: "AS", persona: "Adm", icon: BarChart3, badge: { texto: "Admin", clase: "bg-white/15 text-white" } },
+  { id: "finanzas", slug: "finanzas", titulo: "FINANZAS", iniciales: "LF", persona: "Lizbeth", icon: Factory },
+  { id: "almacen", slug: "almacen", titulo: "ALMACEN", iniciales: "JA", persona: "Jose", icon: Landmark },
+  { id: "logistica", slug: "logistica", titulo: "LOGISTICA", iniciales: "WL", persona: "Williams", icon: Truck },
+  { id: "produccion", slug: "produccion", titulo: "PRODUCCION", iniciales: "MP", persona: "Manuel", icon: Store, badge: { texto: "Permisos limitados", clase: "bg-white/10 text-white/80" } },
+  { id: "gerencia", slug: "gerencia", titulo: "GERENCIA GENERAL", iniciales: "GG", persona: "Gerencia General", icon: BarChart3, badge: { texto: "NEW · Read-Only", clase: "bg-[#facc15] text-black" } },
 ];
 
 /**
@@ -233,8 +237,8 @@ function Login() {
 
       {/* Dock de módulos (scroll horizontal en mobile) */}
       <nav className="mt-10 w-full px-4 pb-10">
-        <div className="mx-auto flex w-full max-w-[1050px] justify-between gap-3 overflow-x-auto rounded-full border border-white/15 bg-black/55 px-6 py-4 backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {DOCK.map(({ id, slug, titulo, icon: Icon }) => {
+        <div className="mx-auto flex w-full max-w-[1100px] justify-between gap-3 overflow-x-auto rounded-3xl border border-white/15 bg-black/55 px-6 py-4 backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {DOCK.map(({ id, slug, titulo, iniciales, persona, badge }) => {
             const sel = activo === id;
             return (
               <button
@@ -243,12 +247,14 @@ function Login() {
                 data-modulo={id}
                 aria-pressed={sel}
                 onClick={() => elegir(id, slug)}
-                className={`flex h-20 min-w-[112px] flex-1 flex-col items-center justify-center gap-1.5 rounded-full border bg-[#141414]/90 text-[15px] font-bold text-white transition-all duration-200 hover:scale-105 hover:border-[#D50000] hover:shadow-[0_0_20px_rgba(213,0,0,0.75)] ${
+                className={`flex min-h-[118px] min-w-[128px] flex-1 flex-col items-center justify-center gap-1 rounded-2xl border bg-[#141414]/90 px-2 py-3 text-center text-white transition-all duration-200 hover:scale-105 hover:border-[#D50000] hover:shadow-[0_0_20px_rgba(213,0,0,0.75)] ${
                   sel ? "scale-105 border-[#D50000] shadow-[0_0_22px_rgba(213,0,0,0.9)]" : "border-white/15"
                 }`}
               >
-                <Icon size={24} strokeWidth={2} />
-                {titulo}
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-[15px] font-bold">{iniciales}</span>
+                <span className="text-[14px] font-bold leading-tight">{persona}</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-white/60">{titulo}</span>
+                {badge && <span className={`mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${badge.clase}`}>{badge.texto}</span>}
               </button>
             );
           })}

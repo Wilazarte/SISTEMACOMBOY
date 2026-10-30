@@ -37,13 +37,13 @@ export const ENCARGADOS_LOGIN: Record<ModuloLogin, { nombre: string; cargo: stri
   ventas: { nombre: "LIZBETH CAHUANA APFATA", cargo: "Tesorera - Módulo de Ventas" },
   contable: { nombre: "Área Contable", cargo: "Contabilidad - COMBOY VID" },
   tesoreria: { nombre: "LIZBETH CAHUANA APFATA", cargo: "Tesorera - Módulo de Compras" },
-  produccion: { nombre: "JOSE MANUEL ORTIZ ARAPA", cargo: "Jefe de Almacén - Módulo de Inventario" },
-  logistica: { nombre: "JOSE MANUEL ORTIZ ARAPA", cargo: "Jefe de Almacén - Módulo de Logística" },
+  produccion: { nombre: "MANUEL CORNEJO APAZA", cargo: "Producción - permisos limitados" },
+  logistica: { nombre: "WILLIAMS LAZARTE COLQUE", cargo: "Logística - emite las Órdenes de Producción" },
   sucursal: { nombre: "COMBOY VID SECOCHA", cargo: "Sede Secocha" },
   almacen: { nombre: "JOSE MANUEL ORTIZ ARAPA", cargo: "Jefe de Almacén - Módulo de Almacén" },
   planilla: { nombre: "Encargado de Planilla", cargo: "RRHH - Módulo de Planilla" },
-  gerencia: { nombre: "Gerencia General", cargo: "Gerencia - COMBOY VID" },
-  soporte: { nombre: "SOPORTE", cargo: "Dueño del sistema - COMBOY VID" },
+  gerencia: { nombre: "Gerencia General", cargo: "Gerencia - solo lectura" },
+  soporte: { nombre: "Adm", cargo: "Soporte - administrador del sistema" },
   finanzas: { nombre: "LIZBETH CAHUANA APFATA", cargo: "Tesorera - Módulo de Finanzas" },
 };
 

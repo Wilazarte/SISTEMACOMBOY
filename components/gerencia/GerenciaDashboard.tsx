@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ClipboardList, Factory, Gauge, HandCoins, Package, TrendingUp } from "lucide-react";
+import { AlertTriangle, ClipboardList, Factory, Gauge, HandCoins, Layers, Package, ShoppingCart, TrendingUp } from "lucide-react";
 import { ErpAlertList, type ErpAlerta } from "@/components/erp/ErpAlertList";
 import { ErpStatsCard } from "@/components/erp/ErpStatsCard";
 import { ErpTable, ErpTd } from "@/components/erp/ErpTable";
 import { Etiqueta, Panel } from "@/components/logistica/piezas";
 import { EncabezadoPlanta, MarcoPlanta, PanelLateral, horaActual, montoCorto } from "@/components/logistica/planta";
 import { useSesion } from "@/lib/auth";
+import { useExpedientes } from "@/lib/expedientes";
 import { useGerencia } from "@/lib/gerencia";
 import { useNotificaciones } from "@/lib/notificaciones";
 import type { OrdenProduccion } from "@/lib/produccion";
@@ -30,6 +31,9 @@ export function GerenciaDashboard() {
   const { sesion } = useSesion();
   const notifs = useNotificaciones(sesion);
   const g = useGerencia();
+  const exp = useExpedientes();
+  const lotesActivos = exp.expedientes.filter((x) => x.estado === "ABIERTO");
+  const avanceLotes = lotesActivos.length ? Math.round(lotesActivos.reduce((a, x) => a + (x.estado_avance || 0), 0) / lotesActivos.length) : 0;
   const comprobantes = useStore<ComprobanteVenta[]>(KEYS.COMPROBANTES, []);
   const ops = useStore<OrdenProduccion[]>(KEYS.PRODUCCION, []);
   const stock = useStore<StockItem[]>(KEYS.STOCK, []);
@@ -75,8 +79,15 @@ export function GerenciaDashboard() {
         accion={<span className="text-[13px] text-[#d4d4d8]">Actualizado: Hoy · {sync} hrs</span>}
       />
 
-      {/* 4 KPIs */}
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* KPIs de todos los módulos (solo lectura, sin botones de acción) */}
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <ErpStatsCard icono={<ShoppingCart size={18} />} titulo="Compras activas" valor={`${g.ticker.comprasActivas} OC`} detalle="Órdenes de compra en curso" />
+        <ErpStatsCard
+          icono={<Layers size={18} />}
+          titulo="Lotes activos"
+          valor={`${lotesActivos.length} lote(s)`}
+          detalle={exp.faltaTabla ? "Expedientes 26W sin instalar" : `${avanceLotes}% de avance promedio`}
+        />
         <ErpStatsCard icono={<TrendingUp size={18} />} titulo="Ventas del mes" valor={montoCorto(d.ventasMes)} detalle={d.emitidosMes ? `${d.emitidosMes} comprobante(s) emitido(s)` : "Sin registro este mes"} />
         <ErpStatsCard icono={<Factory size={18} />} titulo="Producción" valor={`${d.enFabricacion} OT`} detalle={`En fabricación · ${d.qcMes} con QC aprobado este mes`} />
         <ErpStatsCard icono={<Package size={18} />} titulo="Stock valorizado" valor={montoCorto(d.valorStock)} detalle={`${d.conStock} producto(s) con stock`} />
