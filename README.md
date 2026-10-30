@@ -5,9 +5,9 @@
 2. **Usuarios:** desde la raíz del proyecto, con `SUPABASE_SERVICE_ROLE_KEY` en `.env.local` (Supabase → Project Settings → API Keys → `service_role` / secret):
    ```bash
    npm install
-   node --env-file=.env.local scripts/crear-usuarios.mjs
+   CLAVE_INICIAL='una-clave-larga' node --env-file=.env.local scripts/crear-usuarios.mjs
    ```
-   Crea con la Admin API de Supabase los 5 usuarios `creador`, `tesoreria`, `almacen`, `planilla` y `gerencia` `@comboyvid.local`, con correo confirmado y contraseña **`123456`**. Si un usuario ya existe, lo **borra y lo vuelve a crear** (su id cambia).
+   Crea con la Admin API de Supabase los 5 usuarios `creador`, `tesoreria`, `almacen`, `planilla` y `gerencia` `@comboyvid.local`, con correo confirmado y la contraseña de `CLAVE_INICIAL` (mínimo 10 caracteres; ya no hay contraseña fija en el código). Si un usuario ya existe, **no se toca**.
    `--env-file` carga `.env.local` (Node 20.6 o superior). Alternativa: definir las dos variables en la terminal y correr `node scripts/crear-usuarios.mjs`.
 3. **Perfiles:** Supabase → SQL Editor → pegar `supabase/perfiles.sql` → *Run*. Asigna rol y módulos a cada usuario con su id real (hay que volver a correrlo cada vez que se ejecute el paso 2). Debe listar 5 filas.
 
@@ -15,7 +15,7 @@
 
    ⚠ La service role key salta todas las políticas de seguridad: solo en `.env.local` de la PC del administrador, **nunca** con prefijo `NEXT_PUBLIC_` ni subida a git. Después de crear los usuarios se puede borrar de `.env.local`.
 
-   ⚠ `123456` es la misma contraseña para los 5: cambiarla en Supabase → Authentication → Users antes de usar el ERP en producción.
+   ⚠ `CLAVE_INICIAL` es la misma para los 5: cada usuario debe cambiarla (Supabase → Authentication → Users) antes de usar el ERP en producción.
 4. **Datos anteriores:** entrar con `creador` en cada PC que tenía datos y pulsar **"Subir datos de este navegador"** (menú lateral). Se combinan por id, sin duplicar.
 
 ## Instalar y correr (en cada PC)
@@ -27,7 +27,7 @@ npm run build    # verificación de producción
 ```
 
 ## Usuarios y acceso
-Entrar en `/login` con el usuario (sin `@comboyvid.local`) y la contraseña `123456`. El login es de Supabase Auth; el rol y los módulos de cada usuario están en la tabla `perfiles`.
+Entrar en `/login` con el usuario (sin `@comboyvid.local`) y su contraseña. Tras 5 contraseñas incorrectas seguidas el usuario queda bloqueado 15 minutos (`supabase/migrations/20261102_login_intentos.sql`). Las páginas de `/dashboard` y `/secocha` las protege `middleware.ts` en el servidor. El login es de Supabase Auth; el rol y los módulos de cada usuario están en la tabla `perfiles`.
 
 | Usuario | Módulos | Permisos |
 |---|---|---|

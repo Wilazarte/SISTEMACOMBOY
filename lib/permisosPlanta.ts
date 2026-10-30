@@ -2,7 +2,7 @@
 // Se usa en las homes de la planta (/logistica, /almacen, /finanzas, /produccion) para mostrar u ocultar
 // acciones. Los módulos de trabajo (Ventas, Tesorería…) siguen con sus permisos de siempre.
 
-import type { Sesion } from "./auth";
+import type { Sesion } from "./permisos";
 
 /** gerencia: visor general (Dashboard Gerencia /gerencia), no es admin ni opera. */
 export type PerfilPlanta = "soporte" | "logistica" | "almacen" | "finanzas" | "produccion" | "gerencia";
