@@ -38,19 +38,19 @@ export function IslandMenu({
   className?: string;
 }) {
   return (
-    <div className={cn("mx-4 mt-3 flex gap-1 overflow-x-auto rounded-full border border-[#2a2a2a] bg-[#141414]/95 px-2 py-1.5 backdrop-blur", className)}>
+    <div className={cn("mx-4 mt-3 flex gap-1 overflow-x-auto rounded-full border border-[#2a3445] bg-[#1a212e]/95 px-2 py-1.5 backdrop-blur", className)}>
       {acciones.map((a) => (
         <button
           key={a.label}
           type="button"
           onClick={a.onClick}
-          className="flex shrink-0 items-center gap-1.5 rounded-full border border-[#2a2a2a] bg-[#1c1c1c] px-3 py-1.5 text-[13px] font-medium text-[#e5e7eb] transition hover:border-[#d50000] hover:text-white"
+          className="flex shrink-0 items-center gap-1.5 rounded-full border border-[#2a3445] bg-[#212a3a] px-3 py-1.5 text-[13px] font-medium text-[#e5e7eb] transition hover:border-[#2a7bff] hover:text-white"
         >
           {a.icon}
           {a.label}
         </button>
       ))}
-      {acciones.length > 0 && items.length > 0 && <span aria-hidden className="mx-1 my-1.5 w-px shrink-0 bg-[#2a2a2a]" />}
+      {acciones.length > 0 && items.length > 0 && <span aria-hidden className="mx-1 my-1.5 w-px shrink-0 bg-[#2a3445]" />}
       <div role="tablist" className="flex gap-1">
         {items.map((t) => {
           const on = activo === t.id;
@@ -63,13 +63,13 @@ export function IslandMenu({
               onClick={() => onElegir(t.id)}
               className={cn(
                 "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium transition duration-150",
-                on ? "bg-[#d50000] text-white" : "text-[#a1a1aa] hover:bg-[#1c1c1c] hover:text-white"
+                on ? "bg-[#2a7bff] text-white" : "text-[#a1a1aa] hover:bg-[#212a3a] hover:text-white"
               )}
             >
               {t.icon}
               {t.label}
               {t.count !== undefined && t.count > 0 && (
-                <span className={cn("rounded-full px-1.5 text-[11px] font-semibold", on ? "bg-white/20 text-white" : "bg-[#1c1c1c] text-[#e5e7eb]")}>{t.count}</span>
+                <span className={cn("rounded-full px-1.5 text-[11px] font-semibold", on ? "bg-white/20 text-white" : "bg-[#212a3a] text-[#e5e7eb]")}>{t.count}</span>
               )}
             </button>
           );

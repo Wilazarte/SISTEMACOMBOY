@@ -274,7 +274,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <>
           <button
             onClick={() => setPaleta(true)}
-            className="flex h-9 items-center gap-2.5 rounded-lg border border-[#2a2a2a] bg-[#141414] px-2.5 text-[13px] text-[#d4d4d8] transition hover:border-[#d50000] hover:text-white 2xl:w-72"
+            className="flex h-9 items-center gap-2.5 rounded-lg border border-[#2a3445] bg-[#1a212e] px-2.5 text-[13px] text-[#d4d4d8] transition hover:border-[#2a7bff] hover:text-white 2xl:w-72"
             aria-label="Abrir buscador global (Ctrl K)"
             title={buscador ? "Buscar REQ, OC, factura… (Ctrl K)" : "Buscar o ir a… (Ctrl K)"}
           >

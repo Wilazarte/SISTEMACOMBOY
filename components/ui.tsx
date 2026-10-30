@@ -54,7 +54,7 @@ export function CardHeader({ title, subtitle, action }: { title: string; subtitl
   return (
     <div className="flex flex-wrap items-start justify-between gap-3 border-b border-plomo-100 px-5 py-4">
       <div>
-        <h3 className="text-[15px] font-bold uppercase tracking-wide text-[#ff5252]">{title}</h3>
+        <h3 className="text-[15px] font-bold uppercase tracking-wide text-[#60a5fa]">{title}</h3>
         {subtitle && <p className="mt-0.5 text-[13px] text-plomo-500">{subtitle}</p>}
       </div>
       {action}

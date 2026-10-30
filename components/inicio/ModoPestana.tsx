@@ -77,8 +77,8 @@ export function EncabezadoPestana({ modulo, titulo }: { modulo: ModuloInicio; ti
     } else window.location.assign(inicio);
   };
   return (
-    <div className="sticky top-16 z-20 -mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#3a3a3a] bg-[#1a1a1a]/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8" data-sin-guardar>
-      <button type="button" onClick={volver} className="inline-flex items-center gap-2 text-[14px] font-bold text-[#ff8a80] hover:text-white">
+    <div className="sticky top-16 z-20 -mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#2a3445] bg-[#0e1219]/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8" data-sin-guardar>
+      <button type="button" onClick={volver} className="inline-flex items-center gap-2 text-[14px] font-bold text-[#93c5fd] hover:text-white">
         <ArrowLeft size={17} /> Volver a INICIO {TITULO_INICIO[modulo]}
       </button>
       {titulo && <span className="text-[15px] font-bold uppercase text-white">{titulo}</span>}
@@ -166,11 +166,11 @@ export function PiePestana({ modulo }: { modulo: ModuloInicio }) {
   };
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[60] flex items-center justify-end gap-3 border-t border-[#3a3a3a] bg-[#1a1a1a]/95 px-4 py-3 backdrop-blur print:hidden sm:px-6 lg:px-8" data-sin-guardar>
-      <button type="button" onClick={cancelar} className="inline-flex items-center gap-2 rounded-lg border border-[#3a3a3a] bg-[#2a2a2a] px-5 py-2.5 text-[14px] font-bold text-white hover:border-[#d50000]">
+    <div className="fixed inset-x-0 bottom-0 z-[60] flex items-center justify-end gap-3 border-t border-[#2a3445] bg-[#0e1219]/95 px-4 py-3 backdrop-blur print:hidden sm:px-6 lg:px-8" data-sin-guardar>
+      <button type="button" onClick={cancelar} className="inline-flex items-center gap-2 rounded-lg border border-[#2a3445] bg-[#1a212e] px-5 py-2.5 text-[14px] font-bold text-white hover:border-[#2a7bff]">
         <X size={16} /> Cancelar
       </button>
-      <button type="button" onClick={guardarYCerrar} disabled={guardando} className="inline-flex items-center gap-2 rounded-lg bg-[#d50000] px-5 py-2.5 text-[14px] font-bold text-white hover:bg-[#b00000] disabled:opacity-70">
+      <button type="button" onClick={guardarYCerrar} disabled={guardando} className="inline-flex items-center gap-2 rounded-lg bg-[#2a7bff] px-5 py-2.5 text-[14px] font-bold text-white hover:bg-[#1e64e6] disabled:opacity-70">
         {guardando ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Guardar y Cerrar
       </button>
     </div>

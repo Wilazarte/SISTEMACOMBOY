@@ -141,7 +141,7 @@ function DashboardHome() {
                     tickFormatter={(v: number) => (v >= 1000 ? `S/ ${(v / 1000).toLocaleString("es-PE", { maximumFractionDigits: 1 })}k` : `S/ ${v}`)}
                   />
                   <Tooltip
-                    cursor={{ fill: "rgba(213,0,0,0.08)" }}
+                    cursor={{ fill: "rgba(42,123,255,0.08)" }}
                     content={({ active, payload }) => {
                       if (!active || !payload?.length) return null;
                       const p = payload[0].payload as (typeof serie)[number];
@@ -155,7 +155,7 @@ function DashboardHome() {
                       );
                     }}
                   />
-                  <Bar dataKey="total" fill="#d50000" radius={[6, 6, 2, 2]} maxBarSize={44} />
+                  <Bar dataKey="total" fill="#2a7bff" radius={[6, 6, 2, 2]} maxBarSize={44} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

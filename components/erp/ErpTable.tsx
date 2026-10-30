@@ -5,7 +5,7 @@ import { cn } from "./cn";
 
 /**
  * Tabla única del ERP (Tesorería / Compras: FECHA · PROVEEDOR · DOC. REFERENCIA · TOTAL · ACCIONES):
- * cabecera oscura en mayúsculas, filas con borde #2a2a2a y hover. `components/ui` Table la usa en todos los módulos.
+ * cabecera oscura en mayúsculas, filas con borde #2a3445 y hover. `components/ui` Table la usa en todos los módulos.
  * `compacto`: menos relleno y cabeceras que pueden partirse (tablas anchas, ej. planilla del periodo).
  */
 export function ErpTable({
@@ -26,7 +26,7 @@ export function ErpTable({
   return (
     <div className={cn("overflow-x-auto", className)}>
       <table className={cn("w-full min-w-[720px] text-left text-sm", compacto && "[&_td]:px-2 [&_td]:py-2")}>
-        <thead className={cn("border-y border-[#2a2a2a] bg-[#1c1c1c] font-bold uppercase text-[#ff8a80]", compacto ? "text-[10px] tracking-wide" : "text-[11px] tracking-wider")}>
+        <thead className={cn("border-y border-[#2a3445] bg-[#212a3a] font-bold uppercase text-[#93c5fd]", compacto ? "text-[10px] tracking-wide" : "text-[11px] tracking-wider")}>
           <tr>
             {head.map((h) => (
               <th key={h} className={compacto ? "px-2 py-2 leading-tight" : "whitespace-nowrap px-4 py-2.5"}>
@@ -35,7 +35,7 @@ export function ErpTable({
             ))}
           </tr>
         </thead>
-        <tbody className="bg-[#141414] [&>tr:hover]:bg-[#1c1c1c] [&>tr]:border-b [&>tr]:border-[#2a2a2a] [&>tr]:transition-colors">{children}</tbody>
+        <tbody className="bg-[#1a212e] [&>tr:hover]:bg-[#212a3a] [&>tr]:border-b [&>tr]:border-[#2a3445] [&>tr]:transition-colors">{children}</tbody>
       </table>
       {empty && <p className="py-10 text-center text-sm text-[#a1a1aa]">{vacio}</p>}
     </div>

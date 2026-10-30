@@ -78,9 +78,9 @@ export function TarjetasOrdenables({ tarjetas }: { tarjetas: (Tarjeta | false)[]
               setSobre(null);
             }}
             className={cn(
-              "group relative cursor-grab rounded-xl border bg-[#141414] transition duration-200 ease-suave active:cursor-grabbing",
-              arrastrada === t.id ? "opacity-40" : "hover:-translate-y-0.5 hover:border-[#d50000]",
-              sobre === t.id && arrastrada && arrastrada !== t.id ? "border-dashed border-corp bg-rojo-soft" : "border-[#2a2a2a]"
+              "group relative cursor-grab rounded-xl border bg-[#1a212e] transition duration-200 ease-suave active:cursor-grabbing",
+              arrastrada === t.id ? "opacity-40" : "hover:-translate-y-0.5 hover:border-[#2a7bff]",
+              sobre === t.id && arrastrada && arrastrada !== t.id ? "border-dashed border-corp bg-rojo-soft" : "border-[#2a3445]"
             )}
           >
             <ErpStatsCard

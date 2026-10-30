@@ -22,10 +22,10 @@ const ESTACIONES = [
 /** Tarjeta KPI del diseño de Producción: icono grande arriba, título y detalle. */
 function KpiProduccion({ icono, titulo, valor, detalle, href }: { icono: ReactNode; titulo: string; valor?: string; detalle: string; href: string }) {
   return (
-    <button type="button" onClick={() => abrirPestana(href)} className="flex flex-col items-center gap-1 rounded-xl border border-[#2a2a2a] border-b-[#d50000] bg-[#141414] px-3 py-4 text-center transition hover:border-[#d50000]">
+    <button type="button" onClick={() => abrirPestana(href)} className="flex flex-col items-center gap-1 rounded-xl border border-[#2a3445] border-b-[#2a7bff] bg-[#1a212e] px-3 py-4 text-center transition hover:border-[#2a7bff]">
       <span className="text-white">{icono}</span>
       <span className="text-[15px] font-bold text-white">{titulo}</span>
-      {valor && <span className="text-2xl font-bold text-[#d50000]">{valor}</span>}
+      {valor && <span className="text-2xl font-bold text-[#2a7bff]">{valor}</span>}
       <span className="text-[12px] text-[#a1a1aa]">{detalle}</span>
     </button>
   );
@@ -35,7 +35,7 @@ function Encargado({ numero, titulo, detalle }: { numero: number; titulo: string
   return (
     <div>
       <h2 className="flex items-center gap-2 text-[17px] font-bold uppercase text-white">
-        <span className="h-4 w-6 rounded-sm bg-[#d50000]" aria-hidden /> Encargado {numero} · {titulo}
+        <span className="h-4 w-6 rounded-sm bg-[#2a7bff]" aria-hidden /> Encargado {numero} · {titulo}
       </h2>
       <p className="text-[13px] text-[#d4d4d8]">{detalle}</p>
     </div>
@@ -82,9 +82,9 @@ export function ProduccionHome() {
   return (
     <MarcoPlanta lateral={<PanelLateral sesion={sesion} modulo="Producción" notifs={notifs} recordatorios={recordatorios} />}>
       {/* Barra de contexto */}
-      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-[#2a2a2a] bg-[#141414] px-4 py-2 text-[13px] font-semibold text-white">
-        <MapPin size={15} className="text-[#d50000]" /> Planta Arequipa - Perú <span className="text-[#3a3a3a]">|</span> Usuario: {sesion?.nombre ?? "-"}
-        <span className="text-[#3a3a3a]">|</span> {ahora} <span className="text-[#3a3a3a]">|</span> <span className="text-[#4ade80]">Conectado</span>
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-[#2a3445] bg-[#1a212e] px-4 py-2 text-[13px] font-semibold text-white">
+        <MapPin size={15} className="text-[#2a7bff]" /> Planta Arequipa - Perú <span className="text-[#3a4558]">|</span> Usuario: {sesion?.nombre ?? "-"}
+        <span className="text-[#3a4558]">|</span> {ahora} <span className="text-[#3a4558]">|</span> <span className="text-[#4ade80]">Conectado</span>
       </p>
 
       <header>
@@ -104,7 +104,7 @@ export function ProduccionHome() {
         <Encargado numero={1} titulo="Fabricación piezas metalúrgica" detalle="Encargado: Fabricación Piezas (Plasma · Torno · Soldadura) · 3 estaciones" />
         <div className="grid gap-3 md:grid-cols-3">
           {ESTACIONES.map((e) => (
-            <div key={e.nombre} className="flex gap-3 rounded-xl border border-[#2a2a2a] bg-[#141414] p-3">
+            <div key={e.nombre} className="flex gap-3 rounded-xl border border-[#2a3445] bg-[#1a212e] p-3">
               <span className="text-white">{e.icono}</span>
               <span>
                 <span className="block text-[15px] font-bold text-white">{e.nombre}</span>
@@ -130,7 +130,7 @@ export function ProduccionHome() {
         ) : (
           <div className="grid gap-3 lg:grid-cols-2">
             {d.activas.slice(0, 6).map(({ o, consumos, costo }) => (
-              <div key={o.id} className="rounded-lg border border-[#2a2a2a] bg-[#1c1c1c] p-3">
+              <div key={o.id} className="rounded-lg border border-[#2a3445] bg-[#212a3a] p-3">
                 <div className="flex items-start gap-2">
                   <Etiqueta tono="azul">EN PROCESO</Etiqueta>
                   <span className="min-w-0">
@@ -154,7 +154,7 @@ export function ProduccionHome() {
 
       <section className="space-y-2">
         <Encargado numero={2} titulo="Ensamblaje" detalle="Encargado: Ensamblaje — Ensambla PT: remolcadores, tanques de agua y coches mineros" />
-        <div className="rounded-xl border border-[#2a2a2a] bg-[#141414] p-3">
+        <div className="rounded-xl border border-[#2a3445] bg-[#1a212e] p-3">
           <p className="text-[14px] font-semibold text-white">
             Equipos en QC: {d.enQc.length} · Listos (PT disponible): {d.disponibles.length}
           </p>
