@@ -214,6 +214,7 @@ export function AlmacenHome() {
 
       <BarraAcciones
         acciones={[
+          { label: "Expedientes 26W", href: "/erp/lotes", tono: "lleno" },
           { label: "Recepción MP", href: "/dashboard/almacen?tab=ingresos", icono: <Plus size={17} />, tono: "lleno" },
           { label: "Entrega Fabricación", href: "/dashboard/almacen?tab=stock", icono: <ArrowRight size={17} /> },
           { label: "Entrega Ensamblaje", href: "/dashboard/almacen?tab=stock", icono: <PackageMinus size={17} /> },

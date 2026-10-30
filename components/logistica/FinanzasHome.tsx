@@ -272,6 +272,7 @@ export function FinanzasHome() {
 
       <BarraAcciones
         acciones={[
+          { label: "Expedientes 26W", href: "/erp/lotes", tono: "lleno" },
           { label: "Pagar Planilla", href: "/dashboard/compras?tab=planilla", tono: "lleno" },
           { label: "Pagar Proveedor", href: "/dashboard/compras?tab=facturas" },
           { label: "Liquidar Flete", href: "/logistica/cotizar-flete" },
