@@ -13,6 +13,7 @@ import { RequerimientoForm } from "@/components/requerimientos/RequerimientoForm
 import { SEDE_PLANTA_PRINCIPAL } from "@/components/layout/ModuloLayout";
 import { getSesion } from "@/lib/auth";
 import { SEDES, SEDES_STOCK, UNIDADES } from "@/lib/empresa";
+import { sedeNormalizada } from "@/lib/constantes";
 import {
   KEYS,
   crearRequerimiento,
@@ -420,9 +421,9 @@ function RegistrarIngreso({ rol, stock, ordenes }: { rol: Rol; stock: StockItem[
   const [obs, setObs] = useState("");
   const [filas, setFilas] = useState<FilaIngreso[]>([filaIngreso()]);
   const habilitado = puede(rol, "vb.dar");
-  const sedes = Array.from(new Set([...SEDES_STOCK, ...stock.map((s) => s.sede)]));
+  const sedes = Array.from(new Set([...SEDES_STOCK, ...stock.map((s) => sedeNormalizada(s.sede))]));
   const ocs = ordenes.filter((o) => !o.ingresadaAlmacen && o.estado !== "FINALIZADA");
-  const productos = Array.from(new Set(stock.filter((s) => !sede || s.sede === sede).map((s) => s.nombre))).sort();
+  const productos = Array.from(new Set(stock.filter((s) => !sede || sedeNormalizada(s.sede) === sedeNormalizada(sede)).map((s) => s.nombre))).sort();
   const recientes = kardex.filter((m) => m.tipo_movimiento === "INGRESO").slice(0, 30);
   // Formulario oculto por defecto: solo se ve la tabla hasta pulsar "Registrar ingreso"
   const { showForm, setShowForm } = useTogglePanel();
@@ -433,7 +434,7 @@ function RegistrarIngreso({ rol, stock, ordenes }: { rol: Rol; stock: StockItem[
         if (f.id !== id) return f;
         const n = { ...f, [k]: v };
         if (k === "nombre") {
-          const s = stock.find((x) => x.nombre === v.trim().toUpperCase() && (!sede || x.sede === sede)) ?? stock.find((x) => x.nombre === v.trim().toUpperCase());
+          const s = stock.find((x) => x.nombre === v.trim().toUpperCase() && (!sede || sedeNormalizada(x.sede) === sedeNormalizada(sede))) ?? stock.find((x) => x.nombre === v.trim().toUpperCase());
           if (s) n.unidad = s.unidad;
         }
         return n;

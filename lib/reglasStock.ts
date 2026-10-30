@@ -4,7 +4,7 @@
 /** Ubicación del Excel -> sede del sistema. */
 export const UBICACIONES: Record<string, string> = {
   ALMACEN: "Taller Principal Aqp",
-  "ALMACEN AQP": "Almacen Aqp",
+  "ALMACEN AQP": "Taller Principal Aqp",
   "OFICINA LIMA": "Oficina Lima",
   LIMA: "Oficina Lima",
 };

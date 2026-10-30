@@ -17,7 +17,7 @@ import type { MovimientoKardex, StockItem } from "@/lib/types";
 
 const fechaHora = (iso: string) => (iso ? new Date(iso).toLocaleString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-");
 const num = (n: number) => n.toLocaleString("es-PE", { maximumFractionDigits: 2 });
-const FILTROS_SEDE = ["", SEDE_REPUESTOS, "Oficina Lima"];
+const FILTROS_SEDE = ["", ...SEDES_STOCK];
 
 /**
  * STOCK DE ALMACÉN: Sede | Producto | Unidad | Cantidad | Último costo | Valorizado | Actualizado | Acciones
@@ -95,8 +95,7 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
                     {s || "Todas"} <span className="opacity-70">{s ? stock.filter((x) => mismaSede(x.sede, s)).length : stock.length}</span>
                   </button>
                 ))}
-                <Select value={sede} onChange={(e) => setSede(e.target.value)} placeholder="Todas las sedes" options={SEDES_STOCK.map((s) => ({ value: s, label: s }))} className="w-48" />
-                <label className="ml-auto flex cursor-pointer items-center gap-2 text-xs font-semibold text-plomo-600" title="Suma el mismo producto de Taller Principal Aqp y Almacen Aqp (AQP Principal)">
+                <label className="ml-auto flex cursor-pointer items-center gap-2 text-xs font-semibold text-plomo-600" title="Suma el mismo producto guardado con nombres viejos de almacén (Almacen Aqp, Adm Aqp, Planta Arequipa -> Taller Principal Aqp)">
                   <input type="checkbox" checked={agrupar} onChange={(e) => setAgrupar(e.target.checked)} className="h-4 w-4 accent-azul-900" /> Agrupar duplicados
                 </label>
                 <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-amber-800">
