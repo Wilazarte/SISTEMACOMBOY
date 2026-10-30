@@ -26,7 +26,8 @@ export async function POST(req: Request) {
   const faltan = [
     !txt(b.producto_id) && "producto_id",
     !(cantidad > 0) && "cantidad_a_retirar",
-    !MOTIVOS.includes(txt(b.motivo)) && "motivo",
+    // Motivos de la lista, o cualquiera de producción (Fase 3 del expediente 26W)
+    !(MOTIVOS.includes(txt(b.motivo)) || txt(b.motivo).toUpperCase().startsWith("PRODUCCION")) && "motivo",
     !txt(b.solicitante) && "solicitante",
     !txt(b.autoriza) && "autoriza",
   ].filter(Boolean);

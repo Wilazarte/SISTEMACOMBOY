@@ -815,6 +815,18 @@ export function disponibleDe(m: LineaMaterial, stock: StockItem[] = getStock()):
   return { item, cantidad: item?.cantidad ?? 0 };
 }
 
+/** Motivo del vale de la Fase 3: cualquiera que empiece con PRODUCCION (va al costo del equipo). */
+export const motivoValeValido = (m: string) => (m ?? "").trim().toUpperCase().startsWith("PRODUCCION");
+
+/** Ruta 2: la observación de la entrega parcial debe describir los faltantes (mínimo 15 caracteres y 3 palabras). */
+export const MIN_OBS_PARCIAL = 15;
+const OBS_VACIAS = ["POR COMPLETAR", "---", "--", "-", "N/A", "NA", "OK", "."];
+export function observacionParcialValida(obs: string): boolean {
+  const t = (obs ?? "").trim();
+  return t.length >= MIN_OBS_PARCIAL && !OBS_VACIAS.includes(t.toUpperCase()) && t.split(/\s+/).length >= 3;
+}
+export const AVISO_OBS_PARCIAL = "La observación debe describir los faltantes reales (mínimo 15 caracteres). Ej.: Entrega parcial 10 materiales, faltan 14: generar REQ urgente.";
+
 /**
  * FASE 3 · Almacén valida stock. Lo que hay se entrega con Vale de Producción (descuenta stock y anota el kardex).
  * Ruta 1: todo entregado. Ruta 2: entrega parcial con observación y REQ a Logística por lo que falta.
@@ -836,7 +848,8 @@ export async function validarStock(x: Expediente, d: { entregas: Record<string, 
     return { m, pedida, item, hay };
   });
   const faltantes = plan.filter((p) => p.pedida < p.m.cantidad).map((p) => ({ nombre: p.m.nombre, unidad: p.m.unidad, cantidad: r2(p.m.cantidad - p.pedida) }));
-  if (faltantes.length && !d.observaciones.trim()) throw new ErpError("La entrega parcial necesita una observación.");
+  if (!motivoValeValido(d.motivo)) throw new ErpError("Selecciona el motivo del vale (PRODUCCION …).");
+  if (faltantes.length && !observacionParcialValida(d.observaciones)) throw new ErpError(AVISO_OBS_PARCIAL);
   const lineas: LineaEntrega[] = [];
   for (const { m, pedida, item, hay } of plan) {
     let vpi: string | undefined;

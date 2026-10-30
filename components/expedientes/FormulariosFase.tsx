@@ -12,6 +12,8 @@ import {
   TIPOS_ARCHIVO_COTI,
   TIPOS_COMPROBANTE_COMPRA,
   ZONAS_PT,
+  AVISO_OBS_PARCIAL,
+  MIN_OBS_PARCIAL,
   aceptarProduccion,
   bomDe,
   costoBomLote,
@@ -22,6 +24,8 @@ import {
   cerrarExpediente,
   cotizacionApta,
   disponibleDe,
+  motivoValeValido,
+  observacionParcialValida,
   generarOC,
   registrarComprobante,
   registrarCotizacion,
@@ -218,6 +222,12 @@ export function FormFase3({ x, onClose }: { x: Expediente; onClose: () => void }
   const [sede, setSede] = useState(ALMACEN_DEFECTO);
   const { ocupado, enviar } = useEnvio(onClose);
   const faltan = mats.filter((m) => (entregas[m.id] ?? 0) < m.cantidad);
+  // Ruta 2: el botón se habilita cuando la observación describe los faltantes (contador x/15)
+  const largoObs = obs.trim().length;
+  const motivoOk = motivoValeValido(motivo);
+  const obsOk = !faltan.length || observacionParcialValida(obs);
+  const puedeEnviar = motivoOk && obsOk && !ocupado;
+  const error = !motivoOk ? "Selecciona el motivo del vale." : faltan.length && largoObs > 0 && !obsOk ? AVISO_OBS_PARCIAL : "";
   return (
     <Modal open onClose={onClose} title={`Fase 3 · ${x.codigo_expediente} · validar stock`} wide>
       <form onSubmit={(e) => (e.preventDefault(), enviar(() => validarStock(x, { entregas, motivo, recibe, autoriza, observaciones: obs, sedeReq: sede }), faltan.length ? "Entrega parcial y requerimiento enviado a Logística" : "Materiales entregados a Producción"))} className="space-y-3">
@@ -267,10 +277,34 @@ export function FormFase3({ x, onClose }: { x: Expediente; onClose: () => void }
             </Field>
           )}
         </Grid>
-        <Field label={faltan.length ? "Observación de la entrega parcial (obligatoria)" : "Observaciones"}>
-          <Textarea value={obs} onChange={(e) => setObs(e.target.value)} />
+        <Field label={faltan.length ? `Observación de la entrega parcial (obligatoria · ${Math.min(largoObs, MIN_OBS_PARCIAL)}/${MIN_OBS_PARCIAL})` : "Observaciones"}>
+          <textarea
+            value={obs}
+            onChange={(e) => setObs(e.target.value)}
+            placeholder={
+              faltan.length
+                ? `Ej.: Entrega parcial ${mats.length - faltan.length}/${mats.length} materiales con stock disponible. Faltan ${faltan.length} (${faltan
+                    .slice(0, 2)
+                    .map((m) => m.nombre)
+                    .join(", ")}${faltan.length > 2 ? ", etc." : ""}): generar REQ urgente a Logística.${x.lote ? ` Lote ${x.lote}` : ""}`
+                : "Opcional"
+            }
+            className="min-h-[80px] w-full rounded-lg border border-[#2A2D3A] bg-[#23252F] p-3 text-[14px] text-white outline-none placeholder:text-[#6b7080] focus:border-[#FF6D00]"
+          />
         </Field>
-        <Pie onClose={onClose} ocupado={ocupado} texto={faltan.length ? "Entregar parcial y generar REQ" : "Entregar a Producción"} />
+        {error && <p className="text-[13px] text-[#FFB27A]">{error}</p>}
+        <div className="mt-4 flex justify-end gap-2">
+          <Boton onClick={onClose}>Cancelar</Boton>
+          {!puedeEnviar && !ocupado ? (
+            <button type="button" disabled className="cursor-not-allowed rounded-lg bg-gray-600 px-4 py-2 text-[14px] font-semibold text-white/80">
+              {motivoOk ? `Completa observación (${Math.min(largoObs, MIN_OBS_PARCIAL)}/${MIN_OBS_PARCIAL})` : "Selecciona motivo del vale"}
+            </button>
+          ) : (
+            <button type="submit" disabled={ocupado} className={`rounded-lg px-4 py-2 text-[14px] font-bold text-white transition disabled:opacity-60 ${faltan.length ? "bg-orange-500 hover:bg-orange-600" : "bg-[#FF6D00] hover:bg-[#E65C00]"}`}>
+              {ocupado ? "Guardando…" : faltan.length ? `Entregar parcial y generar REQ por ${faltan.length} material(es)` : "Entregar a Producción"}
+            </button>
+          )}
+        </div>
       </form>
     </Modal>
   );
