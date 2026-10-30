@@ -210,3 +210,8 @@ table, .tabular { font-variant-numeric: tabular-nums; }
     linear-gradient(90deg, rgb(213 0 0 / 0.05) 1px, transparent 1px);
   background-size: 48px 48px;
 }
+
+/* Pantalla abierta desde el INICIO: el botón de guardar del formulario pasa a la barra inferior (PiePestana) */
+body[data-modo-pestana] [data-guardar-pestana] {
+  display: none !important;
+}
