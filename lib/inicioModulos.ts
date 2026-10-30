@@ -65,7 +65,7 @@ const P = "/dashboard/produccion";
 export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionInicio[]> = {
   logistica: [
     { slug: "expedientes", label: "Expedientes 26W · Tablero de lotes", grupo: EXP, destino: LOTES },
-    { slug: "orden-produccion", label: "Crear OP · Fase 1", grupo: EXP, destino: LOTES, fase: 1 },
+    { slug: "crear-op", label: "Crear OP · lote mixto · Fase 1", grupo: EXP, destino: "/logistica/crear-op", fase: 1 },
     { slug: "cotizacion-oc", label: "Cotización y OC del REQ · Fase 4", grupo: EXP, destino: LOTES, fase: 4 },
     { slug: "transporte", label: "Registrar Transporte · Fase 6", grupo: EXP, destino: LOTES, fase: 6 },
 

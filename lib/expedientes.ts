@@ -16,7 +16,7 @@ import { getSesion, type Sesion } from "./auth";
 import { getEquipos } from "./equipos";
 import { consumosDeChasis, retiroProduccion, type MotivoRetiro } from "./inventario";
 import { perfilPlanta, type PerfilPlanta } from "./permisosPlanta";
-import { crearOrdenProduccion, getOrdenesProduccion, type DatosOP, type OrdenProduccion } from "./produccion";
+import { getOrdenesProduccion, type OrdenProduccion } from "./produccion";
 import { ErpError, IGV, TOPE_BANCARIZACION, crearRequerimiento, getPendientes, getProcesados, getStock, getValesProduccion, hoy, r2, rucValido, siguienteNumero, uid } from "./storage";
 import { createClient } from "./supabase/client";
 import type { Requerimiento, StockItem, ValeProduccion } from "./types";
@@ -141,7 +141,9 @@ export interface DatosExpediente {
   comprobanteSolicitado?: { fecha: string; usuario: string; nota: string };
   transportes: Transporte[];
   actaCompleta?: ActaEntrega;
-  cierre?: { numeroSerie: string; zona: (typeof ZONAS_PT)[number]; checklist: Record<string, boolean>; observaciones: string; acta: ActaEntrega };
+  cierre?: { numeroSerie: string; zona: (typeof ZONAS_PT)[number]; checklist: Record<string, boolean>; observaciones: string; acta: ActaEntrega; unidades?: UnidadPT[] };
+  /** Lote mixto: "10 × CV-300 · 5 × T-200" (aviso de previsiones a Almacén). */
+  resumenEquipos?: string;
   avances: { fecha: string; usuario: string; porcentaje: number; nota: string }[];
   horas: Horas[];
   anulacion?: string;
@@ -164,6 +166,42 @@ export interface Expediente {
   is_demo: boolean;
   created_by: string | null;
   created_at: string;
+  /** Lote mixto (SQL 20261108): varios equipos por OP en orden_produccion_detalles; sin OP individual (op_id null). */
+  es_lote_mixto?: boolean;
+  almacen_destino?: string | null;
+  total_unidades?: number;
+}
+
+/** Equipo del lote (orden_produccion_detalles). Chasis y serie se llenan en la Fase 8, una unidad por equipo. */
+export interface DetalleOP {
+  id: string;
+  orden_id: string;
+  tipo_equipo: string;
+  marca_motor: string;
+  modelo: string;
+  cantidad: number;
+  codigo_chasis: string | null;
+  serie_motor: string | null;
+  unidades: { chasis: string; serie: string }[];
+  costo_bom: number;
+  orden: number;
+}
+
+export interface UnidadPT {
+  detalleId: string;
+  modelo: string;
+  chasis: string;
+  serie: string;
+}
+
+/** Línea de la lista de materiales (BOM) de un modelo: cantidad por UNA unidad del equipo. */
+export interface LineaBom {
+  id?: string;
+  modelo: string;
+  material: string;
+  unidad: string;
+  cantidad: number;
+  stock_id: string | null;
 }
 
 export interface CotizacionExp {
@@ -238,13 +276,16 @@ interface Estado {
   expedientes: Expediente[];
   cotizaciones: CotizacionExp[];
   ocs: OrdenCompraExp[];
+  /** Equipos de las OP de lote mixto (vacío si falta el SQL 20261108). */
+  detalles: DetalleOP[];
+  bom: LineaBom[];
   listo: boolean;
   /** El SQL 20261105_expedientes_26w.sql aún no se corrió. */
   faltaTabla: boolean;
   error?: string;
 }
 
-let estado: Estado = { expedientes: [], cotizaciones: [], ocs: [], listo: false, faltaTabla: false };
+let estado: Estado = { expedientes: [], cotizaciones: [], ocs: [], detalles: [], bom: [], listo: false, faltaTabla: false };
 const oyentes = new Set<(e: Estado) => void>();
 let iniciado = false;
 let cargaEnCurso: Promise<void> | null = null;
@@ -256,10 +297,13 @@ export function recargarExpedientes(): Promise<void> {
   if (cargaEnCurso) return cargaEnCurso;
   cargaEnCurso = (async () => {
     const sb = createClient();
-    const [e, c, o] = await Promise.all([
+    const [e, c, o, det, bom] = await Promise.all([
       sb.from("expedientes").select("*").order("created_at", { ascending: false }),
       sb.from("cotizaciones").select("*").order("created_at", { ascending: false }),
       sb.from("ordenes_compra").select("*").order("created_at", { ascending: false }),
+      // Lote mixto (SQL 20261108): si aún no se corrió, el resto sigue funcionando
+      sb.from("orden_produccion_detalles").select("*").order("orden"),
+      sb.from("bom_modelos").select("*").order("modelo").order("material"),
     ]);
     const err = e.error ?? c.error ?? o.error;
     if (err) estado = { ...estado, listo: true, faltaTabla: sinTabla(err), error: sinTabla(err) ? undefined : err.message };
@@ -268,6 +312,8 @@ export function recargarExpedientes(): Promise<void> {
         expedientes: (e.data ?? []).map(normalizarExp),
         cotizaciones: (c.data ?? []) as CotizacionExp[],
         ocs: (o.data ?? []) as OrdenCompraExp[],
+        detalles: det.error ? [] : (det.data ?? []).map((r) => ({ ...(r as DetalleOP), cantidad: Number(r.cantidad), costo_bom: Number(r.costo_bom ?? 0), unidades: (r.unidades ?? []) as DetalleOP["unidades"] })),
+        bom: bom.error ? [] : (bom.data ?? []).map((r) => ({ ...(r as LineaBom), cantidad: Number(r.cantidad) })),
         listo: true,
         faltaTabla: false,
       };
@@ -315,6 +361,7 @@ function iniciar(): void {
     .on("postgres_changes", { event: "*", schema: "public", table: "expedientes" }, programar)
     .on("postgres_changes", { event: "*", schema: "public", table: "cotizaciones" }, programar)
     .on("postgres_changes", { event: "*", schema: "public", table: "ordenes_compra" }, programar)
+    .on("postgres_changes", { event: "*", schema: "public", table: "orden_produccion_detalles" }, programar)
     .subscribe();
 }
 
@@ -345,15 +392,18 @@ export const buscarExpediente = (codigo: string): Expediente | undefined => {
 
 export interface Docs {
   op?: OrdenProduccion;
+  /** Lote mixto: equipos a fabricar. */
+  detalles: DetalleOP[];
   reqs: Requerimiento[];
   cotizaciones: CotizacionExp[];
   ocs: OrdenCompraExp[]; // sin anuladas
 }
 
-export function docsDe(x: Expediente, s: Pick<Estado, "cotizaciones" | "ocs"> = estado): Docs {
+export function docsDe(x: Expediente, s: Pick<Estado, "cotizaciones" | "ocs"> & Partial<Pick<Estado, "detalles">> = estado): Docs {
   const ids = new Set(x.datos.reqIds);
   return {
     op: getOrdenesProduccion().find((o) => o.id === x.op_id),
+    detalles: (s.detalles ?? estado.detalles).filter((d) => d.orden_id === x.id),
     reqs: [...getPendientes(), ...getProcesados()].filter((r) => ids.has(r.id)),
     cotizaciones: s.cotizaciones.filter((c) => c.expediente_id === x.id),
     ocs: s.ocs.filter((o) => o.expediente_id === x.id && o.estado !== "ANULADA"),
@@ -361,6 +411,8 @@ export function docsDe(x: Expediente, s: Pick<Estado, "cotizaciones" | "ocs"> = 
 }
 
 export function valesDe(x: Expediente, op?: OrdenProduccion, vales: ValeProduccion[] = getValesProduccion()): ValeProduccion[] {
+  // Lote mixto: los vales de la Fase 3 llevan el código 26W como chasis / OT
+  if (x.es_lote_mixto) return consumosDeChasis("", x.codigo_expediente, vales);
   return x.op_id ? consumosDeChasis(op?.codigo_chasis ?? "", x.op_id, vales) : [];
 }
 
@@ -395,7 +447,8 @@ export function resumen(x: Expediente, d: Docs = docsDe(x)): Resumen {
     f[6] = D.transportes.length > 0 ? "HECHA" : "PENDIENTE";
     f[7] = D.actaCompleta ? "HECHA" : "PENDIENTE";
   }
-  f[8] = D.cierre && d.op?.estado === "QC_APROBADO" ? "HECHA" : "PENDIENTE";
+  // Lote mixto: el acta PT lleva chasis y serie de cada unidad y el QC completo (no hay OP individual)
+  f[8] = D.cierre && (x.es_lote_mixto ? x.estado === "CERRADO" : d.op?.estado === "QC_APROBADO") ? "HECHA" : "PENDIENTE";
   let previa = true;
   for (const n of FASES) {
     if (f[n] === "PENDIENTE" && !previa) f[n] = "BLOQUEADA";
@@ -496,7 +549,13 @@ export function documentos(x: Expediente, d: Docs = docsDe(x)): DocExp[] {
 
   out.push(ok({ n: 1, tipo: "CODIGO", titulo: "Código de seguimiento", numero: x.codigo_expediente, detalle: `${D.producto}${x.lote ? ` · lote ${x.lote}` : ""} · avance ${r.avance} %`, alertas: r.vencido ? [`Plazo vencido hace ${-(r.diasPlazo ?? 0)} día(s).`] : [], fase: 1 }));
   const alOP = [!D.legal.responsableFirma.trim() && "Falta el responsable de firma.", !D.legal.cliente.trim() && "Falta el cliente.", !D.legal.contrato.trim() && "Sin contrato u orden del cliente asociada."].filter(Boolean) as string[];
-  out.push(d.op ? ok({ n: 2, tipo: "OP", titulo: "Orden de Producción", numero: d.op.id, detalle: `${d.op.tipo_equipo} ${d.op.modelo} · chasis ${d.op.codigo_chasis} · ${d.op.estado.replace(/_/g, " ")}`, alertas: alOP, fase: 1 }) : falta(2, "OP", "Orden de Producción", 1, "La OP enlazada no se encuentra."));
+  if (x.es_lote_mixto)
+    out.push(
+      d.detalles.length
+        ? ok({ n: 2, tipo: "OP", titulo: "Orden de Producción · lote mixto", numero: x.codigo_expediente, detalle: `${d.detalles.map((e) => `${e.cantidad} × ${e.tipo_equipo} ${e.marca_motor} ${e.modelo}`).join(" · ")} · destino ${x.almacen_destino ?? "—"}`, alertas: [], fase: 1 })
+        : falta(2, "OP", "Orden de Producción · lote mixto", 1, "No se encuentran los equipos del lote.")
+    );
+  else out.push(d.op ? ok({ n: 2, tipo: "OP", titulo: "Orden de Producción", numero: d.op.id, detalle: `${d.op.tipo_equipo} ${d.op.modelo} · chasis ${d.op.codigo_chasis} · ${d.op.estado.replace(/_/g, " ")}`, alertas: alOP, fase: 1 }) : falta(2, "OP", "Orden de Producción", 1, "La OP enlazada no se encuentra."));
   out.push(D.solicitud ? ok({ n: 3, tipo: "SM", titulo: "Solicitud de Materiales", numero: D.solicitud.numero, detalle: `${D.solicitud.materiales.length} material(es) · ayudante ${D.solicitud.ayudante}`, alertas: [], fase: 2 }) : falta(3, "SM", "Solicitud de Materiales", 2, "Producción aún no acepta la OP."));
   out.push(D.actaParcial ? ok({ n: 4, tipo: "ACTA_PARCIAL", titulo: ruta1 ? "Acta de Entrega de Materiales" : "Acta de Entrega Parcial", numero: D.actaParcial.numero, detalle: `Recibe ${D.actaParcial.recibe} · ${D.actaParcial.lineas.filter((l) => l.entregado > 0).length} línea(s) entregadas`, alertas: [], fase: 3 }) : falta(4, "ACTA_PARCIAL", "Acta de Entrega de Materiales", 3, "Almacén aún no valida stock."));
 
@@ -548,8 +607,9 @@ export function documentos(x: Expediente, d: Docs = docsDe(x)): DocExp[] {
   out.push(ruta1 ? na(14, "ACTA_COMPLETA", "Acta de Entrega Completa", 7) : D.actaCompleta ? ok({ n: 14, tipo: "ACTA_COMPLETA", titulo: "Acta de Entrega Completa de Materiales", numero: D.actaCompleta.numero, detalle: `Recibe ${D.actaCompleta.recibe}`, alertas: [], fase: 7 }) : falta(14, "ACTA_COMPLETA", "Acta de Entrega Completa de Materiales", 7, "Almacén recepciona y entrega a Producción."));
   if (D.cierre) {
     const noOk = Object.entries(D.cierre.checklist).filter(([, v]) => !v).map(([k]) => `Control de calidad sin conformidad: ${k}.`);
-    if (d.op?.estado !== "QC_APROBADO") noOk.push("Falta el QC firmado del supervisor (Producción › QC).");
-    out.push(ok({ n: 15, tipo: "ACTA_PT", titulo: "Acta de Entrega PT a Almacén", numero: D.cierre.acta.numero, detalle: `N° serie ${D.cierre.numeroSerie} · zona ${D.cierre.zona}`, alertas: noOk, fase: 8 }));
+    if (!x.es_lote_mixto && d.op?.estado !== "QC_APROBADO") noOk.push("Falta el QC firmado del supervisor (Producción › QC).");
+    const series = D.cierre.unidades?.length ? `${D.cierre.unidades.length} unidad(es) · series ${D.cierre.unidades.map((u) => u.serie).join(", ")}` : `N° serie ${D.cierre.numeroSerie}`;
+    out.push(ok({ n: 15, tipo: "ACTA_PT", titulo: "Acta de Entrega PT a Almacén", numero: D.cierre.acta.numero, detalle: `${series} · zona ${D.cierre.zona}`, alertas: noOk, fase: 8 }));
   } else out.push(falta(15, "ACTA_PT", "Acta de Entrega PT a Almacén", 8, "Producción cierra con N° de serie y QC."));
   return out;
 }
@@ -602,59 +662,153 @@ async function guardar(x: Expediente, fase: Fase, accion: string, detalle: strin
   return estado.expedientes.find((e) => e.id === x.id) ?? nuevo;
 }
 
-export interface NuevoExpediente {
-  op: DatosOP;
-  lote: string;
-  plazo: string;
-  prioridad: DatosExpediente["prioridad"];
-  costoEstimado: number;
-  precioVenta: number;
-  legal: DatosLegalesOP;
+export interface EquipoLote {
+  tipo: string;
+  marca: string;
+  modelo: string;
+  cantidad: number;
 }
 
-/** FASE 1 · Logística genera la OP con plazo; la base asigna el código 26W-001. Avisa solo a Producción. */
-export async function crearExpediente(d: NuevoExpediente): Promise<Expediente> {
+/** Semana ISO del lote automático: LOTE-2026-W44 (la base lo pone con la fecha de Lima; esto es la vista previa). */
+export function loteDeHoy(fecha = new Date()): string {
+  const d = new Date(Date.UTC(fecha.getFullYear(), fecha.getMonth(), fecha.getDate()));
+  const dia = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dia);
+  const inicio = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const semana = Math.ceil(((d.getTime() - inicio.getTime()) / 86_400_000 + 1) / 7);
+  return `LOTE-${d.getUTCFullYear()}-W${String(semana).padStart(2, "0")}`;
+}
+
+/**
+ * FASE 1 · Logística crea la OP de LOTE MIXTO: destino, plazo, prioridad y equipos (tipo, marca de motor, modelo, cantidad).
+ * La base asigna 26W-XXX y LOTE-AAAA-Wss y avisa a Producción (aprobar) y a Almacén (previsiones).
+ * El costo estimado lo calcula Producción en la Fase 2 con el BOM; chasis y serie van en la Fase 8.
+ */
+export async function crearOpLote(d: { almacen: string; plazo: string; prioridad: DatosExpediente["prioridad"]; equipos: EquipoLote[] }): Promise<Expediente> {
   const { usuario, perfil } = exigir(1);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d.plazo)) throw new ErpError("Indique el plazo de finalización.");
   if (d.plazo < hoy()) throw new ErpError("El plazo no puede estar en el pasado.");
-  if (!(d.costoEstimado >= 0) || !(d.precioVenta >= 0)) throw new ErpError("Costo estimado y precio deben ser montos válidos.");
-  if (!d.legal.responsableFirma.trim()) throw new ErpError("Indique el responsable de firma de la OP.");
-  if (!(d.legal.garantiaMeses >= 0)) throw new ErpError("Indique la garantía en meses.");
-  const op = await crearOrdenProduccion(d.op, usuario);
-  const ahora = new Date().toISOString();
-  const datos: DatosExpediente = {
-    producto: `${op.tipo_equipo} ${op.modelo}`.trim(),
-    modelo: op.modelo,
-    prioridad: d.prioridad,
-    legal: { ...d.legal, cliente: d.legal.cliente.trim(), contrato: d.legal.contrato.trim(), responsableFirma: d.legal.responsableFirma.trim(), penalidad: d.legal.penalidad.trim(), clausulas: d.legal.clausulas.trim() },
+  const equipos = d.equipos.map((e) => ({ tipo_equipo: e.tipo.trim(), marca_motor: e.marca.trim(), modelo: e.modelo.trim().toUpperCase(), cantidad: Number(e.cantidad) }));
+  if (!equipos.length) throw new ErpError("Agregue al menos un equipo al lote.");
+  equipos.forEach((e, i) => {
+    if (!e.tipo_equipo || !e.marca_motor || !e.modelo) throw new ErpError(`Fila ${i + 1}: complete tipo de equipo, marca de motor y modelo.`);
+    if (!Number.isInteger(e.cantidad) || e.cantidad <= 0) throw new ErpError(`Fila ${i + 1}: la cantidad debe ser un número entero mayor a 0.`);
+  });
+  const total = equipos.reduce((a, e) => a + e.cantidad, 0);
+  const modelos = [...new Set(equipos.map((e) => e.modelo))];
+  const resumenEquipos = equipos.map((e) => `${e.cantidad} × ${e.tipo_equipo} ${e.modelo}`).join(" · ");
+  const datos: Omit<DatosExpediente, "prioridad"> = {
+    producto: `Lote mixto · ${total} unidad(es) · ${modelos.length} modelo(s)`,
+    modelo: modelos.join(", "),
+    resumenEquipos,
+    legal: { cliente: "", contrato: "", garantiaMeses: 12, penalidad: "", clausulas: "", responsableFirma: "" },
     reqIds: [],
     transportes: [],
     avances: [],
     horas: [],
-    historial: [{ fecha: ahora, usuario, perfil, fase: 1, accion: "OP generada · expediente abierto", detalle: `${op.id} · plazo ${d.plazo}` }],
+    historial: [{ fecha: new Date().toISOString(), usuario, perfil, fase: 1, accion: "OP de lote mixto generada · expediente abierto", detalle: `${resumenEquipos} · destino ${d.almacen} · plazo ${d.plazo}` }],
   };
-  const { data, error } = await createClient()
-    .from("expedientes")
-    .insert({ lote: d.lote.trim().toUpperCase() || null, op_id: op.id, plazo: d.plazo, costo_estimado: r2(d.costoEstimado), precio_venta: r2(d.precioVenta), estado_avance: 13, fase_actual: 2, datos, created_by: usuario })
-    .select("*")
-    .single();
-  if (error) throw errorSb(error);
+  const { data, error } = await createClient().rpc("crear_op_lote", { p_plazo: d.plazo, p_prioridad: d.prioridad, p_almacen: d.almacen, p_detalles: equipos, p_datos: datos, p_usuario: usuario });
+  if (error) throw error.code === "PGRST202" ? new ErpError("Falta correr el SQL 20261108_op_lote_mixto.sql en Supabase.") : errorSb(error);
   await recargarExpedientes();
-  return normalizarExp(data);
+  return normalizarExp(data as Record<string, unknown>);
 }
 
-/** FASE 2 · Producción acepta: materiales, ayudante de ensamblaje validado, observaciones → Solicitud de Materiales. */
-export function aceptarProduccion(x: Expediente, d: { materiales: Omit<LineaMaterial, "id">[]; ayudante: string; ayudanteValidado: boolean; observaciones: string }): Promise<Expediente> {
+/**
+ * FASE 2 · Producción acepta: materiales, ayudante de ensamblaje validado, observaciones → Solicitud de Materiales.
+ * Lote mixto: el costo estimado = Σ (BOM del modelo × cantidad) a costo de stock (ver costoBomLote); se guarda por equipo y en la OP.
+ */
+export async function aceptarProduccion(x: Expediente, d: { materiales: Omit<LineaMaterial, "id">[]; ayudante: string; ayudanteValidado: boolean; observaciones: string }): Promise<Expediente> {
   const materiales = d.materiales.filter((m) => m.nombre.trim()).map((m) => ({ ...m, id: uid(), nombre: m.nombre.trim(), cantidad: Number(m.cantidad) }));
   if (!materiales.length) throw new ErpError("Agregue al menos un material.");
   if (materiales.some((m) => !(m.cantidad > 0))) throw new ErpError("Las cantidades deben ser mayores a 0.");
   if (!d.ayudante.trim()) throw new ErpError("Indique el ayudante de ensamblaje.");
   if (!d.ayudanteValidado) throw new ErpError("Valide la mano de obra (ayudante de ensamblaje).");
-  return guardar(x, 2, "OP aceptada · solicitud de materiales a Almacén", `${materiales.length} material(es) · ayudante ${d.ayudante.trim()}`, (D) => {
-    if (D.solicitud) throw new ErpError("La OP ya fue aceptada.");
-    return { ...D, solicitud: { numero: `SM-${x.codigo_expediente}`, fecha: new Date().toISOString(), usuario: getSesion()?.usuario ?? "", materiales, ayudante: d.ayudante.trim(), ayudanteValidado: true, observaciones: d.observaciones.trim() } };
-  });
+  const lote = x.es_lote_mixto ? costoBomLote(docsDe(x).detalles) : undefined;
+  const r = await guardar(
+    x,
+    2,
+    "OP aceptada · solicitud de materiales a Almacén",
+    `${materiales.length} material(es) · ayudante ${d.ayudante.trim()}${lote ? ` · costo estimado BOM S/ ${lote.total.toFixed(2)}` : ""}`,
+    (D) => {
+      if (D.solicitud) throw new ErpError("La OP ya fue aceptada.");
+      return { ...D, solicitud: { numero: `SM-${x.codigo_expediente}`, fecha: new Date().toISOString(), usuario: getSesion()?.usuario ?? "", materiales, ayudante: d.ayudante.trim(), ayudanteValidado: true, observaciones: d.observaciones.trim() } };
+    },
+    lote ? { costo_estimado: lote.total } : {}
+  );
+  if (lote) {
+    const sb = createClient();
+    await Promise.all(lote.porDetalle.map((p) => sb.from("orden_produccion_detalles").update({ costo_bom: p.costo }).eq("id", p.detalleId)));
+    await recargarExpedientes();
+  }
+  return r;
 }
+
+// ---- BOM (lista de materiales por modelo) -----------------------------------------------------
+
+export const bomDe = (modelo: string, bom: LineaBom[] = estado.bom): LineaBom[] => bom.filter((b) => b.modelo === modelo.trim().toUpperCase());
+
+/** Costo de stock (costoUnit) de una línea del BOM: por stock_id, o por nombre y unidad. */
+function costoMaterial(b: Pick<LineaBom, "material" | "unidad" | "stock_id">, stock: StockItem[]): number {
+  const it = (b.stock_id && stock.find((s) => s.id === b.stock_id)) || stock.find((s) => s.nombre.trim().toUpperCase() === b.material.trim().toUpperCase() && s.unidad === b.unidad);
+  return Number(it?.costoUnit ?? 0);
+}
+
+export interface CostoLote {
+  total: number;
+  porDetalle: { detalleId: string; modelo: string; cantidad: number; costo: number; sinBom: boolean; sinCosto: string[] }[];
+  /** Materiales del lote: BOM × cantidad, sumados por material (llenan la solicitud de la Fase 2). */
+  materiales: Omit<LineaMaterial, "id">[];
+}
+
+/** Lote mixto: para cada equipo, BOM del modelo × cantidad, a costo de stock. */
+export function costoBomLote(detalles: DetalleOP[], bom: LineaBom[] = estado.bom, stock: StockItem[] = getStock()): CostoLote {
+  const mats = new Map<string, Omit<LineaMaterial, "id">>();
+  const porDetalle = detalles.map((e) => {
+    const lineas = bomDe(e.modelo, bom);
+    let costo = 0;
+    const sinCosto: string[] = [];
+    for (const b of lineas) {
+      const cant = b.cantidad * e.cantidad;
+      const cu = costoMaterial(b, stock);
+      if (!cu) sinCosto.push(b.material);
+      costo += cant * cu;
+      const k = `${b.stock_id ?? ""}|${b.material.toUpperCase()}|${b.unidad}`;
+      const it = b.stock_id ? stock.find((s) => s.id === b.stock_id) : undefined;
+      mats.set(k, { nombre: b.material, unidad: b.unidad, cantidad: r2((mats.get(k)?.cantidad ?? 0) + cant), stockId: b.stock_id ?? undefined, sede: it?.sede });
+    }
+    return { detalleId: e.id, modelo: e.modelo, cantidad: e.cantidad, costo: r2(costo), sinBom: !lineas.length, sinCosto };
+  });
+  return { total: r2(porDetalle.reduce((a, p) => a + p.costo, 0)), porDetalle, materiales: [...mats.values()] };
+}
+
+/** Guarda el BOM de un modelo (cantidades por UNA unidad). Producción / Almacén / SOPORTE. */
+export async function guardarBom(modelo: string, lineas: Omit<LineaBom, "modelo">[]): Promise<void> {
+  const s = getSesion();
+  const p = perfilPlanta(s);
+  if (!s || s.soloLectura || !(p === "soporte" || p === "produccion" || p === "almacen")) throw new ErpError("Solo Producción edita la lista de materiales (BOM).");
+  const m = modelo.trim().toUpperCase();
+  if (!m) throw new ErpError("Indique el modelo.");
+  const limpias = lineas
+    .filter((l) => l.material.trim())
+    .map((l) => ({ modelo: m, material: l.material.trim().toUpperCase(), unidad: (l.unidad || "UND").trim().toUpperCase(), cantidad: Number(l.cantidad), stock_id: l.stock_id || null, updated_by: s.usuario, updated_at: new Date().toISOString() }));
+  if (limpias.some((l) => !(l.cantidad > 0))) throw new ErpError("Las cantidades por unidad deben ser mayores a 0.");
+  const claves = new Set(limpias.map((l) => `${l.material}|${l.unidad}`));
+  if (claves.size !== limpias.length) throw new ErpError("Hay materiales repetidos en el BOM.");
+  const sb = createClient();
+  if (limpias.length) {
+    const { error } = await sb.from("bom_modelos").upsert(limpias, { onConflict: "modelo,material,unidad" });
+    if (error) throw errorSb(error);
+  }
+  // Las líneas quitadas dejan de contar (es la configuración del modelo, no un documento)
+  const quitar = bomDe(m).filter((b) => b.id && !claves.has(`${b.material}|${b.unidad}`)).map((b) => b.id!);
+  if (quitar.length) {
+    const { error } = await sb.from("bom_modelos").delete().in("id", quitar);
+    if (error) throw errorSb(error);
+  }
+  await recargarExpedientes();
+}
+
 
 export function disponibleDe(m: LineaMaterial, stock: StockItem[] = getStock()): { item?: StockItem; cantidad: number } {
   const item = (m.stockId && stock.find((s) => s.id === m.stockId)) || stock.find((s) => s.nombre.trim().toUpperCase() === m.nombre.trim().toUpperCase() && s.unidad === m.unidad && (!m.sede || s.sede === m.sede));
@@ -686,14 +840,14 @@ export async function validarStock(x: Expediente, d: { entregas: Record<string, 
   const lineas: LineaEntrega[] = [];
   for (const { m, pedida, item, hay } of plan) {
     let vpi: string | undefined;
-    if (pedida > 0 && item) vpi = (await retiroProduccion({ producto_id: item.id, cantidad_a_retirar: pedida, chasis_ot: op?.codigo_chasis || x.op_id, motivo: d.motivo, solicitante: d.recibe.trim(), autoriza: d.autoriza.trim() || usuario, op_id: x.op_id }, hay)).vpi;
+    if (pedida > 0 && item) vpi = (await retiroProduccion({ producto_id: item.id, cantidad_a_retirar: pedida, chasis_ot: op?.codigo_chasis || x.op_id || x.codigo_expediente, motivo: d.motivo, solicitante: d.recibe.trim(), autoriza: d.autoriza.trim() || usuario, op_id: x.op_id ?? x.codigo_expediente }, hay)).vpi;
     lineas.push({ materialId: m.id, nombre: m.nombre, unidad: m.unidad, pedido: m.cantidad, entregado: pedida, vpi });
   }
   const ruta: 1 | 2 = faltantes.length ? 2 : 1;
   let req: Requerimiento | undefined;
   if (ruta === 2)
     req = await crearRequerimiento(
-      { fecha: hoy(), sede: d.sedeReq, solicitante: usuario, motivo: `${x.codigo_expediente} · ${x.op_id} · faltante de materiales para producción`, items: faltantes.map((f) => ({ id: uid(), nombre: f.nombre, cantidad: f.cantidad, unidad: f.unidad, marca: "", caracteristica: x.codigo_expediente })), tipo: "BIEN" },
+      { fecha: hoy(), sede: d.sedeReq, solicitante: usuario, motivo: `${x.codigo_expediente} · ${x.op_id ?? x.lote ?? "lote mixto"} · faltante de materiales para producción`, items: faltantes.map((f) => ({ id: uid(), nombre: f.nombre, cantidad: f.cantidad, unidad: f.unidad, marca: "", caracteristica: x.codigo_expediente })), tipo: "BIEN" },
       "ALMACEN"
     );
   const acta: ActaEntrega = { numero: `AEM-${x.codigo_expediente}`, fecha: new Date().toISOString(), entrega: usuario, recibe: d.recibe.trim(), lineas, observaciones: d.observaciones.trim() };
@@ -922,7 +1076,8 @@ export function actaEntregaCompleta(x: Expediente, d: { recibe: string; observac
  * FASE 8 · Producción cierra: N° de serie, checklist de calidad y Acta de Entrega PT a Almacén (zona A1/B2/C3).
  * El QC firmado se sigue haciendo en Producción (crea el equipo terminado); el expediente se cierra cuando están ambos.
  */
-export function cerrarExpediente(x: Expediente, d: { numeroSerie: string; zona: (typeof ZONAS_PT)[number]; checklist: Record<string, boolean>; recibe: string; observaciones: string }): Promise<Expediente> {
+export async function cerrarExpediente(x: Expediente, d: { numeroSerie: string; zona: (typeof ZONAS_PT)[number]; checklist: Record<string, boolean>; recibe: string; observaciones: string; unidades?: UnidadPT[] }): Promise<Expediente> {
+  if (x.es_lote_mixto) return cerrarLoteMixto(x, d);
   const serie = d.numeroSerie.trim().toUpperCase();
   if (!serie) throw new ErpError("Indique el N° de serie del equipo.");
   if (!ZONAS_PT.includes(d.zona)) throw new ErpError("Elija la zona A1, B2 o C3.");
@@ -941,6 +1096,58 @@ export function cerrarExpediente(x: Expediente, d: { numeroSerie: string; zona: 
     `Serie ${serie} · zona ${d.zona}`,
     (D) => ({ ...D, cierre: { numeroSerie: serie, zona: d.zona, checklist: d.checklist, observaciones: d.observaciones.trim(), acta: { numero: `APT-${x.codigo_expediente}`, fecha: new Date().toISOString(), entrega: usuario, recibe: d.recibe.trim(), lineas: [], observaciones: d.observaciones.trim() } } }),
     qc ? { estado: "CERRADO" } : {}
+  );
+}
+
+/**
+ * FASE 8 · lote mixto: chasis y N° de serie de CADA unidad (por equipo del lote), checklist de calidad completo y
+ * Acta de Entrega PT a Almacén (zona A1/B2/C3). Las series quedan en el detalle y el expediente se cierra.
+ */
+async function cerrarLoteMixto(x: Expediente, d: { zona: (typeof ZONAS_PT)[number]; checklist: Record<string, boolean>; recibe: string; observaciones: string; unidades?: UnidadPT[] }): Promise<Expediente> {
+  if (!ZONAS_PT.includes(d.zona)) throw new ErpError("Elija la zona A1, B2 o C3.");
+  if (!d.recibe.trim()) throw new ErpError("Indique quién recibe en Almacén.");
+  if (x.datos.cierre) throw new ErpError("El expediente ya tiene acta de entrega PT.");
+  const r = resumen(x);
+  if (FASES.slice(0, 7).some((n) => r.fases[n] !== "HECHA" && r.fases[n] !== "NO_APLICA")) throw new ErpError("Faltan fases anteriores por cerrar.");
+  const pendientesQC = CHECKLIST_QC.filter((c) => !d.checklist[c]);
+  if (pendientesQC.length) throw new ErpError(`Control de calidad pendiente: ${pendientesQC.join(", ")}.`);
+  const detalles = docsDe(x).detalles;
+  const unidades = (d.unidades ?? []).map((u) => ({ ...u, chasis: u.chasis.trim().toUpperCase(), serie: u.serie.trim().toUpperCase() }));
+  const esperadas = detalles.reduce((a, e) => a + e.cantidad, 0);
+  if (unidades.length !== esperadas || unidades.some((u) => !u.chasis || !u.serie)) throw new ErpError(`Indique chasis y N° de serie de las ${esperadas} unidad(es) del lote.`);
+  const repetido = (k: "chasis" | "serie") => unidades.map((u) => u[k]).find((v, i, a) => a.indexOf(v) !== i);
+  if (repetido("chasis")) throw new ErpError(`El chasis ${repetido("chasis")} está repetido.`);
+  if (repetido("serie")) throw new ErpError(`La serie ${repetido("serie")} está repetida.`);
+  const usadas = new Set(estado.expedientes.filter((e) => e.id !== x.id).flatMap((e) => [e.datos.cierre?.numeroSerie, ...(e.datos.cierre?.unidades ?? []).map((u) => u.serie)]));
+  const otra = unidades.find((u) => usadas.has(u.serie));
+  if (otra) throw new ErpError(`La serie ${otra.serie} ya está en otro expediente.`);
+  const sb = createClient();
+  for (const e of detalles) {
+    const suyas = unidades.filter((u) => u.detalleId === e.id).map((u) => ({ chasis: u.chasis, serie: u.serie }));
+    const { error } = await sb
+      .from("orden_produccion_detalles")
+      .update({ unidades: suyas, codigo_chasis: suyas.length === 1 ? suyas[0].chasis : null, serie_motor: suyas.length === 1 ? suyas[0].serie : null })
+      .eq("id", e.id);
+    if (error) throw errorSb(error);
+  }
+  const usuario = getSesion()?.usuario ?? "";
+  return guardar(
+    x,
+    8,
+    "Acta de Entrega PT a Almacén · lote mixto",
+    `${unidades.length} unidad(es) · zona ${d.zona}`,
+    (D) => ({
+      ...D,
+      cierre: {
+        numeroSerie: unidades.map((u) => u.serie).join(", "),
+        zona: d.zona,
+        checklist: d.checklist,
+        observaciones: d.observaciones.trim(),
+        unidades,
+        acta: { numero: `APT-${x.codigo_expediente}`, fecha: new Date().toISOString(), entrega: usuario, recibe: d.recibe.trim(), lineas: [], observaciones: d.observaciones.trim() },
+      },
+    }),
+    { estado: "CERRADO" }
   );
 }
 
@@ -968,6 +1175,7 @@ export function textoBusqueda(x: Expediente, d: Docs = docsDe(x)): string {
     d.op?.serie_motor,
     eq?.id,
     D.cierre?.numeroSerie,
+    ...d.detalles.flatMap((e) => [e.modelo, e.tipo_equipo, ...e.unidades.flatMap((u) => [u.chasis, u.serie])]),
     ...d.reqs.map((q) => q.numero),
     ...d.cotizaciones.flatMap((c) => [c.ruc, c.razon_social, c.nro_cotizacion]),
     ...d.ocs.flatMap((o) => [o.codigo_oc, o.comprobante?.numero, o.bancarizacion?.codigo_operacion]),
