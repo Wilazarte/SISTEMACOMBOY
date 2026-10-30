@@ -8,6 +8,8 @@ import { recargarExpedientes, useExpedientes } from "@/lib/expedientes";
 import { SALA_MODULO, TITULO_INICIO, accionesPermitidas, urlBoton, type AccionInicio, type ModuloInicio } from "@/lib/inicioModulos";
 import { urlSala } from "@/lib/presencia";
 import { recargarDatos, type StoreKey, KEYS } from "@/lib/storage";
+import { AccesosModulos, type ModuloPlanta } from "@/components/logistica/planta";
+import { isAdmin, permisosPlanta } from "@/lib/permisosPlanta";
 import { HOOK_KPIS, type KpiInicio } from "./kpis";
 
 // INICIO de cada módulo (ERP v3.0): encabezado INICIO [MÓDULO] + código 26W, 4 KPIs reales, a la izquierda (30 %)
@@ -92,10 +94,13 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
         )}
       </header>
 
+      {/* Acceso rápido a los 4 módulos (solo SOPORTE): estaba en los paneles, ahora va en el INICIO */}
+      {permisosPlanta(sesion).canViewOtherModules && <AccesosModulos sesion={sesion} actual={modulo === "soporte" ? undefined : (modulo as ModuloPlanta)} />}
+
       <FilaKpis key={modulo} modulo={modulo} />
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,7fr)]">
-        <ChatModulo sesion={sesion} modulo={modulo} />
+        <ChatModulo sesion={sesion} modulo={modulo} todos={modulo === "soporte" && isAdmin(sesion)} />
 
         <section className="space-y-4 rounded-xl border border-[#2a3445] bg-[#1a212e] p-4">
           <h2 className="flex items-center gap-2 text-[15px] font-bold uppercase tracking-wide text-[#60a5fa]">
@@ -162,8 +167,11 @@ function TarjetaKpi({ k }: { k: KpiInicio }) {
 const CLAVE_LEIDO = "erp-chat-leido";
 
 /** Mensajes del grupo del módulo (tabla chat_mensajes, columna modulo). "Sin leer": lo nuevo desde la última vez que se abrió. */
-function ChatModulo({ sesion, modulo }: { sesion: Sesion | null; modulo: ModuloInicio }) {
-  const sala = SALA_MODULO[modulo];
+/** Grupos que SOPORTE ve en pestañas (cada modulador ve solo el de su módulo; RLS chat_leer hace lo mismo en la base). */
+const SALAS_SOPORTE = [SALA_MODULO.soporte, SALA_MODULO.logistica, SALA_MODULO.almacen, SALA_MODULO.finanzas, SALA_MODULO.produccion, "Gerencia"];
+
+function ChatModulo({ sesion, modulo, todos }: { sesion: Sesion | null; modulo: ModuloInicio; todos?: boolean }) {
+  const [sala, setSala] = useState(SALA_MODULO[modulo]);
   const { mensajes, enviar, faltaTabla } = useChat(sesion, sala, true);
   const [texto, setTexto] = useState("");
   const [error, setError] = useState("");
@@ -211,6 +219,22 @@ function ChatModulo({ sesion, modulo }: { sesion: Sesion | null; modulo: ModuloI
         </span>
         {sinLeer > 0 && <span className="rounded-full bg-[#2a7bff] px-2 py-0.5 text-[11px] text-white">{sinLeer} sin leer</span>}
       </h2>
+      {todos && (
+        <div className="mb-3 flex flex-wrap gap-1.5" role="tablist" aria-label="Grupos de chat">
+          {SALAS_SOPORTE.map((s) => (
+            <button
+              key={s}
+              type="button"
+              role="tab"
+              aria-selected={s === sala}
+              onClick={() => setSala(s)}
+              className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition ${s === sala ? "border-[#2a7bff] bg-[#2a7bff] text-white" : "border-[#2a3445] bg-[#0e1219] text-[#d4d4d8] hover:border-[#2a7bff] hover:text-white"}`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
       {faltaTabla ? (
         <p className="rounded-lg bg-[#0e1219] px-3 py-2 text-[12px] italic text-[#a1a1aa]">Falta activar el chat: ejecute supabase/migrations/20261104_chat_grupal.sql en Supabase.</p>
       ) : (

@@ -11,7 +11,7 @@ import type { OrdenProduccion } from "@/lib/produccion";
 import { KEYS, fechaPE, r2, soles, useStore } from "@/lib/storage";
 import type { StockItem, ValeProduccion } from "@/lib/types";
 import { BotonAccion, Etiqueta, Panel, SinRegistro } from "./piezas";
-import { BarraAcciones, BarraModulos, Filas, MarcoPlanta, PanelLateral, TiemposCosto, horaActual } from "./planta";
+import { BarraAcciones, Filas, MarcoPlanta, PanelLateral, TiemposCosto, horaActual } from "./planta";
 
 const ESTACIONES = [
   { nombre: "Plasma CNC", detalle: "Corte de planchas", icono: <Flame size={30} /> },
@@ -200,7 +200,6 @@ export function ProduccionHome() {
         ]}
       />
 
-      <BarraModulos sesion={sesion} actual="produccion" />
     </MarcoPlanta>
   );
 }

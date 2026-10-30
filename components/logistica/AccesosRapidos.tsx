@@ -35,7 +35,7 @@ import { KEYS, useStore } from "@/lib/storage";
 import type { OrdenProduccion } from "@/lib/produccion";
 import type { Guia } from "@/lib/types";
 import { RUTA_MUNDO_VENTAS, perfilPlanta, permisosPlanta, type PermisosPlanta } from "@/lib/permisosPlanta";
-import { AccesosModulos, type ModuloPlanta } from "./planta";
+import type { ModuloPlanta } from "./planta";
 
 interface Accion {
   label: string;
@@ -132,11 +132,11 @@ function GrillaAcciones({ acciones }: { acciones: Accion[] }) {
 }
 
 /**
- * Accesos rápidos según el perfil. La barra de los 4 módulos solo la ve SOPORTE (canViewOtherModules);
- * los moduladores (Finanzas, Logística, Almacén, Producción) ven únicamente las funciones de su módulo.
+ * Accesos rápidos según el perfil: los moduladores (Finanzas, Logística, Almacén, Producción) ven únicamente las
+ * funciones de su módulo. La barra de los 4 módulos (solo SOPORTE) está en el INICIO de cada módulo.
  * SOPORTE además tiene las funciones globales. Cada acción abre el módulo de siempre en otra pestaña.
  */
-export function AccesosRapidos({ sesion, actual }: { sesion: Sesion | null; actual: ModuloPlanta }) {
+export function AccesosRapidos({ sesion }: { sesion: Sesion | null; actual: ModuloPlanta }) {
   const perfil = perfilPlanta(sesion);
   const permisos = permisosPlanta(sesion);
   const activo = perfil !== "soporte" && perfil !== null;
@@ -145,12 +145,10 @@ export function AccesosRapidos({ sesion, actual }: { sesion: Sesion | null; actu
   // GERENCIA es solo visor: sin accesos a módulos operativos
   if (!sesion || perfil === null || perfil === "gerencia") return null;
   const visible = (a: Accion) => (!a.requiere || permisos[a.requiere]) && puedeVer(sesion, a.permiso ?? a.href.split(/[?#]/)[0]);
-  const barraModulos = permisos.canViewOtherModules && <AccesosModulos sesion={sesion} actual={actual} />;
 
   if (perfil === "soporte")
     return (
       <div className="space-y-4">
-        {barraModulos}
         <div>
           <h3 className="mb-2 text-[13px] font-bold uppercase text-[#60a5fa]">Funciones globales</h3>
           <GrillaAcciones acciones={GLOBALES.filter(visible)} />
@@ -167,11 +165,8 @@ export function AccesosRapidos({ sesion, actual }: { sesion: Sesion | null; actu
 
   return (
     <div className="space-y-4">
-      {barraModulos}
       <section>
-        <h2 className={barraModulos ? "mb-2 text-[13px] font-bold uppercase text-[#60a5fa]" : "mb-3 text-xl font-bold uppercase text-[#60a5fa]"}>
-          {barraModulos ? "Funciones del módulo" : "Accesos rápidos"}
-        </h2>
+        <h2 className="mb-3 text-xl font-bold uppercase text-[#60a5fa]">Accesos rápidos</h2>
         <GrillaAcciones acciones={acciones} />
       </section>
     </div>

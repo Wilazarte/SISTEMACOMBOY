@@ -11,7 +11,7 @@ const clave = process.env.CLAVE_INICIAL ?? ''
 if (!url || !serviceKey) { console.error('Falta NEXT_PUBLIC_SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY'); process.exit(1) }
 if (clave.length < 10 || /^(\d)\1*$|^123456/.test(clave)) { console.error('Defina CLAVE_INICIAL con al menos 10 caracteres (no 123456...)'); process.exit(1) }
 const supabase = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
-const correos = ['creador', 'tesoreria', 'almacen', 'planilla', 'gerencia'].map((u) => `${u}@comboyvid.local`)
+const correos = ['creador', 'tesoreria', 'almacen', 'planilla', 'gerencia', 'logistica', 'produccion'].map((u) => `${u}@comboyvid.local`)
 const { data: existentes, error: eLista } = await supabase.auth.admin.listUsers({ perPage: 1000 })
 if (eLista) { console.error('No se pudo listar usuarios:', eLista.message); process.exit(1) }
 for (const email of correos) {

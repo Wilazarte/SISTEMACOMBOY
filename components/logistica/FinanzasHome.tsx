@@ -14,7 +14,7 @@ import type { ComprobanteVenta, Factura, NotaPedido, OrdenCompra, OrdenDespacho,
 import { npPorCobrar, saldoNP, vencimientoNP } from "@/lib/ventas";
 import { ErpTable, ErpTd } from "@/components/erp/ErpTable";
 import { BotonAccion, BotonVer, Etiqueta, Panel, SinRegistro } from "./piezas";
-import { BarraAcciones, BarraModulos, EncabezadoPlanta, Filas, MarcoPlanta, PanelLateral, horaActual, montoCorto } from "./planta";
+import { BarraAcciones, EncabezadoPlanta, Filas, MarcoPlanta, PanelLateral, horaActual, montoCorto } from "./planta";
 
 /** Tarjeta KPI del diseño de Finanzas: icono a la izquierda, título, monto y detalle en verde/rojo. */
 function KpiFinanzas({ icono, titulo, valor, detalle, href, alerta }: { icono: React.ReactNode; titulo: string; valor: string; detalle: string; href: string; alerta?: boolean }) {
@@ -299,7 +299,6 @@ export function FinanzasHome() {
         </ErpTable>
       </Panel>
 
-      <BarraModulos sesion={sesion} actual="finanzas" />
     </MarcoPlanta>
   );
 }

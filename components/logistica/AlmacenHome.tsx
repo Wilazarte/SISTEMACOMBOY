@@ -11,7 +11,7 @@ import type { Guia, MovimientoKardex, OrdenDespacho, StockItem, ValeProduccion }
 import { estadoOD } from "@/lib/ventas";
 import { abrirPestana } from "@/lib/logistica";
 import { Etiqueta, Panel, SinRegistro } from "./piezas";
-import { BarraAcciones, BarraModulos, EncabezadoPlanta, Filas, MarcoPlanta, PanelLateral, horaActual, montoCorto } from "./planta";
+import { BarraAcciones, EncabezadoPlanta, Filas, MarcoPlanta, PanelLateral, horaActual, montoCorto } from "./planta";
 
 /** Stock crítico: 5 unidades o menos (igual que el Dashboard). */
 const STOCK_CRITICO = 5;
@@ -222,7 +222,6 @@ export function AlmacenHome() {
         ]}
       />
 
-      <BarraModulos sesion={sesion} actual="almacen" />
     </MarcoPlanta>
   );
 }

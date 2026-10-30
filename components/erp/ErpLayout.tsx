@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { ID_BARRA_PESTANAS } from "@/components/ui";
 import type { Sesion } from "@/lib/auth";
 import { VERSION_LOGISTICA } from "@/lib/logistica";
-import { ETIQUETA_PERFIL, perfilPlanta } from "@/lib/permisosPlanta";
+import { ETIQUETA_PERFIL, inicialesDe, perfilPlanta } from "@/lib/permisosPlanta";
 import { ErpHeader, NOMBRE_EMPRESA } from "./ErpHeader";
 
 const horaActual = () => new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", hour12: false });
@@ -45,6 +45,10 @@ export function ErpLayout({
   useEffect(() => setSync(horaActual()), [ruta]);
   const perfil = perfilPlanta(sesion);
   const etiqueta = perfil ? ETIQUETA_PERFIL[perfil] : undefined;
+  // Usuario asignado: "JO - Jose Ortiz Arapa • ALMACEN" (perfiles.avatar_iniciales, nombre_completo, modulo_asignado)
+  const nombreUsuario = sesion.nombreCompleto?.trim() || sesion.nombre || sesion.usuario;
+  const iniciales = inicialesDe(nombreUsuario, sesion.iniciales);
+  const moduloUsuario = etiqueta?.label ?? (sesion.moduloAsignado?.toUpperCase() || undefined);
   return (
     <div className="dark tema-planta relative isolate flex min-h-screen bg-[#0e1219] flex-col pb-32 text-fg" data-modulo={moduleName}>
       {/* Fondo negro-azul con el mapa mundial tenue (estética que Williams pidió recuperar, 2026-10-30) */}
@@ -56,10 +60,10 @@ export function ErpLayout({
       <ErpHeader
         modulo={moduleName}
         inicio={inicio}
-        // Perfil de la planta: SO SOPORTE, AL ALMACEN, FI FINANZAS, LO LOGISTICA, PR PRODUCCION
-        usuario={etiqueta?.label ?? sesion.usuario}
-        nombre={etiqueta ? `${etiqueta.titulo} (${sesion.usuario})` : sesion.nombre}
-        badge={etiqueta?.badge}
+        iniciales={iniciales}
+        usuario={`${iniciales} - ${nombreUsuario}${moduloUsuario ? ` • ${moduloUsuario}` : ""}`}
+        nombre={etiqueta ? `${nombreUsuario} · ${etiqueta.titulo} (${sesion.usuario})` : nombreUsuario}
+        badge={perfil ? "ASIGNADO" : undefined}
         onSalir={onSalir}
         extra={extra}
       />

@@ -18,6 +18,7 @@ export function ErpHeader({
   modulo,
   inicio = "/dashboard",
   usuario,
+  iniciales,
   nombre,
   badge,
   onSalir,
@@ -27,6 +28,8 @@ export function ErpHeader({
   modulo?: string;
   inicio?: string;
   usuario?: string;
+  /** Iniciales del avatar (si no, las 2 primeras letras de `usuario`). */
+  iniciales?: string;
   nombre?: string;
   /** Distintivo junto al usuario (ej. "Soporte Dueño"). */
   badge?: string;
@@ -56,10 +59,10 @@ export function ErpHeader({
         {usuario && (
           <div className="flex items-center gap-3 rounded-full border border-[#2a3445] bg-[#1a212e] py-1 pl-1 pr-3 lg:px-3 lg:py-1.5" title={nombre ?? usuario}>
             <span className="hidden h-8 w-8 items-center justify-center rounded-full bg-[#3f3f46] uppercase text-white md:flex" style={{ fontFamily: TIMES, fontSize: "14px" }}>
-              {usuario.slice(0, 2)}
+              {iniciales ?? usuario.slice(0, 2)}
             </span>
-            <span className="hidden max-w-[140px] truncate text-sm font-semibold text-white md:block">{usuario}</span>
-            {badge && <span className="hidden rounded-full bg-[#2a7bff] px-2 py-0.5 text-[11px] font-semibold text-white lg:inline">{badge}</span>}
+            <span className="hidden max-w-[150px] truncate text-sm font-semibold text-white md:block xl:max-w-[230px] 2xl:max-w-[340px]">{usuario}</span>
+            {badge && <span className="hidden rounded-full bg-[#2a7bff] px-2 py-0.5 text-[11px] font-semibold uppercase text-white lg:inline">{badge}</span>}
             {onSalir && (
               <button type="button" onClick={onSalir} className="ml-1 rounded-full p-1 transition hover:bg-white/10" aria-label="Cerrar sesión" title="Cerrar sesión">
                 <LogOut className="h-5 w-5 text-[#d4d4d8]" />

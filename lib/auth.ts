@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "./supabase/client";
 import type { Rol } from "./types";
 import { DOMINIO, puedeVer, soloSecocha, tieneSecocha, veDashboard, RUTA_GERENCIA, RUTA_SUCURSAL, RUTA_SUCURSAL_ANTIGUA, type RolAuth, type Sesion } from "./permisos";
-import { isAdmin } from "./permisosPlanta";
+import { homeAsignado, isAdmin } from "./permisosPlanta";
 
 export * from "./permisos";
 
@@ -40,6 +40,8 @@ function fijar(s: Sesion | null): void {
   window.dispatchEvent(new Event(EVENTO));
 }
 
+const USUARIO_INACTIVO = "Usuario desactivado. Pida a SOPORTE que lo active.";
+
 /** Lee el usuario autenticado y su perfil. */
 async function cargarSesion(): Promise<Sesion | null> {
   const sb = createClient();
@@ -47,10 +49,22 @@ async function cargarSesion(): Promise<Sesion | null> {
     data: { user },
   } = await sb.auth.getUser();
   if (!user) return null;
-  const { data, error } = await sb.from("perfiles").select("usuario,rol,nombre,modulos,solo_lectura,cargo,nombre_completo").eq("id", user.id).maybeSingle();
+  // "*": las columnas nuevas (avatar_iniciales, modulo_asignado, activo…) son opcionales hasta correr su SQL
+  const { data, error } = await sb.from("perfiles").select("*").eq("id", user.id).maybeSingle();
   if (error) throw error;
   if (!data) return null;
-  return { usuario: data.usuario, rol: data.rol as RolAuth, nombre: data.nombre, modulos: data.modulos ?? [], soloLectura: !!data.solo_lectura, cargo: data.cargo ?? undefined, nombreCompleto: data.nombre_completo ?? undefined };
+  if (data.activo === false) throw new Error(USUARIO_INACTIVO);
+  return {
+    usuario: data.usuario,
+    rol: data.rol as RolAuth,
+    nombre: data.nombre,
+    modulos: data.modulos ?? [],
+    soloLectura: !!data.solo_lectura,
+    cargo: data.cargo ?? undefined,
+    nombreCompleto: data.nombre_completo ?? undefined,
+    iniciales: data.avatar_iniciales ?? undefined,
+    moduloAsignado: data.modulo_asignado ?? undefined,
+  };
 }
 
 /** Intentos fallidos seguidos antes de bloquear (la base aplica el mismo número). */
@@ -69,8 +83,18 @@ const msgBloqueo = (seg: number) => `Usuario bloqueado por ${MAX_INTENTOS_LOGIN}
 
 export async function login(usuario: string, pass: string): Promise<{ sesion?: Sesion; error?: string }> {
   const u = usuario.trim().toLowerCase();
-  const email = u.includes("@") ? u : `${u}@${DOMINIO}`;
   const sb = createClient();
+  // Se entra con el nombre completo ("Jose Ortiz Arapa"), el usuario ("almacen") o el correo
+  // (supabase/migrations/20261106_perfiles_asignacion.sql, email_de_login); sin esa migración, usuario o correo
+  let email = u.includes("@") ? u : `${u}@${DOMINIO}`;
+  if (!u.includes("@")) {
+    try {
+      const { data } = await sb.rpc("email_de_login", { p_texto: usuario.trim() });
+      if (typeof data === "string" && data) email = data;
+    } catch {
+      /* sin la función: usuario@dominio */
+    }
+  }
   // Bloqueo por intentos fallidos (supabase/migrations/20261102_login_intentos.sql); sin esa migración no bloquea
   const bloqueo = await segundosBloqueo(sb.rpc("login_bloqueo", { p_usuario: email }));
   if (bloqueo > 0) return { error: msgBloqueo(bloqueo) };
@@ -91,7 +115,8 @@ export async function login(usuario: string, pass: string): Promise<{ sesion?: S
     return { sesion };
   } catch (e) {
     await sb.auth.signOut();
-    return { error: `No se pudo leer el perfil: ${(e as Error).message}` };
+    const msg = (e as Error).message;
+    return { error: msg === USUARIO_INACTIVO ? msg : `No se pudo leer el perfil: ${msg}` };
   }
 }
 
@@ -142,6 +167,9 @@ export function inicioDe(sesion: Sesion): string {
   if (soloSecocha(sesion)) return RUTA_SUCURSAL;
   // GERENCIA: su único inicio es el Dashboard Gerencia (visor general, solo lectura)
   if (sesion.rol === "gerencia") return RUTA_GERENCIA;
+  // Moduladores (Finanzas, Almacén, Logística, Producción): su INICIO asignado
+  const asignado = homeAsignado(sesion);
+  if (asignado) return asignado;
   if (sesion.modulos.includes("*") || veDashboard(sesion)) return "/dashboard";
   // Sin módulos asignados se queda en /dashboard (el layout muestra el aviso; evita el bucle con /login)
   return sesion.modulos.find((m) => m.startsWith("/dashboard/")) ?? "/dashboard";

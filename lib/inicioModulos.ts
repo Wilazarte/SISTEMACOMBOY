@@ -155,12 +155,8 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
   ],
 };
 
-/** SOPORTE: entra a los 4 INICIO y a las funciones globales. */
+/** SOPORTE: funciones globales (los 4 INICIO van en el acceso rápido a los módulos, arriba del INICIO). */
 export const ACCIONES_SOPORTE: AccionInicio[] = [
-  { slug: "logistica", label: "INICIO Logística", grupo: "Módulos", destino: "/logistica" },
-  { slug: "almacen", label: "INICIO Almacén", grupo: "Módulos", destino: "/almacen" },
-  { slug: "finanzas", label: "INICIO Finanzas", grupo: "Módulos", destino: "/finanzas" },
-  { slug: "produccion", label: "INICIO Producción", grupo: "Módulos", destino: "/produccion" },
   { slug: "gerencia", label: "Dashboard Gerencia", grupo: "Módulos", destino: "/gerencia" },
   { slug: "secocha", label: "Secocha (sucursal)", grupo: "Módulos", destino: "/secocha" },
   { slug: "expedientes", label: "Expedientes 26W · Tablero de lotes", grupo: EXP, destino: LOTES },
