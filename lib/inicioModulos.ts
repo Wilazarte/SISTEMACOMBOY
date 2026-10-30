@@ -5,6 +5,7 @@
 
 import { puedeVer, type Sesion } from "./auth";
 import { permisosPlanta, type PermisosPlanta } from "./permisosPlanta";
+import { FASES, NOMBRE_PERFIL, RESPONSABLE, TITULO_FASE, type Fase } from "./expedientes";
 
 export type ModuloInicio = "logistica" | "almacen" | "finanzas" | "produccion" | "soporte";
 
@@ -198,6 +199,27 @@ export function destinoDe(modulo: ModuloInicio, a: AccionInicio, doc?: string | 
   return `${url.pathname}${url.search}`;
 }
 
-export const buscarAccion = (modulo: ModuloInicio, slug: string): AccionInicio | undefined => accionesDe(modulo).find((a) => a.slug === slug);
+/**
+ * Flujo del expediente 26W en orden (Fase 1 → 8). Las fases del módulo usan su propia acción; las de otros módulos
+ * abren el expediente en esa fase para seguirlo (cada módulo solo actúa en las suyas, ver ExpedienteView).
+ */
+export function fasesFlujo(modulo: ModuloInicio): AccionInicio[] {
+  const propias = accionesDe(modulo).filter((a) => a.fase);
+  return FASES.map((f) => propias.find((a) => a.fase === f) ?? accionFase(f));
+}
+
+const accionFase = (f: Fase): AccionInicio => ({ slug: `fase-${f}`, label: `${TITULO_FASE[f]} · Fase ${f} (${NOMBRE_PERFIL[RESPONSABLE[f]]})`, grupo: EXP, destino: LOTES, fase: f });
+
+/** Fase de la que el módulo es responsable (la primera): su botón principal en el flujo. */
+export const fasePrincipal = (modulo: ModuloInicio): Fase | undefined => FASES.find((f) => RESPONSABLE[f] === modulo);
+
+export const GRUPO_EXPEDIENTE = EXP;
+
+export const buscarAccion = (modulo: ModuloInicio, slug: string): AccionInicio | undefined => {
+  const a = accionesDe(modulo).find((x) => x.slug === slug);
+  if (a) return a;
+  const f = Number(/^fase-([1-8])$/.exec(slug)?.[1]) as Fase;
+  return f ? accionFase(f) : undefined;
+};
 
 export const esModuloInicio = (m: string | null | undefined): m is ModuloInicio => !!m && m in TITULO_INICIO;

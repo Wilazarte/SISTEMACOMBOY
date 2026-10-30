@@ -25,6 +25,7 @@ export function ErpLayout({
   extra,
   mainClassName = "",
   overlays,
+  sinMapa = false,
   children,
 }: {
   moduleName: string;
@@ -38,6 +39,8 @@ export function ErpLayout({
   mainClassName?: string;
   /** Barras, dock, modales y avisos fijos (fuera del contenido). */
   overlays?: ReactNode;
+  /** INICIO de los módulos (rediseño 2026-10-30): fondo liso #0F1115, sin el mapa mundial. */
+  sinMapa?: boolean;
   children: ReactNode;
 }) {
   const ruta = usePathname();
@@ -50,12 +53,14 @@ export function ErpLayout({
   const iniciales = inicialesDe(nombreUsuario, sesion.iniciales);
   const moduloUsuario = etiqueta?.label ?? (sesion.moduloAsignado?.toUpperCase() || undefined);
   return (
-    <div className="dark tema-planta relative isolate flex min-h-screen bg-[#0e1219] flex-col pb-32 text-fg" data-modulo={moduleName}>
-      {/* Fondo negro-azul con el mapa mundial tenue (estética que Williams pidió recuperar, 2026-10-30) */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 z-[-1] bg-[#0e1219]">
-        <Image src="/blue-globe.jpg" alt="" fill priority quality={80} sizes="100vw" className="object-cover object-center opacity-[0.16] grayscale" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0e1219]/40 via-transparent to-[#0e1219]/80" />
-      </div>
+    <div className={`dark tema-planta relative isolate flex min-h-screen flex-col pb-32 text-fg ${sinMapa ? "bg-[#0F1115]" : "bg-[#0e1219]"}`} data-modulo={moduleName}>
+      {/* Fondo negro-azul con el mapa mundial tenue (estética que Williams pidió recuperar, 2026-10-30); los INICIO, liso */}
+      {!sinMapa && (
+        <div aria-hidden className="pointer-events-none fixed inset-0 z-[-1] bg-[#0e1219]">
+          <Image src="/blue-globe.jpg" alt="" fill priority quality={80} sizes="100vw" className="object-cover object-center opacity-[0.16] grayscale" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0e1219]/40 via-transparent to-[#0e1219]/80" />
+        </div>
+      )}
 
       <ErpHeader
         modulo={moduleName}
