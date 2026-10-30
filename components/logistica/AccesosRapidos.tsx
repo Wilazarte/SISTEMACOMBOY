@@ -116,7 +116,7 @@ function GrillaAcciones({ acciones }: { acciones: Accion[] }) {
           key={a.label}
           type="button"
           onClick={() => abrirPestana(a.href)}
-          title="Se abre en una pestaña nueva"
+          title="Abrir"
           className={
             a.destacado
               ? "group col-span-2 flex min-h-[110px] items-center justify-center gap-3 rounded-xl bg-[#2a7bff] px-4 py-4 text-center text-white transition hover:bg-[#1e64e6]"

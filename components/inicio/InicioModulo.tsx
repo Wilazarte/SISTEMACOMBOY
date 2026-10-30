@@ -6,6 +6,7 @@ import { useSesion, type Sesion } from "@/lib/auth";
 import { useChat } from "@/lib/chat";
 import { recargarExpedientes, useExpedientes } from "@/lib/expedientes";
 import { SALA_MODULO, TITULO_INICIO, accionesPermitidas, urlBoton, type AccionInicio, type ModuloInicio } from "@/lib/inicioModulos";
+import { irA } from "@/lib/navegacion";
 import { urlSala } from "@/lib/presencia";
 import { recargarDatos, type StoreKey, KEYS } from "@/lib/storage";
 import { AccesosModulos, type ModuloPlanta } from "@/components/logistica/planta";
@@ -13,13 +14,11 @@ import { isAdmin, permisosPlanta } from "@/lib/permisosPlanta";
 import { HOOK_KPIS, type KpiInicio } from "./kpis";
 
 // INICIO de cada módulo (ERP v3.0): encabezado INICIO [MÓDULO] + código 26W, 4 KPIs reales, a la izquierda (30 %)
-// el chat del grupo del módulo y a la derecha (70 %) un botón por cada función. Sin menús: todo abre en pestaña nueva.
+// el chat del grupo del módulo y a la derecha (70 %) un botón por cada función. Sin menús: todo abre en la misma ventana.
 // Colores del pedido de Williams (2026-10-30): fondo #0e1219, tarjetas #2a3445, botones #2a7bff, texto blanco.
 
-/** Abre una pantalla del ERP en una pestaña nueva (sin noopener: la pestaña avisa a INICIO al guardar). */
-export const abrirEnPestana = (href: string) => {
-  window.open(href, "_blank");
-};
+/** Abre una pantalla del ERP en la misma ventana (Atrás vuelve al INICIO). Nombre antiguo: antes abría pestaña nueva. */
+export const abrirEnPestana = (href: string) => irA(href);
 
 const CLAVE_DOC = "erp-inicio-doc";
 
@@ -76,7 +75,7 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
             INICIO {TITULO_INICIO[modulo]}
             {docValido && <span className="ml-3 align-middle text-2xl text-[#60a5fa] lg:text-3xl">{docValido}</span>}
           </h1>
-          <p className="text-[13px] text-[#d4d4d8]">Cada botón abre su pantalla en una pestaña nueva.</p>
+          <p className="text-[13px] text-[#d4d4d8]">Cada botón abre su pantalla aquí mismo; con Atrás vuelve al INICIO.</p>
         </div>
         {!exp.faltaTabla && abiertos.length > 0 && (
           <label className="flex items-center gap-2 text-[13px] font-semibold text-[#d4d4d8]">
@@ -116,7 +115,7 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
                     key={a.slug}
                     type="button"
                     onClick={() => abrirEnPestana(urlBoton(modulo, a, docValido || undefined))}
-                    title="Se abre en una pestaña nueva"
+                    title="Abrir"
                     className="group flex min-h-[56px] items-center justify-between gap-2 rounded-lg bg-[#2a7bff] px-3 py-2.5 text-left text-[14px] font-bold leading-snug text-white transition hover:bg-[#1e64e6]"
                   >
                     <span>{a.label}</span>

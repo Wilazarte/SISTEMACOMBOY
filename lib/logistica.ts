@@ -14,6 +14,7 @@ import type { OrdenProduccion } from "./produccion";
 import type { Traslado } from "./sucursal-modelos";
 import type { EventoHistorial, Factura, Guia, OrdenCompra, OrdenDespacho } from "./types";
 import { estadoOD } from "./ventas";
+import { irA } from "./navegacion";
 
 export const VERSION_LOGISTICA = "v1.4.2";
 
@@ -181,8 +182,5 @@ export function useLogistica() {
 
 export type DatosLogistica = ReturnType<typeof useLogistica>;
 
-/** Abre un módulo en una pestaña nueva (igual que VENTAS). Las rutas del ERP conservan window.opener para avisar al guardar. */
-export const abrirPestana = (href: string): void => {
-  if (href.startsWith("/")) window.open(href, "_blank");
-  else window.open(href, "_blank", "noopener");
-};
+/** Abre un módulo del ERP en la misma ventana (lib/navegacion). Nombre antiguo: antes abría una pestaña nueva. */
+export const abrirPestana = (href: string): void => irA(href);

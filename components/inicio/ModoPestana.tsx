@@ -1,34 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Loader2, Save, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Loader2, Save, X } from "lucide-react";
 import { toast } from "@/components/ui";
-import { RUTA_INICIO, TITULO_INICIO, type ModuloInicio } from "@/lib/inicioModulos";
+import { recargarExpedientes } from "@/lib/expedientes";
+import { RUTA_INICIO, type ModuloInicio } from "@/lib/inicioModulos";
 import { esperarGuardado } from "@/lib/storage";
 
-// Pestaña de una acción (abierta desde un botón del INICIO): sin menú, encabezado "← Volver a INICIO [MÓDULO]"
-// y pie con Cancelar y Guardar y Cerrar. Guardar y Cerrar envía el formulario que se está llenando (o pulsa su botón
-// Registrar / Emitir…); cuando el ERP confirma el guardado en Supabase, avisa al INICIO (postMessage reload) y cierra.
+// Pantalla de una acción (abierta desde un botón del INICIO, en la misma ventana): barra NavegacionERP arriba
+// (components/NavegacionERP) y pie con Cancelar y Guardar y Cerrar. Guardar y Cerrar envía el formulario que se está
+// llenando (o pulsa su botón Registrar / Emitir…); cuando el ERP confirma el guardado en Supabase, vuelve al INICIO.
 
 const EV_TOAST = "erp:toast";
 const ESPERA_MS = 8000;
-
-/** Avisa al INICIO que abrió la pestaña (recarga sus datos). */
-function avisarInicio() {
-  try {
-    window.opener?.postMessage({ type: "reload" }, window.location.origin);
-  } catch {
-    /* el INICIO ya se cerró */
-  }
-}
-
-/** Cierra la pestaña; si el navegador no la deja cerrar (no la abrió el ERP), vuelve al INICIO. */
-function cerrar(inicio: string) {
-  window.close();
-  setTimeout(() => {
-    if (!window.closed) window.location.assign(inicio);
-  }, 300);
-}
 
 const visible = (el: Element) => !el.closest("[data-sin-guardar], header") && el.getClientRects().length > 0;
 const BOTON_GUARDAR = /^(guardar|registrar|crear|emitir|generar|aprobar|enviar|confirmar|pagar|subir)/i;
@@ -64,30 +49,10 @@ function objetivoGuardar(editado: Element | null): Objetivo {
   return { sinBoton: true };
 }
 
-export function EncabezadoPestana({ modulo, titulo }: { modulo: ModuloInicio; titulo?: string }) {
-  const inicio = RUTA_INICIO[modulo];
-  const volver = () => {
-    if (window.opener && !window.opener.closed) {
-      try {
-        window.opener.focus();
-      } catch {
-        /* otro origen */
-      }
-      cerrar(inicio);
-    } else window.location.assign(inicio);
-  };
-  return (
-    <div className="sticky top-16 z-20 -mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-[#2a3445] bg-[#0e1219]/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8" data-sin-guardar>
-      <button type="button" onClick={volver} className="inline-flex items-center gap-2 text-[14px] font-bold text-[#93c5fd] hover:text-white">
-        <ArrowLeft size={17} /> Volver a INICIO {TITULO_INICIO[modulo]}
-      </button>
-      {titulo && <span className="text-[15px] font-bold uppercase text-white">{titulo}</span>}
-    </div>
-  );
-}
-
 export function PiePestana({ modulo }: { modulo: ModuloInicio }) {
+  const router = useRouter();
   const inicio = RUTA_INICIO[modulo];
+  const cerrar = () => router.push(inicio);
   const [guardando, setGuardando] = useState(false);
   const limpiar = useRef<() => void>(() => undefined);
   // Último campo que el usuario editó (se olvida cuando el ERP confirma un guardado)
@@ -117,8 +82,8 @@ export function PiePestana({ modulo }: { modulo: ModuloInicio }) {
       toast(`No se guardó: ${err}`, "error");
       return;
     }
-    avisarInicio();
-    cerrar(inicio);
+    void recargarExpedientes();
+    cerrar();
   };
 
   const guardarYCerrar = () => {
@@ -162,7 +127,7 @@ export function PiePestana({ modulo }: { modulo: ModuloInicio }) {
 
   const cancelar = () => {
     limpiar.current();
-    cerrar(inicio);
+    cerrar();
   };
 
   return (

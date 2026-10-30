@@ -14,7 +14,7 @@ export interface ErpAlerta {
   icono?: ReactNode;
   /** Punto naranja de "no visto". */
   nuevo?: boolean;
-  /** Destino: se abre en una pestaña nueva (como los accesos de Logística). */
+  /** Destino: se abre en la misma ventana (como los accesos de Logística). */
   href?: string;
   onClick?: () => void;
 }

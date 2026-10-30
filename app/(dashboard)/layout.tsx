@@ -12,13 +12,15 @@ import { CommandPalette, IconoDoc, type Comando } from "@/components/shell/Comma
 import { useIr } from "@/components/shell/ir";
 import { accionesDe, hrefSub, moduloDe, navDe } from "@/components/shell/nav";
 import { ModuloContenido, ModuloLayout, SEDE_PLANTA_PRINCIPAL } from "@/components/layout/ModuloLayout";
-import { EncabezadoPestana, PiePestana } from "@/components/inicio/ModoPestana";
+import { PiePestana } from "@/components/inicio/ModoPestana";
+import { NavegacionERP, type MigaERP } from "@/components/NavegacionERP";
 import { DatalistCatalogo } from "@/components/productos/ProductoInput";
 import { detenerCatalogo, iniciarCatalogo } from "@/lib/productos";
 import { olvidarSedes } from "@/lib/sedes";
 import { RUTA_GERENCIA, RUTA_SUCURSAL, inicioDe, soloSecocha, logout, puedeVer, useSesion, veTesoreria } from "@/lib/auth";
-import { RUTA_NO_AUTORIZADO, homePlantaDe, isAdmin } from "@/lib/permisosPlanta";
-import { RUTA_INICIO, buscarAccion, esModuloInicio, type ModuloInicio } from "@/lib/inicioModulos";
+import { RUTA_NO_AUTORIZADO, homeAsignado, homePlantaDe, isAdmin } from "@/lib/permisosPlanta";
+import { RUTA_INICIO, TITULO_INICIO, buscarAccion, esModuloInicio, type ModuloInicio } from "@/lib/inicioModulos";
+import { registrarNavegador } from "@/lib/navegacion";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
 import { useNotificaciones } from "@/lib/notificaciones";
 import { limpiarPrefs, usePrefs } from "@/lib/preferencias";
@@ -97,7 +99,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [subiendo, setSubiendo] = useState(false);
   // Pestaña de una acción del INICIO (se lee de la URL al cambiar de ruta)
   const [pestanaAccion, setPestanaAccion] = useState<ReturnType<typeof pestanaDe>>(null);
-  useEffect(() => setPestanaAccion(pestanaDe(path, window.location.search)), [path]);
+  const [busqueda, setBusqueda] = useState("");
+  useEffect(() => {
+    setPestanaAccion(pestanaDe(path, window.location.search));
+    setBusqueda(window.location.search);
+  }, [path]);
+  // Todos los botones del ERP navegan en esta misma ventana (lib/navegacion: irA)
+  useEffect(() => registrarNavegador(ir), [ir]);
 
   useEffect(() => {
     if (listo && !sesion) {
@@ -262,6 +270,25 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const enPlanilla = path.startsWith("/dashboard/planilla") || (path === "/dashboard/compras" && tabActiva?.id === "planilla");
   const nombreModulo = enPlanilla ? "PLANILLA" : (NOMBRE_MODULO.find(([r]) => path === r || path.startsWith(`${r}/`))?.[1] ?? (path === "/dashboard" && isAdmin(sesion) ? "SOPORTE" : "DASHBOARD"));
 
+  // Barra NavegacionERP (atrás / adelante / INICIO > MÓDULO > pantalla) en todas las pantallas menos los INICIO
+  const esInicio = Object.values(RUTA_INICIO).includes(path) && !(path === "/dashboard" && new URLSearchParams(busqueda).has("vista"));
+  const moduloNav: ModuloInicio | null =
+    pestanaAccion?.modulo ??
+    (() => {
+      const home = homePlantaDe(path) ?? homeAsignado(sesion);
+      const m = (Object.keys(RUTA_INICIO) as ModuloInicio[]).find((k) => RUTA_INICIO[k] === home);
+      return m ?? (isAdmin(sesion) ? "soporte" : null);
+    })();
+  const pantalla = pestanaAccion?.titulo ?? tabActiva?.label ?? nombreModulo.charAt(0) + nombreModulo.slice(1).toLowerCase();
+  const migas: MigaERP[] | null =
+    !esInicio && moduloNav
+      ? [
+          { label: "INICIO", href: RUTA_INICIO[moduloNav] },
+          { label: TITULO_INICIO[moduloNav], href: RUTA_INICIO[moduloNav] },
+          { label: pantalla },
+        ]
+      : null;
+
   return (
     <ModuloLayout
       moduleName={nombreModulo}
@@ -329,7 +356,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       ) : (
         <ModuloContenido
           key={path}
-          encabezado={pestanaAccion && <EncabezadoPestana modulo={pestanaAccion.modulo} titulo={pestanaAccion.titulo} />}
+          encabezado={migas && moduloNav && <NavegacionERP migas={migas} inicio={RUTA_INICIO[moduloNav]} />}
           avisos={
             <>
               {sesion.soloLectura && (
