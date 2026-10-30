@@ -752,7 +752,8 @@ function RegistrarCompra({
                 Cancelar edición
               </Button>
             )}
-            <Button onClick={guardar} disabled={!proveedorId || !fechaISO || guardandoCompra}>
+            {/* data-guardar-pestana: abierta desde el INICIO, este botón va en la barra inferior (un solo botón de guardar) */}
+            <Button onClick={guardar} disabled={!proveedorId || !fechaISO || guardandoCompra} data-guardar-pestana>
               {editando ? <Pencil size={16} /> : <PackagePlus size={16} />} {editando ? "Guardar cambios" : "Guardar compra e ingresar a stock"}
             </Button>
           </div>

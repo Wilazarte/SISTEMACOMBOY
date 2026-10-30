@@ -438,7 +438,8 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
             </>
           )}
         </p>
-        <Button variant={pagar ? "success" : "warning"} onClick={guardar} disabled={!fechaISO || guardando} className="px-5 py-2.5">
+        {/* data-guardar-pestana: abierta desde el INICIO, este botón va en la barra inferior (un solo botón de guardar) */}
+        <Button variant={pagar ? "success" : "warning"} onClick={guardar} disabled={!fechaISO || guardando} className="px-5 py-2.5" data-guardar-pestana>
           <Receipt size={16} /> {guardando ? "Guardando…" : pagar ? "Registrar y pagar" : "Registrar gasto (por pagar)"}
         </Button>
       </div>

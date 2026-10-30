@@ -11,6 +11,9 @@ import { esperarGuardado } from "@/lib/storage";
 // Pantalla de una acción (abierta desde un botón del INICIO, en la misma ventana): barra NavegacionERP arriba
 // (components/NavegacionERP) y pie con Cancelar y Guardar y Cerrar. Guardar y Cerrar envía el formulario que se está
 // llenando (o pulsa su botón Registrar / Emitir…); cuando el ERP confirma el guardado en Supabase, vuelve al INICIO.
+// Un formulario marca su botón de guardar con data-guardar-pestana: en esta pantalla ese botón se oculta
+// (app/globals.css) y el pie toma su texto ("Guardar compra e ingresar a stock"), así hay un solo botón de guardar.
+// "¿Guardar y crear nuevo registro?" marcado: guarda y se queda en la pantalla con el formulario limpio.
 
 const EV_TOAST = "erp:toast";
 const ESPERA_MS = 8000;
@@ -22,6 +25,12 @@ const botonGuardarEn = (raiz: ParentNode): HTMLButtonElement | undefined => {
   const botones = [...raiz.querySelectorAll<HTMLButtonElement>("button")].filter((b) => !b.disabled && visible(b) && BOTON_GUARDAR.test((b.textContent ?? "").trim()));
   return botones[botones.length - 1];
 };
+
+/** Botón de guardar del formulario abierto (data-guardar-pestana), oculto en esta pantalla. */
+function botonPrincipal(): HTMLButtonElement | undefined {
+  const botones = [...document.querySelectorAll<HTMLButtonElement>("button[data-guardar-pestana]")].filter((b) => !!b.parentElement && visible(b.parentElement));
+  return botones[botones.length - 1];
+}
 
 type Objetivo = { form: HTMLFormElement } | { boton: HTMLButtonElement } | { sinBoton: true } | null;
 
@@ -39,6 +48,8 @@ function objetivoGuardar(editado: Element | null): Objetivo {
     const boton = botonGuardarEn(dialogo);
     return boton ? { boton } : { sinBoton: true };
   }
+  const principal = botonPrincipal();
+  if (principal) return { boton: principal };
   if (!editado || !editado.isConnected || !visible(editado)) return null;
   const form = editado.closest("form");
   if (form) return { form };
@@ -54,6 +65,26 @@ export function PiePestana({ modulo }: { modulo: ModuloInicio }) {
   const inicio = RUTA_INICIO[modulo];
   const cerrar = () => router.push(inicio);
   const [guardando, setGuardando] = useState(false);
+  const [crearNuevo, setCrearNuevo] = useState(false);
+  // Texto y estado del botón del formulario (data-guardar-pestana): el pie lo reemplaza
+  const [principal, setPrincipal] = useState<{
+    texto: string;
+    deshabilitado: boolean;
+  } | null>(null);
+  useEffect(() => {
+    document.body.dataset.modoPestana = "1";
+    const leer = () => {
+      const b = botonPrincipal();
+      const texto = b?.textContent?.trim() ?? "";
+      setPrincipal((p) => (!b ? null : p?.texto === texto && p.deshabilitado === b.disabled ? p : { texto, deshabilitado: b.disabled }));
+    };
+    leer();
+    const reloj = setInterval(leer, 400);
+    return () => {
+      clearInterval(reloj);
+      delete document.body.dataset.modoPestana;
+    };
+  }, []);
   const limpiar = useRef<() => void>(() => undefined);
   // Último campo que el usuario editó (se olvida cuando el ERP confirma un guardado)
   const editado = useRef<Element | null>(null);
@@ -83,6 +114,12 @@ export function PiePestana({ modulo }: { modulo: ModuloInicio }) {
       return;
     }
     void recargarExpedientes();
+    // Guardar y crear nuevo: se queda en la pantalla (el formulario ya se limpió al guardar)
+    if (crearNuevo) {
+      setGuardando(false);
+      editado.current = null;
+      return;
+    }
     cerrar();
   };
 
@@ -131,13 +168,31 @@ export function PiePestana({ modulo }: { modulo: ModuloInicio }) {
   };
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[60] flex items-center justify-end gap-3 border-t border-[#2a3445] bg-[#0e1219]/95 px-4 py-3 backdrop-blur print:hidden sm:px-6 lg:px-8" data-sin-guardar>
-      <button type="button" onClick={cancelar} className="inline-flex items-center gap-2 rounded-lg border border-[#2a3445] bg-[#1a212e] px-5 py-2.5 text-[14px] font-bold text-white hover:border-[#2a7bff]">
-        <X size={16} /> Cancelar
-      </button>
-      <button type="button" onClick={guardarYCerrar} disabled={guardando} className="inline-flex items-center gap-2 rounded-lg bg-[#2a7bff] px-5 py-2.5 text-[14px] font-bold text-white hover:bg-[#1e64e6] disabled:opacity-70">
-        {guardando ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Guardar y Cerrar
-      </button>
+    <div
+      className="fixed inset-x-0 bottom-0 z-[60] flex flex-wrap items-center justify-between gap-3 border-t border-[#2a3445] bg-[#0e1219]/95 px-4 py-3 backdrop-blur print:hidden sm:px-6 lg:px-8"
+      data-sin-guardar
+    >
+      <label className="flex cursor-pointer items-center gap-2 text-[14px] text-white">
+        <input type="checkbox" checked={crearNuevo} onChange={(e) => setCrearNuevo(e.target.checked)} className="h-4 w-4 accent-[#2a7bff]" />
+        ¿Guardar y crear nuevo registro?
+      </label>
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={cancelar}
+          className="inline-flex items-center gap-2 rounded-lg border border-[#2a3445] bg-[#1a212e] px-5 py-2.5 text-[14px] font-bold text-white hover:border-[#2a7bff]"
+        >
+          <X size={16} /> Cancelar
+        </button>
+        <button
+          type="button"
+          onClick={guardarYCerrar}
+          disabled={guardando || !!principal?.deshabilitado}
+          className="inline-flex items-center gap-2 rounded-lg bg-[#2a7bff] px-5 py-2.5 text-[14px] font-bold text-white hover:bg-[#1e64e6] disabled:opacity-70"
+        >
+          {guardando ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} {principal?.texto && !guardando ? principal.texto : crearNuevo ? "Guardar" : "Guardar y Cerrar"}
+        </button>
+      </div>
     </div>
   );
 }
