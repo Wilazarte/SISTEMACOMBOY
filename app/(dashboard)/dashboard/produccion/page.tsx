@@ -9,6 +9,7 @@ import { FirmaPad } from "@/components/FirmaPad";
 import { getSesion } from "@/lib/auth";
 import { puedeEmitirOP } from "@/lib/permisosPlanta";
 import { ALMACENES, ALMACEN_DEFECTO } from "@/lib/empresa";
+import { sedeNormalizada } from "@/lib/constantes";
 import { MARCAS_MOTOR, TIPOS_EQUIPO } from "@/lib/equipos";
 import { anularOrdenProduccion, aprobarQC, crearOrdenProduccion, opVacia, type DatosOP, type OrdenProduccion } from "@/lib/produccion";
 import { KEYS, fechaPE, hoy, puede, useRol, useStore } from "@/lib/storage";
@@ -201,7 +202,7 @@ function ModalQC({ op, supervisores, onClose }: { op: OrdenProduccion; superviso
   const [supervisor, setSupervisor] = useState(supervisores[0] ?? "");
   const [fecha, setFecha] = useState(hoy());
   const [obs, setObs] = useState("");
-  const [sede, setSede] = useState(op.ubicacion_sede || ALMACEN_DEFECTO);
+  const [sede, setSede] = useState(sedeNormalizada(op.ubicacion_sede || ALMACEN_DEFECTO));
   const [firma, setFirma] = useState<ArchivoAdjunto | undefined>();
   const [enviando, setEnviando] = useState(false);
   const aprobar = async () => {

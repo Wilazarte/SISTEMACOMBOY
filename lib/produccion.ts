@@ -7,6 +7,7 @@
 // =====================================================================
 
 import { ALMACEN_DEFECTO } from "./empresa";
+import { sedeNormalizada } from "./constantes";
 import { ingresarEquipoProduccion, getEquipos, nuevoCodigo, type EquipoTerminado } from "./equipos";
 import { getSesion } from "./auth";
 import { puedeEmitirOP } from "./permisosPlanta";
@@ -73,7 +74,7 @@ export async function crearOrdenProduccion(d: DatosOP, usuario: string): Promise
     serie_motor: d.serie_motor.trim().toUpperCase(),
     codigo_chasis,
     color: d.color.trim(),
-    ubicacion_sede: d.ubicacion_sede || ALMACEN_DEFECTO,
+    ubicacion_sede: sedeNormalizada(d.ubicacion_sede || ALMACEN_DEFECTO),
     observaciones: d.observaciones.trim(),
     estado: "EN_FABRICACION",
     creado_por: usuario,
@@ -98,7 +99,7 @@ export async function aprobarQC(
   if (!qc.supervisor.trim()) throw new ErpError("Indique el supervisor QC.");
   if (!qc.firma) throw new ErpError("Falta la firma del supervisor QC.");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(qc.fecha) || qc.fecha > hoy()) throw new ErpError("Fecha de QC inválida.");
-  const sede = qc.ubicacion_sede || op.ubicacion_sede || ALMACEN_DEFECTO;
+  const sede = sedeNormalizada(qc.ubicacion_sede || op.ubicacion_sede || ALMACEN_DEFECTO);
   const equipo = await ingresarEquipoProduccion(
     {
       codigo_chasis: op.codigo_chasis,

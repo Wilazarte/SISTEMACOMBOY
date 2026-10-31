@@ -1,5 +1,5 @@
 // Unifica el stock duplicado: mismo producto (nombre sin mayúsculas ni espacios extra) y misma unidad
-// en sedes que son el mismo lugar (SEDE_MAP de lib/constantes.ts: Taller Principal Aqp = Almacen Aqp).
+// en sedes que son el mismo lugar (SEDE_MAP de lib/constantes.ts: Almacen Aqp, Adm Aqp, Planta Arequipa = Taller Principal Aqp).
 // Ej.: BATERIA 500 U1R  Taller Principal Aqp 7 + Almacen Aqp 15  ->  una sola fila con 22.
 //
 // Uso (desde la raíz del repo, con la service role key de Supabase › Project Settings › API):
@@ -17,7 +17,7 @@
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 
-const SEDE_MAP = { "Taller Principal Aqp": "AQP Principal", "Almacen Aqp": "AQP Principal" };
+const SEDE_MAP = { "Almacen Aqp": "Taller Principal Aqp", "Adm Aqp": "Taller Principal Aqp", "Planta Arequipa": "Taller Principal Aqp", "Suc Secocha": "Sucursal Secocha" };
 const env = Object.fromEntries(
   readFileSync(".env.local", "utf8")
     .split(/\r?\n/)

@@ -7,11 +7,12 @@
 // =====================================================================
 
 import { ALMACENES, ALMACEN_DEFECTO } from "./empresa";
+import { sedeNormalizada } from "./constantes";
 import { ErpError, KEYS, escribir, hoy, leer, siguienteNumero, subirBaucher, uid, type Serie } from "./storage";
 
 export const TIPOS_EQUIPO = ["REMOLCADOR ECO-MINE 3000", "REMOLCADOR ECO-MINE 3500 PRO", "REMOLCADOR ELECTRIC 4000", "COCHE MINERO", "OTRO"] as const;
 export const MARCAS_MOTOR = ["RONCO", "ROMI", "TRANSVERSAL", "OTRO"] as const;
-/** Almacenes donde quedan los equipos terminados (Almacen Aqp por defecto). */
+/** Almacenes donde quedan los equipos terminados (Taller Principal Aqp por defecto). */
 export const SEDES_EQUIPO: readonly string[] = ALMACENES;
 export const SEDE_EQUIPO_DEFECTO = ALMACEN_DEFECTO;
 
@@ -83,7 +84,7 @@ export function registrarMovimiento(m: Omit<MovimientoAlmacen, "id" | "fecha"> &
 }
 
 /** Sede real del equipo (registros hechos en Supabase pueden traer solo ubicacion_sede). */
-export const sedeEquipo = (e: Pick<EquipoTerminado, "sede" | "ubicacion_sede">): string => e.ubicacion_sede || e.sede || "";
+export const sedeEquipo = (e: Pick<EquipoTerminado, "sede" | "ubicacion_sede">): string => sedeNormalizada(e.ubicacion_sede || e.sede || "");
 
 const norm = (s?: string | null) => (s ?? "").replace(/\s+/g, "").toUpperCase();
 
@@ -186,7 +187,7 @@ export async function ingresarEquipoProduccion(
     const rep = getEquipos().find((x) => norm(x.serie_motor) === norm(serie));
     if (rep) throw new ErpError(`La serie de motor ${serie} ya está registrada en ${rep.id}.`);
   }
-  const sede = d.ubicacion_sede?.trim() || ALMACEN_DEFECTO;
+  const sede = sedeNormalizada(d.ubicacion_sede || ALMACEN_DEFECTO);
   const id = await nuevoCodigo("EQ", getEquipos().map((x) => x.id));
   if (getEquipos().some((x) => x.id === id)) throw new ErpError(`El código ${id} ya existe: vuelva a intentar.`);
   const ahora = new Date().toISOString();

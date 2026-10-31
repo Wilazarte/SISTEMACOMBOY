@@ -18,11 +18,11 @@ export const EMPRESA = {
 
 export const SEDES = ["Adm Aqp", "Taller Principal Aqp", "Sucursal Secocha", "Area Comercial", "Gerencia", "Oficina Lima"];
 
-/** Almacenes físicos (ingreso de compras, equipos terminados de Producción, despacho). */
-export const ALMACENES = ["Almacen Aqp", "Planta Arequipa", "Suc Secocha", "Adm Aqp"];
-export const ALMACEN_DEFECTO = "Almacen Aqp";
-/** Todas las ubicaciones donde puede haber stock (almacenes + sedes de requerimientos). */
-export const SEDES_STOCK = Array.from(new Set([...ALMACENES, ...SEDES]));
+/** Almacenes físicos: solo hay dos (ingreso de compras, equipos terminados de Producción, despacho). */
+export const ALMACENES = ["Taller Principal Aqp", "Sucursal Secocha"];
+export const ALMACEN_DEFECTO = "Taller Principal Aqp";
+/** Ubicaciones donde puede haber stock: los dos almacenes (los nombres viejos se leen con sedeNormalizada). */
+export const SEDES_STOCK = ALMACENES;
 
 export const UNIDADES = ["UND", "PZA", "KG", "M", "M2", "GLN", "LT", "CAJA", "PAR", "JGO", "ROLLO", "BOLSA"];
 

@@ -1,10 +1,12 @@
 /**
- * Sedes que son el mismo lugar físico con dos nombres en el stock (ver scripts/unificar-inventario.mjs).
- * Se usa para mostrar el stock agrupado; los datos guardados no cambian hasta correr el script.
+ * Solo hay dos almacenes: Taller Principal Aqp y Sucursal Secocha. Nombres viejos que aún pueden estar
+ * guardados en stock, equipos u OP -> su almacén real (ver scripts/unificar-inventario.mjs).
  */
 export const SEDE_MAP: Record<string, string> = {
-  "Taller Principal Aqp": "AQP Principal",
-  "Almacen Aqp": "AQP Principal",
+  "Almacen Aqp": "Taller Principal Aqp",
+  "Adm Aqp": "Taller Principal Aqp",
+  "Planta Arequipa": "Taller Principal Aqp",
+  "Suc Secocha": "Sucursal Secocha",
 };
 
 export const sedeNormalizada = (sede: string): string => SEDE_MAP[sede.trim()] ?? sede.trim();

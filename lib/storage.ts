@@ -50,6 +50,7 @@ import { generarCodigo } from "./utils/codigos";
 import { clavesDeModulos } from "./storage.por-modulo";
 import { canonizarItems } from "./productos";
 import { normalizarNombre } from "./productos-modelos";
+import { sedeNormalizada } from "./constantes";
 import {
   COMPROBANTES,
   EJEMPLO_NUMERO,
@@ -2139,7 +2140,7 @@ export function crearProveedor(data: Pick<Proveedor, "razonSocial" | "ruc">): Pr
 }
 
 /** Clave de producto en stock: misma sede + mismo nombre (sin mayúsculas/espacios extra) + misma unidad. */
-const claveStock = (sede: string, nombre: string, unidad: string): string => `${sede}|${normalizarNombre(nombre)}|${unidad}`;
+const claveStock = (sede: string, nombre: string, unidad: string): string => `${sedeNormalizada(sede)}|${normalizarNombre(nombre)}|${unidad}`;
 
 // ---------------------------------------------------------------------
 // KARDEX: cada movimiento de stock (ingreso por V°B°, salida por venta / producción, transferencia)
@@ -2177,7 +2178,7 @@ function ingresarStock(sede: string, items: { nombre: string; unidad: string; ca
       existente.actualizado = ahora;
       if (i.productoId) Object.assign(existente, { productoId: i.productoId, sku: i.sku });
     } else {
-      existente = { id: uid(), sede, nombre, unidad: i.unidad, cantidad: i.cantidad, costoUnit: i.precioUnit, actualizado: ahora, ...(i.productoId ? { productoId: i.productoId, sku: i.sku } : {}) };
+      existente = { id: uid(), sede: sedeNormalizada(sede), nombre, unidad: i.unidad, cantidad: i.cantidad, costoUnit: i.precioUnit, actualizado: ahora, ...(i.productoId ? { productoId: i.productoId, sku: i.sku } : {}) };
       stock.push(existente);
     }
     if (ref) movs.push({ sede, stock_id: existente.id, producto: nombre, unidad: i.unidad, tipo_movimiento: ref.tipo, documento: ref.documento, chasis: ref.chasis, motivo: ref.motivo, cantidad: i.cantidad, saldo: existente.cantidad });
