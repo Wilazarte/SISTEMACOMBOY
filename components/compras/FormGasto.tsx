@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { EstadoRuc } from "@/components/EstadoRuc";
 import { FileUp, Paperclip, Plus, Receipt, Trash2, X } from "lucide-react";
 import { FormBancarizacion, bancarizacionVacia } from "@/components/compras/FormBancarizacion";
 import { UNIDADES } from "@/lib/empresa";
@@ -322,6 +323,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
             onChange={(e) => set("ruc", e.target.value.replace(/\D/g, ""))}
             className={cn(d.ruc.length === 11 && (rucMal ? "border-red-400" : "border-emerald-400"))}
           />
+          <EstadoRuc ruc={d.ruc} onValidado={(r) => setD((x) => (x.proveedor.trim() ? x : { ...x, proveedor: r.razon_social }))} />
         </Field>
 
         {/* Retención de 4ta categoría (RHE por más de S/ 1,500) */}

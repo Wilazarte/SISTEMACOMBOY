@@ -4,6 +4,7 @@
 
 import { ErpError, KEYS, escribir, hoy, leer, r2, rucValido, uid } from "./storage";
 import { COMPROBANTES } from "./comprobantes";
+import { exigirRucSunat } from "./ruc";
 import type { ComprobanteContratista, ConcesionContratista, PagoContratista, TipoServicioContratista } from "./types";
 
 export const TIPOS_SERVICIO: Record<TipoServicioContratista, string> = {
@@ -73,6 +74,7 @@ export function guardarConcesion(data: ConcesionContratista): ConcesionContratis
   if (!razonSocial) throw new ErpError("Ingrese la razón social o nombre del contratista.");
   if (ruc && !/^\d{11}$/.test(ruc) && !/^\d{8}$/.test(ruc)) throw new ErpError("RUC (11 dígitos) o DNI (8 dígitos) inválido.");
   if (ruc.length === 11 && !rucValido(ruc)) throw new ErpError("RUC inválido (dígito verificador).");
+  exigirRucSunat(ruc, "del contratista");
   if (!(data.tipoServicio in TIPOS_SERVICIO)) throw new ErpError("Seleccione el tipo de servicio.");
   if (!data.descripcion.trim()) throw new ErpError("Describa el servicio.");
   if (!FECHA.test(data.fecha_inicio)) throw new ErpError("Indique la fecha de inicio.");

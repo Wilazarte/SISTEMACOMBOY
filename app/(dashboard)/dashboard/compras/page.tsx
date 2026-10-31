@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
+import { EstadoRuc } from "@/components/EstadoRuc";
 import { FormGasto } from "@/components/compras/FormGasto";
 import { SelectorCaja } from "@/components/SelectorCaja";
 import { FormBancarizacion, bancarizacionVacia } from "@/components/compras/FormBancarizacion";
@@ -639,6 +640,7 @@ function RegistrarCompra({
                   <Plus size={16} />
                 </Button>
               </div>
+              {prov && <EstadoRuc ruc={prov.ruc} />}
             </Field>
             <Field label="Fecha de compra" hint={fechaError ? `⚠ ${fechaError}` : "DD/MM/AAAA"}>
               <Input
@@ -947,6 +949,7 @@ function RegistrarCompra({
                 className={cn(nuevoProv.ruc.length === 11 && (rucValido(nuevoProv.ruc) ? "border-emerald-400" : "border-red-400"))}
                 placeholder="20XXXXXXXXX"
               />
+              <EstadoRuc ruc={nuevoProv.ruc} onValidado={(r) => setNuevoProv((p) => (p && !p.razonSocial.trim() ? { ...p, razonSocial: r.razon_social } : p))} />
             </Field>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="secondary" onClick={() => setNuevoProv(null)}>
@@ -1123,6 +1126,7 @@ function Cotizaciones({
                 className={cn(ruc.length === 11 && (rucValido(ruc) ? "border-emerald-400" : "border-red-400"))}
                 placeholder="20XXXXXXXXX"
               />
+              <EstadoRuc ruc={ruc} onValidado={(r) => setProveedor((p) => p.trim() || r.razon_social)} />
             </Field>
           </div>
           {items.length > 0 && (
@@ -1368,6 +1372,7 @@ function Ordenes({
                 placeholder={cotis.length ? "Seleccione Nro de cotización…" : "No hay cotizaciones disponibles"}
                 options={cotis.map((c) => ({ value: c.id, label: `${c.numero} · ${c.proveedor} · ${c.reqNumero} · ${soles(c.total)}` }))}
               />
+              {coti && <EstadoRuc ruc={coti.ruc} />}
             </Field>
             <Field label="Fecha OC">
               <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
@@ -1649,6 +1654,7 @@ function EditarOC({ oc, rol, cotizaciones, onClose }: { oc: OrdenCompra; rol: Ro
         </Field>
         <Field label="RUC">
           <Input value={d.ruc} onChange={(e) => set("ruc", e.target.value.replace(/\D/g, "").slice(0, 11))} />
+          <EstadoRuc ruc={d.ruc} />
         </Field>
         <Field label="Fecha OC">
           <Input type="date" value={d.fecha} onChange={(e) => set("fecha", e.target.value)} />
@@ -1831,6 +1837,7 @@ function Facturas({
                 </Field>
                 <Field label="Proveedor">
                   <Input value={oc ? `${oc.proveedor} (${oc.ruc})` : ""} disabled />
+                  {oc && <EstadoRuc ruc={oc.ruc} />}
                 </Field>
                 <Field label="Subtotal (base imponible)" hint={difiere ? `⚠ Difiere de la OC (${soles(oc!.subtotal)})` : undefined}>
                   <Input type="number" step="0.01" value={subtotal || ""} onChange={(e) => setSubtotal(parseFloat(e.target.value) || 0)} className={cn("text-right", difiere && "border-amber-400")} />

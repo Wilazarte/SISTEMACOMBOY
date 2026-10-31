@@ -10,6 +10,7 @@
 import { getSesion, nombreDe, type Sesion } from "./auth";
 import { createClient } from "./supabase/client";
 import { canonizar } from "./productos";
+import { exigirRucSunat } from "./ruc";
 import { deSede, esDeSede, getSedeActual, sedeActualId } from "./sedes";
 import { ErpError, KEYS, escribir, hoy, leer, r2, uid } from "./storage";
 import type { EventoHistorial, ItemReq, Requerimiento, Rol } from "./types";
@@ -175,6 +176,7 @@ export async function registrarVenta(d: DatosVenta): Promise<VentaSucursal> {
   exigir(operaSucursal(), "Su usuario no puede registrar ventas de la sucursal.");
   exigir(!!d.cliente.trim(), "Ingrese el cliente.");
   if (d.tipoDoc === "FA") exigir(/^\d{11}$/.test(d.clienteDoc?.trim() ?? ""), "Para factura (FA) ingrese el RUC del cliente (11 dígitos).");
+  exigirRucSunat(d.clienteDoc, "del cliente");
   const lineas: LineaVentaSuc[] = d.lineas
     .filter((l) => l.producto.trim())
     .map((l) => ({ ...l, ...oficial(l.producto), id: uid(), cantidad: Number(l.cantidad), precio: r2(Number(l.precio)), subtotal: r2(Number(l.cantidad) * Number(l.precio)) }));
@@ -560,6 +562,7 @@ export function guardarCliente(d: Omit<ClienteSuc, "id" | "sucursalId"> & { id?:
   exigir(!!d.nombre.trim(), "Ingrese el nombre del cliente.");
   const doc = d.doc.trim();
   exigir(!doc || /^(\d{8}|\d{11})$/.test(doc), "El documento debe ser DNI (8 dígitos) o RUC (11 dígitos).");
+  exigirRucSunat(doc, "del cliente");
   const lista = getClientesSuc();
   exigir(!doc || !lista.some((c) => c.id !== d.id && c.doc === doc), "Ya existe un cliente con ese documento.");
   const c: ClienteSuc = { ...d, id: d.id ?? uid(), nombre: d.nombre.trim(), doc, sucursalId: getSucursal().id };

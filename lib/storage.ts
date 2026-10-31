@@ -51,6 +51,7 @@ import { clavesDeModulos } from "./storage.por-modulo";
 import { canonizarItems } from "./productos";
 import { normalizarNombre } from "./productos-modelos";
 import { sedeNormalizada } from "./constantes";
+import { exigirRucSunat } from "./ruc";
 import {
   COMPROBANTES,
   EJEMPLO_NUMERO,
@@ -1109,6 +1110,7 @@ export function crearCotizacion(
     throw new ErpError(`El ${req.numero} está ${req.estado}; solo se cotizan REQ aceptados.`);
   if (!data.proveedor.trim()) throw new ErpError("Ingrese el proveedor.");
   if (!rucValido(data.ruc)) throw new ErpError("RUC inválido (11 dígitos con dígito verificador correcto).");
+  exigirRucSunat(data.ruc, "del proveedor");
   if (!data.numero.trim()) throw new ErpError("Ingrese el Nro de cotización.");
   if (getCotizaciones().some((c) => c.numero === data.numero.trim() && c.ruc === data.ruc))
     throw new ErpError("Esa cotización ya fue registrada para este proveedor.");
@@ -1297,6 +1299,7 @@ export async function emitirOrdenCompra(
 function validarOrdenCompra(data: Pick<OrdenCompra, "cotizacionId" | "tiempoEntrega">): Cotizacion {
   const coti = getCotizaciones().find((c) => c.id === data.cotizacionId);
   if (!coti) throw new ErpError("Seleccione una cotización.");
+  exigirRucSunat(coti.ruc, "del proveedor");
   if (coti.estado === "CON_OC") throw new ErpError("Esta cotización ya tiene Orden de Compra.");
   if (getOrdenes().some((o) => o.reqId === coti.reqId))
     throw new ErpError(`El ${coti.reqNumero} ya tiene una Orden de Compra emitida con otra cotización.`);
@@ -1326,6 +1329,7 @@ export async function editarOrdenCompra(id: string, d: EdicionOC, rol: Rol): Pro
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d.fecha)) throw new ErpError("Fecha inválida.");
   if (!d.proveedor.trim()) throw new ErpError("Ingrese el proveedor.");
   if (d.ruc.trim() && !rucValido(d.ruc.trim())) throw new ErpError("RUC inválido (11 dígitos con dígito verificador correcto).");
+  exigirRucSunat(d.ruc, "del proveedor");
   if (!d.tiempoEntrega.trim()) throw new ErpError("Indique el tiempo de entrega.");
   const filas = d.items.filter((i) => i.nombre.trim());
   if (!filas.length) throw new ErpError("La OC debe tener al menos un producto.");
@@ -1518,6 +1522,7 @@ export function crearFactura(
   const oc = getOrdenes().find((o) => o.id === data.ocId);
   if (!oc) throw new ErpError("Seleccione una Orden de Compra.");
   validarOCParaComprobante(oc);
+  exigirRucSunat(oc.ruc, "del proveedor");
   const num = data.numero.trim().toUpperCase();
   if (!/^[EF][A-Z0-9]{3}-\d{1,8}$/.test(num)) throw new ErpError("Formato de factura inválido. Ej: F001-00001234 / E001-123");
   if (getFacturas().some((f) => f.numero === num && f.ruc === oc.ruc)) throw new ErpError("Factura duplicada para este proveedor.");
@@ -1940,6 +1945,7 @@ export function guardarContratista(d: DatosContratista, idOriginal?: string): Tr
   if (!d.nombre.trim()) throw new ErpError("Ingrese el nombre del contratista.");
   if (doc && !/^\d{8}$/.test(doc) && !/^\d{11}$/.test(doc)) throw new ErpError("DNI (8 dígitos) o RUC (11 dígitos) inválido.");
   if (doc.length === 11 && !rucValido(doc)) throw new ErpError("RUC inválido (dígito verificador).");
+  exigirRucSunat(doc, "del contratista");
   if (!(d.tipoServicio in SERVICIOS_CONTRATISTA)) throw new ErpError("Seleccione el tipo de servicio.");
   if (!(Number(d.monto) > 0)) throw new ErpError("El monto contratado debe ser mayor a 0.");
   if (!FECHA_RE.test(d.fechaInicio)) throw new ErpError("Indique la fecha de inicio.");
@@ -2132,6 +2138,7 @@ export function crearProveedor(data: Pick<Proveedor, "razonSocial" | "ruc">): Pr
   const ruc = data.ruc.trim();
   if (!razonSocial) throw new ErpError("Ingrese la razón social del proveedor.");
   if (!rucValido(ruc)) throw new ErpError("RUC inválido (11 dígitos con dígito verificador correcto).");
+  exigirRucSunat(ruc, "del proveedor");
   const lista = getProveedores();
   if (lista.some((p) => p.ruc === ruc)) throw new ErpError(`El RUC ${ruc} ya está registrado.`);
   const prov: Proveedor = { id: uid(), razonSocial, ruc };
@@ -2593,6 +2600,7 @@ function prepararGasto(d: DatosGasto, rol: Rol): Factura {
   if (d.comprobante === "DJ" && total > TOPE_DJ_MOVILIDAD_DIA)
     throw new ErpError(`La declaración jurada de movilidad tiene un tope de ${soles(TOPE_DJ_MOVILIDAD_DIA)} por día (SUNAT). Registre un día por declaración.`);
   if (ruc.length === 11 && !rucValido(ruc)) throw new ErpError("RUC inválido (dígito verificador).");
+  exigirRucSunat(ruc, "del proveedor");
   if (getFacturas().some((f) => f.numero === numero && (ruc ? f.ruc === ruc : f.proveedor === proveedor)) || (ruc && getCompras().some((c) => c.numero === numero && c.ruc === ruc)))
     throw new ErpError(`El comprobante ${numero} de ${proveedor} ya fue registrado.`);
   if (d.detraccion && !(d.detraccionPorc > 0 && d.detraccionPorc <= 100)) throw new ErpError("Indique el % de detracción.");
@@ -2671,6 +2679,7 @@ export function editarGasto(id: string, c: EdicionGasto, rol: Rol): Factura {
   if (ruc && !/^\d{8}$/.test(ruc) && !/^\d{11}$/.test(ruc)) throw new ErpError("RUC (11 dígitos) o DNI (8 dígitos) inválido.");
   if (comp === "FACTURA" && ruc.length !== 11) throw new ErpError("La factura requiere el RUC del proveedor.");
   if (ruc.length === 11 && !rucValido(ruc)) throw new ErpError("RUC inválido (dígito verificador).");
+  exigirRucSunat(ruc, "del proveedor");
   if (lista.some((x) => x.id !== id && x.numero === numero && (ruc ? x.ruc === ruc : x.proveedor === proveedor)))
     throw new ErpError(`El comprobante ${numero} de ${proveedor} ya fue registrado.`);
   const total = f.ocId ? f.total : r2(Number(c.importe));
@@ -2976,6 +2985,7 @@ export function marcarEditado<T extends { historial: EventoHistorial[] }>(doc: T
 function prepararCompra(data: DatosCompra, excluirId?: string): Omit<Compra, "id" | "historial"> {
   const prov = getProveedores().find((p) => p.id === data.proveedorId);
   if (!prov) throw new ErpError("Seleccione el proveedor.");
+  exigirRucSunat(prov.ruc, `de ${prov.razonSocial}`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data.fecha)) throw new ErpError("Fecha de compra inválida. Use DD/MM/AAAA.");
   if (data.fecha > hoy()) throw new ErpError("La fecha de compra no puede ser futura.");
   if (!data.sede.trim()) throw new ErpError("Seleccione la sede / almacén de ingreso.");
@@ -3075,6 +3085,7 @@ export async function emitirOrdenServicio(data: DatosOrdenServicio, adjunto: Fil
   if (!puede(rol, "oc.crear")) throw new ErpError("Solo Tesorería puede emitir órdenes de servicio.");
   if (!data.proveedor.trim()) throw new ErpError("Ingrese el proveedor.");
   if (data.ruc.trim() && !/^\d{8}$|^\d{11}$/.test(data.ruc.trim())) throw new ErpError("El RUC debe tener 11 dígitos (o DNI de 8).");
+  exigirRucSunat(data.ruc, "del proveedor");
   if (!data.concepto.trim()) throw new ErpError("Ingrese el concepto del servicio.");
   const items: ItemServicio[] = data.items
     .filter((i) => i.descripcion.trim())

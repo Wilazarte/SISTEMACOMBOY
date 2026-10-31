@@ -27,6 +27,7 @@ import { BotonPDF } from "@/components/planilla/ContratistasMaestro";
 import { descargarRecibo } from "@/components/planilla/generateReciboPDF";
 import QuickActions, { QA_IDS } from "@/components/tesoreria/QuickActions";
 import { BotonFiltros } from "@/components/ui/BotonFiltros";
+import { EstadoRuc } from "@/components/EstadoRuc";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { KEYS, fechaPE, hoy, r2, rucValido, soles, useStore } from "@/lib/storage";
 import { OPCIONES_COMPROBANTE } from "@/lib/comprobantes";
@@ -203,6 +204,7 @@ function FormConcesion({ form, onChange, onClose }: { form: ConcesionContratista
             onChange={(e) => set("ruc", e.target.value.replace(/\D/g, ""))}
             className={cn(form.ruc.length === 11 && (rucMal ? "border-red-400" : "border-emerald-400"))}
           />
+          <EstadoRuc ruc={form.ruc} onValidado={(r) => !form.razonSocial.trim() && set("razonSocial", r.razon_social)} />
         </Field>
         <Field label="Representante">
           <Input value={form.representante} onChange={(e) => set("representante", e.target.value)} />
