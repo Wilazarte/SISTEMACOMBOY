@@ -332,6 +332,9 @@ export type TipoDoc = "REQ" | "COTI" | "OC" | "FACTURA" | "GUIA";
 
 export type TipoSueldo = "DIARIO" | "SEMANAL" | "QUINCENAL" | "MENSUAL" | "POR_HORA" | "POR_CONTRATO";
 
+/** Cada cuánto se le paga: SEMANAL (planilla de la semana, por defecto) o MENSUAL (planilla del mes). */
+export type FrecuenciaPago = "SEMANAL" | "MENSUAL";
+
 export type TipoAfp = "AFP_INTEGRA" | "AFP_PRIMA" | "AFP_HABITAT" | "AFP_PROFUTURO" | "ONP" | "SIN";
 
 export interface Trabajador {
@@ -342,6 +345,7 @@ export interface Trabajador {
   fechaIngreso: string; // YYYY-MM-DD
   sueldo: number; // monto según tipoSueldo
   tipoSueldo: TipoSueldo;
+  frecuenciaPago?: FrecuenciaPago; // sin dato = SEMANAL (registros antiguos)
   afpTipo: TipoAfp;
   afpPorcentaje: number; // ej. 13
   activo: boolean;

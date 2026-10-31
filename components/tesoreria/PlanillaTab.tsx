@@ -15,6 +15,7 @@ import {
   esContratista,
   eliminarTrabajador,
   fechaPE,
+  frecuenciaPagoDe,
   getAliasHuellas,
   hoy,
   idAsistencia,
@@ -41,7 +42,7 @@ import { AdelantosTrabajador } from "@/components/planilla/AdelantosTrabajador";
 import { PagarSemanaFiltrada } from "@/components/planilla/PagarSemanaFiltrada";
 import { EditarListaSemana } from "@/components/planilla/EditarListaSemana";
 import { enLista, listaDe, type ListaSemana } from "@/lib/listaSemana";
-import { periodoDeFecha } from "@/lib/periodo";
+import { esPeriodoMensual, periodoDeFecha, periodoMensualDeFecha, rangoPeriodoMensual } from "@/lib/periodo";
 import { emparejar, sinHuellas, type DetalleHuella, type NoEncontrado } from "@/lib/emparejarReloj";
 import { ResultadoImportacion } from "@/components/planilla/ResultadoImportacion";
 import { Contratistas } from "@/components/planilla/Contratistas";
@@ -109,6 +110,11 @@ function semanaActual(): { desde: string; hasta: string } {
 }
 /** "Semana 14 - 01 al 07 Abril 2026" (si cruza de mes: "30 Marzo al 05 Abril 2026"). */
 function etiquetaSemana(periodo: string, desde: string, hasta: string): string {
+  const mes = rangoPeriodoMensual(periodo);
+  if (mes) {
+    const [y, m] = mes.desde.split("-");
+    return `Pago mensual - ${MESES_TXT[Number(m) - 1]} ${y} (01 al ${mes.hasta.slice(8)})`;
+  }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || !/^\d{4}-\d{2}-\d{2}$/.test(hasta)) return normalizarPeriodo(periodo);
   const n = periodo.match(/SEMANA\s+(\d+)/i)?.[1];
   const [y1, m1, d1] = desde.split("-");
@@ -281,18 +287,38 @@ export default function PlanillaTab() {
     asistencia.filter((a) => a.periodo === normalizarPeriodo(periodo)).forEach((a) => m.set(a.id, a));
     return m;
   }, [asistencia, periodo]);
+  // Planilla del mes ("MENSUAL - OCTUBRE 2026"): solo fichas con pago mensual; la de la semana: solo las de pago semanal
+  const mensualPeriodo = esPeriodoMensual(periodo);
+  const delTipoPeriodo = (t: Trabajador) => (frecuenciaPagoDe(t) === "MENSUAL") === mensualPeriodo;
+  // Excel de esta sesión: en la planilla del mes solo cuentan las marcas de ese mes
+  const excelPeriodo = useMemo(() => {
+    if (!excel) return null;
+    const mes = mensualPeriodo ? rangoPeriodoMensual(periodo) : null;
+    if (!mes) return excel.asistencia;
+    const m: AsistenciaMap = new Map();
+    excel.asistencia.forEach((fechas, id) => {
+      const f = new Map([...fechas].filter(([fecha]) => fecha >= mes.desde && fecha <= mes.hasta));
+      if (f.size) m.set(id, f);
+    });
+    return m;
+  }, [excel, mensualPeriodo, periodo]);
   const calculados = useMemo(
     () =>
       trabajadores
-        .filter((t) => t.activo)
-        .map((t) => conAdelantos(calcular(t, liq, excel?.asistencia, delPeriodo.get(idAsistencia(periodo, t.id))), adelantos.grupos)),
-    [trabajadores, liq, excel, delPeriodo, periodo, adelantos.grupos]
+        .filter((t) => t.activo && delTipoPeriodo(t))
+        .map((t) => conAdelantos(calcular(t, liq, excelPeriodo, delPeriodo.get(idAsistencia(periodo, t.id))), adelantos.grupos)),
+    [trabajadores, liq, excelPeriodo, delPeriodo, periodo, mensualPeriodo, adelantos.grupos]
   );
+  // Trabajadores de la otra frecuencia (no entran a esta planilla): aviso con acceso a su periodo
+  const otraFrecuencia = trabajadores.filter((t) => t.activo && !delTipoPeriodo(t));
   // Periodos con asistencia o ya pagados (sugerencias del campo Periodo), del más reciente al más antiguo
   const periodosConocidos = useMemo(() => {
     const num = (p: string) => {
       const m = /SEMANA\s+(\d+).*?(\d{4})/.exec(p);
-      return m ? Number(m[2]) * 100 + Number(m[1]) : 0;
+      if (m) return Number(m[2]) * 100 + Number(m[1]);
+      // MENSUAL - OCTUBRE 2026: justo después de la última semana del mes
+      const r = rangoPeriodoMensual(p);
+      return r ? Number(r.hasta.slice(0, 4)) * 100 + Math.ceil(Number(r.hasta.slice(5, 7)) * 4.35) + 0.5 : 0;
     };
     const set = new Set<string>([...asistencia.map((a) => a.periodo), ...historial.lista.map((h) => h.periodo.split(" · ")[0])].filter(Boolean));
     return [...set].sort((a, b) => num(b) - num(a) || b.localeCompare(a));
@@ -377,21 +403,61 @@ export default function PlanillaTab() {
     const creados = registrarDesdeAsistencia([...nombres].map(([id, nombre]) => ({ id, nombre })));
     // DÍAS / HORAS / TARD. se guardan en Supabase con origen RELOJ (única vía además del Módulo Creador)
     if (!per) throw new Error("Indique el periodo (ej. SEMANA 41 - OCTUBRE 2026) antes de importar.");
-    const n = await importarAsistenciaReloj(
-      per,
-      [...mapa].map(([trabajador, fechas]) => {
-        const r = resumirAsistencia(fechas);
-        // S/ por hora: se guardan las horas reales de las marcas (los demás: pago por día)
-        const porHora = lista.find((x) => x.id === trabajador)?.tipoSueldo === "POR_HORA";
-        return { trabajador, ...r, ...(porHora ? { horas: horasReales(fechas) } : {}) };
-      })
-    );
+    const filaDe = (trabajador: string, fechas: Map<string, string[]>) => {
+      const r = resumirAsistencia(fechas);
+      // S/ por hora: se guardan las horas reales de las marcas (los demás: pago por día)
+      const porHora = lista.find((x) => x.id === trabajador)?.tipoSueldo === "POR_HORA";
+      return { trabajador, ...r, ...(porHora ? { horas: horasReales(fechas) } : {}) };
+    };
+    // Ficha con pago MENSUAL: su asistencia va a la planilla del mes ("MENSUAL - OCTUBRE 2026"), separada por mes
+    const esMensual = (id: string) => {
+      const t = lista.find((x) => x.id === id);
+      return !!t && frecuenciaPagoDe(t) === "MENSUAL";
+    };
+    const semanales = [...mapa].filter(([id]) => !esMensual(id));
+    const porMes = new Map<string, { trabajador: string; dias: number; horas: number; tardanzas: number }[]>();
+    [...mapa]
+      .filter(([id]) => esMensual(id))
+      .forEach(([id, fechas]) => {
+        const meses = new Map<string, Map<string, string[]>>();
+        fechas.forEach((marcas, fecha) => {
+          const pm = periodoMensualDeFecha(fecha);
+          if (!pm) return;
+          meses.set(pm, (meses.get(pm) ?? new Map()).set(fecha, marcas));
+        });
+        meses.forEach((f, pm) => porMes.set(pm, [...(porMes.get(pm) ?? []), filaDe(id, f)]));
+      });
+    // Un Excel más corto que lo ya guardado en el mes (ej. solo una semana) reemplazaría días: se pregunta antes
+    for (const [pm, filasMes] of porMes) {
+      const menos = filasMes.filter((f) => {
+        const previo = asistencia.find((a) => a.id === idAsistencia(pm, f.trabajador));
+        return previo && previo.dias > f.dias;
+      });
+      if (
+        menos.length &&
+        !confirm(
+          `${pm}: ${menos
+            .map((f) => `N° ${f.trabajador} ya tiene ${asistencia.find((a) => a.id === idAsistencia(pm, f.trabajador))?.dias} días y este Excel trae ${f.dias}`)
+            .join("; ")}.\n\nEl Excel del reloj REEMPLAZA los días del mes (no los suma). ¿Reemplazar? (Cancelar = se conservan los días guardados)`
+        )
+      )
+        porMes.set(pm, filasMes.filter((f) => !menos.includes(f)));
+    }
+    let n = semanales.length ? await importarAsistenciaReloj(per, semanales.map(([id, fechas]) => filaDe(id, fechas))) : 0;
+    for (const [pm, filasMes] of porMes) if (filasMes.length) n += await importarAsistenciaReloj(pm, filasMes);
+    const mesesTxt = [...porMes.keys()];
+    // Si en el Excel solo vienen trabajadores de pago mensual, se abre directo la planilla del mes
+    const soloMensual = !semanales.length && mesesTxt.length > 0;
+    if (soloMensual) {
+      setPeriodoEstado(mesesTxt[mesesTxt.length - 1]);
+      setFiltro("TODOS");
+    }
     setExcel({ asistencia: mapa, desde, hasta });
-    setRango({ desde, hasta });
+    setRango(soloMensual ? rangoPeriodoMensual(mesesTxt[mesesTxt.length - 1]) ?? { desde, hasta } : { desde, hasta });
     setTab("planilla");
     const unidos = emp.porNombre.length ? ` · ${emp.porNombre.length} unido(s) por nombre (${emp.porNombre.map((x) => `${x.nombre} → N° ${x.id}`).join(", ")})` : "";
     toast(
-      `Asistencia del ${fechaPE(desde)} al ${fechaPE(hasta)} importada en ${per}: ${n} trabajador(es)${creados ? ` · ${creados} nuevo(s) por completar` : ""}${unidos}${emp.noEncontrados.length ? ` · ${emp.noEncontrados.length} sin vincular` : ""}`
+      `Asistencia del ${fechaPE(desde)} al ${fechaPE(hasta)} importada en ${[...(semanales.length ? [per] : []), ...mesesTxt].join(" y ")}: ${n} registro(s)${creados ? ` · ${creados} nuevo(s) por completar` : ""}${unidos}${emp.noEncontrados.length ? ` · ${emp.noEncontrados.length} sin vincular` : ""}`
     );
   };
 
@@ -571,7 +637,9 @@ export default function PlanillaTab() {
                   total: (
                     <>
                       {soles(t.sueldo)}
-                      <span className="ml-1 text-xs font-normal text-plomo-500">{sueldoDe(t).label}</span>
+                      <span className="ml-1 text-xs font-normal text-plomo-500">
+                        {sueldoDe(t).label} · pago {frecuenciaPagoDe(t) === "MENSUAL" ? "mensual" : "semanal"}
+                      </span>
                     </>
                   ),
                   buscar: `${t.id} ${t.dni ?? ""} ${t.cargo} ${t.sede ?? ""} ${afpLabel(t)}`,
@@ -655,6 +723,27 @@ export default function PlanillaTab() {
                     ? `${delPeriodo.size} con asistencia en el periodo`
                     : "Sin asistencia en este periodo"}
               </p>
+              {otraFrecuencia.length > 0 && (
+                <button
+                  type="button"
+                  data-otra-frecuencia
+                  className="mt-1 text-left text-xs font-semibold text-azul-700 underline"
+                  title={otraFrecuencia.map((t) => `N° ${t.id} ${t.nombre}`).join("\n")}
+                  onClick={() => {
+                    const base = rango.desde || excel?.desde || hoy();
+                    const destino = mensualPeriodo ? periodoDeFecha(base) : periodoMensualDeFecha(base);
+                    setPeriodo(destino);
+                    if (!mensualPeriodo) {
+                      setFiltro("TODOS");
+                      const r = rangoPeriodoMensual(destino);
+                      if (r) setRango(r);
+                    }
+                  }}
+                >
+                  {otraFrecuencia.length} de pago {mensualPeriodo ? "semanal" : "mensual"} van en otra planilla → ver{" "}
+                  {mensualPeriodo ? "la semana" : periodoMensualDeFecha(rango.desde || excel?.desde || hoy()).toLowerCase()}
+                </button>
+              )}
             </div>
             <div className="rounded-xl border border-plomo-200 bg-surface p-3 text-sm shadow-sm">
               Básico {soles(totales.basico)} · Extra {soles(totales.extra)}

@@ -18,6 +18,7 @@ import type {
   ServicioContratista,
   CondicionPago,
   EstadoCivil,
+  FrecuenciaPago,
   CuentaOrigenPago,
   Bancarizacion,
   ItemPrecio,
@@ -1724,6 +1725,9 @@ export const TIPOS_SUELDO: Record<TipoSueldo, { label: string; divisor: number }
   POR_CONTRATO: { label: "Por contrato", divisor: 30 }, // contratistas: no entran a la planilla del periodo
 };
 
+/** Frecuencia de pago de la ficha: los registros sin dato se pagan por semana (como hasta ahora). */
+export const frecuenciaPagoDe = (t: Pick<Trabajador, "frecuenciaPago">): FrecuenciaPago => (t.frecuenciaPago === "MENSUAL" ? "MENSUAL" : "SEMANAL");
+
 export const AFP_OPTIONS: Record<TipoAfp, { label: string; porc: number }> = {
   AFP_INTEGRA: { label: "AFP Integra", porc: 10 },
   AFP_PRIMA: { label: "AFP Prima", porc: 10 },
@@ -1809,6 +1813,7 @@ function fichaOpcional(t: Partial<Trabajador>): Partial<Trabajador> {
   if (typeof t.fechaBaja === "string" && FECHA_RE.test(t.fechaBaja)) r.fechaBaja = t.fechaBaja;
   if (t.estadoCivil && ESTADOS_CIVILES.includes(t.estadoCivil)) r.estadoCivil = t.estadoCivil;
   if (t.esContratista === true) r.esContratista = true;
+  if (t.frecuenciaPago === "MENSUAL" || t.frecuenciaPago === "SEMANAL") r.frecuenciaPago = t.frecuenciaPago;
   if (t.bancoNombre && (t.bancoTipoCuenta === "Ahorros" || t.bancoTipoCuenta === "Corriente")) r.bancoTipoCuenta = t.bancoTipoCuenta;
   if (typeof t.ruc === "string" && /^\d{11}$/.test(t.ruc.trim())) r.ruc = t.ruc.trim();
   if (t.tipoServicio && t.tipoServicio in SERVICIOS_CONTRATISTA) r.tipoServicio = t.tipoServicio;
