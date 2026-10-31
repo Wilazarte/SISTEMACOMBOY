@@ -320,7 +320,9 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
   }, [open, onClose]);
   if (!open) return null;
   const modal = (
-    <div className="fixed inset-0 z-50 flex animate-velo items-start justify-center overflow-y-auto bg-black/50 p-4 pt-[6vh] backdrop-blur-[2px]" onMouseDown={onClose}>
+    // z-[70]: por encima de la barra fija "Guardar y Cerrar" de la pestaña nueva (z-[60]), que tapaba el final del formulario.
+    // pb-28: aire al final para que los botones del modal se vean completos al hacer scroll.
+    <div className="fixed inset-0 z-[70] flex animate-velo items-start justify-center overflow-y-auto overscroll-contain bg-black/50 p-4 pb-28 pt-[6vh] backdrop-blur-[2px]" onMouseDown={onClose}>
       <div
         role="dialog"
         aria-modal="true"

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Link2, Unlink, X } from "lucide-react";
 import { Button, cn } from "@/components/ui";
-import { fechaPE } from "@/lib/storage";
+import { fechaPE, frecuenciaPagoDe } from "@/lib/storage";
 import { MOTIVOS, type DetalleHuella, type NoEncontrado } from "@/lib/emparejarReloj";
 import type { Trabajador } from "@/lib/types";
 
@@ -40,7 +40,15 @@ export function ResultadoImportacion({
   onLimpiar?: (ids: string[]) => void;
 }) {
   // Plegada por defecto (para ver la planilla debajo); se abre sola si hay vínculos guardados, huellas de más de 7 días o asistencia antigua
-  const revisar = detalle.some((d) => d.vinculoGuardado || d.dias > 7) || antiguos.length > 0;
+  const mensual = (d: DetalleHuella) => {
+    const t = d.destino ? trabajadores.find((x) => x.id === d.destino) : undefined;
+    return !!t && frecuenciaPagoDe(t) === "MENSUAL";
+  };
+  // Pago semanal: más de 7 días = más de una semana. Pago mensual: el Excel debe ser de un solo mes.
+  const excede = (d: DetalleHuella) => (mensual(d) ? !!d.desde && d.desde.slice(0, 7) !== d.hasta.slice(0, 7) : d.dias > 7);
+  const excedenSemanal = detalle.filter((d) => excede(d) && !mensual(d));
+  const excedenMensual = detalle.filter((d) => excede(d) && mensual(d));
+  const revisar = detalle.some((d) => d.vinculoGuardado || excede(d)) || antiguos.length > 0;
   const [abierto, setAbierto] = useState(revisar);
   useEffect(() => {
     if (revisar) setAbierto(true);
@@ -132,9 +140,13 @@ export function ResultadoImportacion({
                   <tr key={d.huella} data-detalle={d.huella} className={cn("border-t border-plomo-100", !d.destino && "bg-red-50")}>
                     <td className="px-3 py-1.5">{d.huella}</td>
                     <td className="px-3 py-1.5">{d.nombre}</td>
-                    <td className={cn("px-3 py-1.5 text-right font-semibold", d.dias > 7 && "text-orange-600")} title={d.dias > 7 ? "Más de 7 días: el Excel trae más de una semana" : undefined}>
+                    <td
+                      className={cn("px-3 py-1.5 text-right font-semibold", excede(d) && "text-orange-600")}
+                      title={excede(d) ? (mensual(d) ? "Pago mensual: el Excel trae marcas de más de un mes" : "Más de 7 días: el Excel trae más de una semana") : undefined}
+                    >
                       {d.dias}
-                      {d.dias > 7 && " ⚠️"}
+                      {excede(d) && " ⚠️"}
+                      {mensual(d) && <span className="ml-1 rounded bg-plomo-100 px-1 text-[10px] font-bold text-azul-700" title="Pago mensual (ficha del trabajador)">MES</span>}
                     </td>
                     <td className="px-3 py-1.5 whitespace-nowrap">{d.desde ? `${fechaPE(d.desde)} – ${fechaPE(d.hasta)}` : "-"}</td>
                     <td className="px-3 py-1.5">
@@ -180,9 +192,14 @@ export function ResultadoImportacion({
               )}
             </div>
           )}
-          {detalle.some((d) => d.dias > 7) && (
+          {excedenSemanal.length > 0 && (
             <p className="border-t border-plomo-100 px-4 py-2 text-xs text-orange-700">
               ⚠️ Hay huellas con más de 7 días: el Excel trae marcas de más de una semana. Exporte solo la semana a pagar.
+            </p>
+          )}
+          {excedenMensual.length > 0 && (
+            <p className="border-t border-plomo-100 px-4 py-2 text-xs text-orange-700">
+              ⚠️ Hay trabajadores de pago mensual con marcas de más de un mes. Se guardan por separado en cada mes; revise que cada mes esté completo.
             </p>
           )}
         </div>
