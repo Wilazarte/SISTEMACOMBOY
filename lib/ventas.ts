@@ -25,6 +25,7 @@ import {
   sumarDias,
   uid,
 } from "./storage";
+import { exigirRucSunat } from "./ruc";
 import { disponibleEquipo, equipoDeLinea, marcarEquiposVendidos, sedeEquipo } from "./equipos";
 import { getDerivaciones, getReqsSuc, getSucursal, marcarAceptadoVentas, type ProductoTraslado, type Traslado } from "./sucursal";
 import { asientoAjusteVenta, asientoDe, asientoNotaPedido, esAsientoContable, revertirAsiento, revertirAsientoId } from "./contable";
@@ -132,6 +133,7 @@ export function guardarCliente(data: Cliente): Cliente {
   const numDoc = data.numDoc.trim().toUpperCase();
   const err = validarDocumento(data.tipoDoc, numDoc);
   if (err) throw new ErpError(err);
+  if (data.tipoDoc === "RUC") exigirRucSunat(numDoc, "del cliente");
   if (!data.razonSocial.trim()) throw new ErpError("Ingrese la razón social o nombres.");
   if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim())) throw new ErpError("Email inválido.");
   if (!(Number(data.lineaCredito) >= 0)) throw new ErpError("La línea de crédito no puede ser negativa.");
@@ -342,6 +344,7 @@ export function editarNotaPedido(id: string, data: DatosNP, rol: Rol): NotaPedid
 function armarNP(data: DatosNP): Omit<NotaPedido, "id" | "numero" | "vendedor" | "estado" | "historial"> {
   const cliente = getClientes().find((c) => c.id === data.clienteId);
   if (!cliente) throw new ErpError("Seleccione el cliente.");
+  if (cliente.tipoDoc === "RUC") exigirRucSunat(cliente.numDoc, `de ${cliente.razonSocial}`);
   const cond = getCondicionesPago().find((c) => c.id === data.condPagoId);
   if (!cond) throw new ErpError("Seleccione la condición de pago.");
   if (!cond.activo) throw new ErpError(`La condición ${cond.nombre} está desactivada.`);
@@ -849,6 +852,7 @@ function generarCuotas(fecha: string, monto: number, n: number, dias: number): C
 function armarComprobante(data: DatosComprobante, existente?: ComprobanteVenta): ComprobanteVenta {
   const cliente = getClientes().find((c) => c.id === data.clienteId);
   if (!cliente) throw new ErpError("Seleccione el cliente.");
+  if (cliente.tipoDoc === "RUC") exigirRucSunat(cliente.numDoc, `de ${cliente.razonSocial}`);
   if (data.tipo === "FACTURA" && cliente.tipoDoc !== "RUC") throw new ErpError("La factura requiere un cliente con RUC. Para DNI/CE emita boleta.");
   const cond = getCondicionesPago().find((c) => c.id === data.condPagoId);
   if (!cond) throw new ErpError("Seleccione la condición de pago.");

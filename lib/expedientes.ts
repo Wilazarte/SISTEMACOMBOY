@@ -18,6 +18,7 @@ import { consumosDeChasis, retiroProduccion, type MotivoRetiro } from "./inventa
 import { perfilPlanta, type PerfilPlanta } from "./permisosPlanta";
 import { getOrdenesProduccion, type OrdenProduccion } from "./produccion";
 import { ErpError, IGV, TOPE_BANCARIZACION, crearRequerimiento, getPendientes, getProcesados, getStock, getValesProduccion, hoy, r2, rucValido, siguienteNumero, uid } from "./storage";
+import { exigirRucSunat, validarRuc } from "./ruc";
 import { createClient } from "./supabase/client";
 import type { Requerimiento, StockItem, ValeProduccion } from "./types";
 
@@ -928,17 +929,10 @@ export interface RespuestaRuc {
 
 /** Valida el RUC en SUNAT por Decolecta (Edge Function validar-ruc-decolecta). Con cotización, guarda el resultado en ella. */
 export async function validarRucDecolecta(ruc: string, cotizacionId?: string): Promise<RespuestaRuc> {
-  const limpio = ruc.replace(/\D/g, "");
-  if (!rucValido(limpio)) throw new ErpError(`RUC ${limpio || "vacío"} no es válido (11 dígitos y dígito verificador).`);
-  const { data, error } = await createClient().functions.invoke("validar-ruc-decolecta", { body: { ruc: limpio, cotizacion_id: cotizacionId } });
-  if (error) {
-    const ctx = (error as { context?: Response }).context;
-    const cuerpo = ctx && typeof ctx.json === "function" ? ((await ctx.json().catch(() => null)) as { error?: string } | null) : null;
-    if (cuerpo?.error) throw new ErpError(cuerpo.error);
-    throw new ErpError(/not found|404|Failed to send/i.test(error.message) ? "Falta desplegar la Edge Function validar-ruc-decolecta en Supabase." : error.message);
-  }
+  // Misma consulta que el resto del ERP (lib/ruc): el RUC queda en el padrón ruc_validados para todos los módulos.
+  const r = await validarRuc(ruc, { cotizacionId, forzar: true });
   if (cotizacionId) await recargarExpedientes();
-  return data as RespuestaRuc;
+  return r;
 }
 
 /** Logística sube la cotización: archivo + datos del proveedor. Luego se valida el RUC (Decolecta) antes de la OC. */
@@ -1063,6 +1057,7 @@ export function registrarTransporte(x: Expediente, t: Omit<Transporte, "id" | "r
   if (!t.sinFlete) {
     if (!t.empresa.trim()) throw new ErpError("Indique la empresa de transportes.");
     if (!rucValido(t.ruc.trim())) throw new ErpError(`RUC del transportista ${t.ruc || "vacío"} no es válido.`);
+    exigirRucSunat(t.ruc, "del transportista");
     if (!t.guiaRemitente.trim()) throw new ErpError("Indique el N° de guía de remisión remitente.");
     if (!t.guiaTransportista.trim()) throw new ErpError("Indique el N° de guía del transportista.");
     if (!(t.costoFlete >= 0)) throw new ErpError("Indique el costo del flete.");

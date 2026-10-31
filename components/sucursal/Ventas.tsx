@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRightLeft, Ban, CheckCircle2, ClipboardCheck, FileText, HandCoins, PackageCheck, Truck, Wrench } from "lucide-react";
 import { Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, Textarea, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
+import { EstadoRuc } from "@/components/EstadoRuc";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { BotonNuevo } from "@/components/ui/BotonFiltros";
 import { FirmaPad } from "@/components/FirmaPad";
@@ -194,6 +195,7 @@ function FormVenta({ stock, clientes, onCancelar, onRegistrada }: { stock: Stock
         </Field>
         <Field label={tipoDoc === "FA" ? "RUC *" : "DNI / RUC"}>
           <Input value={doc} onChange={(e) => setDoc(e.target.value.replace(/\D/g, "").slice(0, 11))} inputMode="numeric" placeholder={tipoDoc === "FA" ? "11 dígitos" : "Opcional"} />
+          <EstadoRuc ruc={doc} onValidado={(r) => setCliente((c) => c.trim() || r.razon_social)} />
         </Field>
         <Field label="Comprobante">
           <Select value={tipoDoc} onChange={(e) => setTipoDoc(e.target.value as TipoDocVenta)} options={[{ value: "BV", label: "BV · Boleta" }, { value: "FA", label: "FA · Factura" }]} />

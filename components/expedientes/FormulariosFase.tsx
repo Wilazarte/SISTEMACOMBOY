@@ -3,6 +3,7 @@
 import { useMemo, useState, type DragEvent, type ReactNode } from "react";
 import { CheckCircle2, FileUp, Plus, ShieldCheck, Trash2, XCircle } from "lucide-react";
 import { Field, Input, Modal, Select, Textarea, ejecutarAsync, toast } from "@/components/ui";
+import { EstadoRuc } from "@/components/EstadoRuc";
 import { ALMACENES, ALMACEN_DEFECTO } from "@/lib/empresa";
 import {
   BANCOS_PE,
@@ -673,6 +674,7 @@ export function FormTransporte({ x, onClose }: { x: Expediente; onClose: () => v
             </Field>
             <Field label="RUC del transportista" hint={t.ruc && !rucValido(t.ruc) ? "RUC con dígito verificador incorrecto" : undefined}>
               <Input value={t.ruc} maxLength={11} inputMode="numeric" onChange={(e) => set("ruc", e.target.value.replace(/\D/g, ""))} />
+              <EstadoRuc ruc={t.ruc} onValidado={(r) => !t.empresa.trim() && set("empresa", r.razon_social)} />
             </Field>
             <Field label="N° guía de remisión remitente">
               <Input value={t.guiaRemitente} onChange={(e) => set("guiaRemitente", e.target.value)} />

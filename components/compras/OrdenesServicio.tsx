@@ -5,6 +5,7 @@ import { Ban, Check, Eye, FileText, Paperclip, Plus, Trash2, Upload, Wrench, X }
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, Textarea, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import type { FilaDoc } from "@/components/ui/ListaDocs";
 import { ProductoInput } from "@/components/productos/ProductoInput";
+import { EstadoRuc } from "@/components/EstadoRuc";
 import {
   abrirArchivo,
   anularOrdenServicio,
@@ -237,6 +238,7 @@ export function FormOrdenServicio({
           </Field>
           <Field label="RUC">
             <Input value={ruc} onChange={(e) => setRuc(e.target.value.replace(/\D/g, "").slice(0, 11))} placeholder="11 dígitos" inputMode="numeric" />
+            <EstadoRuc ruc={ruc} onValidado={(r) => setProveedor((p) => p.trim() || r.razon_social)} />
           </Field>
           <Field label="Fecha OS">
             <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Search, Trash2, UserPlus } from "lucide-react";
 import { Button, Field, Input, Select, cn } from "@/components/ui";
+import { EstadoRuc } from "@/components/EstadoRuc";
 import { UNIDADES } from "@/lib/empresa";
 import { KEYS, cargarCondicionesPago, r2, soles, useStore } from "@/lib/storage";
 import { DETALLE_LUGAR, LARGO_DOC, LUGARES_ENTREGA, lugarConDireccion, calcularLinea, lineaVacia, totalesVenta, validarDocumento } from "@/lib/ventas";
@@ -222,6 +223,7 @@ export function SelectorCliente({
         placeholder={lista.length ? "Seleccione cliente…" : soloRuc ? "Sin clientes con RUC" : "Sin coincidencias"}
         options={[...(sel && !lista.includes(sel) ? [sel] : []), ...lista].map((c) => ({ value: c.id, label: `${c.tipoDoc} ${c.numDoc} · ${c.razonSocial}` }))}
       />
+      {sel?.tipoDoc === "RUC" && <EstadoRuc ruc={sel.numDoc} />}
     </div>
   );
 }
@@ -245,7 +247,7 @@ export function FormCliente({
       <Field label="Tipo doc. *">
         <Select value={form.tipoDoc} onChange={(e) => set("tipoDoc", e.target.value as TipoDocCliente)} options={(["RUC", "DNI", "CE"] as const).map((t) => ({ value: t, label: t }))} />
       </Field>
-      <Field label="Número *" hint={errDoc ?? `${LARGO_DOC[form.tipoDoc]} · Autocompletado SUNAT no disponible: ingrese los datos manualmente.`}>
+      <Field label="Número *" hint={errDoc ?? (form.tipoDoc === "RUC" ? "11 dígitos · se valida en SUNAT (obligatorio) y completa razón social y dirección" : LARGO_DOC[form.tipoDoc])}>
         <Input
           value={form.numDoc}
           inputMode={form.tipoDoc === "CE" ? "text" : "numeric"}
@@ -253,6 +255,14 @@ export function FormCliente({
           onChange={(e) => set("numDoc", form.tipoDoc === "CE" ? e.target.value.toUpperCase() : e.target.value.replace(/\D/g, ""))}
           className={cn(form.numDoc && (errDoc ? "border-red-400" : "border-emerald-400"))}
         />
+        {form.tipoDoc === "RUC" && (
+          <EstadoRuc
+            ruc={form.numDoc}
+            onValidado={(r) =>
+              onChange({ ...form, razonSocial: form.razonSocial.trim() || r.razon_social, direccionFiscal: form.direccionFiscal.trim() || r.direccion })
+            }
+          />
+        )}
       </Field>
       <Field label={form.tipoDoc === "RUC" ? "Razón social *" : "Nombres y apellidos *"} className="sm:col-span-2">
         <Input value={form.razonSocial} onChange={(e) => set("razonSocial", e.target.value)} />
