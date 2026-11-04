@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { BadgeCheck, Boxes, ChevronRight, ClipboardList, FilePlus, FileSearch, FolderOpen, Landmark, LayoutGrid, MessageSquare, PackageCheck, Send, Truck, Video, type LucideIcon } from "lucide-react";
+import { BadgeCheck, Boxes, ClipboardList, FilePlus, FileSearch, FolderOpen, Landmark, LayoutGrid, MessageSquare, PackageCheck, Send, Truck, Video, type LucideIcon } from "lucide-react";
 import { useSesion, type Sesion } from "@/lib/auth";
 import { useChat } from "@/lib/chat";
 import { recargarExpedientes, useExpedientes } from "@/lib/expedientes";
@@ -122,8 +122,8 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[12px] font-semibold uppercase tracking-wide text-[#9CA3AF]">{GRUPO_EXPEDIENTE}</p>
                 {extrasFlujo.map((a) => (
-                  <button key={a.slug} type="button" onClick={() => abrir(a)} className="text-[12px] font-semibold text-[#D1D5DB] underline-offset-2 hover:text-white hover:underline">
-                    {a.label} →
+                  <button key={a.slug} type="button" onClick={() => abrir(a)} className="rounded-lg px-3 py-1 text-[12px] font-semibold border border-[#4B5060] bg-transparent text-[#E5E7EB] transition hover:border-[#FF6D00] hover:bg-[#FF6D00]/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6D00]/60">
+                    {a.label}
                   </button>
                 ))}
               </div>
@@ -137,7 +137,7 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
                       type="button"
                       onClick={() => abrir(a)}
                       className={`flex min-h-[64px] items-start gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13px] leading-snug transition ${
-                        esPrincipal ? "bg-[#FF6D00] font-semibold text-white hover:bg-[#E56200]" : "border border-[#3A3D4A] bg-transparent text-[#D1D5DB] hover:border-white/20 hover:text-white"
+                        esPrincipal ? "bg-[#FF6D00] font-semibold text-white hover:bg-[#E56200]" : "border border-[#4B5060] bg-transparent text-[#E5E7EB] hover:border-[#FF6D00] hover:bg-[#FF6D00]/10 hover:text-white"
                       }`}
                     >
                       <Icono size={18} strokeWidth={1.75} className="mt-0.5 shrink-0" />
@@ -154,16 +154,15 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
               {grupos.map(([grupo, lista]) => (
                 <div key={grupo}>
                   <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-[#9CA3AF]">{grupo}</p>
-                  <div className="space-y-1.5">
+                  <div className="grid grid-cols-1 gap-2">
                     {lista.map((a) => (
                       <button
                         key={a.slug}
                         type="button"
                         onClick={() => abrir(a)}
-                        className="flex w-full items-center justify-between gap-2 rounded-lg bg-[#23252F] px-3 py-2 text-left text-[13px] text-[#E5E7EB] transition hover:bg-[#2A2D3A] hover:text-white"
+                        className="flex min-h-[40px] w-full items-center justify-center rounded-lg px-3 py-2 text-center text-[13px] font-semibold leading-snug border border-[#4B5060] bg-transparent text-[#E5E7EB] transition hover:border-[#FF6D00] hover:bg-[#FF6D00]/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6D00]/60"
                       >
                         <span>{a.label}</span>
-                        <ChevronRight size={14} className="shrink-0 text-[#6B7280]" />
                       </button>
                     ))}
                   </div>
@@ -176,7 +175,7 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
             <button
               type="button"
               onClick={() => window.open(urlSala(`Planta ${SALA_MODULO[modulo]}`), "_blank", "noopener")}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#23252F] px-4 py-2 text-[13px] text-[#E5E7EB] transition hover:bg-[#2A2D3A] hover:text-white"
+              className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-[13px] font-semibold border border-[#4B5060] bg-transparent text-[#E5E7EB] transition hover:border-[#FF6D00] hover:bg-[#FF6D00]/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6D00]/60"
             >
               <Video size={16} /> Iniciar videollamada {SALA_MODULO[modulo]}
             </button>
