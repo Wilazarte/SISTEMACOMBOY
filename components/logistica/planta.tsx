@@ -89,45 +89,39 @@ export function BarraModulos({ sesion, actual }: { sesion: Sesion | null; actual
 }
 
 /**
- * Accesos rápidos: los 4 módulos en 4 columnas. El actual va resaltado y abre su módulo de trabajo;
- * los demás abren su home en la misma ventana. Sin permiso: candado y "No autorizado".
+ * Accesos a los 4 módulos (solo SOPORTE): una fila discreta de botones pequeños con silueta, arriba a la derecha.
+ * El actual va marcado y abre su módulo de trabajo; los demás abren su home en la misma ventana. Sin permiso: candado.
  */
 export function AccesosModulos({ sesion, actual }: { sesion: Sesion | null; /** Módulo resaltado (sin él, ninguno: INICIO SOPORTE). */ actual?: ModuloPlanta }) {
   return (
-    <section>
-      <h2 className="mb-3 text-xl font-bold uppercase text-[#60a5fa]">Accesos rápidos</h2>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {MODULOS_PLANTA.map((m) => {
-          const esActual = m.id === actual;
-          const permitido = !!sesion && puedeVer(sesion, m.home);
-          return (
-            <button
-              key={m.id}
-              type="button"
-              disabled={!permitido}
-              onClick={() => abrirPestana(esActual ? m.trabajo : m.home)}
-              title={permitido ? "Se abre en la misma ventana" : "No autorizado - acceso denegado"}
-              className={cn(
-                "group relative flex min-h-[170px] flex-col items-center justify-center gap-3 rounded-xl border bg-[#1a212e] px-4 py-6 transition",
-                permitido ? "border-[#2a3445] hover:border-[#2a7bff]" : "cursor-not-allowed border-[#2a3445] opacity-50"
-              )}
-            >
-              <span
-                className={
-                  esActual
-                    ? "flex h-20 w-20 items-center justify-center rounded-full bg-[#2a7bff] text-white"
-                    : "flex h-20 w-20 items-center justify-center text-[#2a7bff] transition group-hover:scale-105"
-                }
-              >
-                {permitido ? m.icono(esActual) : <Lock size={44} strokeWidth={1.6} />}
-              </span>
-              <span className={esActual ? "rounded-lg bg-[#2563eb]/25 px-3 py-0.5 text-2xl font-bold text-white" : "text-2xl font-bold text-white"}>{m.titulo}</span>
-              {!permitido && <span className="text-[12px] font-semibold text-[#93c5fd]">No autorizado - acceso denegado</span>}
-            </button>
-          );
-        })}
-      </div>
-    </section>
+    <nav aria-label="Ir a otro módulo" className="flex flex-wrap items-center justify-end gap-1.5">
+      <span className="mr-1 text-[11px] uppercase tracking-wide text-[#6B7280]">Módulos</span>
+      {MODULOS_PLANTA.map((m) => {
+        const esActual = m.id === actual;
+        const permitido = !!sesion && puedeVer(sesion, m.home);
+        return (
+          <button
+            key={m.id}
+            type="button"
+            disabled={!permitido}
+            onClick={() => abrirPestana(esActual ? m.trabajo : m.home)}
+            title={permitido ? (esActual ? `${m.titulo}: abrir módulo de trabajo` : `Ir a ${m.titulo}`) : "No autorizado - acceso denegado"}
+            aria-current={esActual ? "page" : undefined}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12px] transition [&_svg]:h-3.5 [&_svg]:w-3.5",
+              !permitido
+                ? "cursor-not-allowed border-[#2A2D3A] text-[#6B7280] opacity-60"
+                : esActual
+                  ? "border-[#2a7bff]/60 text-[#93c5fd] hover:border-[#2a7bff]"
+                  : "border-[#3A3D4A] text-[#9CA3AF] hover:border-[#6B7280] hover:text-white"
+            )}
+          >
+            {permitido ? m.icono(true) : <Lock />}
+            {m.titulo}
+          </button>
+        );
+      })}
+    </nav>
   );
 }
 

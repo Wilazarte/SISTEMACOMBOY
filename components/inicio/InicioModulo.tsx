@@ -76,6 +76,9 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
 
   return (
     <div className="w-full space-y-4 text-white">
+      {/* Acceso rápido a los 4 módulos (solo SOPORTE): fila discreta arriba, no compite con las acciones del módulo */}
+      {permisosPlanta(sesion).canViewOtherModules && <AccesosModulos sesion={sesion} actual={modulo === "soporte" ? undefined : (modulo as ModuloPlanta)} />}
+
       <header className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#2A2D3A] bg-[#1C1E26] px-5 py-4">
         <div>
           <h1 className="text-3xl font-bold uppercase leading-tight lg:text-4xl">
@@ -99,9 +102,6 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
           </label>
         )}
       </header>
-
-      {/* Acceso rápido a los 4 módulos (solo SOPORTE): estaba en los paneles, ahora va en el INICIO */}
-      {permisosPlanta(sesion).canViewOtherModules && <AccesosModulos sesion={sesion} actual={modulo === "soporte" ? undefined : (modulo as ModuloPlanta)} />}
 
       {/* Rediseño 2026-10-30: izquierda (3/12) KPIs, notificaciones en vivo y mensajes; derecha (9/12) acciones por flujo */}
       <div className="grid gap-4 lg:grid-cols-12">
