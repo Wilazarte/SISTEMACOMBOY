@@ -44,7 +44,7 @@ export function ErpStatsCard({
     </>
   );
   const cls = cn(
-    "flex flex-col items-center gap-1 rounded-xl border border-[#2a3445] bg-[#1a212e] px-4 py-5 text-center transition hover:border-[#2a7bff]",
+    "flex flex-col items-center gap-1 rounded-xl border border-white/[0.08] glass-card px-4 py-5 text-center transition hover-cian",
     className
   );
   if (href && !onClick)

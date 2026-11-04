@@ -169,7 +169,7 @@ export function PiePestana({ modulo }: { modulo: ModuloInicio }) {
 
   return (
     <div
-      className="fixed inset-x-0 bottom-0 z-[60] flex flex-wrap items-center justify-between gap-3 border-t border-[#2a3445] bg-[#0e1219]/95 px-4 py-3 backdrop-blur print:hidden sm:px-6 lg:px-8"
+      className="fixed inset-x-0 bottom-0 z-[60] flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.08] bg-[#0e1219]/95 px-4 py-3 backdrop-blur print:hidden sm:px-6 lg:px-8"
       data-sin-guardar
     >
       <label className="flex cursor-pointer items-center gap-2 text-[14px] text-white">
@@ -180,7 +180,7 @@ export function PiePestana({ modulo }: { modulo: ModuloInicio }) {
         <button
           type="button"
           onClick={cancelar}
-          className="inline-flex items-center gap-2 rounded-lg border border-[#2a3445] bg-[#1a212e] px-5 py-2.5 text-[14px] font-bold text-white hover:border-[#2a7bff]"
+          className="inline-flex items-center gap-2 rounded-lg border border-white/[0.08] glass-card px-5 py-2.5 text-[14px] font-bold text-white hover-cian"
         >
           <X size={16} /> Cancelar
         </button>
@@ -188,7 +188,7 @@ export function PiePestana({ modulo }: { modulo: ModuloInicio }) {
           type="button"
           onClick={guardarYCerrar}
           disabled={guardando || !!principal?.deshabilitado}
-          className="inline-flex items-center gap-2 rounded-lg bg-[#2a7bff] px-5 py-2.5 text-[14px] font-bold text-white hover:bg-[#1e64e6] disabled:opacity-70"
+          className="inline-flex items-center gap-2 rounded-lg grad-azul px-5 py-2.5 text-[14px] font-bold text-white disabled:opacity-70"
         >
           {guardando ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} {principal?.texto && !guardando ? principal.texto : crearNuevo ? "Guardar" : "Guardar y Cerrar"}
         </button>

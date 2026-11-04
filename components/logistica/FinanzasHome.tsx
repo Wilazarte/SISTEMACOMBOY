@@ -19,7 +19,7 @@ import { BarraAcciones, EncabezadoPlanta, Filas, MarcoPlanta, PanelLateral, hora
 /** Tarjeta KPI del diseño de Finanzas: icono a la izquierda, título, monto y detalle en verde/rojo. */
 function KpiFinanzas({ icono, titulo, valor, detalle, href, alerta }: { icono: React.ReactNode; titulo: string; valor: string; detalle: string; href: string; alerta?: boolean }) {
   return (
-    <button type="button" onClick={() => abrirPestana(href)} className="flex items-center gap-3 rounded-xl border border-[#2a3445] bg-[#1a212e] px-4 py-4 text-left transition hover:border-[#2a7bff]">
+    <button type="button" onClick={() => abrirPestana(href)} className="flex items-center gap-3 rounded-xl border border-white/[0.08] glass-card px-4 py-4 text-left transition hover-cian">
       <span className="shrink-0 text-[#2a7bff]">{icono}</span>
       <span className="min-w-0">
         <span className="block text-[15px] font-semibold text-white">{titulo}</span>
@@ -158,7 +158,7 @@ export function FinanzasHome() {
                 ...d.porPagar.map((f) => ({ clave: f.id, titulo: `${f.proveedor} · ${f.numero}`, detalle: f.fechaVencimiento ? `Vence ${fechaPE(f.fechaVencimiento)}` : undefined, derecha: <Etiqueta>{soles(f.netoPagar ?? f.total)}</Etiqueta>, href: "/dashboard/compras?tab=facturas" })),
               ]}
             />
-            <div id="fletes" className="mt-2 flex scroll-mt-24 items-center justify-between rounded-lg border border-[#2a3445] bg-[#212a3a] px-3 py-2">
+            <div id="fletes" className="mt-2 flex scroll-mt-24 items-center justify-between rounded-lg border border-white/[0.08] bg-[#212a3a] px-3 py-2">
               <span className="text-[13px] font-semibold text-white">Liquidar Flete Marvisur · Grael · Shalom ({d.fletesMes.length})</span>
               <span className="flex items-center gap-2">
                 <span className="font-bold text-white">{soles(d.totalFletes)}</span>
@@ -185,7 +185,7 @@ export function FinanzasHome() {
               {["Subir Asistencia", "Sistema Calcula Automático", "Planilla Lista / Pagar"].map((p, i) => (
                 <Fragment key={p}>
                   {i > 0 && <ArrowRight size={16} className="text-[#2a7bff]" aria-hidden />}
-                  <li className="flex items-center gap-2 rounded-full border border-[#2a3445] bg-[#212a3a] px-3 py-1">
+                  <li className="flex items-center gap-2 rounded-full border border-white/[0.08] bg-[#212a3a] px-3 py-1">
                     {i < 2 ? <span className="flex h-6 w-6 items-center justify-center rounded-full border border-[#2a7bff] text-[12px] text-[#2a7bff]">{i + 1}</span> : <CheckCircle2 size={20} className="text-[#2a7bff]" />}
                     {p}
                   </li>
@@ -205,7 +205,7 @@ export function FinanzasHome() {
                 Generar Boletas de Pago
               </BotonAccion>
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-3 rounded-lg border border-[#2a3445] bg-[#212a3a] p-3">
+            <div className="mt-3 grid grid-cols-2 gap-3 rounded-lg border border-white/[0.08] bg-[#212a3a] p-3">
               <div>
                 <p className="text-[14px] font-bold text-white">Obreros</p>
                 <p className="text-[12px] text-[#a1a1aa]">Pago diario, semanal, quincenal o por hora</p>
@@ -246,7 +246,7 @@ export function FinanzasHome() {
                 <Filas max={4} vacio="Aún no hay facturas de proveedores." items={d.ultimasRecibidas.map((f) => ({ clave: f.id, titulo: `${f.numero} · ${f.proveedor}`, derecha: <Etiqueta tono={f.estadoPago === "PAGADA" ? "verde" : "naranja"}>{f.estadoPago === "PAGADA" ? "Pagada" : "Por pagar"}</Etiqueta>, href: "/dashboard/compras?tab=facturas" }))} />
               </div>
             </div>
-            <div className="mt-3 flex flex-wrap items-end justify-between gap-3 rounded-lg border border-[#2a3445] bg-[#212a3a] p-3">
+            <div className="mt-3 flex flex-wrap items-end justify-between gap-3 rounded-lg border border-white/[0.08] bg-[#212a3a] p-3">
               <div>
                 <p className="text-[12px] font-semibold text-[#a1a1aa]">IGV Ventas</p>
                 <p className="text-xl font-bold text-[#4ade80]">{soles(d.igvVentas)}</p>

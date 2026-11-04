@@ -290,7 +290,7 @@ export function FormFase3({ x, onClose }: { x: Expediente; onClose: () => void }
                     .join(", ")}${faltan.length > 2 ? ", etc." : ""}): generar REQ urgente a Logística.${x.lote ? ` Lote ${x.lote}` : ""}`
                 : "Opcional"
             }
-            className="min-h-[80px] w-full rounded-lg border border-[#2A2D3A] bg-[#23252F] p-3 text-[14px] text-white outline-none placeholder:text-[#6b7080] focus:border-[#FF6D00]"
+            className="min-h-[80px] w-full rounded-lg border border-white/[0.08] bg-white/[0.04] p-3 text-[14px] text-white outline-none placeholder:text-[#6b7080] focus:border-[#FF6D00]"
           />
         </Field>
         {error && <p className="text-[13px] text-[#FFB27A]">{error}</p>}

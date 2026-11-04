@@ -61,11 +61,11 @@ export function NavegacionERP({ migas, inicio }: { migas: MigaERP[]; inicio: str
   }, [verRecientes]);
   return (
     <div
-      className="sticky top-16 z-30 -mx-4 mb-4 flex items-center justify-between gap-3 border-b border-[#2a3445] bg-[#0e1219]/95 px-4 py-2.5 backdrop-blur print:hidden sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
+      className="sticky top-16 z-30 -mx-4 mb-4 flex items-center justify-between gap-3 border-b border-white/[0.08] bg-[#0e1219]/95 px-4 py-2.5 backdrop-blur print:hidden sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
       data-sin-guardar
     >
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex shrink-0 rounded-full border border-[#3a4558] bg-[#1a212e]">
+        <div className="flex shrink-0 rounded-full border border-[#3a4558] glass-card">
           <button type="button" onClick={() => router.back()} className="rounded-l-full p-2 text-white transition hover:bg-[#2a3445]" title="Atrás" aria-label="Atrás">
             <ArrowLeft size={18} />
           </button>
@@ -78,7 +78,7 @@ export function NavegacionERP({ migas, inicio }: { migas: MigaERP[]; inicio: str
             <button
               type="button"
               onClick={() => setVerRecientes(!verRecientes)}
-              className="rounded-full border border-[#3a4558] bg-[#1a212e] p-2 text-white transition hover:bg-[#2a3445]"
+              className="rounded-full border border-[#3a4558] glass-card p-2 text-white transition hover:bg-[#2a3445]"
               title="Últimas pantallas"
               aria-label="Últimas pantallas"
               aria-expanded={verRecientes}
@@ -86,8 +86,8 @@ export function NavegacionERP({ migas, inicio }: { migas: MigaERP[]; inicio: str
               <History size={18} />
             </button>
             {verRecientes && (
-              <div className="absolute left-0 top-11 z-40 w-72 overflow-hidden rounded-xl border border-[#2a3445] bg-[#141a24] shadow-pop">
-                <p className="border-b border-[#2a3445] px-3 py-2 text-[11px] font-bold uppercase text-[#a1a1aa]">Últimas {recientes.length} pantallas</p>
+              <div className="absolute left-0 top-11 z-40 w-72 overflow-hidden rounded-xl border border-white/[0.08] bg-[#141a24] shadow-pop">
+                <p className="border-b border-white/[0.08] px-3 py-2 text-[11px] font-bold uppercase text-[#a1a1aa]">Últimas {recientes.length} pantallas</p>
                 {recientes.map((r) => (
                   <button
                     key={r.href}

@@ -16,7 +16,7 @@ import { NotificacionesEnVivo } from "./NotificacionesEnVivo";
 
 // INICIO de cada módulo (ERP v3.0, rediseño de Williams 2026-10-30): encabezado INICIO [MÓDULO] + código 26W; a la
 // izquierda (3/12) 4 KPIs reales, notificaciones en vivo y el chat del grupo; a la derecha (9/12) las acciones: el flujo
-// 26W en orden (Fase 1 → 8, la fase propia en naranja #FF6D00) y debajo los demás grupos en columnas. Sin mapa de fondo.
+// 26W en orden (Fase 1 → 8, la fase propia en azul eléctrico, tema GLASS) y debajo los demás grupos en columnas. Sin mapa de fondo.
 // Todo abre en la misma ventana.
 
 /** Abre una pantalla del ERP en la misma ventana (Atrás vuelve al INICIO). Nombre antiguo: antes abría pestaña nueva. */
@@ -79,18 +79,18 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
       {/* Acceso rápido a los 4 módulos (solo SOPORTE): fila discreta arriba, no compite con las acciones del módulo */}
       {permisosPlanta(sesion).canViewOtherModules && <AccesosModulos sesion={sesion} actual={modulo === "soporte" ? undefined : (modulo as ModuloPlanta)} />}
 
-      <header className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#2A2D3A] bg-[#1C1E26] px-5 py-4">
+      <header className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/[0.08] glass-card glass-blur px-5 py-4">
         <div>
           <h1 className="text-3xl font-bold uppercase leading-tight lg:text-4xl">
             INICIO {TITULO_INICIO[modulo]}
-            {docValido && <span className="ml-3 align-middle text-2xl text-[#FF6D00] lg:text-3xl">{docValido}</span>}
+            {docValido && <span className="texto-azul ml-3 align-middle text-2xl lg:text-3xl">{docValido}</span>}
           </h1>
           <p className="text-[13px] text-[#9CA3AF]">Cada botón abre su pantalla aquí mismo; con Atrás vuelve al INICIO.</p>
         </div>
         {!exp.faltaTabla && abiertos.length > 0 && (
           <label className="flex items-center gap-2 text-[13px] font-semibold text-[#D1D5DB]">
-            <FolderOpen size={16} className="text-[#FF6D00]" /> Expediente
-            <select value={docValido} onChange={(e) => elegirDoc(e.target.value)} className="rounded-lg border border-[#2A2D3A] bg-[#23252F] px-3 py-1.5 text-[14px] text-white">
+            <FolderOpen size={16} className="text-[#00f2fe]" /> Expediente
+            <select value={docValido} onChange={(e) => elegirDoc(e.target.value)} className="rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-[14px] text-white">
               <option value="">Sin expediente</option>
               {abiertos.map((x) => (
                 <option key={x.id} value={x.codigo_expediente}>
@@ -111,7 +111,7 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
           <ChatModulo sesion={sesion} modulo={modulo} todos={modulo === "soporte" && isAdmin(sesion)} />
         </div>
 
-        <section className="space-y-5 rounded-xl border border-[#2A2D3A] bg-[#1C1E26] p-5 lg:col-span-9">
+        <section className="space-y-5 rounded-xl border border-white/[0.08] glass-card glass-blur p-5 lg:col-span-9">
           <h2 className="flex items-center gap-2 text-[15px] font-semibold text-white">
             <LayoutGrid size={16} /> Acciones rápidas
           </h2>
@@ -122,7 +122,7 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-[12px] font-semibold uppercase tracking-wide text-[#9CA3AF]">{GRUPO_EXPEDIENTE}</p>
                 {extrasFlujo.map((a) => (
-                  <button key={a.slug} type="button" onClick={() => abrir(a)} className="rounded-lg px-3 py-1 text-[12px] font-semibold border border-[#4B5060] bg-transparent text-[#E5E7EB] transition hover:border-[#FF6D00] hover:bg-[#FF6D00]/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6D00]/60">
+                  <button key={a.slug} type="button" onClick={() => abrir(a)} className="rounded-lg px-3 py-1 text-[12px] font-semibold btn-glass text-[#E5E7EB] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00f2fe]/60">
                     {a.label}
                   </button>
                 ))}
@@ -137,7 +137,7 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
                       type="button"
                       onClick={() => abrir(a)}
                       className={`flex min-h-[64px] items-start gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13px] leading-snug transition ${
-                        esPrincipal ? "bg-[#FF6D00] font-semibold text-white hover:bg-[#E56200]" : "border border-[#4B5060] bg-transparent text-[#E5E7EB] hover:border-[#FF6D00] hover:bg-[#FF6D00]/10 hover:text-white"
+                        esPrincipal ? "grad-azul font-semibold hover-cian" : "btn-glass text-[#E5E7EB] hover:text-white"
                       }`}
                     >
                       <Icono size={18} strokeWidth={1.75} className="mt-0.5 shrink-0" />
@@ -160,7 +160,7 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
                         key={a.slug}
                         type="button"
                         onClick={() => abrir(a)}
-                        className="flex min-h-[40px] w-full items-center justify-center rounded-lg px-3 py-2 text-center text-[13px] font-semibold leading-snug border border-[#4B5060] bg-transparent text-[#E5E7EB] transition hover:border-[#FF6D00] hover:bg-[#FF6D00]/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6D00]/60"
+                        className="flex min-h-[40px] w-full items-center justify-center rounded-lg px-3 py-2 text-center text-[13px] font-semibold leading-snug btn-glass text-[#E5E7EB] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00f2fe]/60"
                       >
                         <span>{a.label}</span>
                       </button>
@@ -171,11 +171,11 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
             </div>
           )}
 
-          <div className="border-t border-[#2A2D3A] pt-4">
+          <div className="border-t border-white/[0.08] pt-4">
             <button
               type="button"
               onClick={() => window.open(urlSala(`Planta ${SALA_MODULO[modulo]}`), "_blank", "noopener")}
-              className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-[13px] font-semibold border border-[#4B5060] bg-transparent text-[#E5E7EB] transition hover:border-[#FF6D00] hover:bg-[#FF6D00]/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF6D00]/60"
+              className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-[13px] font-semibold btn-glass text-[#E5E7EB] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00f2fe]/60"
             >
               <Video size={16} /> Iniciar videollamada {SALA_MODULO[modulo]}
             </button>
@@ -203,10 +203,10 @@ function FilaKpis({ modulo }: { modulo: ModuloInicio }) {
 
 function TarjetaKpi({ k }: { k: KpiInicio }) {
   return (
-    <button type="button" onClick={() => abrirEnPestana(k.href)} className="min-w-0 rounded-xl border border-[#2A2D3A] bg-[#1C1E26] px-3 py-3 text-left transition hover:border-white/20">
+    <button type="button" onClick={() => abrirEnPestana(k.href)} className="min-w-0 rounded-xl border border-white/[0.08] glass-card glass-blur px-3 py-3 text-left hover-cian">
       <span className="block truncate text-[11px] font-medium uppercase tracking-wide text-[#9CA3AF]">{k.titulo}</span>
       <span className="mt-0.5 block truncate text-xl font-bold text-white">{k.valor}</span>
-      <span className={`mt-0.5 block truncate text-[11px] ${k.alerta ? "text-[#FF6D00]" : "text-[#4ade80]"}`}>{k.detalle}</span>
+      <span className={`mt-0.5 block truncate text-[11px] ${k.alerta ? "text-[#ff6a5f]" : "text-[#4ade80]"}`}>{k.detalle}</span>
     </button>
   );
 }
@@ -259,12 +259,12 @@ function ChatModulo({ sesion, modulo, todos }: { sesion: Sesion | null; modulo: 
   };
 
   return (
-    <section className="flex min-h-[320px] flex-col rounded-xl border border-[#2A2D3A] bg-[#1C1E26] p-4" data-sin-guardar>
+    <section className="aviso-glass glass-blur flex min-h-[320px] flex-col rounded-xl p-4 pl-5" data-sin-guardar>
       <h2 className="mb-3 flex items-center justify-between gap-2 text-[15px] font-semibold text-white">
         <span className="flex items-center gap-2">
           <MessageSquare size={17} /> Mensajes del grupo {sala}
         </span>
-        {sinLeer > 0 && <span className="rounded-full bg-[#FF6D00] px-2 py-0.5 text-[11px] font-bold text-white">{sinLeer} sin leer</span>}
+        {sinLeer > 0 && <span className="rounded-full grad-fuego px-2 py-0.5 text-[11px] font-bold">{sinLeer} sin leer</span>}
       </h2>
       {todos && (
         <div className="mb-3 flex flex-wrap gap-1.5" role="tablist" aria-label="Grupos de chat">
@@ -275,7 +275,7 @@ function ChatModulo({ sesion, modulo, todos }: { sesion: Sesion | null; modulo: 
               role="tab"
               aria-selected={s === sala}
               onClick={() => setSala(s)}
-              className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition ${s === sala ? "border-[#FF6D00] bg-[#FF6D00] text-white" : "border-[#2A2D3A] bg-[#23252F] text-[#D1D5DB] hover:border-white/20 hover:text-white"}`}
+              className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition ${s === sala ? "grad-azul" : "border-white/[0.08] bg-white/[0.04] text-[#D1D5DB] hover:border-[#00f2fe] hover:text-white"}`}
             >
               {s}
             </button>
@@ -283,15 +283,15 @@ function ChatModulo({ sesion, modulo, todos }: { sesion: Sesion | null; modulo: 
         </div>
       )}
       {faltaTabla ? (
-        <p className="rounded-lg bg-[#23252F] px-3 py-2 text-[12px] italic text-[#a1a1aa]">Falta activar el chat: ejecute supabase/migrations/20261104_chat_grupal.sql en Supabase.</p>
+        <p className="rounded-lg bg-white/[0.04] px-3 py-2 text-[12px] italic text-[#a1a1aa]">Falta activar el chat: ejecute supabase/migrations/20261104_chat_grupal.sql en Supabase.</p>
       ) : (
         <>
           <ul ref={lista} className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1 lg:max-h-[520px]">
             {mensajes.length === 0 && <li className="text-[12px] text-[#a1a1aa]">Sin mensajes todavía.</li>}
             {mensajes.map((m) => (
-              <li key={m.id} className={`rounded-lg px-3 py-1.5 ${leido && m.creado > leido && m.usuario !== sesion?.usuario ? "border border-[#FF6D00]/60 bg-[#23252F]" : "bg-[#23252F]"}`}>
+              <li key={m.id} className={`rounded-lg px-3 py-1.5 ${leido && m.creado > leido && m.usuario !== sesion?.usuario ? "border border-[#ff2a5f]/60 bg-[#ff2a5f]/[0.06]" : "bg-white/[0.04]"}`}>
                 <span className="flex justify-between gap-2 text-[11px] text-[#a1a1aa]">
-                  <span className="truncate font-semibold text-[#FDBA74]">{m.nombre || m.usuario}</span>
+                  <span className="truncate font-semibold text-[#7dd3fc]">{m.nombre || m.usuario}</span>
                   <span>{new Date(m.creado).toLocaleString("es-PE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false })}</span>
                 </span>
                 <span className="block break-words text-[13px] text-white">{m.texto}</span>
@@ -305,9 +305,9 @@ function ChatModulo({ sesion, modulo, todos }: { sesion: Sesion | null; modulo: 
               maxLength={1000}
               placeholder="Nuevo mensaje para el grupo…"
               aria-label={`Mensaje para el grupo ${sala}`}
-              className="min-w-0 flex-1 rounded-lg border border-[#2A2D3A] bg-[#23252F] px-3 py-2 text-[13px] text-white placeholder:text-[#71717a] focus:border-[#FF6D00] focus:outline-none"
+              className="min-w-0 flex-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-[13px] text-white placeholder:text-[#71717a] focus:border-[#00f2fe] focus:outline-none"
             />
-            <button type="submit" disabled={!texto.trim()} aria-label="Enviar" className="rounded-lg bg-[#FF6D00] px-3 text-white hover:bg-[#E56200] disabled:opacity-50">
+            <button type="submit" disabled={!texto.trim()} aria-label="Enviar" className="grad-azul rounded-lg px-3 disabled:opacity-50">
               <Send size={15} />
             </button>
           </form>

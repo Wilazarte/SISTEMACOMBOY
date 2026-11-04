@@ -38,13 +38,13 @@ export function IslandMenu({
   className?: string;
 }) {
   return (
-    <div className={cn("mx-4 mt-3 flex gap-1 overflow-x-auto rounded-full border border-[#2a3445] bg-[#1a212e]/95 px-2 py-1.5 backdrop-blur", className)}>
+    <div className={cn("mx-4 mt-3 flex gap-1 overflow-x-auto rounded-full border border-white/[0.08] glass-blur px-2 py-1.5", className)}>
       {acciones.map((a) => (
         <button
           key={a.label}
           type="button"
           onClick={a.onClick}
-          className="flex shrink-0 items-center gap-1.5 rounded-full border border-[#2a3445] bg-[#212a3a] px-3 py-1.5 text-[13px] font-medium text-[#e5e7eb] transition hover:border-[#2a7bff] hover:text-white"
+          className="flex shrink-0 items-center gap-1.5 rounded-full border border-white/[0.08] bg-[#212a3a] px-3 py-1.5 text-[13px] font-medium text-[#e5e7eb] transition hover-cian hover:text-white"
         >
           {a.icon}
           {a.label}
@@ -63,7 +63,7 @@ export function IslandMenu({
               onClick={() => onElegir(t.id)}
               className={cn(
                 "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium transition duration-150",
-                on ? "bg-[#2a7bff] text-white" : "text-[#a1a1aa] hover:bg-[#212a3a] hover:text-white"
+                on ? "grad-azul text-white" : "text-[#a1a1aa] hover:bg-[#212a3a] hover:text-white"
               )}
             >
               {t.icon}

@@ -90,7 +90,7 @@ export function AlmacenHome() {
       <EncabezadoPlanta icono={<Package size={30} />} titulo="ALMACEN" subtitulo="Almacenero · Arequipa · Perú" />
 
       {/* Stock MP valorizado */}
-      <section className="flex flex-wrap items-center gap-4 rounded-xl border border-[#2a3445] bg-[#1a212e] px-5 py-4">
+      <section className="flex flex-wrap items-center gap-4 rounded-xl border border-white/[0.08] glass-card px-5 py-4">
         <span className="flex items-center gap-2 rounded-lg border border-[#2a7bff] px-3 py-1.5 text-[13px] font-bold uppercase leading-tight text-[#60a5fa]">
           <Warehouse size={20} /> Almacén · Planta
           <br />
@@ -112,7 +112,7 @@ export function AlmacenHome() {
               key={sede}
               type="button"
               onClick={() => abrirPestana("/dashboard/almacen?tab=stock")}
-              className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition hover:border-[#2a7bff] ${i === 0 ? "border-[#2a7bff] bg-[#2a7bff]/10" : "border-[#2a3445] bg-[#212a3a]"}`}
+              className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition hover-cian ${i === 0 ? "border-[#2a7bff] bg-[#2a7bff]/10" : "border-white/[0.08] bg-[#212a3a]"}`}
             >
               <Warehouse size={26} className="shrink-0 text-[#2a7bff]" />
               <span className="min-w-0">

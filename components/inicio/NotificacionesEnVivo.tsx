@@ -56,11 +56,11 @@ export function NotificacionesEnVivo({ sesion, modulo }: { sesion: Sesion | null
   };
 
   return (
-    <section className="rounded-xl border border-[#2A2D3A] bg-[#1C1E26] p-4" data-sin-guardar>
+    <section className="aviso-glass glass-blur rounded-xl p-4 pl-5" data-sin-guardar>
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-[15px] font-semibold text-white">
           <Bell size={16} /> Notificaciones en vivo
-          {nuevas > 0 && <span className="rounded-full bg-[#FF6D00] px-2 py-0.5 text-[11px] font-bold text-white">{nuevas}</span>}
+          {nuevas > 0 && <span className="rounded-full grad-fuego px-2 py-0.5 text-[11px] font-bold">{nuevas}</span>}
         </h2>
         <span className="flex items-center gap-1.5 text-[12px] text-[#4ade80]">
           <span className="h-2 w-2 animate-pulse rounded-full bg-[#4ade80]" /> en vivo
@@ -71,16 +71,16 @@ export function NotificacionesEnVivo({ sesion, modulo }: { sesion: Sesion | null
       ) : (
         <ul className="space-y-2">
           {avisos.map((a) => (
-            <li key={a.id} className="flex items-center justify-between gap-3 rounded-lg border border-transparent bg-[#23252F] p-3 transition hover:border-[#FF6D00]/50">
+            <li key={a.id} className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.04] p-3 hover-cian">
               <div className="min-w-0">
                 <p className="flex gap-2 text-[13px] font-medium text-white">
-                  <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${a.nueva ? "bg-[#FF6D00]" : "bg-[#4B5563]"}`} />
+                  <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${a.nueva ? "bg-[#ff2a5f] shadow-[0_0_8px_rgba(255,42,95,0.8)]" : "bg-[#4B5563]"}`} />
                   <span className="min-w-0 break-words">{a.titulo}</span>
                 </p>
                 <p className="truncate pl-4 text-[12px] text-[#9CA3AF]">{a.detalle}</p>
               </div>
               {a.href && (
-                <button type="button" onClick={() => ir(a)} className="shrink-0 rounded-lg bg-[#2A2D3A] px-3 py-1.5 text-[12px] font-semibold text-white transition hover:bg-[#3A3D4A]">
+                <button type="button" onClick={() => ir(a)} className="shrink-0 btn-glass px-3 py-1.5 text-[12px] font-semibold">
                   Ir
                 </button>
               )}
