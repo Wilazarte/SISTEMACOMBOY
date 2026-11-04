@@ -20,7 +20,7 @@ const TIPOS_LOTE = ["MOTOR ELÉCTRICO", "TRIMOTO", ...TIPOS_EQUIPO];
 const PRIORIDADES: DatosExpediente["prioridad"][] = ["NORMAL", "ALTA", "URGENTE"];
 const nuevaFila = (): EquipoLote => ({ tipo: "", marca: "RONCO", modelo: "", cantidad: 1 });
 
-const campo = "w-full rounded-lg border border-[#343846] bg-[#23252F] px-3 py-2 text-[14px] text-white outline-none transition placeholder:text-[#6b7080] focus:border-[#60a5fa]";
+const campo = "w-full rounded-lg border border-[#343846] bg-white/[0.04] px-3 py-2 text-[14px] text-white outline-none transition placeholder:text-[#6b7080] focus:border-[#60a5fa]";
 const etiqueta = "mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-[#a1a1aa]";
 const tarjeta = "rounded-xl border border-[#2a2d38] bg-[#181a21] p-4 sm:p-5";
 
@@ -207,14 +207,14 @@ export function CrearOP() {
                     </td>
                     <td className="w-24 px-2 py-2">
                       <span className="flex gap-1">
-                        <button type="button" onClick={() => setEditando(editando === i ? null : i)} className="rounded-md p-2 text-[#93c5fd] transition hover:bg-[#23252F]" title="Editar" aria-label={`Editar fila ${i + 1}`}>
+                        <button type="button" onClick={() => setEditando(editando === i ? null : i)} className="rounded-md p-2 text-[#93c5fd] transition hover:bg-white/[0.06]" title="Editar" aria-label={`Editar fila ${i + 1}`}>
                           <Pencil size={16} />
                         </button>
                         <button
                           type="button"
                           disabled={detalles.length === 1}
                           onClick={() => eliminarDetalle(i)}
-                          className="rounded-md p-2 text-[#f87171] transition hover:bg-[#23252F] disabled:opacity-30"
+                          className="rounded-md p-2 text-[#f87171] transition hover:bg-white/[0.06] disabled:opacity-30"
                           title={detalles.length === 1 ? "El lote necesita al menos un equipo" : "Quitar"}
                           aria-label={`Quitar fila ${i + 1}`}
                         >
@@ -241,7 +241,7 @@ export function CrearOP() {
       <section className={tarjeta}>
         <h2 className="mb-4 text-[13px] font-bold uppercase tracking-wide text-white">Resumen</h2>
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="flex items-center gap-3 rounded-lg bg-[#23252F] px-4 py-3">
+          <div className="flex items-center gap-3 rounded-lg bg-white/[0.04] px-4 py-3">
             <Package size={22} className="text-[#60a5fa]" />
             <div>
               <p className="text-[12px] uppercase text-[#a1a1aa]">Total equipos</p>
@@ -250,7 +250,7 @@ export function CrearOP() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3 rounded-lg bg-[#23252F] px-4 py-3">
+          <div className="flex items-center gap-3 rounded-lg bg-white/[0.04] px-4 py-3">
             <Layers size={22} className="text-[#60a5fa]" />
             <div>
               <p className="text-[12px] uppercase text-[#a1a1aa]">Modelos</p>
@@ -275,10 +275,10 @@ export function CrearOP() {
       </section>
 
       <div className="flex justify-end gap-2 pb-6">
-        <button type="button" onClick={() => router.back()} className="rounded-lg border border-[#343846] px-4 py-2.5 text-[14px] font-semibold text-white transition hover:bg-[#23252F]">
+        <button type="button" onClick={() => router.back()} className="rounded-lg border border-[#343846] px-4 py-2.5 text-[14px] font-semibold text-white transition hover:bg-white/[0.06]">
           Cancelar
         </button>
-        <button type="submit" disabled={ocupado || !puede} className="flex items-center gap-2 rounded-lg bg-[#2a7bff] px-5 py-2.5 text-[14px] font-bold text-white transition hover:bg-[#1e64e6] disabled:opacity-50">
+        <button type="submit" disabled={ocupado || !puede} className="flex items-center gap-2 rounded-lg grad-azul px-5 py-2.5 text-[14px] font-bold text-white transition disabled:opacity-50">
           {ocupado && <Loader2 size={16} className="animate-spin" />} Crear orden
         </button>
       </div>

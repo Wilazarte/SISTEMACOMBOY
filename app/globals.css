@@ -127,14 +127,38 @@ html, body, button, input, select, textarea, table, th, td, div, span, p, h1, h2
   --sb-borde: 42 52 69;
   --sb-activo: 42 123 255;
 }
+/* Tema GLASS (Williams, 2026-11-04): cristal esmerilado sobre negro grafito con malla abstracta, azul eléctrico
+   (#0066ff → #00f2fe) para lo activo/principal, rojo fuego (#ff2a5f → #ff6a00) solo para lo urgente y hover cian.
+   Se monta sobre .tema-planta (ErpLayout) y cambia los tokens que usan las páginas de los módulos. */
+.tema-planta {
+  --canvas: 10 11 14;
+  --surface: 20 23 31;
+  --corp: 0 102 255;
+  --vino-900: 0 82 220;
+  --glass-bg: rgba(20, 23, 31, 0.72);
+  --glass-borde: rgba(255, 255, 255, 0.08);
+  --grad-azul: linear-gradient(135deg, #0066ff 0%, #00f2fe 100%);
+  --grad-fuego: linear-gradient(135deg, #ff2a5f 0%, #ff6a00 100%);
+  --cian: #00f2fe;
+}
+/* Tarjetas y cajas de las páginas (bg-surface): cristal translúcido. Sin backdrop-filter aquí: crearía un bloque
+   contenedor y rompería los modales position:fixed que viven dentro de las tarjetas. */
+.tema-planta .bg-surface { background-color: rgb(20 23 31 / 0.78); }
+/* Menús desplegables y modales (shadow-pop): cristal casi opaco con desenfoque, para que el texto se lea */
+.tema-planta .bg-surface.shadow-pop { background-color: rgb(16 19 26 / 0.94); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border-color: rgba(255, 255, 255, 0.1); }
+.tema-planta .border-plomo-200 { border-color: rgba(255, 255, 255, 0.08); }
+.tema-planta .bg-corp { background-image: var(--grad-azul); box-shadow: 0 4px 15px rgba(0, 102, 255, 0.3); }
+.tema-planta .bg-corp:hover { filter: brightness(1.08); }
+.tema-planta .shadow-card { box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35); }
+.tema-planta table thead { background-color: rgba(255, 255, 255, 0.03); }
 .tema-planta :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea):not(.bg-transparent) {
-  background-color: #212a3a;
-  border-color: #2a3445;
+  background-color: rgba(10, 11, 14, 0.55);
+  border-color: rgba(255, 255, 255, 0.1);
   color: #fff;
 }
 .tema-planta :is(input, select, textarea):not(.bg-transparent):focus {
-  border-color: #2a7bff;
-  box-shadow: 0 0 0 3px rgb(42 123 255 / 0.3);
+  border-color: #00f2fe;
+  box-shadow: 0 0 0 3px rgb(0 242 254 / 0.18);
 }
 /* COMBOY VID SUCURSAL (app/(sucursal)): siempre claro, header blanco, aunque el ERP esté en oscuro */
 .tema-claro {
@@ -214,4 +238,150 @@ table, .tabular { font-variant-numeric: tabular-nums; }
 /* Pantalla abierta desde el INICIO: el botón de guardar del formulario pasa a la barra inferior (PiePestana) */
 body[data-modo-pestana] [data-guardar-pestana] {
   display: none !important;
+}
+
+/* ===================== Tema GLASS: piezas reutilizables (2026-11-04) ===================== */
+@layer components {
+  /* Fondo de los módulos: negro grafito con malla abstracta (manchas de luz azul y fuego + retícula tenue) */
+  .fondo-malla {
+    background-color: #0a0b0e;
+    background-image:
+      radial-gradient(circle at 10% 20%, rgba(0, 102, 255, 0.2) 0%, transparent 45%),
+      radial-gradient(circle at 90% 80%, rgba(255, 42, 95, 0.13) 0%, transparent 42%),
+      radial-gradient(circle at 75% 10%, rgba(0, 242, 254, 0.07) 0%, transparent 35%),
+      linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(180deg, #0a0b0e 0%, #14171f 100%);
+    background-size: 100% 100%, 100% 100%, 100% 100%, 56px 56px, 56px 56px, 100% 100%;
+  }
+  /* Tarjeta de cristal (sin desenfoque: segura con modales fijos dentro) */
+  .glass-card {
+    background-color: rgba(20, 23, 31, 0.72);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+  /* Cristal esmerilado con desenfoque: barras, dock, chat, notificaciones (no contienen modales) */
+  .glass-blur {
+    background-color: rgba(20, 23, 31, 0.6);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    backdrop-filter: blur(12px) saturate(140%);
+  }
+  /* Barra superior */
+  .glass-barra {
+    background: rgba(10, 11, 14, 0.85);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+  }
+  /* Botones de módulos y acciones rápidas: cristal + contorno cian al pasar el cursor */
+  .btn-glass {
+    background-color: rgba(20, 23, 31, 0.6);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    color: #fff;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .btn-glass:hover, .hover-cian:hover {
+    border-color: #00f2fe;
+    box-shadow: 0 0 15px rgba(0, 242, 254, 0.25);
+    translate: 0 -2px;
+  }
+  .hover-cian { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+  /* Activo / principal: azul eléctrico */
+  .grad-azul {
+    background-image: linear-gradient(135deg, #0066ff 0%, #00f2fe 100%);
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 4px 15px rgba(0, 102, 255, 0.35);
+  }
+  .grad-azul:hover:not(:disabled) { filter: brightness(1.08); }
+  /* Urgente / ASIGNADO / contadores: rojo fuego */
+  .grad-fuego {
+    background-image: linear-gradient(135deg, #ff2a5f 0%, #ff6a00 100%);
+    color: #fff;
+    border-color: transparent;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(255, 42, 95, 0.3);
+  }
+  /* Texto con degradado azul (nombre del módulo en la barra) */
+  .texto-azul {
+    background-image: linear-gradient(135deg, #3d8bff 0%, #00f2fe 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  /* Cajas de notificaciones y chat: cristal con barra lateral cian; .aviso-critico la cambia a rojo fuego */
+  .aviso-glass {
+    position: relative;
+    background-color: rgba(15, 18, 25, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .aviso-glass::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: #00f2fe;
+  }
+  .aviso-critico::before { background: linear-gradient(180deg, #ff2a5f 0%, #ff6a00 100%); }
+}
+
+/* ===================== Secciones con color propio (tema GLASS, 2026-11-04) =====================
+   <div className="seccion" style={estiloSeccion(i | "Nombre")}> (lib/seccionColor.ts): barra superior, manchas de luz
+   y un trazo geométrico abstracto en la esquina con el color de la sección; el título (.seccion-titulo) y el hover
+   de sus botones toman el mismo color. */
+.tema-planta .seccion {
+  --sec: 0 102 255;
+  position: relative;
+  isolation: isolate;
+  border-color: rgb(var(--sec) / 0.32);
+  /* Sin overflow:hidden (recortaría menús desplegables): la barra superior es una capa del fondo, que ya respeta el borde redondeado */
+  background-image:
+    linear-gradient(90deg, rgb(var(--sec)) 0%, rgb(var(--sec) / 0.35) 45%, transparent 90%),
+    radial-gradient(120% 90% at 100% 0%, rgb(var(--sec) / 0.17) 0%, transparent 55%),
+    radial-gradient(70% 60% at 0% 100%, rgb(var(--sec) / 0.07) 0%, transparent 60%);
+  background-size: 100% 3px, 100% 100%, 100% 100%;
+  background-repeat: no-repeat;
+}
+.tema-planta .seccion::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  right: 0;
+  width: min(220px, 60%);
+  height: min(220px, 100%);
+  pointer-events: none;
+  border-top-right-radius: inherit;
+  background:
+    radial-gradient(circle at 100% 0%, transparent 52%, rgb(var(--sec) / 0.32) 53%, transparent 54.5%),
+    radial-gradient(circle at 100% 0%, transparent 32%, rgb(var(--sec) / 0.2) 33%, transparent 34.5%),
+    repeating-linear-gradient(135deg, rgb(var(--sec) / 0.15) 0 1px, transparent 1px 11px);
+  -webkit-mask-image: radial-gradient(circle at 100% 0%, #000 0%, #000 30%, transparent 75%);
+  mask-image: radial-gradient(circle at 100% 0%, #000 0%, #000 30%, transparent 75%);
+}
+/* Fuera de los módulos (Sucursal en claro) el título queda en el azul de siempre */
+.seccion-titulo { display: flex; align-items: center; gap: 0.5rem; color: #60a5fa; }
+.tema-planta .seccion-titulo {
+  color: color-mix(in srgb, rgb(var(--sec)) 55%, #ffffff);
+}
+.tema-planta .seccion-titulo::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  transform: rotate(45deg);
+  background: rgb(var(--sec));
+  box-shadow: 0 0 10px rgb(var(--sec) / 0.8);
+}
+.tema-planta .seccion .btn-glass:hover,
+.tema-planta .seccion .hover-cian:hover {
+  border-color: rgb(var(--sec));
+  box-shadow: 0 0 15px rgb(var(--sec) / 0.35);
 }

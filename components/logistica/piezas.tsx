@@ -1,5 +1,6 @@
 "use client";
 
+import { estiloSeccion } from "@/lib/seccionColor";
 import type { ReactNode } from "react";
 import { ArrowUpRight, ChevronRight } from "lucide-react";
 import { cn } from "@/components/ui";
@@ -12,10 +13,10 @@ export const NARANJA = "#2a7bff";
 
 export function Panel({ titulo, icono, accion, children, className, id }: { titulo?: string; icono?: ReactNode; accion?: ReactNode; children: ReactNode; className?: string; id?: string }) {
   return (
-    <section id={id} className={cn("rounded-xl border border-[#2a3445] bg-[#1a212e] p-4 text-[#e5e7eb]", className)}>
+    <section id={id} className={cn("rounded-xl border border-white/[0.08] glass-card p-4 text-[#e5e7eb]", titulo && "seccion", className)} style={titulo ? estiloSeccion(titulo) : undefined}>
       {titulo && (
         <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="flex items-center gap-2 text-[15px] font-bold uppercase tracking-wide text-[#60a5fa]">
+          <h2 className="seccion-titulo text-[15px] font-bold uppercase tracking-wide">
             {icono}
             {titulo}
           </h2>
@@ -48,7 +49,7 @@ export function BotonAccion({ href, children, icono, lleno }: { href: string; ch
       onClick={() => abrirPestana(href)}
       className={cn(
         "inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-[13px] font-semibold transition",
-        lleno ? "bg-[#2a7bff] text-white hover:bg-[#1e64e6]" : "border border-[#3a4558] bg-[#212a3a] text-[#e5e7eb] hover:border-[#2a7bff] hover:text-white"
+        lleno ? "grad-azul text-white" : "border border-[#3a4558] bg-[#212a3a] text-[#e5e7eb] hover-cian hover:text-white"
       )}
     >
       {icono}
@@ -68,9 +69,9 @@ export function Acceso({ icono, titulo, texto, href }: { icono: ReactNode; titul
       type="button"
       onClick={() => abrirPestana(href)}
       title="Abrir"
-      className="group flex items-center gap-3 rounded-xl border border-[#2a3445] bg-[#1a212e] px-4 py-4 text-left transition hover:border-[#2a7bff]"
+      className="group flex items-center gap-3 rounded-xl border border-white/[0.08] glass-card px-4 py-4 text-left transition hover-cian"
     >
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#2a7bff] text-white">{icono}</span>
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full grad-azul text-white">{icono}</span>
       <span className="min-w-0 flex-1">
         <span className="block text-[14px] font-bold uppercase text-white">{titulo}</span>
         <span className="block truncate text-[12px] text-[#a1a1aa]">{texto}</span>
@@ -93,13 +94,13 @@ export function Etiqueta({ children, tono = "naranja" }: { children: ReactNode; 
 export function Barra({ pct }: { pct: number }) {
   return (
     <span className="block h-1.5 w-full overflow-hidden rounded-full bg-white/10" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-      <span className="block h-full rounded-full bg-[#2a7bff]" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
+      <span className="block h-full rounded-full grad-azul" style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
     </span>
   );
 }
 
 export function Vacio({ children }: { children: ReactNode }) {
-  return <p className="rounded-lg border border-dashed border-[#2a3445] px-3 py-4 text-center text-[13px] text-[#a1a1aa]">{children}</p>;
+  return <p className="rounded-lg border border-dashed border-white/[0.08] px-3 py-4 text-center text-[13px] text-[#a1a1aa]">{children}</p>;
 }
 
 /** Aviso de dato que el ERP todavía no registra (no se inventan cifras). */

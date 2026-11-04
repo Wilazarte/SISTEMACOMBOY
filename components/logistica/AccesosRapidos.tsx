@@ -119,8 +119,8 @@ function GrillaAcciones({ acciones }: { acciones: Accion[] }) {
           title="Abrir"
           className={
             a.destacado
-              ? "group col-span-2 flex min-h-[110px] items-center justify-center gap-3 rounded-xl bg-[#2a7bff] px-4 py-4 text-center text-white transition hover:bg-[#1e64e6]"
-              : "group flex min-h-[110px] flex-col items-center justify-center gap-2 rounded-xl border border-[#2a3445] bg-[#1a212e] px-3 py-4 text-center transition hover:border-[#2a7bff]"
+              ? "group col-span-2 flex min-h-[110px] items-center justify-center gap-3 rounded-xl grad-azul px-4 py-4 text-center text-white transition"
+              : "group flex min-h-[110px] flex-col items-center justify-center gap-2 rounded-xl border border-white/[0.08] glass-card px-3 py-4 text-center transition hover-cian"
           }
         >
           <span className={a.destacado ? "text-white" : "text-[#2a7bff] transition group-hover:scale-105"}>{a.icono}</span>

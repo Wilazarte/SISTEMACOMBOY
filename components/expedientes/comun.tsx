@@ -42,7 +42,7 @@ export function Boton({ children, onClick, lleno, disabled, title, type = "butto
       title={title}
       className={cn(
         "inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-40",
-        lleno ? "bg-[#FF6D00] text-white hover:bg-[#E65C00]" : "border border-[#444444] bg-[#222222] text-[#e5e7eb] hover:border-[#FF6D00] hover:text-white"
+        lleno ? "bg-[#FF6D00] text-white hover:bg-[#E65C00]" : "border border-[#444444] bg-[#222222] text-[#e5e7eb] hover-cian hover:text-white"
       )}
     >
       {children}

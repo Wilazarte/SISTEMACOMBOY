@@ -56,21 +56,21 @@ export function NotificationSidebar({
           type="button"
           onClick={onToggle}
           aria-expanded={false}
-          className="fixed right-2 top-[72px] z-40 flex items-center gap-1.5 rounded-lg border border-[#2a3445] bg-[#1a212e] px-2.5 py-1.5 text-[13px] font-bold text-white shadow-lg transition hover:border-[#2a7bff] print:hidden"
+          className="fixed right-2 top-[72px] z-40 flex items-center gap-1.5 rounded-lg border border-white/[0.08] glass-card px-2.5 py-1.5 text-[13px] font-bold text-white shadow-lg transition hover-cian print:hidden"
           style={{ fontFamily: TIMES }}
         >
-          <Bell size={14} className="text-[#2a7bff]" /> Notificaciones ({notifs.length})
+          <Bell size={14} className="text-[#00f2fe]" /> Notificaciones ({notifs.length})
         </button>
       )}
 
       <aside
         // Sin transform: los modales de las secciones del módulo (position fixed) deben seguir centrados en pantalla
-        className={`fixed top-16 z-30 h-[calc(100vh-64px)] w-[min(320px,85vw)] overflow-y-auto border-l border-[#2a3445] bg-[#1a212e]/95 p-5 backdrop-blur pb-28 transition-[right] duration-300 print:hidden ${abierta ? "right-0" : "pointer-events-none -right-[340px]"}`}
+        className={`fixed top-16 z-30 h-[calc(100vh-64px)] w-[min(320px,85vw)] overflow-y-auto border-l border-white/[0.08] glass-blur p-5 pb-28 transition-[right] duration-300 print:hidden ${abierta ? "right-0" : "pointer-events-none -right-[340px]"}`}
         style={{ fontFamily: TIMES }}
         aria-hidden={!abierta}
       >
         <button type="button" onClick={onToggle} aria-expanded={abierta} className="mb-6 flex w-full items-center gap-2 text-left" title="Ocultar notificaciones">
-          <Bell className="h-5 w-5 text-[#2a7bff]" />
+          <Bell className="h-5 w-5 text-[#00f2fe]" />
           <h3 className="flex-1 text-[17px] font-bold uppercase text-[#60a5fa]">Notificaciones ({notifs.length})</h3>
           <ChevronsRight className="h-5 w-5 text-[#a1a1aa]" />
         </button>

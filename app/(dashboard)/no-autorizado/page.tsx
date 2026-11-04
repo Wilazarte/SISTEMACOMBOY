@@ -15,7 +15,7 @@ export default function NoAutorizadoPage() {
   const [motivo, setMotivo] = useState("");
   useEffect(() => setMotivo(new URLSearchParams(window.location.search).get("motivo") ?? ""), []);
   return (
-    <div className="mx-auto mt-10 max-w-lg rounded-2xl border border-[#2a3445] bg-[#1a212e] p-8 text-center text-[#e5e7eb]">
+    <div className="mx-auto mt-10 max-w-lg rounded-2xl border border-white/[0.08] glass-card p-8 text-center text-[#e5e7eb]">
       <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#2a7bff]/15 text-[#2a7bff]">
         <Lock size={32} />
       </span>
@@ -23,7 +23,7 @@ export default function NoAutorizadoPage() {
       <p className="mt-2 text-[15px] text-[#d4d4d8]">
         {motivo === "op" ? "Solo Logística puede emitir OP." : perfil && perfil !== "soporte" ? `Perfil ${ETIQUETA_PERFIL[perfil].label} - Acceso restringido solo a tu módulo.` : "Su usuario no tiene permiso para abrir esta página."}
       </p>
-      <Link href={home} className="mt-6 inline-flex rounded-lg bg-[#2a7bff] px-5 py-2 text-[14px] font-semibold text-white hover:bg-[#1e64e6]">
+      <Link href={home} className="mt-6 inline-flex rounded-lg grad-azul px-5 py-2 text-[14px] font-semibold text-white">
         Ir a mi módulo
       </Link>
     </div>

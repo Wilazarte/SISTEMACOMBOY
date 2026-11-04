@@ -1,5 +1,6 @@
 "use client";
 
+import { estiloSeccion } from "@/lib/seccionColor";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { AlertTriangle, Bell, CircleDollarSign, Clock, Cog, Lock, MessageSquare, Package, Plus, Send, Timer, Truck, Users, Video } from "lucide-react";
 import { useChat } from "@/lib/chat";
@@ -43,7 +44,7 @@ export function MarcoPlanta({ children, lateral }: { children: ReactNode; /** Si
 
 export function EncabezadoPlanta({ icono, titulo, subtitulo, accion }: { icono: ReactNode; titulo: string; subtitulo: string; accion?: ReactNode }) {
   return (
-    <header className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#2a3445] bg-[#1a212e] px-5 py-4">
+    <header className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/[0.08] glass-card px-5 py-4">
       <div className="flex items-center gap-4">
         <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border-2 border-[#2a7bff] text-[#2a7bff]">{icono}</span>
         <div>
@@ -60,7 +61,7 @@ export function EncabezadoPlanta({ icono, titulo, subtitulo, accion }: { icono: 
 /** Barra inferior de acciones del módulo (diseños): `tono` lleno (naranja), borde o verde. Abre en la misma ventana. */
 export function BarraAcciones({ acciones }: { acciones: { label: string; href: string; icono?: ReactNode; tono?: "lleno" | "borde" | "verde" }[] }) {
   return (
-    <div className="grid grid-cols-2 gap-2 rounded-xl border border-[#2a3445] bg-[#1a212e] p-3 sm:grid-cols-4 xl:flex xl:flex-wrap">
+    <div className="grid grid-cols-2 gap-2 rounded-xl border border-white/[0.08] glass-card p-3 sm:grid-cols-4 xl:flex xl:flex-wrap">
       {acciones.map((a) => (
         <button
           key={a.label}
@@ -69,10 +70,10 @@ export function BarraAcciones({ acciones }: { acciones: { label: string; href: s
           className={cn(
             "inline-flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-[14px] font-bold transition",
             a.tono === "lleno"
-              ? "bg-[#2a7bff] text-white hover:bg-[#1e64e6]"
+              ? "grad-azul text-white"
               : a.tono === "verde"
                 ? "border border-[#22c55e] text-[#4ade80] hover:bg-[#22c55e]/10"
-                : "border border-[#2a7bff]/70 text-white hover:bg-[#2a7bff]/10"
+                : "btn-glass"
           )}
         >
           {a.icono}
@@ -110,9 +111,9 @@ export function AccesosModulos({ sesion, actual }: { sesion: Sesion | null; /** 
             className={cn(
               "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[12px] transition [&_svg]:h-3.5 [&_svg]:w-3.5",
               !permitido
-                ? "cursor-not-allowed border-[#2A2D3A] text-[#6B7280] opacity-60"
+                ? "cursor-not-allowed border-white/[0.08] text-[#6B7280] opacity-60"
                 : esActual
-                  ? "border-[#2a7bff]/60 text-[#93c5fd] hover:border-[#2a7bff]"
+                  ? "border-[#2a7bff]/60 text-[#93c5fd] hover-cian"
                   : "border-[#3A3D4A] text-[#9CA3AF] hover:border-[#6B7280] hover:text-white"
             )}
           >
@@ -132,8 +133,8 @@ export interface ItemLateral {
   href: string;
 }
 
-function Bloque({ titulo, icono, items, vacio }: { titulo: string; icono: ReactNode; items: ItemLateral[]; vacio: string }) {
-  return <ErpAlertList titulo={titulo} icono={icono} items={items} vacio={vacio} max={5} />;
+function Bloque({ titulo, icono, items, vacio, critico, tono }: { titulo: string; icono: ReactNode; items: ItemLateral[]; vacio: string; critico?: boolean; tono?: number }) {
+  return <ErpAlertList titulo={titulo} icono={icono} items={items} vacio={vacio} max={5} critico={critico} tono={tono} />;
 }
 
 const PESTANAS_PANEL = [
@@ -177,7 +178,7 @@ export function PanelLateral({
             aria-current={activa === p.id ? "true" : undefined}
             className={cn(
               "rounded-md px-2.5 py-1 text-[11px] font-bold uppercase transition",
-              activa === p.id ? "bg-[#2a7bff] text-white" : "bg-[#2a3445] text-[#d4d4d8] hover:bg-[#3a4558] hover:text-white"
+              activa === p.id ? "grad-azul" : "border border-white/[0.08] bg-white/[0.04] text-[#d4d4d8] hover:border-[#00f2fe] hover:text-white"
             )}
           >
             {p.label}
@@ -185,13 +186,13 @@ export function PanelLateral({
         ))}
       </nav>
       <div id="panel-notificaciones" className="scroll-mt-24">
-        <Bloque titulo="Notificaciones" icono={<Bell size={15} />} items={notifs.filter((n) => n.tipo !== "stock")} vacio="Sin notificaciones nuevas." />
+        <Bloque titulo="Notificaciones" icono={<Bell size={15} />} items={notifs.filter((n) => n.tipo !== "stock")} vacio="Sin notificaciones nuevas." tono={2} />
       </div>
       <div id="panel-alertas" className="scroll-mt-24">
-        <Bloque titulo="Alertas" icono={<AlertTriangle size={15} />} items={[...notifs.filter((n) => n.tipo === "stock"), ...alertas]} vacio="Sin alertas." />
+        <Bloque titulo="Alertas" icono={<AlertTriangle size={15} />} items={[...notifs.filter((n) => n.tipo === "stock"), ...alertas]} vacio="Sin alertas." critico tono={1} />
       </div>
       <div id="panel-recordatorios" className="scroll-mt-24">
-        <Bloque titulo="Recordatorios" icono={<Clock size={15} />} items={recordatorios} vacio="Sin pendientes." />
+        <Bloque titulo="Recordatorios" icono={<Clock size={15} />} items={recordatorios} vacio="Sin pendientes." tono={3} />
       </div>
       <div id="panel-chat" className="scroll-mt-24" data-sin-guardar>
         <ChatGrupal sesion={sesion} modulo={modulo} />
@@ -212,14 +213,14 @@ export function ReunionGrupal({ sesion, modulo, otrasSalas = [] }: { sesion: Ses
   };
   return (
     <div>
-      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#60a5fa]">
+      <p className="seccion-titulo mb-2 text-[13px] font-bold uppercase" style={estiloSeccion(5)}>
         <Video size={15} /> Reunión grupal
       </p>
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" onClick={() => abrirPestana(urlSala(`Planta ${modulo}`))} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#2a7bff] px-2 py-2 text-[13px] font-semibold text-white hover:bg-[#1e64e6]">
+        <button type="button" onClick={() => abrirPestana(urlSala(`Planta ${modulo}`))} className="inline-flex items-center justify-center gap-1.5 rounded-lg grad-azul px-2 py-2 text-[13px] font-semibold text-white">
           <Video size={15} /> Iniciar videollamada
         </button>
-        <button type="button" onClick={crearSala} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#3a4558] bg-[#212a3a] px-2 py-2 text-[13px] font-semibold text-white hover:border-[#2a7bff]">
+        <button type="button" onClick={crearSala} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[#3a4558] bg-[#212a3a] px-2 py-2 text-[13px] font-semibold text-white hover-cian">
           <Plus size={15} /> Crear sala
         </button>
       </div>
@@ -231,7 +232,7 @@ export function ReunionGrupal({ sesion, modulo, otrasSalas = [] }: { sesion: Ses
       {otrasSalas.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
           {otrasSalas.map((m) => (
-            <button key={m} type="button" onClick={() => abrirPestana(urlSala(`Planta ${m}`))} className="inline-flex items-center gap-1.5 rounded-lg border border-[#3a4558] bg-[#212a3a] px-2.5 py-1.5 text-[12px] font-semibold text-white hover:border-[#2a7bff]">
+            <button key={m} type="button" onClick={() => abrirPestana(urlSala(`Planta ${m}`))} className="inline-flex items-center gap-1.5 rounded-lg border border-[#3a4558] bg-[#212a3a] px-2.5 py-1.5 text-[12px] font-semibold text-white hover-cian">
               <Video size={13} /> Unirse a {m}
             </button>
           ))}
@@ -281,7 +282,7 @@ export function ChatGrupal({ sesion, modulo }: { sesion: Sesion | null; modulo: 
   };
   return (
     <div>
-      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#60a5fa]">
+      <p className="seccion-titulo mb-2 text-[13px] font-bold uppercase" style={estiloSeccion(0)}>
         <MessageSquare size={15} /> Chat grupal
       </p>
       {faltaTabla ? (
@@ -291,7 +292,7 @@ export function ChatGrupal({ sesion, modulo }: { sesion: Sesion | null; modulo: 
           <ul ref={lista} className="max-h-56 space-y-1.5 overflow-y-auto pr-1">
             {mensajes.length === 0 && <li className="text-[12px] text-[#71717a]">Sin mensajes todavía.</li>}
             {mensajes.map((m) => (
-              <li key={m.id} className="rounded-lg bg-[#212a3a] px-3 py-1.5">
+              <li key={m.id} className="aviso-glass py-1.5 pl-4 pr-3">
                 <span className="flex justify-between gap-2 text-[11px] text-[#a1a1aa]">
                   <span className="truncate font-semibold text-[#93c5fd]">
                     {m.usuario}
@@ -310,9 +311,9 @@ export function ChatGrupal({ sesion, modulo }: { sesion: Sesion | null; modulo: 
               maxLength={1000}
               placeholder="Escribir mensaje…"
               aria-label="Mensaje para el chat grupal"
-              className="min-w-0 flex-1 rounded-lg border border-[#3a4558] bg-[#212a3a] px-3 py-1.5 text-[13px] text-white placeholder:text-[#71717a] focus:border-[#2a7bff] focus:outline-none"
+              className="min-w-0 flex-1 rounded-lg border border-[#3a4558] bg-[#212a3a] px-3 py-1.5 text-[13px] text-white placeholder:text-[#71717a] focus:border-[#00f2fe] focus:outline-none"
             />
-            <button type="submit" disabled={!texto.trim()} aria-label="Enviar" className="rounded-lg bg-[#2a7bff] px-3 text-white hover:bg-[#1e64e6] disabled:opacity-50">
+            <button type="submit" disabled={!texto.trim()} aria-label="Enviar" className="rounded-lg grad-azul px-3 text-white disabled:opacity-50">
               <Send size={15} />
             </button>
           </form>
@@ -336,7 +337,7 @@ export function TiemposCosto() {
   }, [ops, vales, stock]);
   return (
     <div>
-      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#60a5fa]">
+      <p className="seccion-titulo mb-2 text-[13px] font-bold uppercase" style={estiloSeccion("Tiempos reales y costo")}>
         <Timer size={15} /> Tiempos reales y costo
       </p>
       {filas.length === 0 ? (

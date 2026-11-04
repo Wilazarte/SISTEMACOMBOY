@@ -53,14 +53,12 @@ export function ErpLayout({
   const iniciales = inicialesDe(nombreUsuario, sesion.iniciales);
   const moduloUsuario = etiqueta?.label ?? (sesion.moduloAsignado?.toUpperCase() || undefined);
   return (
-    <div className={`dark tema-planta relative isolate flex min-h-screen flex-col pb-32 text-fg ${sinMapa ? "bg-[#0F1115]" : "bg-[#0e1219]"}`} data-modulo={moduleName}>
-      {/* Fondo negro-azul con el mapa mundial tenue (estética que Williams pidió recuperar, 2026-10-30); los INICIO, liso */}
-      {!sinMapa && (
-        <div aria-hidden className="pointer-events-none fixed inset-0 z-[-1] bg-[#0e1219]">
-          <Image src="/blue-globe.jpg" alt="" fill priority quality={80} sizes="100vw" className="object-cover object-center opacity-[0.16] grayscale" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#0e1219]/40 via-transparent to-[#0e1219]/80" />
-        </div>
-      )}
+    <div className={"dark tema-planta relative isolate flex min-h-screen flex-col pb-32 text-fg"} data-modulo={moduleName}>
+      {/* Tema GLASS (2026-11-04): negro grafito con malla abstracta (luz azul eléctrico arriba, fuego abajo). En los
+          módulos el mapa mundial queda apenas visible debajo; los INICIO, solo la malla. */}
+      <div aria-hidden className="fondo-malla pointer-events-none fixed inset-0 z-[-1]">
+        {!sinMapa && <Image src="/blue-globe.jpg" alt="" fill priority quality={80} sizes="100vw" className="object-cover object-center opacity-[0.07] mix-blend-screen grayscale" />}
+      </div>
 
       <ErpHeader
         modulo={moduleName}
@@ -76,7 +74,7 @@ export function ErpLayout({
       <main className={`w-full flex-1 transition-[padding] duration-300 ${mainClassName}`}>
         <div className="mx-auto w-full max-w-[1600px] px-4 pt-20 sm:px-6 lg:px-8">{children}</div>
       </main>
-      <footer className="mt-8 flex flex-wrap items-center justify-between gap-2 border-t border-[#2a3445] px-4 py-4 text-xs text-[#a1a1aa] sm:px-6 lg:px-8">
+      <footer className="mt-8 flex flex-wrap items-center justify-between gap-2 glass-blur border-t border-white/[0.08] px-4 py-4 text-xs text-[#a1a1aa] sm:px-6 lg:px-8">
         <span>
           <span className="font-semibold text-white">{NOMBRE_EMPRESA}</span> © 2025 · ERP COMBOY VID · Sede {sede} · Área Informática
         </span>

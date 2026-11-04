@@ -116,7 +116,7 @@ export function DashboardLotes() {
               </h3>
               <div className="space-y-2">
                 {items.map(({ x, r, c }) => (
-                  <button key={x.id} type="button" onClick={() => abrir(x.codigo_expediente)} className="block w-full rounded-lg border border-[#333333] bg-[#1A1A1A] p-2.5 text-left transition hover:border-[#FF6D00]">
+                  <button key={x.id} type="button" onClick={() => abrir(x.codigo_expediente)} className="block w-full rounded-lg border border-[#333333] bg-[#1A1A1A] p-2.5 text-left transition hover-cian">
                     <span className="flex items-center justify-between gap-2">
                       <span className="text-[17px] font-black text-[#FF6D00]">{x.codigo_expediente}</span>
                       {x.is_demo && <span className="rounded bg-white/10 px-1.5 text-[10px] text-[#a1a1aa]">DEMO</span>}

@@ -323,7 +323,7 @@ function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requ
                 />
                 Seleccionar todos ({pendientes.length})
               </label>
-              <button className={`${BTN_REQ} h-7 border-[#2a7bff] bg-[#2a7bff] px-2`} disabled={elegidos.length === 0} onClick={aceptarLote}>
+              <button className={`${BTN_REQ} h-7 border-[#2a7bff] grad-azul px-2`} disabled={elegidos.length === 0} onClick={aceptarLote}>
                 <Check size={13} /> Aceptar{elegidos.length ? ` (${elegidos.length})` : ""}
               </button>
               <button className={`${BTN_REQ} h-7 border-[#ff1a1a] bg-[#ff1a1a] px-2 font-bold`} disabled={elegidos.length === 0} onClick={() => setRechazoLote(true)}>
@@ -380,7 +380,7 @@ function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requ
                   </span>
                 );
               })()}
-              <button className={`${BTN_REQ} border-[#2a7bff] bg-[#2a7bff] shadow-[0_0_14px_rgba(42,123,255,0.6)]`} disabled={!habilitado} onClick={() => ejecutar(() => aceptarRequerimiento(r.id, rol), `${r.numero} ACEPTADO`)}>
+              <button className={`${BTN_REQ} border-[#2a7bff] grad-azul shadow-[0_0_14px_rgba(42,123,255,0.6)]`} disabled={!habilitado} onClick={() => ejecutar(() => aceptarRequerimiento(r.id, rol), `${r.numero} ACEPTADO`)}>
                 <Check size={14} /> Aceptar
               </button>
               <button className={`${BTN_REQ} border-[#2a7bff] bg-[#212a3a] shadow-[0_0_12px_rgba(42,123,255,0.35)]`} disabled={!habilitado} onClick={() => { setMotivo(""); setObs(r); }}>

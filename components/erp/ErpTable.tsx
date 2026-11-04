@@ -26,7 +26,7 @@ export function ErpTable({
   return (
     <div className={cn("overflow-x-auto", className)}>
       <table className={cn("w-full min-w-[720px] text-left text-sm", compacto && "[&_td]:px-2 [&_td]:py-2")}>
-        <thead className={cn("border-y border-[#2a3445] bg-[#212a3a] font-bold uppercase text-[#93c5fd]", compacto ? "text-[10px] tracking-wide" : "text-[11px] tracking-wider")}>
+        <thead className={cn("border-y border-white/[0.08] bg-[#212a3a] font-bold uppercase text-[#93c5fd]", compacto ? "text-[10px] tracking-wide" : "text-[11px] tracking-wider")}>
           <tr>
             {head.map((h) => (
               <th key={h} className={compacto ? "px-2 py-2 leading-tight" : "whitespace-nowrap px-4 py-2.5"}>
@@ -35,7 +35,7 @@ export function ErpTable({
             ))}
           </tr>
         </thead>
-        <tbody className="bg-[#1a212e] [&>tr:hover]:bg-[#212a3a] [&>tr]:border-b [&>tr]:border-[#2a3445] [&>tr]:transition-colors">{children}</tbody>
+        <tbody className="glass-card [&>tr:hover]:bg-[#212a3a] [&>tr]:border-b [&>tr]:border-white/[0.08] [&>tr]:transition-colors">{children}</tbody>
       </table>
       {empty && <p className="py-10 text-center text-sm text-[#a1a1aa]">{vacio}</p>}
     </div>
