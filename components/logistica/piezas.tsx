@@ -1,5 +1,6 @@
 "use client";
 
+import { estiloSeccion } from "@/lib/seccionColor";
 import type { ReactNode } from "react";
 import { ArrowUpRight, ChevronRight } from "lucide-react";
 import { cn } from "@/components/ui";
@@ -12,10 +13,10 @@ export const NARANJA = "#2a7bff";
 
 export function Panel({ titulo, icono, accion, children, className, id }: { titulo?: string; icono?: ReactNode; accion?: ReactNode; children: ReactNode; className?: string; id?: string }) {
   return (
-    <section id={id} className={cn("rounded-xl border border-white/[0.08] glass-card p-4 text-[#e5e7eb]", className)}>
+    <section id={id} className={cn("rounded-xl border border-white/[0.08] glass-card p-4 text-[#e5e7eb]", titulo && "seccion", className)} style={titulo ? estiloSeccion(titulo) : undefined}>
       {titulo && (
         <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="flex items-center gap-2 text-[15px] font-bold uppercase tracking-wide text-[#60a5fa]">
+          <h2 className="seccion-titulo text-[15px] font-bold uppercase tracking-wide">
             {icono}
             {titulo}
           </h2>

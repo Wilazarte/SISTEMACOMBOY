@@ -11,6 +11,7 @@ import { urlSala } from "@/lib/presencia";
 import { recargarDatos, type StoreKey, KEYS } from "@/lib/storage";
 import { AccesosModulos, type ModuloPlanta } from "@/components/logistica/planta";
 import { isAdmin, permisosPlanta } from "@/lib/permisosPlanta";
+import { estiloSeccion } from "@/lib/seccionColor";
 import { HOOK_KPIS, type KpiInicio } from "./kpis";
 import { NotificacionesEnVivo } from "./NotificacionesEnVivo";
 
@@ -118,9 +119,9 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
           {acciones.length === 0 && <p className="text-[13px] text-[#9CA3AF]">Su usuario no tiene funciones habilitadas en este módulo.</p>}
 
           {fases.length > 0 && (
-            <div>
-              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[12px] font-semibold uppercase tracking-wide text-[#9CA3AF]">{GRUPO_EXPEDIENTE}</p>
+            <div className="seccion rounded-xl border bg-white/[0.02] p-4" style={estiloSeccion(0)}>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="seccion-titulo text-[13px] font-bold uppercase tracking-wide">{GRUPO_EXPEDIENTE}</p>
                 {extrasFlujo.map((a) => (
                   <button key={a.slug} type="button" onClick={() => abrir(a)} className="rounded-lg px-3 py-1 text-[12px] font-semibold btn-glass text-[#E5E7EB] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00f2fe]/60">
                     {a.label}
@@ -151,9 +152,10 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
 
           {grupos.length > 0 && (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {grupos.map(([grupo, lista]) => (
-                <div key={grupo}>
-                  <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-[#9CA3AF]">{grupo}</p>
+              {grupos.map(([grupo, lista], i) => (
+                // Cada grupo con su color de marca (rojo, cian, naranja…) para distinguirlo de un vistazo
+                <div key={grupo} className="seccion rounded-xl border bg-white/[0.02] p-4" style={estiloSeccion(i + 1)}>
+                  <p className="seccion-titulo mb-3 text-[13px] font-bold uppercase tracking-wide">{grupo}</p>
                   <div className="grid grid-cols-1 gap-2">
                     {lista.map((a) => (
                       <button
@@ -194,16 +196,16 @@ function FilaKpis({ modulo }: { modulo: ModuloInicio }) {
   const kpis = useKpis(true);
   return (
     <div className="grid grid-cols-2 gap-2">
-      {kpis.map((k) => (
-        <TarjetaKpi key={k.titulo} k={k} />
+      {kpis.map((k, i) => (
+        <TarjetaKpi key={k.titulo} k={k} i={i} />
       ))}
     </div>
   );
 }
 
-function TarjetaKpi({ k }: { k: KpiInicio }) {
+function TarjetaKpi({ k, i }: { k: KpiInicio; i: number }) {
   return (
-    <button type="button" onClick={() => abrirEnPestana(k.href)} className="min-w-0 rounded-xl border border-white/[0.08] glass-card glass-blur px-3 py-3 text-left hover-cian">
+    <button type="button" onClick={() => abrirEnPestana(k.href)} className="seccion min-w-0 rounded-xl border glass-card glass-blur px-3 py-3 text-left hover-cian" style={estiloSeccion(i)}>
       <span className="block truncate text-[11px] font-medium uppercase tracking-wide text-[#9CA3AF]">{k.titulo}</span>
       <span className="mt-0.5 block truncate text-xl font-bold text-white">{k.valor}</span>
       <span className={`mt-0.5 block truncate text-[11px] ${k.alerta ? "text-[#ff6a5f]" : "text-[#4ade80]"}`}>{k.detalle}</span>

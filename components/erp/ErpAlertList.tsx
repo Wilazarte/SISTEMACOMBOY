@@ -1,5 +1,6 @@
 "use client";
 
+import { estiloSeccion } from "@/lib/seccionColor";
 import type { ReactNode } from "react";
 import { cn } from "./cn";
 import { abrirPestana } from "@/lib/logistica";
@@ -30,6 +31,7 @@ export function ErpAlertList({
   vacio,
   max,
   critico,
+  tono,
   className,
 }: {
   titulo?: string;
@@ -39,13 +41,15 @@ export function ErpAlertList({
   max?: number;
   /** Alertas críticas (stock, pendientes urgentes): barra lateral rojo fuego en vez de cian. */
   critico?: boolean;
+  /** Color de sección fijo (posición en lib/seccionColor.ts); si no, sale del título. */
+  tono?: number;
   className?: string;
 }) {
   const visibles = max ? items.slice(0, max) : items;
   return (
     <div className={className}>
       {titulo && (
-        <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#60a5fa]">
+        <p className="seccion-titulo mb-2 text-[13px] font-bold uppercase" style={estiloSeccion(tono ?? titulo)}>
           {icono} {titulo}
         </p>
       )}

@@ -1,5 +1,6 @@
 "use client";
 
+import { estiloSeccion } from "@/lib/seccionColor";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { AlertTriangle, Bell, CircleDollarSign, Clock, Cog, Lock, MessageSquare, Package, Plus, Send, Timer, Truck, Users, Video } from "lucide-react";
 import { useChat } from "@/lib/chat";
@@ -132,8 +133,8 @@ export interface ItemLateral {
   href: string;
 }
 
-function Bloque({ titulo, icono, items, vacio, critico }: { titulo: string; icono: ReactNode; items: ItemLateral[]; vacio: string; critico?: boolean }) {
-  return <ErpAlertList titulo={titulo} icono={icono} items={items} vacio={vacio} max={5} critico={critico} />;
+function Bloque({ titulo, icono, items, vacio, critico, tono }: { titulo: string; icono: ReactNode; items: ItemLateral[]; vacio: string; critico?: boolean; tono?: number }) {
+  return <ErpAlertList titulo={titulo} icono={icono} items={items} vacio={vacio} max={5} critico={critico} tono={tono} />;
 }
 
 const PESTANAS_PANEL = [
@@ -185,13 +186,13 @@ export function PanelLateral({
         ))}
       </nav>
       <div id="panel-notificaciones" className="scroll-mt-24">
-        <Bloque titulo="Notificaciones" icono={<Bell size={15} />} items={notifs.filter((n) => n.tipo !== "stock")} vacio="Sin notificaciones nuevas." />
+        <Bloque titulo="Notificaciones" icono={<Bell size={15} />} items={notifs.filter((n) => n.tipo !== "stock")} vacio="Sin notificaciones nuevas." tono={2} />
       </div>
       <div id="panel-alertas" className="scroll-mt-24">
-        <Bloque titulo="Alertas" icono={<AlertTriangle size={15} />} items={[...notifs.filter((n) => n.tipo === "stock"), ...alertas]} vacio="Sin alertas." critico />
+        <Bloque titulo="Alertas" icono={<AlertTriangle size={15} />} items={[...notifs.filter((n) => n.tipo === "stock"), ...alertas]} vacio="Sin alertas." critico tono={1} />
       </div>
       <div id="panel-recordatorios" className="scroll-mt-24">
-        <Bloque titulo="Recordatorios" icono={<Clock size={15} />} items={recordatorios} vacio="Sin pendientes." />
+        <Bloque titulo="Recordatorios" icono={<Clock size={15} />} items={recordatorios} vacio="Sin pendientes." tono={3} />
       </div>
       <div id="panel-chat" className="scroll-mt-24" data-sin-guardar>
         <ChatGrupal sesion={sesion} modulo={modulo} />
@@ -212,7 +213,7 @@ export function ReunionGrupal({ sesion, modulo, otrasSalas = [] }: { sesion: Ses
   };
   return (
     <div>
-      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#60a5fa]">
+      <p className="seccion-titulo mb-2 text-[13px] font-bold uppercase" style={estiloSeccion(5)}>
         <Video size={15} /> Reunión grupal
       </p>
       <div className="grid grid-cols-2 gap-2">
@@ -281,7 +282,7 @@ export function ChatGrupal({ sesion, modulo }: { sesion: Sesion | null; modulo: 
   };
   return (
     <div>
-      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#60a5fa]">
+      <p className="seccion-titulo mb-2 text-[13px] font-bold uppercase" style={estiloSeccion(0)}>
         <MessageSquare size={15} /> Chat grupal
       </p>
       {faltaTabla ? (
@@ -336,7 +337,7 @@ export function TiemposCosto() {
   }, [ops, vales, stock]);
   return (
     <div>
-      <p className="mb-2 flex items-center gap-2 text-[13px] font-bold uppercase text-[#60a5fa]">
+      <p className="seccion-titulo mb-2 text-[13px] font-bold uppercase" style={estiloSeccion("Tiempos reales y costo")}>
         <Timer size={15} /> Tiempos reales y costo
       </p>
       {filas.length === 0 ? (
