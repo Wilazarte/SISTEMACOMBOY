@@ -1,6 +1,6 @@
-// Prevents additional console window on Windows in release, DO NOT REMOVE!!
+// Sin ventana de consola en Windows (release).
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-  app_lib::run();
+    comboy_erp_lib::run()
 }

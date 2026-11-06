@@ -87,6 +87,7 @@ import { ALMACENES, ALMACEN_DEFECTO, SEDES, UNIDADES } from "@/lib/empresa";
 import { pdfCotizacion, pdfFactura, pdfOrdenCompra, pdfRequerimiento } from "@/lib/pdf";
 import { asientoOrdenCompra, reasentarOrdenCompra } from "@/lib/contable";
 import { getSesion, puedeVer } from "@/lib/auth";
+import { useBloqueoSerie } from "@/lib/bloqueos";
 import PlanillaInterna from "@/components/tesoreria/PlanillaTab";
 import { DeclaracionesJuradas } from "@/components/tesoreria/DeclaracionesJuradas";
 import { pdfDeclaracionJurada } from "@/lib/pdf";
@@ -1612,6 +1613,8 @@ function EditarOC({ oc, rol, cotizaciones, onClose }: { oc: OrdenCompra; rol: Ro
     items: oc.items.map((i) => ({ ...i })),
   }));
   const [guardando, setGuardando] = useState(false);
+  // Un solo equipo edita la OC a la vez (lib/bloqueos.ts)
+  const bloqueo = useBloqueoSerie(oc.numero, "oc");
   const opcionesCoti = cotizaciones.filter((c) => c.id === oc.cotizacionId || c.estado !== "CON_OC");
   const coti = cotizaciones.find((c) => c.id === d.cotizacionId);
   const subtotal = r2(d.items.reduce((a, i) => a + r2(i.cantidad * i.precioUnit), 0));
@@ -1642,6 +1645,11 @@ function EditarOC({ oc, rol, cotizaciones, onClose }: { oc: OrdenCompra; rol: Ro
 
   return (
     <div className="space-y-4 text-sm">
+      {bloqueo.mensaje && (
+        <div className="rounded-xl border border-amber-300/60 bg-amber-500/10 px-3 py-2 font-semibold text-amber-600">
+          🔒 {bloqueo.mensaje}. Podrá guardar cuando termine.
+        </div>
+      )}
       <div className="grid gap-3 md:grid-cols-3">
         <Field label="Cotización" className="md:col-span-2">
           <Select value={d.cotizacionId} onChange={(e) => elegirCoti(e.target.value)} options={opcionesCoti.map((c) => ({ value: c.id, label: `${c.numero} · ${c.proveedor} · ${soles(c.total)}` }))} />
@@ -1706,8 +1714,8 @@ function EditarOC({ oc, rol, cotizaciones, onClose }: { oc: OrdenCompra; rol: Ro
         <Button variant="secondary" onClick={onClose}>
           Cancelar
         </Button>
-        <Button onClick={guardar} disabled={guardando}>
-          <Pencil size={14} /> {guardando ? "Guardando…" : "Guardar cambios"}
+        <Button onClick={guardar} disabled={guardando || !bloqueo.libre}>
+          <Pencil size={14} /> {guardando ? "Guardando…" : bloqueo.cargando ? "Verificando…" : "Guardar cambios"}
         </Button>
       </div>
     </div>

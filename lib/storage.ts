@@ -53,6 +53,17 @@ import { canonizarItems } from "./productos";
 import { normalizarNombre } from "./productos-modelos";
 import { sedeNormalizada } from "./constantes";
 import { exigirRucSunat } from "./ruc";
+import { esErrorDeRed, enLinea } from "./offline/red";
+import {
+  correlativoReservado,
+  encolarCambios,
+  guardarCopiaClave,
+  leerCopia,
+  offlineActivo,
+  prepararPendientes,
+  reservarCorrelativos,
+  superponerPendientes,
+} from "./offline/storageOffline";
 import {
   COMPROBANTES,
   EJEMPLO_NUMERO,
@@ -425,10 +436,46 @@ function fijarDesdeServidor(key: StoreKey, filas: Fila[]): void {
     if (typeof r.fecha === "string" && DESTINOS[key].forma === "observaciones") r.fecha = new Date(r.fecha).toISOString();
     return r;
   });
-  cache.set(key, deFilas(key, limpias));
+  // App Windows / Android: copia local para abrir sin señal
+  guardarCopiaClave(key, () => limpias);
+  // Cambios hechos sin señal que aún no suben: siguen en pantalla
+  const conLocales = offlineActivo() ? superponerPendientes(key, limpias) : limpias;
+  cache.set(key, deFilas(key, conLocales));
   servidor.set(key, new Map(aFilas(key, cache.get(key)).map((f) => [f.id, firma(f)])));
   cargadas.add(key);
   avisar(key);
+}
+
+/** Descarga una clave; sin señal (solo en las apps) usa la copia local del equipo. */
+async function descargarOCopia(key: StoreKey): Promise<Fila[]> {
+  try {
+    return await descargar(key);
+  } catch (e) {
+    if (!offlineActivo() || !esErrorDeRed(e)) throw e;
+    const copia = await leerCopia(key);
+    if (!copia) throw e;
+    modoSinSenal = true;
+    return copia as Fila[];
+  }
+}
+
+/** true si los datos en pantalla salen de la copia local (se recargan al volver la señal). */
+let modoSinSenal = false;
+export const estaSinSenal = (): boolean => modoSinSenal;
+
+/**
+ * App Windows / Android: tras subir la cola, vuelve a leer del servidor las claves en uso y reserva
+ * números para emitir sin señal. La llama useSync() (hooks/useSync.ts).
+ */
+export async function trasSincronizar(claves: string[] = []): Promise<void> {
+  const todas = modoSinSenal ? Array.from(cargadas) : (claves.filter((k) => cargadas.has(k as StoreKey)) as StoreKey[]);
+  modoSinSenal = false;
+  await Promise.all(todas.map((k) => recargar(k)));
+  await reservarCorrelativos(async (serie) => {
+    const { data, error } = await createClient().rpc("siguiente_numero", { serie });
+    if (error) throw error;
+    return Number(data);
+  });
 }
 
 /** Descarga todas las filas de una clave (paginado: PostgREST devuelve máx. 1000 por consulta). */
@@ -455,6 +502,9 @@ async function descargar(key: StoreKey): Promise<Fila[]> {
 
 /** Vuelve a leer del servidor (tras una operación hecha en Supabase, ej. retiro para producción). */
 export const recargarDatos = (...keys: StoreKey[]) => Promise.all(keys.map((k) => recargar(k)));
+
+/** Vuelve a leer todas las claves que esta pantalla usa (p. ej. tras resolver un conflicto). */
+export const recargarTodo = () => Promise.all(Array.from(cargadas).map((k) => recargar(k)));
 
 async function recargar(key: StoreKey): Promise<void> {
   try {
@@ -512,7 +562,7 @@ export function cargarClave(key: StoreKey): Promise<void> {
   if (enCargaInicial.has(key)) return carga.catch(() => undefined);
   let p = cargando.get(key);
   if (!p) {
-    p = descargar(key)
+    p = descargarOCopia(key)
       .catch((e) => {
         if (TABLAS_OPCIONALES.includes(DESTINOS[key].tabla) && esTablaFaltante(e)) return [] as Fila[];
         throw e;
@@ -550,13 +600,14 @@ const esTablaFaltante = (e: unknown): boolean => {
 export function iniciarDatos(modulos: string[] = getSesion()?.modulos ?? ["*"]): Promise<void> {
   carga ??= (async () => {
     const claves = clavesDeModulos(modulos, Object.keys(DESTINOS) as StoreKey[]);
+    await prepararPendientes();
     console.time("iniciarDatos");
     claves.forEach((k) => enCargaInicial.add(k));
     // Una tabla opcional que aún no existe (ej. ventas antes de correr fix_ventas.sql) no bloquea el resto del ERP
     const faltantes = new Set<string>();
     const resultados = await Promise.all(
       claves.map((k) =>
-        descargar(k)
+        descargarOCopia(k)
           .catch((e) => {
             const tabla = DESTINOS[k].tabla;
             if (TABLAS_OPCIONALES.includes(tabla) && esTablaFaltante(e)) {
@@ -584,7 +635,7 @@ export function iniciarDatos(modulos: string[] = getSesion()?.modulos ?? ["*"]):
     let primera = true;
     canal = TABLAS.filter((t) => !faltantes.has(t)).reduce(
       (c, tabla) => c.on("postgres_changes", { event: "*", schema: "public", table: tabla }, (p) => void aplicarCambio(tabla, p as RealtimePostgresChangesPayload<Fila>)),
-      sb.channel("erp-cambios")
+      sb.channel("erp_changes")
     ).subscribe((estado) => {
       if (estado !== "SUBSCRIBED") return;
       // Al reconectar se recargan las claves en uso por si se perdieron cambios sin conexión
@@ -678,6 +729,25 @@ export function escribir<T>(key: StoreKey, value: T): void {
   avisar(key);
   if (cambios.length === 0 && borrados.length === 0) return;
 
+  // App Windows / Android: copia local al día y, sin señal, el cambio va a la cola (sync_status = 'pending')
+  const enCola = () => {
+    // Base de cada fila = última versión conocida (la del servidor, o la del cambio anterior aún en cola):
+    // al subir en orden, si el servidor ya no coincide es que otro equipo la cambió -> conflicto
+    const tipo = d.forma === "lista" || d.forma === "objeto" ? d.tipo : undefined;
+    return encolarCambios(key, d.tabla, cambios, borrados.map((id) => ({ id, tipo })), (id) => antes.get(id) ?? null);
+  };
+  if (offlineActivo()) {
+    guardarCopiaClave(key, () => aFilas(key, cache.get(key)));
+    if (!enLinea()) {
+      cola = cola.then(() =>
+        enCola().catch((e) => {
+          avisarError(`No se pudo guardar en esta PC: ${(e as Error).message}`);
+        })
+      );
+      return;
+    }
+  }
+
   pendientes.set(key, (pendientes.get(key) ?? 0) + 1);
   if (sinCargar) sucias.add(key);
   cola = cola.then(async () => {
@@ -697,6 +767,11 @@ export function escribir<T>(key: StoreKey, value: T): void {
         if (error) throw error;
       }
     } catch (e) {
+      // Se cayó la señal a mitad de camino: el cambio queda en la cola local, no se revierte
+      if (offlineActivo() && esErrorDeRed(e)) {
+        await enCola().catch((e2) => avisarError(`No se pudo guardar en esta PC: ${(e2 as Error).message}`));
+        return;
+      }
       const err = e as { code?: string; message?: string };
       errorEscritura ??= err.message ?? String(e);
       avisarError(
@@ -782,6 +857,13 @@ function fijarContador(serie: Serie, n: number): void {
  */
 async function siguiente(serie: Serie): Promise<number> {
   const { data, error } = await createClient().rpc("siguiente_numero", { serie });
+  if (error && offlineActivo() && esErrorDeRed(error)) {
+    // Sin señal: número reservado en esta PC cuando había conexión (ver lib/offline/storageOffline.ts)
+    const n = await correlativoReservado(serie);
+    if (n === null) throw new ErpError(`Sin señal: esta PC no tiene números ${serie} reservados. Conéctese una vez para reservar.`);
+    fijarContador(serie, n);
+    return n;
+  }
   if (error) {
     if (error.code === "42501") throw new ErpError(error.message);
     if (error.code === "PGRST202" || /could not find the function/i.test(error.message))
