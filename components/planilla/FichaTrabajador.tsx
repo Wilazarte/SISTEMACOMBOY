@@ -5,7 +5,7 @@ import { Briefcase, HeartPulse, History, Landmark, Power, Save, Trash2, User, Us
 import { Badge, Button, Field, Input, Modal, Select, Textarea, cn, ejecutar, toast } from "@/components/ui";
 import { SEDES } from "@/lib/empresa";
 import { historialPagosTrabajador, type PagoTrabajador } from "@/lib/historial";
-import { AFP_OPTIONS, BANCOS, ESTADOS_CIVILES, TIPOS_SUELDO, cambiarEstadoTrabajador, edad, eliminarTrabajador, fechaPE, frecuenciaPagoDe, guardarTrabajador, hoy, soles } from "@/lib/storage";
+import { AFP_OPTIONS, BANCOS, ESTADOS_CIVILES, TIPOS_SUELDO, cambiarEstadoTrabajador, divisorSueldo, edad, eliminarTrabajador, fechaPE, frecuenciaPagoDe, guardarTrabajador, hoy, soles } from "@/lib/storage";
 import type { EstadoCivil, FrecuenciaPago, TipoAfp, TipoSueldo, Trabajador } from "@/lib/types";
 
 const OPC_SUELDO = (Object.keys(TIPOS_SUELDO) as TipoSueldo[]).map((k) => ({ value: k, label: TIPOS_SUELDO[k].label.toUpperCase() }));
@@ -134,7 +134,7 @@ export function FichaTrabajador({
             >
               <Select value={frecuenciaPagoDe(f)} onChange={(e) => set("frecuenciaPago", e.target.value as FrecuenciaPago)} options={OPC_FRECUENCIA} />
             </Field>
-            <Field label={`Sueldo ${sueldo.label.toLowerCase()} (S/) *`} hint={`Diario: ${soles(f.sueldo / sueldo.divisor)}`}>
+            <Field label={`Sueldo ${sueldo.label.toLowerCase()} (S/) *`} hint={`Diario: ${soles(f.sueldo / divisorSueldo(f))}${divisorSueldo(f) === 27 ? " (mes de 27 días)" : ""}`}>
               <Input type="number" min={0} step="0.01" value={f.sueldo || ""} onChange={(e) => set("sueldo", parseFloat(e.target.value) || 0)} />
             </Field>
             <Field label="Fecha de ingreso *">

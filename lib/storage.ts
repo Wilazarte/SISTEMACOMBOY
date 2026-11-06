@@ -1728,6 +1728,13 @@ export const TIPOS_SUELDO: Record<TipoSueldo, { label: string; divisor: number }
 /** Frecuencia de pago de la ficha: los registros sin dato se pagan por semana (como hasta ahora). */
 export const frecuenciaPagoDe = (t: Pick<Trabajador, "frecuenciaPago">): FrecuenciaPago => (t.frecuenciaPago === "MENSUAL" ? "MENSUAL" : "SEMANAL");
 
+/** Planilla MENSUAL (frecuencia de pago mensual): el mes son 27 días (sueldo diario = mensual / 27). */
+export const DIAS_PERIODO_MENSUAL = 27;
+
+/** Divisor del sueldo diario: sueldo mensual con pago mensual = 27 días; el resto, el de su tipo de sueldo (mensual con pago semanal = 26). */
+export const divisorSueldo = (t: Pick<Trabajador, "tipoSueldo" | "frecuenciaPago">): number =>
+  t.tipoSueldo === "MENSUAL" && frecuenciaPagoDe(t) === "MENSUAL" ? DIAS_PERIODO_MENSUAL : (TIPOS_SUELDO[t.tipoSueldo] ?? TIPOS_SUELDO.DIARIO).divisor;
+
 export const AFP_OPTIONS: Record<TipoAfp, { label: string; porc: number }> = {
   AFP_INTEGRA: { label: "AFP Integra", porc: 10 },
   AFP_PRIMA: { label: "AFP Prima", porc: 10 },

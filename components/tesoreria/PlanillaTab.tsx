@@ -12,6 +12,7 @@ import {
   MSG_ASISTENCIA_BLOQUEADA,
   TIPOS_SUELDO,
   detectarDuplicados,
+  divisorSueldo,
   esContratista,
   eliminarTrabajador,
   fechaPE,
@@ -172,7 +173,7 @@ function calcular(t: Trabajador, liq: LiquidacionPeriodo, asistenciaExterna?: As
     ? { ...resumirAsistencia(fechas), ...(porHora ? { horas: horasReales(fechas) } : {}) }
     : { dias: registro?.dias ?? 0, horas: registro?.horas ?? (porHora ? 0 : (registro?.dias ?? 0) * liq.horasJornada), tardanzas: registro?.tardanzas ?? 0 };
   // S/ por hora (cualquier modo): básico = S/ hora × horas reales del reloj (sin jornada); extra solo manual
-  const r = porHora ? liquidarPorHora(t.sueldo, reloj.horas, liq.ajustes[t.id]) : liquidar(t.sueldo, sueldoDe(t).divisor, reloj, liq, liq.ajustes[t.id]);
+  const r = porHora ? liquidarPorHora(t.sueldo, reloj.horas, liq.ajustes[t.id]) : liquidar(t.sueldo, divisorSueldo(t), reloj, liq, liq.ajustes[t.id]);
   const descuentoAfp = r2(r.bruto * ((t.afpPorcentaje || 0) / 100));
   const neto = r2(r.bruto - descuentoAfp);
   return {
@@ -916,7 +917,7 @@ export default function PlanillaTab() {
                 </label>
               )}
               <p className="min-w-[240px] flex-1 text-xs text-plomo-500">
-                {MODOS_LIQUIDACION[liq.modo].ayuda}. Sueldo diario = mensual / 26 · quincenal / 13 · semanal / 6 (diario: el mismo); sueldo hora = diario / {liq.horasJornada} (por hora: el de su ficha). Tardanza: entrada después de las{" "}
+                {MODOS_LIQUIDACION[liq.modo].ayuda}. Sueldo diario = mensual / 26 (con pago mensual: / 27, el mes son 27 días) · quincenal / 13 · semanal / 6 (diario: el mismo); sueldo hora = diario / {liq.horasJornada} (por hora: el de su ficha). Tardanza: entrada después de las{" "}
                 {HORA_TARDANZA}. Los botones ajustan solo esta planilla: lo del reloj 🔒 no cambia.
               </p>
             </div>
