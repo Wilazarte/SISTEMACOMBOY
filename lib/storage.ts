@@ -144,6 +144,17 @@ export const hoy = (): string => {
   }
 };
 
+/** Fecha (YYYY-MM-DD) en Perú de un timestamp (ej. fecha_cierre de la planilla). Inválido -> null. */
+export function fechaLocal(ts: string | null | undefined): string | null {
+  const f = new Date(String(ts ?? ""));
+  if (!ts || isNaN(f.getTime())) return null;
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric", month: "2-digit", day: "2-digit" }).format(f);
+  } catch {
+    return f.toISOString().slice(0, 10);
+  }
+}
+
 /**
  * Fecha (YYYY-MM-DD) + d días, sin romper nunca: acepta "YYYY-MM-DD", "DD/MM/YYYY", ISO con hora o Date.
  * Fecha vacía / inválida -> se usa hoy. Días no numéricos (undefined, NaN) -> 0.

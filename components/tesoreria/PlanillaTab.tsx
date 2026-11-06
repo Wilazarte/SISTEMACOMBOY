@@ -15,6 +15,7 @@ import {
   divisorSueldo,
   esContratista,
   eliminarTrabajador,
+  fechaLocal,
   fechaPE,
   frecuenciaPagoDe,
   getAliasHuellas,
@@ -483,6 +484,9 @@ export default function PlanillaTab() {
     ejecutarAsync(async () => {
       // Código global BOL-xxx-AAAA (uno por trabajador y periodo; al volver a descargar se reutiliza)
       const codigo = await codigoBoleta(normalizarPeriodo(periodo), t.id, t.nombre, t.totalPagar);
+      // Ya pagado: fechas del cierre (asistencia y día del pago); sin pagar: las fechas del periodo y hoy
+      const p = normalizarPeriodo(periodo);
+      const cierre = historial.lista.find((h) => h.periodo === p || h.periodo === `${p} · TODOS` || h.periodo === `${p} · ${grupoDe(filtroDe(t))}`);
       pdfBoletaPago({
       periodo: normalizarPeriodo(periodo),
       id: t.id,
@@ -506,6 +510,9 @@ export default function PlanillaTab() {
       adelantos: t.adelantosDescuento,
       adelantosDetalle: t.adelantosDetalle,
         totalPagar: t.totalPagar,
+        asistenciaDesde: cierre?.asistencia_desde || rango.desde || excel?.desde || null,
+        asistenciaHasta: cierre?.asistencia_hasta || rango.hasta || excel?.hasta || null,
+        fechaPago: cierre?.fecha_cierre ? fechaLocal(cierre.fecha_cierre) : hoy(),
       }, codigo);
     }, "Boleta descargada");
 

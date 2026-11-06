@@ -490,6 +490,11 @@ export interface DatosBoleta {
   /** Cada adelanto descontado en esta boleta (fecha, monto, motivo). Sin lista, la fila sale sin detalle. */
   adelantosDetalle?: AdelantoBoleta[];
   totalPagar: number;
+  /** Días de asistencia que se pagan en esta boleta (YYYY-MM-DD). */
+  asistenciaDesde?: string | null;
+  asistenciaHasta?: string | null;
+  /** Fecha en que se realiza el pago (cierre del periodo; sin cerrar: el día de emisión). */
+  fechaPago?: string | null;
 }
 
 export type AdelantoBoleta = Pick<Adelanto, "fecha" | "monto" | "motivo" | "medio_pago">;
@@ -537,6 +542,8 @@ export function pdfBoletaPago(d: DatosBoleta, codigo: string): void {
       ["Sueldo diario", soles(d.sueldoDiario)],
       ["Valor hora", d.valorHora],
       ["Periodo", d.periodo],
+      ["Asistencia pagada", d.asistenciaDesde ? `Del ${fechaPE(d.asistenciaDesde)} al ${fechaPE(d.asistenciaHasta || d.asistenciaDesde)}` : "-"],
+      ["Fecha de pago", d.fechaPago ? fechaPE(d.fechaPago.slice(0, 10)) : "-"],
       ["Liquidación", d.modo],
       ["Pensión", `${d.pension} (${d.afpPorcentaje}%)`],
       ...(cuenta ? ([["Cuenta de pago", cuenta]] as [string, string][]) : []),
