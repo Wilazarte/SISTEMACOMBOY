@@ -12,8 +12,10 @@ import {
   MSG_ASISTENCIA_BLOQUEADA,
   TIPOS_SUELDO,
   detectarDuplicados,
+  divisorSueldo,
   esContratista,
   eliminarTrabajador,
+  fechaLocal,
   fechaPE,
   frecuenciaPagoDe,
   getAliasHuellas,
@@ -172,7 +174,7 @@ function calcular(t: Trabajador, liq: LiquidacionPeriodo, asistenciaExterna?: As
     ? { ...resumirAsistencia(fechas), ...(porHora ? { horas: horasReales(fechas) } : {}) }
     : { dias: registro?.dias ?? 0, horas: registro?.horas ?? (porHora ? 0 : (registro?.dias ?? 0) * liq.horasJornada), tardanzas: registro?.tardanzas ?? 0 };
   // S/ por hora (cualquier modo): básico = S/ hora × horas reales del reloj (sin jornada); extra solo manual
-  const r = porHora ? liquidarPorHora(t.sueldo, reloj.horas, liq.ajustes[t.id]) : liquidar(t.sueldo, sueldoDe(t).divisor, reloj, liq, liq.ajustes[t.id]);
+  const r = porHora ? liquidarPorHora(t.sueldo, reloj.horas, liq.ajustes[t.id]) : liquidar(t.sueldo, divisorSueldo(t), reloj, liq, liq.ajustes[t.id]);
   const descuentoAfp = r2(r.bruto * ((t.afpPorcentaje || 0) / 100));
   const neto = r2(r.bruto - descuentoAfp);
   return {
@@ -482,6 +484,9 @@ export default function PlanillaTab() {
     ejecutarAsync(async () => {
       // Código global BOL-xxx-AAAA (uno por trabajador y periodo; al volver a descargar se reutiliza)
       const codigo = await codigoBoleta(normalizarPeriodo(periodo), t.id, t.nombre, t.totalPagar);
+      // Ya pagado: fechas del cierre (asistencia y día del pago); sin pagar: las fechas del periodo y hoy
+      const p = normalizarPeriodo(periodo);
+      const cierre = historial.lista.find((h) => h.periodo === p || h.periodo === `${p} · TODOS` || h.periodo === `${p} · ${grupoDe(filtroDe(t))}`);
       pdfBoletaPago({
       periodo: normalizarPeriodo(periodo),
       id: t.id,
@@ -505,6 +510,9 @@ export default function PlanillaTab() {
       adelantos: t.adelantosDescuento,
       adelantosDetalle: t.adelantosDetalle,
         totalPagar: t.totalPagar,
+        asistenciaDesde: cierre?.asistencia_desde || rango.desde || excel?.desde || null,
+        asistenciaHasta: cierre?.asistencia_hasta || rango.hasta || excel?.hasta || null,
+        fechaPago: cierre?.fecha_cierre ? fechaLocal(cierre.fecha_cierre) : hoy(),
       }, codigo);
     }, "Boleta descargada");
 
@@ -916,7 +924,7 @@ export default function PlanillaTab() {
                 </label>
               )}
               <p className="min-w-[240px] flex-1 text-xs text-plomo-500">
-                {MODOS_LIQUIDACION[liq.modo].ayuda}. Sueldo diario = mensual / 26 · quincenal / 13 · semanal / 6 (diario: el mismo); sueldo hora = diario / {liq.horasJornada} (por hora: el de su ficha). Tardanza: entrada después de las{" "}
+                {MODOS_LIQUIDACION[liq.modo].ayuda}. Sueldo diario = mensual / 26 (con pago mensual: / 27, el mes son 27 días) · quincenal / 13 · semanal / 6 (diario: el mismo); sueldo hora = diario / {liq.horasJornada} (por hora: el de su ficha). Tardanza: entrada después de las{" "}
                 {HORA_TARDANZA}. Los botones ajustan solo esta planilla: lo del reloj 🔒 no cambia.
               </p>
             </div>

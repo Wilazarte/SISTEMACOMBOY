@@ -99,7 +99,7 @@ export interface ResultadoLiquidacion {
 }
 
 /**
- * sueldo_diario = sueldo / divisor del tipo (MENSUAL 26, QUINCENAL 13, SEMANAL 6, DIARIO 1)
+ * sueldo_diario = sueldo / divisor del tipo (MENSUAL 26, o 27 con frecuencia de pago mensual, QUINCENAL 13, SEMANAL 6, DIARIO 1)
  * sueldo_hora = sueldo_diario / horas de jornada (8)
  * DÍAS: básico = diario × días · HORAS: básico = hora × horas · DÍAS + HORAS: básico = diario × días; extra = hora × (1 + recargo) × horas extra
  */
