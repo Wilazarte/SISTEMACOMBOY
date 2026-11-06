@@ -7,7 +7,7 @@ import { toast } from "@/components/ui";
 import { adelantosDelTrabajador, adelantosDescontadosEn } from "@/lib/adelantos";
 import type { HistorialDetalle, HistorialPlanilla } from "@/lib/historial";
 import { pdfBoletaPago, pdfPlanillaHistorial } from "@/lib/pdf";
-import { codigoBoleta, fechaPE, soles } from "@/lib/storage";
+import { codigoBoleta, fechaLocal, fechaPE, soles } from "@/lib/storage";
 import { useHistorialDetalle } from "./useHistorialPlanilla";
 
 const horasTxt = (h: number) => h.toLocaleString("es-PE", { maximumFractionDigits: 2 });
@@ -43,6 +43,9 @@ async function boletaHistorial(h: HistorialPlanilla, d: HistorialDetalle): Promi
         adelantos: d.adelantos,
         adelantosDetalle: adelantos,
         totalPagar: d.total_pagar,
+        asistenciaDesde: h.asistencia_desde,
+        asistenciaHasta: h.asistencia_hasta,
+        fechaPago: h.fecha_cierre ? fechaLocal(h.fecha_cierre) : null,
       },
       codigo
     );
