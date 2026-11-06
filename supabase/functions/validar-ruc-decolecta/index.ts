@@ -1,8 +1,12 @@
 // Edge Function validar-ruc-decolecta (Supabase, Deno).
 // Recibe { ruc, cotizacion_id? }, consulta el RUC en Decolecta (padrón SUNAT) y devuelve razón social, estado,
 // condición de domicilio y dirección fiscal. Si viene cotizacion_id, guarda el resultado en cotizaciones
+<<<<<<< HEAD
+// (ruc_validado = ACTIVO y HABIDO). Cada consulta queda en proveedor_validacion_log.
+=======
 // (ruc_validado = ACTIVO y HABIDO). Cada consulta queda en proveedor_validacion_log y cada RUC encontrado
 // en ruc_validados (padrón del sistema: todos los módulos exigen un RUC de esa tabla antes de guardar).
+>>>>>>> d60c9a231f55f452664da792e465ff43299542b6
 //
 // Secretos (Supabase › Edge Functions › Secrets):
 //   DECOLECTA_TOKEN  token de la cuenta Decolecta (obligatorio)
@@ -27,7 +31,11 @@ function rucValido(ruc: string): boolean {
   return (d === 10 ? 0 : d === 11 ? 1 : d) === Number(ruc[10]);
 }
 
+<<<<<<< HEAD
+const ROLES = ["creador", "soporte", "almacen", "logistica", "produccion", "tesoreria", "finanzas"];
+=======
 // Cualquier usuario con perfil puede validar: el RUC es obligatorio en todos los módulos que lo piden.
+>>>>>>> d60c9a231f55f452664da792e465ff43299542b6
 const txt = (o: Record<string, unknown>, ...k: string[]) => {
   for (const x of k) if (typeof o[x] === "string" && (o[x] as string).trim()) return (o[x] as string).trim();
   return "";
@@ -45,7 +53,11 @@ Deno.serve(async (req) => {
   if (!u?.user) return json({ error: "Inicie sesión." }, 401);
   const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const { data: perfil } = await admin.from("perfiles").select("usuario,rol").eq("id", u.user.id).maybeSingle();
+<<<<<<< HEAD
+  if (!perfil || !ROLES.includes(perfil.rol)) return json({ error: "Su usuario no puede validar RUC." }, 403);
+=======
   if (!perfil) return json({ error: "Su usuario no tiene perfil en el ERP: no puede validar RUC." }, 403);
+>>>>>>> d60c9a231f55f452664da792e465ff43299542b6
 
   const body = (await req.json().catch(() => ({}))) as { ruc?: string; cotizacion_id?: string };
   const ruc = String(body.ruc ?? "").replace(/\D/g, "");
@@ -75,6 +87,12 @@ Deno.serve(async (req) => {
   await admin.from("proveedor_validacion_log").insert({ ruc, cotizacion_id: body.cotizacion_id ?? null, respuesta_decolecta: { status, ...respuesta }, ok, usuario: perfil.usuario });
   if (!ok) return json({ error: status === 404 ? `RUC ${ruc} no existe en SUNAT.` : `Decolecta no respondió (HTTP ${status || "sin conexión"}).`, status }, 502);
 
+<<<<<<< HEAD
+  if (body.cotizacion_id) {
+    const { error } = await admin
+      .from("cotizaciones")
+      .update({ ruc_validado: validado, ruc_estado: estado, condicion_habido: condicion, razon_social_sunat: razon, direccion_fiscal: direccion, validado_at: new Date().toISOString() })
+=======
   const validado_at = new Date().toISOString();
   // Padrón del sistema. Si la tabla aún no existe (SQL pendiente) la respuesta igual sirve para esta sesión.
   const { error: errPadron } = await admin
@@ -86,9 +104,14 @@ Deno.serve(async (req) => {
     const { error } = await admin
       .from("cotizaciones")
       .update({ ruc_validado: validado, ruc_estado: estado, condicion_habido: condicion, razon_social_sunat: razon, direccion_fiscal: direccion, validado_at })
+>>>>>>> d60c9a231f55f452664da792e465ff43299542b6
       .eq("id", body.cotizacion_id)
       .eq("ruc", ruc);
     if (error) return json({ error: error.message }, 500);
   }
+<<<<<<< HEAD
+  return json({ ruc, razon_social: razon, estado, condicion, direccion, validado });
+=======
   return json({ ruc, razon_social: razon, estado, condicion, direccion, validado, validado_at });
+>>>>>>> d60c9a231f55f452664da792e465ff43299542b6
 });
