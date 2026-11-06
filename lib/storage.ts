@@ -492,6 +492,9 @@ async function descargar(key: StoreKey): Promise<Fila[]> {
 /** Vuelve a leer del servidor (tras una operación hecha en Supabase, ej. retiro para producción). */
 export const recargarDatos = (...keys: StoreKey[]) => Promise.all(keys.map((k) => recargar(k)));
 
+/** Vuelve a leer todas las claves que esta pantalla usa (p. ej. tras resolver un conflicto). */
+export const recargarTodo = () => Promise.all(Array.from(cargadas).map((k) => recargar(k)));
+
 async function recargar(key: StoreKey): Promise<void> {
   try {
     fijarDesdeServidor(key, await descargar(key));
@@ -621,7 +624,7 @@ export function iniciarDatos(modulos: string[] = getSesion()?.modulos ?? ["*"]):
     let primera = true;
     canal = TABLAS.filter((t) => !faltantes.has(t)).reduce(
       (c, tabla) => c.on("postgres_changes", { event: "*", schema: "public", table: tabla }, (p) => void aplicarCambio(tabla, p as RealtimePostgresChangesPayload<Fila>)),
-      sb.channel("erp-cambios")
+      sb.channel("erp_changes")
     ).subscribe((estado) => {
       if (estado !== "SUBSCRIBED") return;
       // Al reconectar se recargan las claves en uso por si se perdieron cambios sin conexión

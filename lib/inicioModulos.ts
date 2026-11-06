@@ -161,6 +161,7 @@ export const ACCIONES_SOPORTE: AccionInicio[] = [
   { slug: "expedientes", label: "Expedientes 26W · Tablero de lotes", grupo: EXP, destino: LOTES },
   { slug: "resumen", label: "Dashboard general (resumen)", grupo: "Soporte", destino: "/dashboard?vista=resumen" },
   { slug: "creador", label: "Creador (usuarios, asistencia)", grupo: "Soporte", destino: "/dashboard/creador" },
+  { slug: "conflictos", label: "Conflictos de sincronización (apps sin señal)", grupo: "Soporte", destino: "/soporte/conflictos" },
 ];
 
 export const accionesDe = (modulo: ModuloInicio): AccionInicio[] => (modulo === "soporte" ? ACCIONES_SOPORTE : ACCIONES_INICIO[modulo]);
