@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Eye, EyeOff, Loader2, Lock, LogIn, User } from "lucide-react";
+import { AlertCircle, ArrowLeft, Eye, EyeOff, Loader2, Lock, LogIn, User, X } from "lucide-react";
 import { LogoComboy } from "@/components/LogoComboy";
 import { CLAVE_MODULO, CLAVE_USUARIO, RUTA_SUCURSAL, login, logout, perteneceAModulo, useSesion } from "@/lib/auth";
 import { cargarSedes, getSedeActual, olvidarSedes } from "@/lib/sedes";
@@ -75,8 +75,20 @@ export default function LoginSucursal() {
     router.replace(RUTA_SUCURSAL);
   };
 
+  // Regresa al menú de selección de perfil del ERP (/login). Necesario en la app de escritorio y el APK, que no tienen botón atrás.
+  const volver = () => router.push("/login", { scroll: false });
+
   return (
     <div className="relative isolate min-h-screen overflow-hidden bg-black text-white">
+      <button
+        type="button"
+        onClick={volver}
+        className="fixed left-4 top-4 z-20 flex items-center gap-2 rounded-full border border-white/20 bg-black/50 px-4 py-2 text-sm font-medium text-white/80 backdrop-blur-md transition hover:border-red-600/60 hover:bg-white/10 hover:text-white"
+        aria-label="Volver a la selección de perfil"
+      >
+        <ArrowLeft size={16} /> Volver
+      </button>
+
       {/* Mismo fondo del login del ERP: mapa mundial rojo */}
       <div aria-hidden className="pointer-events-none fixed inset-0 z-[-1]">
         <Image src="/login-bg.jpg" alt="" fill priority quality={90} sizes="100vw" className="object-cover object-center opacity-60" />
@@ -92,7 +104,18 @@ export default function LoginSucursal() {
         <p className="mt-3 text-center text-[20px] text-blue-300">Sede Secocha</p>
 
         <form onSubmit={entrar} noValidate className="mt-8 w-full max-w-sm space-y-4 rounded-2xl border border-red-900/50 bg-black/60 p-6 shadow-2xl backdrop-blur-xl">
-          <h2 className="text-lg font-bold text-white">Iniciar sesión</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-white">Iniciar sesión</h2>
+            <button
+              type="button"
+              onClick={volver}
+              className="flex h-8 w-8 items-center justify-center rounded-full text-white/50 transition hover:bg-white/10 hover:text-white"
+              aria-label="Cambiar perfil"
+              title="Cambiar perfil"
+            >
+              <X size={16} />
+            </button>
+          </div>
           <label className="block">
             <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-gray-300">Usuario o correo</span>
             <span className="relative block">
@@ -138,7 +161,11 @@ export default function LoginSucursal() {
           </button>
         </form>
 
-        <p className="mt-8 text-center text-xs text-white/50">COMBOY VID © 2025 - Módulo Secocha</p>
+        <button type="button" onClick={volver} className="mt-6 flex items-center gap-1.5 text-sm text-blue-300 underline-offset-4 transition hover:text-white hover:underline">
+          <ArrowLeft size={14} /> Volver a la selección de perfil
+        </button>
+
+        <p className="mt-4 text-center text-xs text-white/50">COMBOY VID © 2025 - Módulo Secocha</p>
       </main>
     </div>
   );
