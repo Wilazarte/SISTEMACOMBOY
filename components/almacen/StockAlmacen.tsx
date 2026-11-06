@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
+import { EtiquetasTarjeta } from "@/components/erp/ErpTable";
 import { productoNormalizado, sedeNormalizada } from "@/lib/constantes";
 import { FileDown, FileSpreadsheet, History, PackageMinus, Truck, Upload } from "lucide-react";
 import { Button, Card, CardHeader, Field, Input, Modal, Select, cn, ejecutar, toast } from "@/components/ui";
@@ -168,6 +169,8 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
   );
 }
 
+const CABECERA_KARDEX = ["Fecha", "Tipo", "Documento", "Chasis", "Cantidad", "Saldo", "Usuario"];
+
 /** Kardex: Fecha | Tipo | Documento | Chasis | Cantidad | Saldo | Usuario */
 function KardexModal({ item, onClose }: { item: StockItem; onClose: () => void }) {
   const kardex = useStore<MovimientoKardex[]>(KEYS.KARDEX, []);
@@ -185,11 +188,13 @@ function KardexModal({ item, onClose }: { item: StockItem; onClose: () => void }
       <p className="mb-3 text-sm text-plomo-600">
         {item.sede} · {item.unidad} · saldo actual <b className="text-fg">{num(item.cantidad)}</b>
       </p>
-      <div className="max-h-[60vh] overflow-auto rounded-xl border border-plomo-200">
+      {/* En celular, cada movimiento se ve como tarjeta (app Android) */}
+      <EtiquetasTarjeta id="kardex" head={CABECERA_KARDEX} />
+      <div className="tabla-tarjetas max-h-[60vh] overflow-auto rounded-xl border border-plomo-200" data-tt="kardex">
         <table className="w-full text-xs">
           <thead className="sticky top-0 bg-azul-900 text-left text-[10px] uppercase tracking-widest text-white">
             <tr>
-              {["Fecha", "Tipo", "Documento", "Chasis", "Cantidad", "Saldo", "Usuario"].map((h) => (
+              {CABECERA_KARDEX.map((h) => (
                 <th key={h} className={cn("px-2.5 py-2", (h === "Cantidad" || h === "Saldo") && "text-right")}>
                   {h}
                 </th>

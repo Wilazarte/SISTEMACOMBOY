@@ -385,3 +385,49 @@ body[data-modo-pestana] [data-guardar-pestana] {
   border-color: rgb(var(--sec));
   box-shadow: 0 0 15px rgb(var(--sec) / 0.35);
 }
+
+/* -------------------------------------------------------------------------
+   Tablas como tarjetas en celular (app Android y navegador móvil).
+   ErpTable tarjetas / Kardex: cada fila es una tarjeta; cada celda muestra su cabecera
+   a la izquierda (la pone EtiquetasTarjeta en components/erp/ErpTable.tsx).
+   ------------------------------------------------------------------------- */
+@media (max-width: 767px) {
+  .tabla-tarjetas table { min-width: 0 !important; }
+  .tabla-tarjetas thead { display: none; }
+  .tabla-tarjetas table,
+  .tabla-tarjetas tbody,
+  .tabla-tarjetas tr,
+  .tabla-tarjetas td { display: block; width: 100%; }
+  .tabla-tarjetas tbody { background: transparent !important; }
+  .tabla-tarjetas tr {
+    margin: 0 0 10px;
+    padding: 6px 12px;
+    border: 1px solid rgba(147, 197, 253, 0.18) !important;
+    border-radius: 14px;
+  }
+  .tabla-tarjetas td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0 !important;
+    text-align: right !important;
+    white-space: normal !important;
+    word-break: break-word;
+    border: 0 !important;
+  }
+  .tabla-tarjetas td + td { border-top: 1px dashed rgba(147, 197, 253, 0.12) !important; }
+  .tabla-tarjetas td::before {
+    flex-shrink: 0;
+    max-width: 45%;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #93c5fd;
+  }
+  .tabla-tarjetas td:empty { display: none; }
+  /* Botones de acciones: a todo el ancho de la tarjeta */
+  .tabla-tarjetas td:last-child:has(button) { justify-content: flex-end; flex-wrap: wrap; }
+}

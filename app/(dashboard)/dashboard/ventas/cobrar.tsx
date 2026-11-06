@@ -328,7 +328,7 @@ export function CuentasPorCobrar() {
 
       <Card>
         <CardHeader title="Cobros registrados" />
-        <Table head={["Fecha", "Documento", "Comprobante", "Cliente", "Monto", "Caja / Banco", "Referencia", "Usuario"]} empty={cobros.length === 0}>
+        <Table tarjetas head={["Fecha", "Documento", "Comprobante", "Cliente", "Monto", "Caja / Banco", "Referencia", "Usuario"]} empty={cobros.length === 0}>
           {cobros.slice(0, 100).map((c) => (
             <tr key={c.id}>
               <Td>{fechaPE(c.fecha)}</Td>

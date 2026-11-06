@@ -15,12 +15,19 @@ import { CloudOff, Loader2, RefreshCw, TriangleAlert } from "lucide-react";
 import { useSync } from "@/hooks/useSync";
 import { buscarActualizacion } from "@/lib/offline/actualizador";
 import { localDb } from "@/lib/offline/localDb";
-import { esAppNativa, esTauri } from "@/lib/offline/plataforma";
+import { esAppNativa, esCapacitor, esTauri } from "@/lib/offline/plataforma";
+import { FotoGuiaFlotante } from "./FotoGuia";
 
 export function AppNativa() {
   const [app, setApp] = useState(false);
   useEffect(() => setApp(esAppNativa()), []);
-  return app ? <Insignia /> : null;
+  if (!app) return null;
+  return (
+    <>
+      <Insignia />
+      {esCapacitor() && <FotoGuiaFlotante />}
+    </>
+  );
 }
 
 function Insignia() {

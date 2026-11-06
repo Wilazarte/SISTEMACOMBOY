@@ -421,7 +421,7 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
               material: ya incluye todo (sin utilidad ni mano de obra aparte). La suma es el subtotal de la nota, sin IGV por ser traslado interno. Luego
               apruébela para generar la Orden de Despacho a Secocha.
             </p>
-            <Table head={["Cant.", "Unidad", "Material", "Precio unitario S/", "Total S/"]} empty={costear.costos.items.length === 0}>
+            <Table tarjetas head={["Cant.", "Unidad", "Material", "Precio unitario S/", "Total S/"]} empty={costear.costos.items.length === 0}>
               {costear.costos.items.map((i, idx) => (
                 <tr key={i.lineaId}>
                   <Td className="text-right">{i.cantidad}</Td>

@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getSesion } from "@/lib/auth";
 import { EV_SYNC, estadoCola, procesarCola, reintentarErrores, type ResultadoSync } from "@/lib/offline/cola";
-import { esAppNativa } from "@/lib/offline/plataforma";
+import { esAppNativa, esCapacitor } from "@/lib/offline/plataforma";
 import { enLinea } from "@/lib/offline/red";
 import { trasSincronizar } from "@/lib/storage";
 
@@ -54,6 +54,8 @@ export function useSync(): EstadoSync & { sincronizar: () => Promise<void>; rein
     try {
       const r: ResultadoSync = await procesarCola(getSesion()?.usuario);
       if (!r.sinRed) await trasSincronizar(r.claves);
+      // Android: fotos de guías tomadas sin señal
+      if (!r.sinRed && esCapacitor()) await import("@/lib/movil/fotosGuia").then((m) => m.subirFotosPendientes()).catch(() => undefined);
       setEstado((e) => ({ ...e, ultimaSync: r.sinRed ? e.ultimaSync : new Date() }));
     } catch (e) {
       console.warn("sync:", (e as Error).message);
@@ -82,7 +84,15 @@ export function useSync(): EstadoSync & { sincronizar: () => Promise<void>; rein
     window.addEventListener("erp:cola", alEncolar);
     window.addEventListener(EV_SYNC, alEncolar);
     window.addEventListener("erp:sesion", alVolver);
+    // Android: el plugin Network avisa al instante cuando vuelve la señal (más fiable que "online" en el WebView)
+    let quitarRed: (() => void) | undefined;
+    if (esCapacitor())
+      void import("@capacitor/network").then(async ({ Network }) => {
+        const h = await Network.addListener("networkStatusChange", (st) => (st.connected ? alVolver() : alCaer()));
+        quitarRed = () => void h.remove();
+      });
     return () => {
+      quitarRed?.();
       clearTimeout(primera);
       clearInterval(timer);
       window.removeEventListener("online", alVolver);

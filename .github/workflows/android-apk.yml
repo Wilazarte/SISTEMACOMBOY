@@ -1,0 +1,85 @@
+# App Android (Capacitor 6, carpeta android/ + capacitor.config.ts).
+# En cada push a main que toque la app Android (o a mano: Actions → "Run workflow"):
+#   1. arma COMBOY-ERP.apk (debug, se instala directo en el celular),
+#   2. si existen los secretos ANDROID_KEYSTORE_*, también el APK firmado de producción,
+#   3. lo publica en un Release "apk-v1.0.N" que NO queda como "latest"
+#      (el "latest" es de la app de Windows: de ahí lee su actualizador).
+# Los cambios de pantallas del ERP llegan solos al celular al publicar en Vercel.
+name: App Android (APK)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["android/**", "capacitor.config.ts", "movil/**", ".github/workflows/android-apk.yml"]
+  # En los PR solo se compila (prueba), no se publica
+  pull_request:
+    paths: ["android/**", "capacitor.config.ts", "movil/**", ".github/workflows/android-apk.yml"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    env:
+      VERSION_CODE: ${{ github.run_number }}
+      VERSION_NAME: 1.0.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      - run: npm ci
+      - run: npx cap sync android
+
+      - name: APK debug (instalable)
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/COMBOY-ERP.apk"
+
+      - name: APK firmado (si hay keystore)
+        working-directory: android
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then echo "Sin keystore: solo APK debug."; exit 0; fi
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/comboy.jks"
+          export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/comboy.jks"
+          ./gradlew assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/COMBOY-ERP-firmado.apk"
+
+      - name: Release apk-v1.0.N (sin marcar como latest)
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ARCHIVOS="COMBOY-ERP.apk"
+          [ -f COMBOY-ERP-firmado.apk ] && ARCHIVOS="$ARCHIVOS COMBOY-ERP-firmado.apk"
+          gh release create "apk-v$VERSION_NAME" $ARCHIVOS \
+            --title "COMBOY VID ERP $VERSION_NAME (Android)" \
+            --notes "Descargue COMBOY-ERP.apk en el celular y ábralo (permita instalar apps de esta fuente)." \
+            --latest=false
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: COMBOY-ERP-apk-${{ env.VERSION_NAME }}
+          path: COMBOY-ERP*.apk

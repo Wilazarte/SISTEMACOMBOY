@@ -160,7 +160,7 @@ export function ListaDocs({
       </div>
       )}
 
-      <Table head={["Fecha", et.contraparte, ...(conRef ? [et.ref] : []), ...(extra ? [extra] : []), et.total, ...(conAcciones ? ["Acciones"] : [])]} empty={visibles.length === 0}>
+      <Table tarjetas head={["Fecha", et.contraparte, ...(conRef ? [et.ref] : []), ...(extra ? [extra] : []), et.total, ...(conAcciones ? ["Acciones"] : [])]} empty={visibles.length === 0}>
         {visibles.map((f) => (
           <tr key={f.id} className={cn("hover:bg-plomo-50", f.claseFila)}>
             <Td className="whitespace-nowrap">
