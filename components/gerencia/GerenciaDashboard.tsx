@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
-import { Activity, AlertTriangle, CandlestickChart, ClipboardList, Factory, HandCoins, Layers, LineChart, Package, ShoppingCart, TrendingUp } from "lucide-react";
+import { Activity, AlertTriangle, ScatterChart, ClipboardList, Factory, HandCoins, Layers, LineChart, Package, ShoppingCart, TrendingUp } from "lucide-react";
 import { ErpAlertList, type ErpAlerta } from "@/components/erp/ErpAlertList";
 import { ErpTable, ErpTd } from "@/components/erp/ErpTable";
 import { Etiqueta, Panel } from "@/components/logistica/piezas";
 import { MarcoPlanta, PanelLateral, montoCorto } from "@/components/logistica/planta";
-import { CintaCotizaciones, Cotizacion, CurvaAcumulada, Delta, GraficoVelas, ProfundidadFlujo, variacion, type ItemCinta, type Vela } from "./bolsa";
+import { CintaCotizaciones, Cotizacion, CurvaAcumulada, Delta, GraficoDispersion, ProfundidadFlujo, variacion, type ItemCinta, type PuntoVenta } from "./bolsa";
 import { cn } from "@/components/ui";
 import { useSesion } from "@/lib/auth";
 import { useExpedientes } from "@/lib/expedientes";
@@ -66,7 +66,7 @@ function relojLima(ms: number) {
 
 /**
  * Dashboard Gerencia estilo terminal bursátil (Wall Street): cinta de cotizaciones en movimiento con los KPIs del
- * ERP, cifras verde/rojo con flecha, velas semanales de ventas y curva acumulada del mes. Mismo marco que los demás
+ * ERP, cifras verde/rojo con flecha, dispersión de ventas y curva acumulada del mes. Mismo marco que los demás
  * módulos (panel derecho con notificaciones, chat y reunión). Solo lectura: no hay botones ni enlaces a los módulos.
  */
 export function GerenciaDashboard() {
@@ -124,24 +124,18 @@ export function GerenciaDashboard() {
     const curvaActual = acumulada(mes, diasDelMes(mes));
     const curvaAnterior = acumulada(mesAnt, diasDelMes(mesAnt));
 
-    // Velas: 12 semanas (lunes a domingo); apertura = ventas del 1.er día, cierre = del último día transcurrido
-    const dow = (new Date(`${hoyStr}T12:00:00Z`).getUTCDay() + 6) % 7;
-    const lunes = masDias(hoyStr, -dow);
-    const velas: Vela[] = Array.from({ length: 12 }, (_, k) => {
-      const ini = masDias(lunes, -7 * (11 - k));
-      const dias = Array.from({ length: 7 }, (_, i) => masDias(ini, i)).filter((f) => f <= hoyStr);
-      const vals = dias.map((f) => r2(ventasDia.get(f) || 0));
-      return {
-        etiqueta: fechaCorta(ini),
-        rango: `${fechaCorta(ini)} – ${fechaCorta(dias[dias.length - 1] ?? ini)}`,
-        apertura: vals[0] ?? 0,
-        cierre: vals[vals.length - 1] ?? 0,
-        maximo: Math.max(0, ...vals),
-        minimo: Math.min(...vals, Infinity) === Infinity ? 0 : Math.min(...vals),
-        volumen: dias.reduce((a, f) => a + (comprobDia.get(f) || 0), 0),
-        total: r2(vals.reduce((a, v) => a + v, 0)),
-      };
-    });
+    // Dispersión: cada comprobante emitido de los últimos 90 días (x = fecha, y = monto)
+    const DIAS_DISP = 90;
+    const inicio = masDias(hoyStr, -(DIAS_DISP - 1));
+    const diaDe = (f: string) => Math.round((Date.parse(`${f}T12:00:00Z`) - Date.parse(`${inicio}T12:00:00Z`)) / 86_400_000);
+    const puntos: PuntoVenta[] = comprobantes
+      .filter((c) => c.estado === "EMITIDO" && c.fecha && c.fecha.slice(0, 10) >= inicio && c.fecha.slice(0, 10) <= hoyStr)
+      .map((c) => ({ dia: diaDe(c.fecha.slice(0, 10)), fecha: c.fecha.slice(0, 10), monto: r2(c.total || 0), doc: c.numero || c.serie || "Comprobante", cliente: c.cliente || "" }));
+    // Marcas del eje X: el 1.° y el 15 de cada mes dentro de la ventana
+    const marcas = Array.from({ length: DIAS_DISP }, (_, k) => masDias(inicio, k))
+      .map((f, k) => ({ f, k }))
+      .filter(({ f }) => f.endsWith("-01") || f.endsWith("-15"))
+      .map(({ f, k }) => ({ dia: k, texto: f.endsWith("-01") ? MESES[+f.slice(5, 7) - 1] : fechaCorta(f) }));
 
     const enFabricacion = ops.filter((o) => o.estado === "EN_FABRICACION").length;
     const qcMes = ops.filter((o) => o.estado === "QC_APROBADO" && (o.qc?.fecha || o.fecha).startsWith(mes)).length;
@@ -166,7 +160,9 @@ export function GerenciaDashboard() {
       emitidosMes,
       curvaActual,
       curvaAnterior,
-      velas,
+      puntos,
+      marcas,
+      diasDisp: DIAS_DISP,
       sparkVentas: ultimos(ventasDia, 30),
       sparkCompras: ultimos(comprasDia, 30),
       enFabricacion,
@@ -359,11 +355,11 @@ export function GerenciaDashboard() {
         </section>
 
         <Panel
-          titulo="Velas semanales · ventas diarias"
-          icono={<CandlestickChart size={17} />}
-          accion={<span className="mono text-[11px] text-[#9ca3af]">12 semanas · verde: cerró arriba de la apertura</span>}
+          titulo="Dispersión de ventas · comprobantes"
+          icono={<ScatterChart size={17} />}
+          accion={<span className="mono text-[11px] text-[#9ca3af]">90 días · {d.puntos.length} comprobante(s) · cada punto: fecha y monto</span>}
         >
-          <GraficoVelas velas={d.velas} />
+          <GraficoDispersion puntos={d.puntos} dias={d.diasDisp} etiquetas={d.marcas} />
         </Panel>
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">

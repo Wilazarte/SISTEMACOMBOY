@@ -1,7 +1,7 @@
 "use client";
 
 // Piezas del estilo "terminal bursátil" del Dashboard Gerencia (pedido de Williams, 2026-11-07):
-// cinta de cotizaciones en movimiento, cifras verde/rojo con flecha, velas semanales y curva acumulada.
+// cinta de cotizaciones en movimiento, cifras verde/rojo con flecha, dispersión de ventas y curva acumulada.
 // Todo se dibuja con SVG propio a partir de los datos reales del ERP; aquí no se calcula ni se inventa nada.
 
 import { useMemo, useRef, useState, type ReactNode } from "react";
@@ -142,93 +142,122 @@ export function Cotizacion({
   );
 }
 
-export interface Vela {
-  etiqueta: string;
-  /** Rango de fechas de la semana, para el tooltip. */
-  rango: string;
-  apertura: number;
-  maximo: number;
-  minimo: number;
-  cierre: number;
-  /** Volumen: comprobantes emitidos en la semana. */
-  volumen: number;
-  total: number;
+export interface PuntoVenta {
+  /** Día (0 = el más antiguo de la ventana). */
+  dia: number;
+  fecha: string;
+  monto: number;
+  doc: string;
+  cliente: string;
 }
 
-/** Gráfico de velas japonesas: cada vela es una semana de ventas diarias (apertura = 1.er día, cierre = último). */
-export function GraficoVelas({ velas }: { velas: Vela[] }) {
-  const [activa, setActiva] = useState<number | null>(null);
+/**
+ * Gráfico de dispersión: cada punto es un comprobante emitido (x = fecha, y = monto). Verde si supera el ticket
+ * promedio de la ventana, rojo si queda por debajo; la línea punteada amarilla marca ese promedio.
+ */
+export function GraficoDispersion({
+  puntos,
+  dias,
+  etiquetas,
+}: {
+  puntos: PuntoVenta[];
+  /** Días de la ventana. */ dias: number;
+  /** Marcas del eje X: día → texto. */ etiquetas: { dia: number; texto: string }[];
+}) {
+  const [activo, setActivo] = useState<number | null>(null);
+  const ref = useRef<SVGSVGElement>(null);
   const W = 720;
-  const H = 300;
+  const H = 280;
   const izq = 8;
   const der = 62;
   const arriba = 12;
-  const altoPrecio = 190;
-  const altoVol = 52;
-  const baseVol = arriba + altoPrecio + 26 + altoVol;
-  const max = Math.max(1, ...velas.map((v) => v.maximo));
-  const maxVol = Math.max(1, ...velas.map((v) => v.volumen));
-  const paso = (W - izq - der) / Math.max(1, velas.length);
-  const cuerpo = Math.min(22, paso * 0.56);
-  const y = (v: number) => arriba + altoPrecio - (v / max) * altoPrecio;
-  const lineas = [0, 0.25, 0.5, 0.75, 1].map((f) => f * max);
-  const sinDatos = velas.every((v) => v.total === 0);
-  const v = activa !== null ? velas[activa] : null;
+  const alto = H - arriba - 28;
+  const max = Math.max(1, ...puntos.map((p) => p.monto)) * 1.08;
+  const prom = puntos.length ? puntos.reduce((a, p) => a + p.monto, 0) / puntos.length : 0;
+  const x = (d: number) => izq + 6 + (d / Math.max(1, dias - 1)) * (W - izq - der - 12);
+  const y = (v: number) => arriba + alto - (v / max) * alto;
+  const mover = (e: { clientX: number; clientY: number }) => {
+    const r = ref.current?.getBoundingClientRect();
+    if (!r || !puntos.length) return;
+    const px = ((e.clientX - r.left) / r.width) * W;
+    const py = ((e.clientY - r.top) / r.height) * H;
+    let mejor = -1;
+    let dist = Infinity;
+    puntos.forEach((p, i) => {
+      const dd = (x(p.dia) - px) ** 2 + (y(p.monto) - py) ** 2;
+      if (dd < dist) [dist, mejor] = [dd, i];
+    });
+    setActivo(dist < 40 ** 2 ? mejor : null);
+  };
+  const p = activo !== null ? puntos[activo] : null;
+  const arribaProm = puntos.filter((q) => q.monto >= prom).length;
 
   return (
     <div className="relative">
+      <div className="mono mb-2 flex flex-wrap gap-4 text-[12px] text-[#d4d4d8]">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: SUBE }} /> Sobre el promedio ({arribaProm})
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: BAJA }} /> Bajo el promedio ({puntos.length - arribaProm})
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block h-0 w-5 border-t-2 border-dashed border-[#facc15]" /> Ticket promedio {montoCorto(prom)}
+        </span>
+      </div>
       <div className="-mx-1 overflow-x-auto px-1">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full min-w-[600px]" role="img" aria-label="Velas semanales de ventas diarias y volumen de comprobantes">
-          {lineas.map((p) => (
-            <g key={p}>
-              <line x1={izq} x2={W - der} y1={y(p)} y2={y(p)} stroke={REJILLA} />
-              <text x={W - der + 6} y={y(p) + 4} className="mono" fontSize={11} fill="#9ca3af">
-                {montoCorto(p)}
+        <svg
+          ref={ref}
+          viewBox={`0 0 ${W} ${H}`}
+          className="w-full min-w-[600px]"
+          role="img"
+          aria-label="Dispersión de comprobantes emitidos por fecha y monto"
+          onMouseMove={mover}
+          onMouseLeave={() => setActivo(null)}
+          onTouchStart={(e) => mover(e.touches[0])}
+        >
+          {[0, 0.25, 0.5, 0.75, 1].map((f) => (
+            <g key={f}>
+              <line x1={izq} x2={W - der} y1={y(f * max)} y2={y(f * max)} stroke={REJILLA} />
+              <text x={W - der + 6} y={y(f * max) + 4} className="mono" fontSize={11} fill="#9ca3af">
+                {montoCorto(f * max)}
               </text>
             </g>
           ))}
-          <line x1={izq} x2={W - der} y1={baseVol} y2={baseVol} stroke={REJILLA} />
-          <text x={W - der + 6} y={baseVol - altoVol + 10} className="mono" fontSize={10} fill="#9ca3af">
-            VOL
-          </text>
-          {velas.map((vel, i) => {
-            const cx = izq + paso * i + paso / 2;
-            const sube = vel.cierre >= vel.apertura;
-            const color = vel.total === 0 ? GRIS : sube ? SUBE : BAJA;
-            const yA = y(Math.max(vel.apertura, vel.cierre));
-            const yB = y(Math.min(vel.apertura, vel.cierre));
-            const hVol = (vel.volumen / maxVol) * altoVol;
-            return (
-              <g key={vel.etiqueta + i} opacity={activa === null || activa === i ? 1 : 0.45}>
-                <line x1={cx} x2={cx} y1={y(vel.maximo)} y2={y(vel.minimo)} stroke={color} strokeWidth={2} />
-                <rect x={cx - cuerpo / 2} y={yA} width={cuerpo} height={Math.max(2, yB - yA)} rx={2} fill={sube ? color : "#0a0b0e"} stroke={color} strokeWidth={2} />
-                {vel.volumen > 0 && <rect x={cx - cuerpo / 2} y={baseVol - hVol} width={cuerpo} height={hVol} rx={2} fill={color} opacity={0.4} />}
-                <text x={cx} y={H - 4} textAnchor="middle" className="mono" fontSize={10} fill="#9ca3af">
-                  {vel.etiqueta}
-                </text>
-                {/* Zona de hover más grande que la vela */}
-                <rect x={izq + paso * i} y={0} width={paso} height={H} fill="transparent" onMouseEnter={() => setActiva(i)} onMouseLeave={() => setActiva(null)} onClick={() => setActiva(i)} />
-              </g>
-            );
-          })}
-          {sinDatos && (
-            <text x={(W - der) / 2} y={arriba + altoPrecio / 2} textAnchor="middle" className="mono" fontSize={14} fill="#9ca3af">
-              Sin comprobantes emitidos en las últimas semanas
+          {etiquetas.map((e) => (
+            <g key={e.dia}>
+              <line x1={x(e.dia)} x2={x(e.dia)} y1={arriba} y2={arriba + alto} stroke={REJILLA} />
+              <text x={x(e.dia)} y={H - 8} textAnchor="middle" className="mono" fontSize={10} fill="#9ca3af">
+                {e.texto}
+              </text>
+            </g>
+          ))}
+          {puntos.length > 0 && <line x1={izq} x2={W - der} y1={y(prom)} y2={y(prom)} stroke="#facc15" strokeWidth={1.5} strokeDasharray="5 4" opacity={0.8} />}
+          {puntos.map((q, i) => (
+            <circle
+              key={`${q.doc}-${i}`}
+              cx={x(q.dia)}
+              cy={y(q.monto)}
+              r={activo === i ? 7 : 5}
+              fill={q.monto >= prom ? SUBE : BAJA}
+              fillOpacity={activo === null || activo === i ? 0.85 : 0.35}
+              stroke="#0a0b0e"
+              strokeWidth={2}
+            />
+          ))}
+          {puntos.length === 0 && (
+            <text x={(W - der) / 2} y={arriba + alto / 2} textAnchor="middle" className="mono" fontSize={14} fill="#9ca3af">
+              Sin comprobantes emitidos en este periodo
             </text>
           )}
         </svg>
       </div>
-      {v && (
-        <div className="mono pointer-events-none absolute right-2 top-2 rounded-md border border-white/15 bg-black/90 px-3 py-2 text-[12px] leading-5 text-[#e5e7eb] shadow-lg">
-          <p className="font-bold text-[#facc15]">{v.rango}</p>
+      {p && (
+        <div className="mono pointer-events-none absolute right-2 top-8 rounded-md border border-white/15 bg-black/90 px-3 py-2 text-[12px] leading-5 text-[#e5e7eb] shadow-lg">
+          <p className="font-bold text-[#facc15]">{p.doc}</p>
+          <p>{p.cliente}</p>
           <p>
-            Apertura {montoCorto(v.apertura)} · Cierre {montoCorto(v.cierre)}
-          </p>
-          <p>
-            Máx {montoCorto(v.maximo)} · Mín {montoCorto(v.minimo)}
-          </p>
-          <p>
-            Semana {montoCorto(v.total)} · {v.volumen} comprob.
+            {p.fecha.slice(8, 10)}/{p.fecha.slice(5, 7)}/{p.fecha.slice(0, 4)} · <span style={{ color: p.monto >= prom ? SUBE : BAJA }}>{montoCorto(p.monto)}</span>
           </p>
         </div>
       )}
