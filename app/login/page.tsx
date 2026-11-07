@@ -145,14 +145,14 @@ function Login() {
   return (
     <Fondo>
       {/* Logo (tal cual, sin fondo) */}
-      <header className="mt-8 flex justify-center px-4">
+      <header className="mt-6 flex md:mt-8 justify-center px-4">
         <Logo />
       </header>
 
       {/* Título + formulario del módulo elegido */}
       <section className="flex flex-col items-center px-4 text-center">
-        <h1 className="mt-10 font-serif text-[28px] font-bold uppercase leading-tight text-white md:text-[40px]">BIENVENIDO AL SISTEMA ERP COMBOY VID</h1>
-        <p className="mt-4 text-[20px] text-[#6B8AFF]">{encargado ? `${encargado.nombre} · ${encargado.cargo}` : "Selecciona tu módulo"}</p>
+        <h1 className="mt-6 font-serif text-[24px] md:mt-10 md:text-[40px] sm:text-[28px] font-bold uppercase leading-tight text-white">BIENVENIDO AL SISTEMA ERP COMBOY VID</h1>
+        <p className="texto-azul mt-3 text-[18px] md:mt-4 md:text-[20px]">{encargado ? `${encargado.nombre} · ${encargado.cargo}` : "Selecciona tu módulo"}</p>
         {proximamente && (
           <p className="mt-6 animate-aparecer rounded-full border border-white/20 bg-black/40 px-5 py-2 text-sm text-white/80 backdrop-blur-xl">
             {tarjetaDe(pedido as ModuloLogin).titulo.split(" (")[0]} estará disponible próximamente.
@@ -164,7 +164,7 @@ function Login() {
             key={modulo}
             onSubmit={entrar}
             noValidate
-            className="mt-8 w-full max-w-sm animate-aparecer space-y-4 rounded-3xl border border-white/20 bg-black/40 p-6 text-left shadow-[0_0_40px_rgba(196,30,30,0.35)] backdrop-blur-xl"
+            className="mt-8 w-full max-w-sm animate-aparecer space-y-4 glass-blur rounded-3xl border border-white/10 p-6 text-left shadow-[0_8px_30px_rgba(0,0,0,0.45),0_0_30px_rgba(0,102,255,0.2)]"
           >
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-white">Iniciar sesión</h2>
@@ -235,9 +235,9 @@ function Login() {
         )}
       </section>
 
-      {/* Dock de módulos (scroll horizontal en mobile) */}
-      <nav className="mt-10 w-full px-4 pb-10">
-        <div className="mx-auto flex w-full max-w-[1100px] justify-between gap-3 overflow-x-auto rounded-3xl border border-white/15 bg-black/55 px-6 py-4 backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* Perfiles: en celular lista vertical (1 col; 2 en tablet), en escritorio una fila. Tema GLASS (PR #66). */}
+      <nav className="mt-8 w-full px-4 pb-10 md:mt-10">
+        <div className="glass-blur mx-auto grid w-full max-w-[1100px] grid-cols-1 gap-2.5 rounded-3xl border border-white/10 p-3 shadow-[0_8px_30px_rgba(0,0,0,0.45)] sm:grid-cols-2 sm:gap-3 sm:p-4 lg:flex lg:justify-between lg:px-6">
           {DOCK.map(({ id, slug, titulo, iniciales, persona, badge }) => {
             const sel = activo === id;
             return (
@@ -247,14 +247,22 @@ function Login() {
                 data-modulo={id}
                 aria-pressed={sel}
                 onClick={() => elegir(id, slug)}
-                className={`flex min-h-[118px] min-w-[128px] flex-1 flex-col items-center justify-center gap-1 rounded-2xl border bg-[#141414]/90 px-2 py-3 text-center text-white transition-all duration-200 hover:scale-105 hover:border-[#D50000] hover:shadow-[0_0_20px_rgba(213,0,0,0.75)] ${
-                  sel ? "scale-105 border-[#D50000] shadow-[0_0_22px_rgba(213,0,0,0.9)]" : "border-white/15"
+                className={`btn-glass flex min-h-[64px] w-full items-center gap-3 !rounded-2xl px-4 py-3 text-left lg:min-h-[118px] lg:min-w-[128px] lg:flex-1 lg:flex-col lg:justify-center lg:gap-1 lg:px-2 lg:text-center ${
+                  sel ? "!border-[#00f2fe] shadow-[0_0_18px_rgba(0,242,254,0.35)]" : ""
                 }`}
               >
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-[15px] font-bold">{iniciales}</span>
-                <span className="text-[14px] font-bold leading-tight">{persona}</span>
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-white/60">{titulo}</span>
-                {badge && <span className={`mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold ${badge.clase}`}>{badge.texto}</span>}
+                <span
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[15px] font-bold text-white lg:h-10 lg:w-10 ${
+                    sel ? "grad-azul" : "border border-white/15 bg-gradient-to-br from-[#0066ff]/35 to-[#ff2a5f]/25"
+                  }`}
+                >
+                  {iniciales}
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col lg:items-center">
+                  <span className="truncate text-[15px] font-bold leading-tight lg:text-[14px]">{persona}</span>
+                  <span className="texto-azul text-[11px] font-semibold uppercase tracking-wide">{titulo}</span>
+                </span>
+                {badge && <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold lg:mt-0.5 ${badge.clase}`}>{badge.texto}</span>}
               </button>
             );
           })}
@@ -264,9 +272,9 @@ function Login() {
               type="button"
               data-modulo="sucursal-secocha"
               onClick={() => router.push(SUCURSAL_SECOCHA.href)}
-              className="flex h-20 min-w-[132px] flex-1 flex-col items-center justify-center gap-1.5 rounded-full border border-blue-500 bg-blue-500/15 text-center text-[14px] font-bold leading-tight text-blue-100 shadow-[0_0_15px] shadow-blue-500/50 transition-all duration-200 hover:bg-blue-500/25 hover:shadow-blue-500/80"
+              className="grad-azul hover-cian flex min-h-[56px] w-full items-center justify-center gap-2 rounded-2xl text-center text-[15px] font-bold leading-tight sm:col-span-2 lg:h-20 lg:min-h-0 lg:w-auto lg:min-w-[132px] lg:flex-1 lg:flex-col lg:gap-1.5 lg:rounded-full lg:text-[14px]"
             >
-              <Store size={24} strokeWidth={2} />
+              <Store size={22} strokeWidth={2} />
               {SUCURSAL_SECOCHA.titulo}
             </button>
           )}
@@ -278,7 +286,7 @@ function Login() {
 
 /** Logo COMBOY VID transparente (/logo.png), al 150 %. */
 function Logo() {
-  return <Image src="/logo.png" alt="COMBOY VID" width={750} height={240} priority className="h-[240px] w-[750px] max-w-full object-contain drop-shadow-[0_0_18px_rgba(0,0,0,0.6)]" />;
+  return <Image src="/logo.png" alt="COMBOY VID" width={750} height={240} priority className="h-[150px] w-[750px] max-w-full sm:h-[240px] object-contain drop-shadow-[0_0_18px_rgba(0,0,0,0.6)]" />;
 }
 
 /** Fondo: imagen de referencia /login-bg.jpg a pantalla completa con overlay negro 40%. */
@@ -288,6 +296,8 @@ function Fondo({ children }: { children?: React.ReactNode }) {
       <div aria-hidden className="pointer-events-none fixed inset-0 z-[-1]">
         <Image src="/login-bg.jpg" alt="" fill priority quality={90} sizes="100vw" className="object-cover object-center" />
         <div className="absolute inset-0 bg-black/40" />
+        {/* Malla abstracta del tema GLASS (luces azul y fuego + retícula), translúcida sobre el mapa */}
+        <div className="fondo-malla absolute inset-0 opacity-60 mix-blend-screen" />
       </div>
       <main className="relative z-10 flex min-h-screen flex-col">{children}</main>
     </div>
