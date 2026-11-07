@@ -74,7 +74,7 @@ export function CrearOP() {
         e.preventDefault();
         void crear();
       }}
-      className="mx-auto max-w-5xl space-y-5 text-[#e5e7eb]"
+      className="w-full space-y-5 text-[#e5e7eb]"
     >
       <header className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">

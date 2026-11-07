@@ -13,7 +13,7 @@ const horaActual = () => new Date().toLocaleTimeString("es-PE", { hour: "2-digit
 
 /**
  * Layout global de todos los módulos (diseño de Logística Planta): fondo #0e1219 con el mapa mundial tenue,
- * ErpHeader fijo, contenido de 1600 px y pie con versión y última sincronización.
+ * ErpHeader fijo, contenido a todo el ancho de la pantalla y pie con versión y última sincronización.
  * Tema: clases .dark .tema-planta (app/globals.css) — los colores de las páginas salen de ahí.
  */
 export function ErpLayout({
@@ -72,9 +72,10 @@ export function ErpLayout({
       />
 
       <main className={`w-full flex-1 transition-[padding] duration-300 ${mainClassName}`}>
-        <div className="mx-auto w-full max-w-[1600px] px-4 pt-20 sm:px-6 lg:px-8">{children}</div>
+        {/* Ancho completo (2026-11-07, pedido de Williams): sin tope de 1600 px, el contenido llena la pantalla de cualquier PC */}
+        <div className="w-full px-3 pt-20 sm:px-4 lg:px-5 2xl:px-6">{children}</div>
       </main>
-      <footer className="mt-8 flex flex-wrap items-center justify-between gap-2 glass-blur border-t border-white/[0.08] px-4 py-4 text-xs text-[#a1a1aa] sm:px-6 lg:px-8">
+      <footer className="mt-8 flex flex-wrap items-center justify-between gap-2 glass-blur border-t border-white/[0.08] px-4 py-4 text-xs text-[#a1a1aa] sm:px-4 lg:px-5 2xl:px-6">
         <span>
           <span className="font-semibold text-white">{NOMBRE_EMPRESA}</span> © 2025 · ERP COMBOY VID · Sede {sede} · Área Informática
         </span>
