@@ -431,3 +431,29 @@ body[data-modo-pestana] [data-guardar-pestana] {
   /* Botones de acciones: a todo el ancho de la tarjeta */
   .tabla-tarjetas td:last-child:has(button) { justify-content: flex-end; flex-wrap: wrap; }
 }
+
+/* ===================== Gerencia: terminal bursátil (Williams, 2026-11-07) =====================
+   Solo dentro de .tema-bolsa (Dashboard Gerencia): cifras y símbolos en monoespaciada como una terminal de bolsa
+   (excepción acotada a la regla Times New Roman), cinta de cotizaciones en movimiento y punto "en vivo". */
+.tema-bolsa .mono,
+.tema-bolsa .mono *,
+.tema-bolsa svg text {
+  font-family: ui-monospace, "Cascadia Mono", "Consolas", "SFMono-Regular", "Menlo", "Courier New", monospace !important;
+  font-variant-numeric: tabular-nums;
+}
+.tema-bolsa .cinta-pista { animation: cinta-bolsa 45s linear infinite; }
+.tema-bolsa .cinta-bolsa:hover .cinta-pista { animation-play-state: paused; }
+.tema-bolsa .cinta-bolsa::before,
+.tema-bolsa .cinta-bolsa::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 28px; z-index: 1; pointer-events: none;
+}
+.tema-bolsa .cinta-bolsa::before { left: 0; background: linear-gradient(90deg, #000, transparent); }
+.tema-bolsa .cinta-bolsa::after { right: 0; background: linear-gradient(270deg, #000, transparent); }
+@keyframes cinta-bolsa { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.tema-bolsa .punto-vivo { animation: punto-vivo 1.6s ease-in-out infinite; }
+@keyframes punto-vivo { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) {
+  .tema-bolsa .cinta-pista { animation: none; }
+  .tema-bolsa .cinta-bolsa { overflow-x: auto; }
+  .tema-bolsa .punto-vivo { animation: none; }
+}
