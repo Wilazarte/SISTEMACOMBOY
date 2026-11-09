@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { EstadoRuc } from "@/components/EstadoRuc";
+import { rucSunat } from "@/lib/ruc";
 import { FileUp, Paperclip, Plus, Receipt, Trash2, X } from "lucide-react";
 import { FormBancarizacion, bancarizacionVacia } from "@/components/compras/FormBancarizacion";
 import { UNIDADES } from "@/lib/empresa";
@@ -37,6 +38,9 @@ import {
   PORC_RETENCION_RHE,
   TOPE_DJ_MOVILIDAD_DIA,
   TOPE_RETENCION_RHE,
+  PROVEEDOR_VARIOS,
+  admiteProveedorVarios,
+  esProveedorVarios,
   numeroAutomatico,
   placeholderComprobante,
   retencionRHE,
@@ -57,7 +61,8 @@ const vacio = (): Omit<DatosGasto, "fecha"> => ({
   importe: 0,
   comprobante: "FACTURA",
   numero: "",
-  proveedor: "",
+  // Por defecto PROVEEDORES VARIOS (editable); al validar un RUC se reemplaza por la razón social de SUNAT
+  proveedor: PROVEEDOR_VARIOS,
   ruc: "",
   detraccion: false,
   detraccionPorc: DETRACCION_SUGERIDA.TRANSPORTE,
@@ -276,7 +281,17 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
         <Field label="Tipo de comprobante *">
           <Select
             value={d.comprobante}
-            onChange={(e) => set("comprobante", e.target.value as ComprobanteGasto)}
+            onChange={(e) => {
+              const comprobante = e.target.value as ComprobanteGasto;
+              setD((x) => ({
+                ...x,
+                comprobante,
+                // DJ / RHE llevan el nombre de una persona: el genérico se quita; al volver, se repone si quedó vacío
+                proveedor: !admiteProveedorVarios(comprobante)
+                  ? esProveedorVarios(x.proveedor) ? "" : x.proveedor
+                  : x.proveedor.trim() ? x.proveedor : PROVEEDOR_VARIOS,
+              }));
+            }}
             options={OPCIONES_COMPROBANTE}
           />
           {esRHE && <span className="mt-1 block text-xs text-plomo-500">Persona natural con RUC 10 - 4ta categoría</span>}
@@ -303,7 +318,12 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
           <Input value={d.proveedor} list="proveedores-gasto" onChange={(e) => {
             const p = proveedores.find((x) => x.razonSocial === e.target.value.toUpperCase());
             setD((x) => ({ ...x, proveedor: e.target.value, ruc: p?.ruc ?? x.ruc }));
-          }} placeholder="Razón social o nombre" />
+          }} onFocus={(e) => esProveedorVarios(d.proveedor) && e.target.select()} placeholder="Razón social o nombre" />
+          {esProveedorVarios(d.proveedor) && (
+            <span className="mt-1 block text-xs text-plomo-500">
+              Por defecto. Escriba encima para cambiarlo{d.comprobante === "FACTURA" ? "; con factura, al validar el RUC se pone la razón social" : ""}.
+            </span>
+          )}
           <datalist id="proveedores-gasto">
             {proveedores.map((p) => (
               <option key={p.id} value={p.razonSocial}>
@@ -320,10 +340,15 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
             value={d.ruc}
             maxLength={d.comprobante === "DJ" ? 8 : 11}
             inputMode="numeric"
-            onChange={(e) => set("ruc", e.target.value.replace(/\D/g, ""))}
+            onChange={(e) => {
+              const ruc = e.target.value.replace(/\D/g, "");
+              // RUC ya validado en el sistema: reemplaza PROVEEDORES VARIOS por su razón social
+              const sunat = ruc.length === 11 ? rucSunat(ruc) : undefined;
+              setD((x) => ({ ...x, ruc, proveedor: sunat && esProveedorVarios(x.proveedor) ? sunat.razon_social : x.proveedor }));
+            }}
             className={cn(d.ruc.length === 11 && (rucMal ? "border-red-400" : "border-emerald-400"))}
           />
-          <EstadoRuc ruc={d.ruc} onValidado={(r) => setD((x) => (x.proveedor.trim() ? x : { ...x, proveedor: r.razon_social }))} />
+          <EstadoRuc ruc={d.ruc} onValidado={(r) => setD((x) => (x.proveedor.trim() && !esProveedorVarios(x.proveedor) ? x : { ...x, proveedor: r.razon_social }))} />
         </Field>
 
         {/* Retención de 4ta categoría (RHE por más de S/ 1,500) */}

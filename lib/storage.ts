@@ -63,6 +63,7 @@ import {
   numeroAutomatico,
   numeroSinComprobante,
   retencionRHE,
+  esProveedorVarios,
 } from "./comprobantes";
 
 export const KEYS = {
@@ -2618,13 +2619,18 @@ function prepararGasto(d: DatosGasto, rol: Rol): Factura {
   const ruc = d.ruc.trim();
   if (ruc && !/^\d{8}$/.test(ruc) && !/^\d{11}$/.test(ruc)) throw new ErpError("RUC (11 dígitos) o DNI (8 dígitos) inválido.");
   if (d.comprobante === "FACTURA" && ruc.length !== 11) throw new ErpError("La factura requiere el RUC del proveedor.");
+  if (esProveedorVarios(proveedor) && (d.comprobante === "FACTURA" || ruc.length === 11))
+    throw new ErpError("Con RUC el gasto va a nombre de la razón social de SUNAT, no de PROVEEDORES VARIOS. Valide el RUC y se completa solo.");
+  if (esProveedorVarios(proveedor) && (d.comprobante === "DJ" || d.comprobante === "RXH"))
+    throw new ErpError(d.comprobante === "DJ" ? "Indique el nombre de quien declara." : "Indique la persona que emite el recibo por honorarios.");
   if (d.comprobante === "RXH" && !ruc) throw new ErpError("El recibo por honorarios requiere el RUC (10…) o DNI de la persona.");
   if (d.comprobante === "DJ" && !/^\d{8}$/.test(ruc)) throw new ErpError("La declaración jurada solo lleva el DNI (8 dígitos) de quien declara.");
   if (d.comprobante === "DJ" && total > TOPE_DJ_MOVILIDAD_DIA)
     throw new ErpError(`La declaración jurada de movilidad tiene un tope de ${soles(TOPE_DJ_MOVILIDAD_DIA)} por día (SUNAT). Registre un día por declaración.`);
   if (ruc.length === 11 && !rucValido(ruc)) throw new ErpError("RUC inválido (dígito verificador).");
   exigirRucSunat(ruc, "del proveedor");
-  if (getFacturas().some((f) => f.numero === numero && (ruc ? f.ruc === ruc : f.proveedor === proveedor)) || (ruc && getCompras().some((c) => c.numero === numero && c.ruc === ruc)))
+  // Sin RUC el duplicado se busca por nombre; con PROVEEDORES VARIOS el nombre no distingue a nadie, así que no se compara.
+  if (getFacturas().some((f) => f.numero === numero && (ruc ? f.ruc === ruc : !esProveedorVarios(proveedor) && f.proveedor === proveedor)) || (ruc && getCompras().some((c) => c.numero === numero && c.ruc === ruc)))
     throw new ErpError(`El comprobante ${numero} de ${proveedor} ya fue registrado.`);
   if (d.detraccion && !(d.detraccionPorc > 0 && d.detraccionPorc <= 100)) throw new ErpError("Indique el % de detracción.");
   if (d.archivos.some((a) => a.dataUrl.length > MAX_ARCHIVO * 1.4)) throw new ErpError("Cada archivo debe pesar como máximo 1.5 MB.");
