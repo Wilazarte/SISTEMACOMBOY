@@ -1,0 +1,261 @@
+<TaskerData sr="" dvi="1" tv="6.3.13">
+<Profile sr="prof202" ve="2">
+<cdate>1762646400000</cdate>
+<edate>1762646400000</edate>
+<flags>8</flags>
+<id>202</id>
+<mid0>104</mid0>
+<nme>JARVIS Vigia Patrones</nme>
+<Time sr="con0">
+<fh>0</fh>
+<fm>0</fm>
+<rep>2</rep>
+<repval>2</repval>
+<th>23</th>
+<tm>59</tm>
+</Time>
+</Profile>
+<Task sr="task104">
+<cdate>1762646400000</cdate>
+<edate>1762646400000</edate>
+<id>104</id>
+<nme>JARVIS Vigia</nme>
+<pri>40</pri>
+<Action sr="act0" ve="7">
+<code>129</code>
+<Str sr="arg0" ve="3">/* ==========================================================================
+   JARVIS · librería común (se incrusta al inicio de cada JavaScriptlet)
+   Funciones de Tasker usadas: global, setGlobal, readFile, writeFile, shell,
+   say, musicPlay, loadApp, setAlarm, wifi, mobileData, mediaVol, call,
+   browseURL, performTask, flash, createDir, goHome.
+   ========================================================================== */
+var JV = {};
+JV.DIR   = '/storage/emulated/0/COMBOY/';
+JV.LOG   = JV.DIR + 'jarvis_log.csv';
+JV.MEM   = JV.DIR + 'jarvis_memoria.md';
+JV.HIST  = JV.DIR + 'jarvis_historial.json';
+JV.CONT  = JV.DIR + 'jarvis_contactos.csv';
+JV.AUDIO = JV.DIR + 'jarvis_voz.mp3';
+JV.MODELO = 'claude-sonnet-5-5';
+JV.VOZ_ADAM = 'pNInz6obpgDQGcFmaJgB';
+
+/* Lee una variable global de Tasker con valor por defecto. */
+JV.g = function (n, def) {
+  try {
+    var v = global(n);
+    if (v === undefined || v === null || v === '' || v === '%' + n) return def;
+    return v;
+  } catch (e) { return def; }
+};
+JV.set = function (n, v) { try { setGlobal(n, String(v)); } catch (e) {} };
+JV.dueno = function () { return JV.g('JV_DUENO', 'Williams'); };
+
+JV.pad = function (n) { return (n &lt; 10 ? '0' : '') + n; };
+JV.hoy = function () {
+  var d = new Date();
+  return d.getFullYear() + '-' + JV.pad(d.getMonth() + 1) + '-' + JV.pad(d.getDate());
+};
+JV.iso = function () {
+  var d = new Date();
+  return JV.hoy() + ' ' + JV.pad(d.getHours()) + ':' + JV.pad(d.getMinutes()) + ':' + JV.pad(d.getSeconds());
+};
+
+JV.leer = function (p) { try { var t = readFile(p); return t ? String(t) : ''; } catch (e) { return ''; } };
+JV.escribir = function (p, t, agregar) { try { writeFile(p, t, !!agregar); return true; } catch (e) { return false; } };
+
+/* ---------- Registro CSV: fecha,tipo,valor,detalle ---------- */
+JV.csv = function (s) {
+  s = String(s === undefined || s === null ? '' : s).replace(/"/g, '""').replace(/[\r\n]+/g, ' ');
+  return '"' + s + '"';
+};
+JV.log = function (tipo, valor, detalle) {
+  if (!JV.leer(JV.LOG)) JV.escribir(JV.LOG, 'fecha,tipo,valor,detalle\n', false);
+  JV.escribir(JV.LOG, [JV.iso(), tipo, valor, detalle].map(JV.csv).join(',') + '\n', true);
+  if (tipo === 'venta') JV.set('JV_ULTIMA_VENTA', Date.now());
+};
+JV.filas = function () {
+  var t = JV.leer(JV.LOG), out = [];
+  if (!t) return out;
+  var ls = t.split('\n');
+  for (var i = 1; i &lt; ls.length; i++) {
+    var m = ls[i].match(/^"([^"]*)","([^"]*)","((?:[^"]|"")*)","((?:[^"]|"")*)"$/);
+    if (m) out.push({ fecha: m[1], tipo: m[2], valor: m[3].replace(/""/g, '"'), detalle: m[4].replace(/""/g, '"') });
+  }
+  return out;
+};
+/* Resumen del día que JARVIS recibe como contexto. */
+JV.resumenHoy = function () {
+  var f = JV.filas(), hoy = JV.hoy(), r = { ventas: 0, monto: 0, enfoque: 0, distraccion: 0, animo: [] };
+  for (var i = 0; i &lt; f.length; i++) {
+    if (f[i].fecha.indexOf(hoy) !== 0) continue;
+    var v = parseFloat(f[i].valor) || 0;
+    if (f[i].tipo === 'venta') { r.ventas++; r.monto += v; }
+    else if (f[i].tipo === 'enfoque') r.enfoque += v;
+    else if (f[i].tipo === 'distraccion') r.distraccion += v;
+    else if (f[i].tipo === 'animo') r.animo.push(v);
+  }
+  r.monto = Math.round(r.monto * 100) / 100;
+  r.distraccion = Math.round(r.distraccion);
+  return r;
+};
+JV.ultimas = function (n) {
+  var f = JV.filas(), s = f.slice(Math.max(0, f.length - n)), out = [];
+  for (var i = 0; i &lt; s.length; i++) out.push(s[i].fecha + ' | ' + s[i].tipo + ' | ' + s[i].valor + ' | ' + s[i].detalle);
+  return out.join('\n');
+};
+
+/* ---------- Voz: ElevenLabs (Adam) con respaldo en TTS de Android ---------- */
+JV.hablar = function (texto) {
+  if (!texto) return;
+  var key = JV.g('CLAVE_ELEVEN', ''), ok = false;
+  if (key) {
+    try {
+      var x = new XMLHttpRequest();
+      x.open('POST', 'https://api.elevenlabs.io/v1/text-to-speech/' + JV.g('JV_VOZ_ID', JV.VOZ_ADAM) + '?output_format=mp3_44100_64', false);
+      x.setRequestHeader('xi-api-key', key);
+      x.setRequestHeader('Content-Type', 'application/json');
+      x.setRequestHeader('Accept', 'audio/mpeg');
+      x.overrideMimeType('text/plain; charset=x-user-defined');
+      x.send(JSON.stringify({
+        text: texto,
+        model_id: JV.g('JV_VOZ_MODELO', 'eleven_multilingual_v2'),
+        voice_settings: { stability: 0.45, similarity_boost: 0.8 }
+      }));
+      if (x.status === 200 &amp;&amp; x.responseText.length &gt; 1000) {
+        var raw = x.responseText, partes = [], trozo = 8192;
+        for (var i = 0; i &lt; raw.length; i += trozo) {
+          var cods = [];
+          var fin = Math.min(i + trozo, raw.length);
+          for (var j = i; j &lt; fin; j++) cods.push(raw.charCodeAt(j) &amp; 0xff);
+          partes.push(String.fromCharCode.apply(null, cods));
+        }
+        JV.escribir(JV.AUDIO + '.b64', btoa(partes.join('')), false);
+        shell('base64 -d "' + JV.AUDIO + '.b64" &gt; "' + JV.AUDIO + '"', false, 20);
+        musicPlay(JV.AUDIO, 0, false, 'media');
+        ok = true;
+      }
+    } catch (e) { ok = false; }
+  }
+  if (!ok) { try { say(texto, '', '', 'media', 5, 5); } catch (e2) { flash(texto); } }
+};
+
+/* ---------- Seguridad: solo el dueño ---------- */
+/* No existe verificación biométrica de voz en AutoVoice. JARVIS se protege con:
+   1) Solo se activa desde perfiles de Tasker en ESTE teléfono (sin puertos abiertos).
+   2) Acciones sensibles exigen el teléfono desbloqueado Y la palabra clave %JV_PIN dicha en la orden.
+   3) El texto de notificaciones de terceros NUNCA se trata como orden. */
+JV.SENSIBLES = { whatsapp: 1, llamar: 1, datos: 1 };
+JV.bloqueado = function () { return JV.g('KEYG', 'off') === 'on'; };
+JV.validarPin = function (texto) {
+  var pin = JV.g('JV_PIN', '');
+  if (!pin) return { ok: false, texto: texto };
+  var re = new RegExp('\\b' + pin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&amp;') + '\\b', 'i');
+  return { ok: re.test(texto), texto: texto.replace(re, ' ').replace(/\s+/g, ' ').trim() };
+};
+
+/* ---------- Contactos (jarvis_contactos.csv: nombre,numero con código país) ---------- */
+JV.contacto = function (nombre) {
+  if (/^\+?\d{8,15}$/.test(String(nombre).replace(/\s/g, ''))) return String(nombre).replace(/[\s+]/g, '');
+  var t = JV.leer(JV.CONT).split('\n'), n = String(nombre).toLowerCase().trim();
+  for (var i = 0; i &lt; t.length; i++) {
+    var p = t[i].split(',');
+    if (p.length &gt;= 2 &amp;&amp; p[0].toLowerCase().trim() === n) return p[1].replace(/[\s+]/g, '');
+  }
+  return '';
+};
+
+/* ---------- Ejecución de acciones devueltas por el cerebro ---------- */
+JV.ejecutar = function (a, pinOk) {
+  var tipo = a.tipo, v = String(a.valor || ''), d = String(a.detalle || '');
+  var on = /^(on|si|sí|true|1|activar|encender)$/i.test(v);
+  if (JV.SENSIBLES[tipo] &amp;&amp; (!pinOk || JV.bloqueado())) return 'bloqueada (falta palabra clave o teléfono bloqueado)';
+  try {
+    switch (tipo) {
+      case 'abrir_app': loadApp(v, '', false); return 'ok';
+      case 'alarma': {
+        var hm = v.split(':');
+        setAlarm(parseInt(hm[0], 10), parseInt(hm[1] || '0', 10), d || 'JARVIS', false); return 'ok';
+      }
+      case 'recordatorio': {
+        var t = new Date(Date.now() + (parseInt(v, 10) || 10) * 60000);
+        setAlarm(t.getHours(), t.getMinutes(), d || 'Recordatorio JARVIS', false); return 'ok';
+      }
+      case 'wifi': wifi(on); return 'ok';
+      case 'datos': mobileData(on); return 'ok';
+      case 'volumen': mediaVol(Math.max(0, Math.min(15, parseInt(v, 10) || 0)), false, false); return 'ok';
+      case 'no_molestar': performTask('JARVIS No Molestar', 60, on ? 'on' : 'off', ''); return 'ok';
+      case 'registrar_venta': JV.log('venta', parseFloat(v) || 0, d); return 'ok';
+      case 'registrar_animo': JV.log('animo', parseInt(v, 10) || 0, d); return 'ok';
+      case 'registrar_enfoque': JV.log('enfoque', parseInt(v, 10) || 0, d); return 'ok';
+      case 'recordar': JV.escribir(JV.MEM, '\n- (' + JV.hoy() + ') ' + v + (d ? ' — ' + d : ''), true); return 'ok';
+      case 'llamar': {
+        var num = JV.contacto(v); if (!num) return 'contacto no encontrado';
+        call('+' + num, true); return 'ok';
+      }
+      case 'whatsapp': {
+        var tel = JV.contacto(v); if (!tel) return 'contacto no encontrado';
+        performTask('JARVIS Enviar WhatsApp', 60, tel, d); return 'ok';
+      }
+      case 'ninguna': return 'ok';
+    }
+  } catch (e) { return 'error: ' + e; }
+  return 'tipo desconocido';
+};
+
+
+/* ==========================================================================
+   Tarea: JARVIS Vigia (detector de patrones, corre cada 2 minutos)
+   1) &gt;= %JV_LIMITE_DIST (15) min seguidos en TikTok/Instagram -&gt; audio y te saca.
+   2) &gt;= %JV_HORAS_SIN_VENTA (4) h sin registrar venta en horario laboral -&gt; alerta.
+   ========================================================================== */
+var ahora = Date.now(), h = new Date().getHours();
+function azar(l) { return l[Math.floor(Math.random() * l.length)]; }
+if (JV.g('JV_DIA', '') !== JV.hoy()) { JV.set('JV_DIA', JV.hoy()); JV.set('JV_DIST_HOY', 0); }
+
+/* ---- 1. Distracción ---- */
+var ini = parseInt(JV.g('JV_DIST_INI', '0'), 10);
+if (ini &gt; 0) {
+  var min = Math.floor((ahora - ini) / 60000);
+  var limite = parseInt(JV.g('JV_LIMITE_DIST', '15'), 10);
+  var ult = parseInt(JV.g('JV_DIST_ALERTA', '0'), 10);
+  if (min &gt;= limite &amp;&amp; ahora - ult &gt;= 5 * 60000) {
+    var app = JV.g('JV_DIST_APP', 'redes');
+    var r = JV.resumenHoy();
+    var frase = azar([
+      'Jefe, patrón de distracción detectado: ' + min + ' minutos en ' + app + '. Cierra y haz una sola cosa: responde al último cliente.',
+      'Jefe, ' + min + ' minutos de scroll. Eso no vende hoodies. Dos minutos para publicar una historia de COMBOY y vuelves si quieres.',
+      'Jefe, llevas ' + min + ' minutos en ' + app + ' y ' + r.ventas + ' ventas hoy. El que publica cobra, el que mira paga. Volvamos a enfoque.'
+    ]);
+    JV.log('alerta_distraccion', min, app);
+    JV.set('JV_DIST_ALERTA', ahora);
+    if (JV.g('JV_EXPULSAR', 'si') === 'si') { try { goHome(0); } catch (e) {} }
+    JV.hablar(frase);
+  }
+}
+
+/* ---- 2. Ventas ---- */
+var hIni = parseInt(JV.g('JV_HORA_INI', '9'), 10), hFin = parseInt(JV.g('JV_HORA_FIN', '22'), 10);
+var ultVenta = parseInt(JV.g('JV_ULTIMA_VENTA', '0'), 10);
+if (!ultVenta) { JV.set('JV_ULTIMA_VENTA', ahora); ultVenta = ahora; }
+var horasSin = (ahora - ultVenta) / 3600000;
+var limiteH = parseFloat(JV.g('JV_HORAS_SIN_VENTA', '4'));
+var ultAlertaV = parseInt(JV.g('JV_VENTA_ALERTA', '0'), 10);
+if (h &gt;= hIni &amp;&amp; h &lt; hFin &amp;&amp; horasSin &gt;= limiteH &amp;&amp; ahora - ultAlertaV &gt;= 3600000) {
+  var rv = JV.resumenHoy(), meta = parseFloat(JV.g('JV_META', '0')), mon = JV.g('JV_MONEDA', 'S/');
+  var falta = meta &gt; 0 ? ' Te faltan ' + Math.max(0, Math.round(meta - rv.monto)) + ' ' + mon + ' para la meta.' : '';
+  var frase2 = azar([
+    'Jefe, ' + Math.floor(horasSin) + ' horas sin registrar ventas.' + falta + ' Escríbele ahora a tres clientes que preguntaron y no compraron.',
+    'Jefe, ' + Math.floor(horasSin) + ' horas en cero.' + falta + ' Sube una historia con precio y stock limitado, y responde todo en 5 minutos.',
+    'Jefe, el día se va sin caja.' + falta + ' Si vendiste y no lo registraste, dime "registra venta". Si no, ofrece un combo a tu último comprador.'
+  ]);
+  JV.log('alerta_ventas', Math.floor(horasSin), falta);
+  JV.set('JV_VENTA_ALERTA', ahora);
+  JV.hablar(frase2);
+}
+</Str>
+<Str sr="arg1" ve="3"/>
+<Int sr="arg2" val="1"/>
+<Int sr="arg3" val="60"/>
+</Action>
+</Task>
+</TaskerData>
