@@ -107,7 +107,7 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
       // Requerimientos de Almacén por revisar (los que ya avisó la base, SQL 20261117, no se repiten)
       const conAviso = reqsConAviso(flujo.items);
       for (const r of reqs.filter((x) => x.origen !== "SUCURSAL" && !conAviso.has(x.id)))
-        out.push({ clave: `req:${r.id}`, tipo: "requerimiento", titulo: `${r.numero} de Almacén por revisar`, detalle: `${r.sede} · ${r.solicitante} · ${r.items.length} producto(s)`, modulo: "Almacén → Tesorería", href: "/dashboard/compras", prioridad: 2 });
+        out.push({ clave: `req:${r.id}`, tipo: "requerimiento", titulo: `${r.numero} de Almacén por revisar`, detalle: `${r.sede} · ${r.solicitante} · ${r.items.length} producto(s)`, modulo: "Almacén → Tesorería", href: "/dashboard/compras?tab=nuevos", prioridad: 2 });
       // Facturas por pagar que vencen en los próximos días
       for (const f of facturas) {
         if (f.estadoPago !== "POR_PAGAR" || !f.fechaVencimiento) continue;

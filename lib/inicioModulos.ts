@@ -116,6 +116,7 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "expedientes", label: "Expedientes 26W · Tablero de lotes", grupo: EXP, destino: LOTES },
     { slug: "pago-bancarizacion", label: "Pagar OC y Bancarización · Fase 5", grupo: EXP, destino: LOTES, fase: 5 },
 
+    { slug: "nuevos-req", label: "NUEVOS REQ (Almacén por revisar)", grupo: "Tesorería", destino: `${C}?tab=nuevos` },
     { slug: "registrar-gasto", label: "Registrar gasto (Cajas)", grupo: "Tesorería", destino: `${C}?tab=registrar` },
     { slug: "cotizaciones", label: "Cotizaciones", grupo: "Tesorería", destino: `${C}?tab=cotizaciones` },
     { slug: "ordenes-oc-os", label: "Órdenes OC / OS (bancarizar voucher)", grupo: "Tesorería", destino: `${C}?tab=ordenes` },
