@@ -12,7 +12,7 @@ from xml.sax.saxutils import escape
 RAIZ = Path(__file__).resolve().parent
 JS = RAIZ / "tasker" / "js"
 SALIDA = RAIZ / "tasker"
-TV = "6.3.13"
+TV = "6.2.22"  # versión de Tasker que declara el archivo (importable en 6.2 y posteriores)
 FECHA = "1762646400000"  # 2025-11-09, solo metadato
 
 LIB = (JS / "00_lib.js").read_text(encoding="utf-8")
@@ -50,6 +50,22 @@ PERFILES = [
 ]
 
 
+# Lo que NO se puede incrustar en XML (plugins de terceros y una acción nativa cuyo formato
+# no está documentado). Se deja un comentario <!-- MANUAL --> donde va cada pieza.
+MANUAL_PERFILES = [
+    "<!-- MANUAL: perfil 'JARVIS Continuous Listen' = Evento > Plugin > AutoVoice > Recognized "
+    "(Command Filter: jarvis) -> tarea 'JARVIS Brain + Voice'. README, paso manual 1. -->",
+    "<!-- MANUAL: perfil 'JARVIS Notificaciones' = Evento > Plugin > AutoNotification > Intercept "
+    "(Apps: WhatsApp, Instagram, Gmail) -> tarea 'JARVIS Notificacion'. README, paso manual 2. -->",
+]
+MANUAL_TAREAS = {
+    109: "<!-- MANUAL: en 'JARVIS Enviar WhatsApp', tras el JavaScriptlet: Esperar 2 s + Plugin > AutoInput > "
+         "Action (Click, Id com.whatsapp:id/send). README, paso manual 3. -->",
+    108: "<!-- MANUAL: en 'JARVIS No Molestar', tras el JavaScriptlet: Audio > No molestar = Solo prioridad "
+         "(If %par1 ~ on) y = Todo (If %par1 ~ off). README, paso manual 4. -->",
+}
+
+
 def accion_js(codigo: str, timeout: int) -> str:
     return (
         '<Action sr="act0" ve="7">\n<code>129</code>\n'
@@ -62,7 +78,9 @@ def accion_js(codigo: str, timeout: int) -> str:
 
 def tarea_xml(tid, nombre, archivo, timeout, pri) -> str:
     codigo = LIB + "\n\n" + (JS / archivo).read_text(encoding="utf-8")
+    manual = MANUAL_TAREAS.get(tid)
     return (
+        (manual + "\n" if manual else "") +
         f'<Task sr="task{tid}">\n<cdate>{FECHA}</cdate>\n<edate>{FECHA}</edate>\n'
         f"<id>{tid}</id>\n<nme>{escape(nombre)}</nme>\n<pri>{pri}</pri>\n"
         f"{accion_js(codigo, timeout)}\n</Task>"
@@ -95,7 +113,7 @@ def main():
         f"<tids>{','.join(str(t) for t in tareas)}</tids>\n</Project>"
     )
     (SALIDA / "JARVIS.prj.xml").write_text(
-        envolver("\n".join(perfiles.values()) + "\n" + proyecto + "\n" + "\n".join(tareas.values())),
+        envolver("\n".join(MANUAL_PERFILES + list(perfiles.values())) + "\n" + proyecto + "\n" + "\n".join(tareas.values())),
         encoding="utf-8")
 
     (SALIDA / "perfiles").mkdir(exist_ok=True)

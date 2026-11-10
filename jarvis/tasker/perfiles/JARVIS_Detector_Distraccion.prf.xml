@@ -1,4 +1,4 @@
-<TaskerData sr="" dvi="1" tv="6.3.13">
+<TaskerData sr="" dvi="1" tv="6.2.22">
 <Profile sr="prof201" ve="2">
 <cdate>1762646400000</cdate>
 <edate>1762646400000</edate>
@@ -40,7 +40,7 @@ JV.MEM   = JV.DIR + 'jarvis_memoria.md';
 JV.HIST  = JV.DIR + 'jarvis_historial.json';
 JV.CONT  = JV.DIR + 'jarvis_contactos.csv';
 JV.AUDIO = JV.DIR + 'jarvis_voz.mp3';
-JV.MODELO = 'claude-sonnet-5-5';
+JV.MODELO = 'claude-sonnet-4-5-20250929'; // deprecado: Anthropic lo retira el 2026-11-30 (cámbialo con %JV_MODELO)
 JV.VOZ_ADAM = 'pNInz6obpgDQGcFmaJgB';
 
 /* Lee una variable global de Tasker con valor por defecto. */
@@ -64,7 +64,17 @@ JV.iso = function () {
   return JV.hoy() + ' ' + JV.pad(d.getHours()) + ':' + JV.pad(d.getMinutes()) + ':' + JV.pad(d.getSeconds());
 };
 
-JV.leer = function (p) { try { var t = readFile(p); return t ? String(t) : ''; } catch (e) { return ''; } };
+/* Lee un archivo. Si no existe o está vacío devuelve porDefecto ('' si no se indica).
+   Para jarvis_historial.json se llama JV.leer(JV.HIST, []) y devuelve [] si no existe. */
+JV.leer = function (p, porDefecto) {
+  if (porDefecto === undefined) porDefecto = '';
+  var t;
+  try { t = readFile(p); } catch (e) { return porDefecto; }
+  if (!t) return porDefecto;
+  t = String(t);
+  if (Array.isArray(porDefecto)) { try { var j = JSON.parse(t); return Array.isArray(j) ? j : porDefecto; } catch (e2) { return porDefecto; } }
+  return t;
+};
 JV.escribir = function (p, t, agregar) { try { writeFile(p, t, !!agregar); return true; } catch (e) { return false; } };
 
 /* ---------- Registro CSV: fecha,tipo,valor,detalle ---------- */
@@ -241,7 +251,7 @@ JV.MEM   = JV.DIR + 'jarvis_memoria.md';
 JV.HIST  = JV.DIR + 'jarvis_historial.json';
 JV.CONT  = JV.DIR + 'jarvis_contactos.csv';
 JV.AUDIO = JV.DIR + 'jarvis_voz.mp3';
-JV.MODELO = 'claude-sonnet-5-5';
+JV.MODELO = 'claude-sonnet-4-5-20250929'; // deprecado: Anthropic lo retira el 2026-11-30 (cámbialo con %JV_MODELO)
 JV.VOZ_ADAM = 'pNInz6obpgDQGcFmaJgB';
 
 /* Lee una variable global de Tasker con valor por defecto. */
@@ -265,7 +275,17 @@ JV.iso = function () {
   return JV.hoy() + ' ' + JV.pad(d.getHours()) + ':' + JV.pad(d.getMinutes()) + ':' + JV.pad(d.getSeconds());
 };
 
-JV.leer = function (p) { try { var t = readFile(p); return t ? String(t) : ''; } catch (e) { return ''; } };
+/* Lee un archivo. Si no existe o está vacío devuelve porDefecto ('' si no se indica).
+   Para jarvis_historial.json se llama JV.leer(JV.HIST, []) y devuelve [] si no existe. */
+JV.leer = function (p, porDefecto) {
+  if (porDefecto === undefined) porDefecto = '';
+  var t;
+  try { t = readFile(p); } catch (e) { return porDefecto; }
+  if (!t) return porDefecto;
+  t = String(t);
+  if (Array.isArray(porDefecto)) { try { var j = JSON.parse(t); return Array.isArray(j) ? j : porDefecto; } catch (e2) { return porDefecto; } }
+  return t;
+};
 JV.escribir = function (p, t, agregar) { try { writeFile(p, t, !!agregar); return true; } catch (e) { return false; } };
 
 /* ---------- Registro CSV: fecha,tipo,valor,detalle ---------- */
