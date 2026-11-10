@@ -49,7 +49,9 @@ async function recargar(): Promise<void> {
     .not("tipo", "is", null)
     .order("created_at", { ascending: false })
     .limit(LIMITE);
-  estado = error ? { items: [], disponible: false } : { items: (data ?? []) as NotifFlujo[], disponible: true };
+  // REQ de Almacén: abren Tesorería > NUEVOS REQ (el SQL 20261117 guarda solo /dashboard/compras)
+  const items = ((data ?? []) as NotifFlujo[]).map((n) => (n.tipo === "REQ_ALMACEN" ? { ...n, href: "/dashboard/compras?tab=nuevos" } : n));
+  estado = error ? { items: [], disponible: false } : { items, disponible: true };
   avisar();
 }
 
