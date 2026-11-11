@@ -8,7 +8,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import QRCode from "qrcode";
 import { EMPRESA } from "./empresa";
-import { CUENTAS_ORIGEN_PAGO, codigoContratista, codigoGasto, cuentaBancariaTxt, fechaPE, getTrabajadores, soles } from "./storage";
+import { CUENTAS_ORIGEN_PAGO, codigoContratista, codigoGasto, cotizacionGasto, getFacturas, cuentaBancariaTxt, fechaPE, getTrabajadores, soles } from "./storage";
 import { codigoDesdeNumero, estadoDocumento } from "./utils/codigos";
 import { SEDE_PLANTA_PRINCIPAL, bloqueDocumento, sedeOrigenReq, type DocUnificado, type TipoDocumento } from "./plantillasDocumentos";
 import { equipoDeLinea, sedeEquipo } from "./equipos";
@@ -740,6 +740,7 @@ function pdfGasto(f: Factura, codigo: string): void {
         ["RUC / DNI", f.ruc || "-"],
         ["Fecha", fechaPE(f.fecha)],
         ["Comprobante", `${comp} ${f.numero}`],
+        ["Cotización", f.cotizacionProveedor ? `${f.cotizacionProveedor}${f.cotizacionAuto ? " (interna)" : ""}` : "-"],
         ["Adjuntos", f.archivos?.length ? f.archivos.map((a) => a.nombre).join(", ") : "-"],
       ],
       head: ["#", "Descripción", "Importe"],
@@ -855,7 +856,12 @@ export function pdfFactura(f: Factura, oc?: OrdenCompra): void {
     return;
   }
   if (f.esGastoTesoreria) {
-    void conCodigo(async () => pdfGasto(f, await codigoGasto(f.id)));
+    void conCodigo(async () => {
+      const codigo = await codigoGasto(f.id);
+      // Gasto sin cotización (antiguo o guardado antes de correr el SQL): se le asigna COT-PROV-xxxx-AAAA ahora
+      const g = await cotizacionGasto(f.id).catch(() => getFacturas().find((x) => x.id === f.id) ?? f);
+      pdfGasto({ ...g, codigo }, codigo);
+    });
     return;
   }
   const esDJ = f.tipo === "DECLARACION_JURADA";

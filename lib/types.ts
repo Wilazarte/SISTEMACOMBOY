@@ -260,6 +260,10 @@ export interface Factura {
   retencionMonto?: number;
   /** Recibo de servicios públicos: N° de suministro. */
   suministro?: string;
+  /** Cotización emitida por el proveedor (su N°) o, si no la entregó, código interno COT-PROV-0001-2026. */
+  cotizacionProveedor?: string;
+  /** true: el N° lo generó el sistema porque no había cotización del proveedor. */
+  cotizacionAuto?: boolean;
   archivos?: ArchivoGasto[];
   /** Declaración jurada de gasto: PENDIENTE (recién emitida), ENVIADA (a Gerencia), APROBADA. */
   djEstado?: "PENDIENTE" | "ENVIADA" | "APROBADA";
@@ -296,7 +300,7 @@ export type ComprobanteGasto =
   | "SIN_COMPROBANTE"
   | "RECIBO";
 export interface ArchivoGasto {
-  tipo: "FACTURA" | "GUIA";
+  tipo: "FACTURA" | "GUIA" | "COTIZACION";
   nombre: string;
   mime: string;
   dataUrl: string;

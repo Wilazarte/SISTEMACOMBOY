@@ -64,6 +64,7 @@ const vacio = (): Omit<DatosGasto, "fecha"> => ({
   archivos: [],
   retencion: true,
   suministro: "",
+  cotizacion: "",
 });
 
 /**
@@ -90,6 +91,9 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
   const [fechaTxt, setFechaTxt] = useState(fechaPE(hoy()));
   const refFactura = useRef<HTMLInputElement>(null);
   const refGuia = useRef<HTMLInputElement>(null);
+  const refCotizacion = useRef<HTMLInputElement>(null);
+  // Sin cotización del proveedor: el sistema genera COT-PROV-0001-2026 al guardar
+  const [sinCotizacion, setSinCotizacion] = useState(false);
   const set = <K extends keyof typeof d>(k: K, v: (typeof d)[K]) => setD((x) => ({ ...x, [k]: v }));
   const fechaISO = parseFechaPE(fechaTxt);
   const fechaError = fechaTxt.length === 10 && !fechaISO ? "Fecha inexistente" : fechaISO > hoy() ? "La fecha no puede ser futura" : undefined;
@@ -112,7 +116,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
     if (!/^(application\/pdf|image\/(png|jpe?g|webp))$/.test(file.type)) return toast("Adjunte un PDF o una imagen (JPG / PNG).", "error");
     if (file.size > MAX_ARCHIVO) return toast(`El archivo pesa ${(file.size / 1048576).toFixed(1)} MB. Máximo 1.5 MB.`, "error");
     // dataUrl guarda la referencia: "sb:tesoreria/..." (Storage) o el base64 si Storage lo rechaza
-    subirBaucher(file, tipo === "GUIA" ? "gasto-guia" : "gasto-factura")
+    subirBaucher(file, tipo === "GUIA" ? "gasto-guia" : tipo === "COTIZACION" ? "gasto-cotizacion" : "gasto-factura")
       .then(({ ref }) => setD((x) => ({ ...x, archivos: [...x.archivos.filter((a) => a.tipo !== tipo), { tipo, nombre: file.name, mime: file.type, dataUrl: ref }] })))
       .catch((e) => toast((e as Error).message, "error"));
   };
@@ -121,10 +125,15 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
     setGuardando(true);
     let id = "";
     let dj: Factura | undefined;
+    let cot = "";
+    let auto = false;
+    let aviso = "";
     const ok = await ejecutarAsync(
       async () => {
+        if (!sinCotizacion && !d.cotizacion?.trim())
+          throw new Error('Ingrese el N° de la cotización del proveedor o marque "El proveedor no entregó cotización".');
         const r = await registrarGastoCompleto(
-          { ...d, fecha: fechaISO },
+          { ...d, cotizacion: sinCotizacion ? "" : d.cotizacion, archivos: sinCotizacion ? d.archivos.filter((a) => a.tipo !== "COTIZACION") : d.archivos, fecha: fechaISO },
           {
             items: orden === "OC" ? filas : undefined,
             servicios: orden === "OS" ? lineasServicio(servicios, d.descripcion, d.importe, d.comprobante === "FACTURA") : undefined,
@@ -133,6 +142,9 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
           rol
         );
         id = r.gasto.id;
+        cot = r.gasto.cotizacionProveedor ?? "";
+        auto = !!r.gasto.cotizacionAuto;
+        aviso = r.avisoCotizacion ?? "";
         if (r.gasto.comprobanteGasto === "DJ") dj = r.gasto;
         return r;
       },
@@ -145,7 +157,10 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
       toast(`Declaración jurada ${dj.numero} registrada`);
       pdfDeclaracionJurada(dj);
     }
+    if (auto && cot) toast(`Cotización generada: ${cot}`);
+    if (aviso) toast(`Gasto registrado sin código de cotización: ${aviso}`, "error");
     setD(vacio());
+    setSinCotizacion(false);
     setOrden("NINGUNA");
     setFilas([filaOC()]);
     setServicios([servicioVacio()]);
@@ -325,6 +340,44 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
           />
           <EstadoRuc ruc={d.ruc} onValidado={(r) => setD((x) => (x.proveedor.trim() ? x : { ...x, proveedor: r.razon_social }))} />
         </Field>
+
+        {/* Cotización emitida por el proveedor (o código interno si no la entregó) */}
+        <div className="rounded-xl border border-plomo-200 p-4 md:col-span-3">
+          <p className="text-sm font-semibold text-fg">Cotización del proveedor</p>
+          <div className="mt-3 grid gap-4 md:grid-cols-3">
+            <Field label={sinCotizacion ? "Código de cotización" : "N° de cotización del proveedor *"} hint={sinCotizacion ? "Se genera solo al guardar (correlativo del año)" : "Tal como figura en la cotización"}>
+              <Input
+                value={sinCotizacion ? "" : d.cotizacion ?? ""}
+                disabled={sinCotizacion}
+                maxLength={40}
+                onChange={(e) => set("cotizacion", e.target.value.toUpperCase())}
+                placeholder={sinCotizacion ? "COT-PROV-0001-2026" : "Ej: COT-2026-0154"}
+              />
+            </Field>
+            <label className="flex cursor-pointer items-center gap-2 self-center text-sm text-fg md:col-span-2">
+              <input type="checkbox" checked={sinCotizacion} onChange={(e) => setSinCotizacion(e.target.checked)} className="h-4 w-4 accent-corp" />
+              El proveedor no entregó cotización: generar código automático
+            </label>
+          </div>
+          {!sinCotizacion && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+              <input ref={refCotizacion} type="file" accept="application/pdf,image/*" className="hidden" onChange={(e) => adjuntar("COTIZACION", e.target.files?.[0])} />
+              {archivo("COTIZACION") ? (
+                <span className="inline-flex items-center gap-2 rounded-lg border border-dashed border-plomo-200 px-3 py-2">
+                  <Paperclip size={14} className="text-emerald-600" /> <span className="max-w-[220px] truncate font-medium">{archivo("COTIZACION")?.nombre}</span>
+                  <button type="button" onClick={() => setD((x) => ({ ...x, archivos: x.archivos.filter((y) => y.tipo !== "COTIZACION") }))} className="text-red-500" aria-label="Quitar cotización">
+                    <X size={14} />
+                  </button>
+                </span>
+              ) : (
+                <button type="button" onClick={() => refCotizacion.current?.click()} className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-plomo-200 px-3 py-2 text-plomo-600 hover:text-fg">
+                  <FileUp size={14} /> Adjuntar cotización (opcional)
+                </button>
+              )}
+              <span className="text-xs text-slate-400">PDF o imagen · máx. 1.5 MB</span>
+            </div>
+          )}
+        </div>
 
         {/* Retención de 4ta categoría (RHE por más de S/ 1,500) */}
         {esRHE && (
