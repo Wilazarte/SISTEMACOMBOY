@@ -175,6 +175,7 @@ function calcular(t: Trabajador, liq: LiquidacionPeriodo, asistenciaExterna?: As
     : { dias: registro?.dias ?? 0, horas: registro?.horas ?? (porHora ? 0 : (registro?.dias ?? 0) * liq.horasJornada), tardanzas: registro?.tardanzas ?? 0 };
   // S/ por hora (cualquier modo): básico = S/ hora × horas reales del reloj (sin jornada); extra solo manual
   const r = porHora ? liquidarPorHora(t.sueldo, reloj.horas, liq.ajustes[t.id]) : liquidar(t.sueldo, divisorSueldo(t), reloj, liq, liq.ajustes[t.id]);
+  // AFP / ONP: % sobre lo que se paga por los días (u horas) laborados, nunca sobre el sueldo completo del mes
   const descuentoAfp = r2(r.bruto * ((t.afpPorcentaje || 0) / 100));
   const neto = r2(r.bruto - descuentoAfp);
   return {
@@ -1041,7 +1042,7 @@ export default function PlanillaTab() {
                     <Td className="text-right">{t.liq.montoExtra ? soles(t.liq.montoExtra) : <span className="text-slate-400">-</span>}</Td>
                     <Td className="text-right text-red-600">
                       - {soles(t.descuentoAfp)}
-                      <p className="text-[10px] text-plomo-500">{t.afpPorcentaje}%</p>
+                      <p className="text-[10px] text-plomo-500" title="Sobre el sueldo pagado por los días laborados">{t.afpPorcentaje}% de {soles(t.bruto)}</p>
                     </Td>
                     <Td className="text-right">
                       <button
@@ -1175,7 +1176,7 @@ export default function PlanillaTab() {
                   )}
                   <tr className="border-t text-red-600">
                     <td className="p-2">
-                      Desc. {afpLabel(boletaSel)} {boletaSel.afpPorcentaje}%
+                      Desc. {afpLabel(boletaSel)} {boletaSel.afpPorcentaje}% de {soles(boletaSel.bruto)} (sueldo pagado por {boletaSel.liq.modo === "HORAS" ? `${horasTxt(boletaSel.horas)} h` : `${boletaSel.dias} días`})
                     </td>
                     <td className="p-2 text-right">- {soles(boletaSel.descuentoAfp)}</td>
                   </tr>

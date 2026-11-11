@@ -553,7 +553,7 @@ export function pdfBoletaPago(d: DatosBoleta, codigo: string): void {
       ["INGRESO", "Remuneración básica", d.basicoDetalle, soles(d.basico)],
       ["INGRESO", "Horas extra", d.horasExtra, soles(d.montoExtra)],
       ["", "Remuneración bruta", "", soles(d.bruto)],
-      ["DESCUENTO", `Aporte ${d.pension}`, `${d.afpPorcentaje}% de la remuneración bruta`, `- ${soles(d.descuentoAfp)}`],
+      ["DESCUENTO", `Aporte ${d.pension}`, `${d.afpPorcentaje}% de ${soles(d.bruto)} (sueldo pagado: ${d.basicoDetalle})`, `- ${soles(d.descuentoAfp)}`],
       ...filasAdelantos(d),
     ],
     alinearDerecha: [3],
