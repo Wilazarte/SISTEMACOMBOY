@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { getSesion, rolNegocio } from "./auth";
 import { createClient } from "./supabase/client";
+import { errorCaja, nombreCaja } from "./cajas";
 import type {
   AliasHuellas,
   ArchivoGasto,
@@ -1175,6 +1176,9 @@ export const CUENTAS_ORIGEN_PAGO: Record<CuentaOrigenPago, string> = {
   caja_general: "CAJA GENERAL",
   caja_chica: "CAJA CHICA",
   fondo_reserva: "FONDO DE RESERVA",
+  prestamo: "PRÉSTAMO",
+  credito: "CRÉDITO",
+  otros: "OTROS",
 };
 
 /** Bucket privado de Storage y carpeta de los bauchers (equivale a /uploads/tesoreria/vouchers/). */
@@ -1187,8 +1191,10 @@ export function validarVoucher(file: File): void {
   if (file.size > MAX_VOUCHER) throw new ErpError(`El baucher pesa ${(file.size / 1048576).toFixed(1)} MB. Máximo 5 MB.`);
 }
 
-function validarPagoOC(data: Partial<Pick<OrdenCompra, "cuentaOrigenPago" | "voucherMonto">>): void {
+function validarPagoOC(data: Partial<Pick<OrdenCompra, "cuentaOrigenPago" | "voucherMonto" | "caja">>): void {
   if (!data.cuentaOrigenPago || !(data.cuentaOrigenPago in CUENTAS_ORIGEN_PAGO)) throw new ErpError("Seleccione de qué cuenta se realiza el pago.");
+  const errCaja = data.caja !== undefined ? errorCaja(data.caja) : null;
+  if (errCaja) throw new ErpError(errCaja);
   if (data.voucherMonto !== undefined && !(data.voucherMonto >= 0)) throw new ErpError("El monto del baucher no puede ser negativo.");
 }
 
@@ -1486,7 +1492,8 @@ function validarBancarizacion(b: Bancarizacion): Bancarizacion {
   if (!TIPOS_BANCARIZACION.includes(b.tipo)) throw new ErpError("Seleccione el tipo de bancarización.");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(b.fecha)) throw new ErpError("Indique la fecha de pago.");
   if (b.fecha > hoy()) throw new ErpError("La fecha de pago no puede ser futura.");
-  if (!b.caja?.trim()) throw new ErpError("Seleccione de qué cuenta se realiza el pago.");
+  const errCaja = errorCaja(b.caja);
+  if (errCaja) throw new ErpError(errCaja);
   return { tipo: b.tipo, fecha: b.fecha, caja: b.caja.trim(), ...(b.nroOperacion?.trim() ? { nroOperacion: b.nroOperacion.trim().toUpperCase() } : {}) };
 }
 
@@ -1611,15 +1618,31 @@ export async function crearDeclaracionJurada(
   return dj;
 }
 
-/** Origen de la OC según la caja elegida: "Caja Chica…" -> caja chica, "Fondo de Reserva" -> fondo de reserva, el resto -> caja general. */
-export const cuentaOrigenDeCaja = (caja: string): CuentaOrigenPago => (/chica/i.test(caja) ? "caja_chica" : /reserva/i.test(caja) ? "fondo_reserva" : "caja_general");
+/** Origen de la OC según la fuente elegida (Caja General, Caja Chica, Fondo de Reserva, Préstamo, Crédito, Otros). */
+export const cuentaOrigenDeCaja = (caja: string): CuentaOrigenPago => {
+  switch (nombreCaja(caja)) {
+    case "CAJA CHICA":
+      return "caja_chica";
+    case "FONDO DE RESERVA":
+      return "fondo_reserva";
+    case "PRÉSTAMO":
+      return "prestamo";
+    case "CRÉDITO":
+      return "credito";
+    case "OTROS":
+      return "otros";
+    default:
+      return /chica/i.test(caja) ? "caja_chica" : /reserva/i.test(caja) ? "fondo_reserva" : "caja_general";
+  }
+};
 
 /**
  * Marcar PAGADA pide la caja de la que salió el dinero y, si el total pasa S/ 2,000 o el proveedor tiene RUC,
  * la bancarización. Revertir a POR PAGAR la quita.
  */
 export function marcarPago(id: string, pagada: boolean, rol: Rol, caja?: string, bancarizacion?: Bancarizacion): void {
-  if (pagada && !caja?.trim()) throw new ErpError("Seleccione de qué caja sale el pago.");
+  const errCaja = pagada ? errorCaja(caja) : null;
+  if (errCaja) throw new ErpError(errCaja);
   const fac = getFacturas().find((f) => f.id === id);
   const b = pagada && bancarizacion ? validarBancarizacion({ ...bancarizacion, caja: caja ?? "" }) : undefined;
   if (pagada && fac && !b && requiereBancarizacion(fac.netoPagar ?? fac.total, fac.ruc))

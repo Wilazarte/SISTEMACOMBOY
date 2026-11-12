@@ -218,7 +218,7 @@ export interface OrdenServicio {
 }
 
 /** Cuenta de la que sale el pago de una OC (se guarda como enum). */
-export type CuentaOrigenPago = "caja_general" | "caja_chica" | "fondo_reserva";
+export type CuentaOrigenPago = "caja_general" | "caja_chica" | "fondo_reserva" | "prestamo" | "credito" | "otros";
 
 export type TipoComprobante = "FACTURA" | "DECLARACION_JURADA";
 

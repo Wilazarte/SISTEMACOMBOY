@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CheckCircle2, Lock } from "lucide-react";
 import { Button, Modal, toast } from "@/components/ui";
 import { SelectorCaja } from "@/components/SelectorCaja";
-import { CAJA_POR_DEFECTO } from "@/lib/cajas";
+import { CAJA_POR_DEFECTO, errorCaja } from "@/lib/cajas";
 import { cerrarPlanilla, guardarCajaPlanilla, type FilaCierre } from "@/lib/historial";
 import { asientoPlanilla } from "@/lib/contable";
 import { getSesion, rolNegocio } from "@/lib/auth";
@@ -118,7 +118,7 @@ export function PagarSemanaFiltrada({
             <Button variant="secondary" onClick={() => setAbierto(false)} disabled={guardando}>
               Cancelar
             </Button>
-            <button type="button" onClick={pagar} disabled={guardando || !caja} className={VERDE}>
+            <button type="button" onClick={pagar} disabled={guardando || !!errorCaja(caja)} className={VERDE}>
               <Lock size={16} /> {guardando ? "Pagando…" : `Pagar ${soles(total)}`}
             </button>
           </div>
