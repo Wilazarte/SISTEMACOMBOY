@@ -42,12 +42,12 @@ declare
 begin
   if con_sede and to_regprocedure('public.sede_central()') is not null then
     update public.cajas set estado = 'INACTIVA'
-     where upper(btrim(nombre)) not in ('CAJA CHICA', 'CAJA GENERAL', 'FONDO DE RESERVA')
+     where upper(btrim(nombre)) not in ('CAJA CHICA', 'CAJA GENERAL', 'FONDO DE RESERVA', 'PRÉSTAMO', 'CRÉDITO', 'OTROS')
        and coalesce(upper(estado), 'ACTIVA') <> 'INACTIVA'
        and (sede_id is null or sede_id = public.sede_central());
   else
     update public.cajas set estado = 'INACTIVA'
-     where upper(btrim(nombre)) not in ('CAJA CHICA', 'CAJA GENERAL', 'FONDO DE RESERVA')
+     where upper(btrim(nombre)) not in ('CAJA CHICA', 'CAJA GENERAL', 'FONDO DE RESERVA', 'PRÉSTAMO', 'CRÉDITO', 'OTROS')
        and coalesce(upper(estado), 'ACTIVA') <> 'INACTIVA';
   end if;
 end $$;

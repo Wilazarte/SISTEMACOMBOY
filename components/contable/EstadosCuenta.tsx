@@ -59,7 +59,7 @@ export function EstadosCuenta({ anio, mes, onVerDiario }: { anio: number; mes: n
     const filas = lista.map((m) => ({ Fecha: fechaPE(m.fecha), Cuenta: m.cuenta, Concepto: m.concepto, "Doc. referencia": m.documento, Proveedor: m.proveedor, Debe: m.debe || "", Haber: m.haber || "", Saldo: m.saldo ?? 0 }));
     const libro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas), "Estado de cuenta");
-    XLSX.writeFile(libro, `Estado-cuenta-${(cuenta || "3-cajas").replace(/\s+/g, "-")}-${periodo.replace(/\s+/g, "-")}.xlsx`);
+    XLSX.writeFile(libro, `Estado-cuenta-${(cuenta || "todas-las-cuentas").replace(/\s+/g, "-")}-${periodo.replace(/\s+/g, "-")}.xlsx`);
   };
 
   return (
@@ -94,7 +94,7 @@ export function EstadosCuenta({ anio, mes, onVerDiario }: { anio: number; mes: n
 
       <Card>
         <CardHeader
-          title={`Estado de cuenta · ${cuenta || "las 3 cajas"} · ${periodo}`}
+          title={`Estado de cuenta · ${cuenta || "todas las cuentas"} · ${periodo}`}
           subtitle="Egresos automáticos desde gastos, facturas, compras y adelantos pagados con la caja. Saldo = saldo de la cuenta después de cada movimiento."
           action={
             <div className="flex flex-wrap items-center gap-2">

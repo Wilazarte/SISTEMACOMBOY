@@ -1,4 +1,4 @@
-// Estados de cuenta de Caja Chica, Caja General y Fondo de Reserva (Reportes › Estados de cuenta).
+// Estados de cuenta de las fuentes de pago (Caja General, Caja Chica, Fondo de Reserva, Préstamo, Crédito, Otros) (Reportes › Estados de cuenta).
 // Los movimientos se calculan de los documentos que ya registran de qué caja salió el dinero:
 //   - facturas y gastos PAGADOS (campo caja; incluye los egresos de planilla),
 //   - compras directas (caja),
@@ -8,11 +8,15 @@
 import type { Adelanto } from "./adelantos";
 import type { Compra, Factura, MovimientoCajaManual } from "./types";
 import { COMPROBANTES } from "./comprobantes";
+import { nombreCaja, partirCaja } from "./cajas";
 
 export const CUENTAS_CAJA = [
-  { codigo: "CAJA_CHICA", nombre: "CAJA CHICA", titulo: "Caja Chica" },
-  { codigo: "CAJA_GENERAL", nombre: "CAJA GENERAL", titulo: "Caja General" },
+  { codigo: "CAJA_GENERAL", nombre: "CAJA GENERAL", titulo: "Caja General (transferencias)" },
+  { codigo: "CAJA_CHICA", nombre: "CAJA CHICA", titulo: "Caja Chica (efectivo)" },
   { codigo: "FONDO_RESERVA", nombre: "FONDO DE RESERVA", titulo: "Fondo de Reserva" },
+  { codigo: "PRESTAMO", nombre: "PRÉSTAMO", titulo: "Préstamo" },
+  { codigo: "CREDITO", nombre: "CRÉDITO", titulo: "Crédito" },
+  { codigo: "OTROS", nombre: "OTROS", titulo: "Otros" },
 ] as const;
 export type CuentaCaja = (typeof CUENTAS_CAJA)[number]["nombre"];
 
@@ -30,8 +34,14 @@ export interface MovimientoCaja {
 }
 
 const cuentaDe = (caja?: string | null): CuentaCaja | undefined => {
-  const n = (caja ?? "").trim().toUpperCase();
+  const n = nombreCaja(caja);
   return CUENTAS_CAJA.find((c) => c.nombre === n)?.nombre;
+};
+
+/** Concepto con el dato extra de la fuente: "Gasto GST-050 · Préstamo de: Juan Pérez". */
+const conDetalle = (concepto: string, caja?: string | null) => {
+  const d = partirCaja(caja).detalle.trim();
+  return d ? `${concepto} · ${nombreCaja(caja) === "PRÉSTAMO" ? "Préstamo de: " : ""}${d}` : concepto;
 };
 
 /** Fecha en que se marcó pagada (historial); si no está, la del documento. */
@@ -47,7 +57,7 @@ export function movimientosCaja(facturas: Factura[], compras: Compra[], adelanto
       id: `fac-${f.id}`,
       cuenta,
       fecha: fechaPago(f),
-      concepto: f.tipoGasto === "PLANILLA" ? `Pago ${f.numero.replace(/^PLLA\s+/, "planilla ")}` : f.esGastoTesoreria ? f.descripcion || `Gasto ${f.numero}` : `Factura ${f.numero} · ${f.ocNumero}`,
+      concepto: conDetalle(f.tipoGasto === "PLANILLA" ? `Pago ${f.numero.replace(/^PLLA\s+/, "planilla ")}` : f.esGastoTesoreria ? f.descripcion || `Gasto ${f.numero}` : `Factura ${f.numero} · ${f.ocNumero}`, f.caja),
       documento: f.esGastoTesoreria ? [f.codigo, f.comprobanteGasto === "DJ" ? f.numero : ""].filter(Boolean).join(" · ") || f.numero : f.numero,
       proveedor: f.proveedor,
       debe: 0,
@@ -58,12 +68,12 @@ export function movimientosCaja(facturas: Factura[], compras: Compra[], adelanto
   for (const c of compras) {
     const cuenta = cuentaDe(c.caja);
     if (!cuenta) continue;
-    out.push({ id: `com-${c.id}`, cuenta, fecha: c.fecha, concepto: `Compra ${(COMPROBANTES[c.tipoComprobante] ?? "Factura").toLowerCase()} ${c.numero}`, documento: c.numero, proveedor: c.proveedor, debe: 0, haber: c.total, origen: "COMPRA" });
+    out.push({ id: `com-${c.id}`, cuenta, fecha: c.fecha, concepto: conDetalle(`Compra ${(COMPROBANTES[c.tipoComprobante] ?? "Factura").toLowerCase()} ${c.numero}`, c.caja), documento: c.numero, proveedor: c.proveedor, debe: 0, haber: c.total, origen: "COMPRA" });
   }
   for (const a of adelantos) {
     const cuenta = cuentaDe(a.caja_nombre);
     if (!cuenta || /anulad/i.test(a.estado)) continue;
-    out.push({ id: `ade-${a.id}`, cuenta, fecha: a.fecha, concepto: `Adelanto de sueldo${a.motivo ? ` · ${a.motivo}` : ""}`, documento: "ADELANTO", proveedor: a.trabajador_nombre, debe: 0, haber: a.monto, origen: "ADELANTO" });
+    out.push({ id: `ade-${a.id}`, cuenta, fecha: a.fecha, concepto: conDetalle(`Adelanto de sueldo${a.motivo ? ` · ${a.motivo}` : ""}`, a.caja_nombre), documento: "ADELANTO", proveedor: a.trabajador_nombre, debe: 0, haber: a.monto, origen: "ADELANTO" });
   }
   for (const m of manuales) {
     const cuenta = cuentaDe(m.cuenta);
