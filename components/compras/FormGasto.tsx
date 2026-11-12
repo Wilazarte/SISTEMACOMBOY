@@ -340,7 +340,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
           }} onFocus={(e) => esProveedorVarios(d.proveedor) && e.target.select()} placeholder="Razón social o nombre" />
           {esProveedorVarios(d.proveedor) && (
             <span className="mt-1 block text-xs text-plomo-500">
-              Por defecto (N° {RUC_VARIOS}). Escriba encima o elija otro de la lista{d.comprobante === "FACTURA" ? "; con factura, al validar el RUC se pone la razón social" : ""}.
+              Por defecto (N° {RUC_VARIOS}). Escriba encima o elija otro de la lista; si escribe un RUC real, se pone la razón social de SUNAT.
             </span>
           )}
           <datalist id="proveedores-gasto">
