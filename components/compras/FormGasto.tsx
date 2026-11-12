@@ -39,6 +39,7 @@ import {
   TOPE_DJ_MOVILIDAD_DIA,
   TOPE_RETENCION_RHE,
   PROVEEDOR_VARIOS,
+  RUC_VARIOS,
   admiteProveedorVarios,
   esProveedorVarios,
   numeroAutomatico,
@@ -61,9 +62,9 @@ const vacio = (): Omit<DatosGasto, "fecha"> => ({
   importe: 0,
   comprobante: "FACTURA",
   numero: "",
-  // Por defecto PROVEEDORES VARIOS (editable); al validar un RUC se reemplaza por la razón social de SUNAT
+  // Por defecto VARIOS/SIN DATOS con N° 010101 (editable); al validar un RUC se reemplaza por la razón social de SUNAT
   proveedor: PROVEEDOR_VARIOS,
-  ruc: "",
+  ruc: RUC_VARIOS,
   detraccion: false,
   detraccionPorc: DETRACCION_SUGERIDA.TRANSPORTE,
   archivos: [],
@@ -287,9 +288,9 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
                 ...x,
                 comprobante,
                 // DJ / RHE llevan el nombre de una persona: el genérico se quita; al volver, se repone si quedó vacío
-                proveedor: !admiteProveedorVarios(comprobante)
-                  ? esProveedorVarios(x.proveedor) ? "" : x.proveedor
-                  : x.proveedor.trim() ? x.proveedor : PROVEEDOR_VARIOS,
+                ...(!admiteProveedorVarios(comprobante)
+                  ? esProveedorVarios(x.proveedor) ? { proveedor: "", ruc: x.ruc === RUC_VARIOS ? "" : x.ruc } : {}
+                  : !x.proveedor.trim() && !x.ruc ? { proveedor: PROVEEDOR_VARIOS, ruc: RUC_VARIOS } : {}),
               }));
             }}
             options={OPCIONES_COMPROBANTE}
@@ -316,15 +317,19 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
         )}
         <Field label={d.comprobante === "DJ" ? "Nombre de quien declara *" : esRHE ? "Persona que emite el RHE *" : "Proveedor / agencia *"} className="md:col-span-2">
           <Input value={d.proveedor} list="proveedores-gasto" onChange={(e) => {
-            const p = proveedores.find((x) => x.razonSocial === e.target.value.toUpperCase());
-            setD((x) => ({ ...x, proveedor: e.target.value, ruc: p?.ruc ?? x.ruc }));
+            const v = e.target.value;
+            const p = proveedores.find((x) => x.razonSocial === v.toUpperCase());
+            // VARIOS/SIN DATOS pone 010101; al cambiar a otro proveedor, el 010101 se limpia
+            const ruc = esProveedorVarios(v) ? RUC_VARIOS : p?.ruc ?? "";
+            setD((x) => ({ ...x, proveedor: v, ruc: esProveedorVarios(v) || p ? ruc : x.ruc === RUC_VARIOS ? "" : x.ruc }));
           }} onFocus={(e) => esProveedorVarios(d.proveedor) && e.target.select()} placeholder="Razón social o nombre" />
           {esProveedorVarios(d.proveedor) && (
             <span className="mt-1 block text-xs text-plomo-500">
-              Por defecto. Escriba encima para cambiarlo{d.comprobante === "FACTURA" ? "; con factura, al validar el RUC se pone la razón social" : ""}.
+              Por defecto (N° {RUC_VARIOS}). Escriba encima o elija otro de la lista{d.comprobante === "FACTURA" ? "; con factura, al validar el RUC se pone la razón social" : ""}.
             </span>
           )}
           <datalist id="proveedores-gasto">
+            <option value={PROVEEDOR_VARIOS}>{RUC_VARIOS}</option>
             {proveedores.map((p) => (
               <option key={p.id} value={p.razonSocial}>
                 {p.ruc}
@@ -339,6 +344,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
           <Input
             value={d.ruc}
             maxLength={d.comprobante === "DJ" ? 8 : 11}
+            onFocus={(e) => d.ruc === RUC_VARIOS && e.target.select()}
             inputMode="numeric"
             onChange={(e) => {
               const ruc = e.target.value.replace(/\D/g, "");
