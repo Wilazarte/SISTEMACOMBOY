@@ -66,6 +66,9 @@ import {
   esProveedorVarios,
   PROVEEDOR_VARIOS,
   RUC_VARIOS,
+  PROVEEDOR_VARIOS_ID,
+  errorDocProveedor,
+  proveedorVarios,
 } from "./comprobantes";
 
 export const KEYS = {
@@ -3087,7 +3090,9 @@ export function marcarEditado<T extends { historial: EventoHistorial[] }>(doc: T
 
 /** Valida y arma la compra (sin id ni historial). `excluirId`: la propia compra al editar (no cuenta como duplicada). */
 function prepararCompra(data: DatosCompra, excluirId?: string): Omit<Compra, "id" | "historial"> {
-  const prov = getProveedores().find((p) => p.id === data.proveedorId);
+  // VARIOS/SIN DATOS (010101): proveedor genérico fijo, no está en la tabla de proveedores
+  const generico = data.proveedorId === PROVEEDOR_VARIOS_ID;
+  const prov = generico ? proveedorVarios() : getProveedores().find((p) => p.id === data.proveedorId);
   if (!prov) throw new ErpError("Seleccione el proveedor.");
   exigirRucSunat(prov.ruc, `de ${prov.razonSocial}`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data.fecha)) throw new ErpError("Fecha de compra inválida. Use DD/MM/AAAA.");
@@ -3102,7 +3107,7 @@ function prepararCompra(data: DatosCompra, excluirId?: string): Omit<Compra, "id
   const re = NUM_COMPROBANTE[data.tipoComprobante];
   if (!auto && (!numero || (re && !re.test(numero))))
     throw new ErpError(`N° de ${COMPROBANTES[data.tipoComprobante].toLowerCase()} inválido.${re ? ` Ej: ${data.tipoComprobante === "FACTURA" ? "F001-00001234" : "B001-00000456"}` : ""}`);
-  if (!auto && (getCompras().some((c) => c.id !== excluirId && c.numero === numero && c.ruc === prov.ruc) || getFacturas().some((f) => f.numero === numero && f.ruc === prov.ruc)))
+  if (!auto && !generico && (getCompras().some((c) => c.id !== excluirId && c.numero === numero && c.ruc === prov.ruc) || getFacturas().some((f) => f.numero === numero && f.ruc === prov.ruc)))
     throw new ErpError(`El comprobante ${numero} de ${prov.razonSocial} ya fue registrado.`);
 
   const filas = data.items.filter((i) => i.nombre.trim());
@@ -3188,7 +3193,8 @@ export function totalesOS(items: Pick<ItemServicio, "cantidad" | "precioUnit">[]
 export async function emitirOrdenServicio(data: DatosOrdenServicio, adjunto: File | null, rol: Rol): Promise<OrdenServicio> {
   if (!puede(rol, "oc.crear")) throw new ErpError("Solo Tesorería puede emitir órdenes de servicio.");
   if (!data.proveedor.trim()) throw new ErpError("Ingrese el proveedor.");
-  if (data.ruc.trim() && !/^\d{8}$|^\d{11}$/.test(data.ruc.trim())) throw new ErpError("El RUC debe tener 11 dígitos (o DNI de 8).");
+  const errDoc = errorDocProveedor(data.proveedor, data.ruc);
+  if (errDoc) throw new ErpError(errDoc);
   exigirRucSunat(data.ruc, "del proveedor");
   if (!data.concepto.trim()) throw new ErpError("Ingrese el concepto del servicio.");
   const items: ItemServicio[] = data.items
