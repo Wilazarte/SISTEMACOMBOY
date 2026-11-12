@@ -2029,13 +2029,13 @@ function Facturas({
                         title={a.nombre}
                         onClick={() => abrirArchivo(a.dataUrl)}
                       >
-                        <Upload size={14} /> {a.tipo === "GUIA" ? "Guía" : "Adjunto"}
+                        <Upload size={14} /> {a.tipo === "GUIA" ? "Guía" : a.tipo === "COTIZACION" ? "Cotización" : "Adjunto"}
                       </Button>
                     ))}
                   </div>
             </>
           ),
-          buscar: `${f.numero} ${f.ocNumero} ${f.codigo ?? ""} ${f.ruc}`,
+          buscar: `${f.numero} ${f.ocNumero} ${f.codigo ?? ""} ${f.ruc} ${f.cotizacionProveedor ?? ""}`,
           tipoDoc: f.esGastoTesoreria ? "GASTO" : f.tipo === "DECLARACION_JURADA" ? "DJ" : "FACTURA",
           estado: f.estadoPago,
           subFecha: vencida ? <span className="font-semibold text-red-600">venció {fechaPE(f.fechaVencimiento)}</span> : undefined,

@@ -27,11 +27,13 @@ export function EditarGasto({ gasto, rol, onClose }: { gasto: Factura; rol: Rol;
   const [numero, setNumero] = useState(gasto.numero);
   const [proveedor, setProveedor] = useState(gasto.proveedor);
   const [ruc, setRuc] = useState(gasto.ruc);
+  // Si el gasto quedó con código interno (COT-PROV-…), aquí se registra la cotización real cuando llegue
+  const [cotizacion, setCotizacion] = useState(gasto.cotizacionAuto ? "" : gasto.cotizacionProveedor ?? "");
   const fecha = parseFechaPE(fechaTxt);
   const rucMal = ruc.length === 11 && !rucValido(ruc);
 
   const guardar = () => {
-    if (ejecutar(() => void editarGasto(gasto.id, { tipoGasto, fecha, importe, descripcion, numero, proveedor, ruc }, rol), `${gasto.codigo ?? gasto.numero} actualizado`)) onClose();
+    if (ejecutar(() => void editarGasto(gasto.id, { tipoGasto, fecha, importe, descripcion, numero, proveedor, ruc, cotizacion }, rol), `${gasto.codigo ?? gasto.numero} actualizado`)) onClose();
   };
 
   return (
@@ -59,7 +61,12 @@ export function EditarGasto({ gasto, rol, onClose }: { gasto: Factura; rol: Rol;
         <Field label={comp === "DJ" ? "N° DJ *" : `N° ${COMPROBANTES_GASTO[comp].toLowerCase()} *`}>
           <Input value={numero} disabled={numeroAutomatico(comp)} onChange={(e) => setNumero(e.target.value.toUpperCase())} />
         </Field>
-        <div />
+        <Field
+          label="N° cotización del proveedor"
+          hint={gasto.cotizacionAuto ? `Código interno: ${gasto.cotizacionProveedor}. Escriba el N° real si ya llegó.` : "Vacío: se conserva el actual"}
+        >
+          <Input value={cotizacion} maxLength={40} onChange={(e) => setCotizacion(e.target.value.toUpperCase())} placeholder={gasto.cotizacionProveedor ?? "Ej: COT-2026-0154"} />
+        </Field>
         <Field label="Proveedor / agencia *" className="md:col-span-2">
           <Input value={proveedor} onChange={(e) => setProveedor(e.target.value)} />
         </Field>

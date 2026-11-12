@@ -2389,6 +2389,8 @@ export interface DatosGasto {
   retencion?: boolean;
   /** Recibo de servicios públicos: N° de suministro. */
   suministro?: string;
+  /** N° de la cotización emitida por el proveedor. Vacío: se genera COT-PROV-0001-2026 al guardar. */
+  cotizacion?: string;
 }
 
 /** Detracción y neto a pagar: ej. agencia S/ 100 con 4 % -> detracción S/ 4, neto S/ 96. */
@@ -2520,7 +2522,7 @@ export async function registrarGastoCompleto(
   /** `items`: OC del gasto (productos del catálogo). `servicios`: OS del gasto (texto libre). Solo una de las dos. */
   opc: { items?: ItemOCGasto[]; servicios?: ServicioOSGasto[]; bancarizacion?: Bancarizacion },
   rol: Rol
-): Promise<{ gasto: Factura; oc?: OrdenCompra; os?: OrdenServicio }> {
+): Promise<{ gasto: Factura; oc?: OrdenCompra; os?: OrdenServicio; avisoCotizacion?: string }> {
   // Declaración jurada: el N° lo pone el servidor (DJ-0001, DJ-0002…) al final, cuando todo lo demás ya validó
   const esDJ = d.comprobante === "DJ";
   const f = prepararGasto(esDJ ? { ...d, numero: DJ_AUTO } : d.comprobante === "SIN_COMPROBANTE" ? { ...d, numero: numeroSinComprobante() } : d, rol);
@@ -2594,10 +2596,57 @@ export async function registrarGastoCompleto(
     f.bancarizacion = b;
     f.historial = [...f.historial, evento(rol, "Marcada como PAGADA", textoBancarizacion(b))];
   }
+  // Cotización del proveedor: sin N° del proveedor, el sistema reserva COT-PROV-0001-2026 (al final, cuando todo validó).
+  // Si la numeración aún no está en Supabase, el gasto se guarda igual y el código se asigna después (al abrir su PDF).
+  let avisoCotizacion: string | undefined;
+  if (!f.cotizacionProveedor) {
+    try {
+      f.cotizacionProveedor = await reservarCotizacionProveedor();
+      f.cotizacionAuto = true;
+    } catch (e) {
+      avisoCotizacion = (e as Error).message;
+    }
+  }
+  if (f.cotizacionProveedor) {
+    const texto = `Cotización ${f.cotizacionProveedor}${f.cotizacionAuto ? " (generada: el proveedor no entregó cotización)" : " del proveedor"}`;
+    f.historial = [...f.historial, evento(rol, "Cotización registrada", texto)];
+  }
   if (oc) escribir(KEYS.ORDENES, [oc, ...getOrdenes()]);
   if (os) escribir(KEYS.ORDENES_SERVICIO, [os, ...getOrdenesServicio()]);
   escribir(KEYS.FACTURAS, [f, ...getFacturas()]);
-  return { gasto: f, oc, os };
+  return { gasto: f, oc, os, avisoCotizacion };
+}
+
+/**
+ * Reserva el siguiente código de cotización interna del año en Supabase (atómico): COT-PROV-0001-2026.
+ * Se usa cuando el proveedor no entregó cotización (supabase/migrations/20261118_cotizacion_proveedor_gasto.sql).
+ */
+async function reservarCotizacionProveedor(): Promise<string> {
+  const { data, error } = await createClient().rpc("siguiente_numero_cot_prov");
+  if (error) {
+    if (error.code === "42501") throw new ErpError(error.message);
+    if (error.code === "PGRST202" || /could not find the function/i.test(error.message))
+      throw new ErpError("Falta la numeración de cotizaciones en Supabase: ejecute supabase/migrations/20261118_cotizacion_proveedor_gasto.sql.");
+    throw new ErpError(`No se pudo generar el código de cotización: ${error.message}`);
+  }
+  const anio = Number(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric" }).format(new Date()));
+  return `COT-PROV-${String(Number(data)).padStart(4, "0")}-${anio}`;
+}
+
+/** Gasto antiguo o guardado sin código de cotización: le asigna COT-PROV-xxxx-AAAA una sola vez. */
+export async function cotizacionGasto(facturaId: string): Promise<Factura> {
+  const f = getFacturas().find((x) => x.id === facturaId);
+  if (!f) throw new ErpError("Gasto no encontrado.");
+  if (f.cotizacionProveedor || !f.esGastoTesoreria || f.tipoGasto === "PLANILLA") return f;
+  const cotizacionProveedor = await reservarCotizacionProveedor();
+  const nuevo: Factura = {
+    ...f,
+    cotizacionProveedor,
+    cotizacionAuto: true,
+    historial: [...f.historial, evento("TESORERIA", "Cotización registrada", `Cotización ${cotizacionProveedor} (generada: el proveedor no entregó cotización)`)],
+  };
+  escribir(KEYS.FACTURAS, getFacturas().map((x) => (x.id === facturaId ? nuevo : x)));
+  return nuevo;
 }
 
 /** Valida el gasto y arma la fila de Facturas (sin guardar). */
@@ -2636,6 +2685,9 @@ function prepararGasto(d: DatosGasto, rol: Rol): Factura {
   const retencion = d.comprobante === "RXH" ? retencionRHE(total, d.retencion ?? true) : 0;
   const neto = r2(netoDetraccion - retencion);
   const suministro = d.comprobante === "SERVICIO_PUBLICO" ? d.suministro?.trim().toUpperCase() : undefined;
+  const cotizacion = (d.cotizacion ?? "").trim().toUpperCase();
+  if (cotizacion.length > 40) throw new ErpError("El N° de cotización del proveedor es demasiado largo (máx. 40 caracteres).");
+  if (/^COT-PROV-/.test(cotizacion)) throw new ErpError("COT-PROV-… es el código que genera el sistema. Deje el campo vacío para generarlo.");
   const f: Factura = {
     id: uid(),
     tipo: d.comprobante === "DJ" ? "DECLARACION_JURADA" : "FACTURA",
@@ -2660,6 +2712,7 @@ function prepararGasto(d: DatosGasto, rol: Rol): Factura {
     ...(d.detraccion ? { detraccionPorc: d.detraccionPorc, detraccionMonto: monto } : {}),
     ...(retencion ? { retencionPorc: PORC_RETENCION_RHE, retencionMonto: retencion } : {}),
     ...(suministro ? { suministro } : {}),
+    ...(cotizacion ? { cotizacionProveedor: cotizacion, cotizacionAuto: false } : {}),
     netoPagar: neto,
     ...(d.archivos.length ? { archivos: d.archivos } : {}),
     creadoPor: usuarioActual(),
@@ -2668,7 +2721,7 @@ function prepararGasto(d: DatosGasto, rol: Rol): Factura {
 }
 
 /** Campos que se pueden corregir en un gasto POR PAGAR (el tipo de comprobante y la OC no cambian). */
-export type EdicionGasto = Pick<Factura, "numero" | "fecha" | "proveedor" | "ruc" | "descripcion"> & { tipoGasto: TipoGasto; importe: number };
+export type EdicionGasto = Pick<Factura, "numero" | "fecha" | "proveedor" | "ruc" | "descripcion"> & { tipoGasto: TipoGasto; importe: number; cotizacion?: string };
 
 /**
  * Quién puede editar un gasto: solo gastos de Tesorería POR PAGAR (no los egresos de planilla),
@@ -2713,7 +2766,18 @@ export function editarGasto(id: string, c: EdicionGasto, rol: Rol): Factura {
   // RHE: la retención sigue la decisión del registro (si se quitó con un importe > S/ 1,500, sigue sin retención)
   const retencion = comp === "RXH" ? retencionRHE(total, f.retencionPorc !== undefined || f.total <= TOPE_RETENCION_RHE) : 0;
   const neto = r2(netoDetraccion - retencion);
-  const cambios = [numero !== f.numero && `N° ${f.numero} → ${numero}`, total !== f.total && `importe ${soles(f.total)} → ${soles(total)}`].filter(Boolean).join(" · ");
+  // Cotización: si llega la del proveedor, reemplaza al código generado; vacío conserva el actual
+  const cot = (c.cotizacion ?? "").trim().toUpperCase();
+  if (cot.length > 40) throw new ErpError("El N° de cotización del proveedor es demasiado largo (máx. 40 caracteres).");
+  if (cot && /^COT-PROV-/.test(cot) && cot !== f.cotizacionProveedor) throw new ErpError("COT-PROV-… es el código que genera el sistema; no se escribe a mano.");
+  const cambiaCot = !!cot && cot !== f.cotizacionProveedor;
+  const cambios = [
+    numero !== f.numero && `N° ${f.numero} → ${numero}`,
+    total !== f.total && `importe ${soles(f.total)} → ${soles(total)}`,
+    cambiaCot && `cotización ${f.cotizacionProveedor ?? "-"} → ${cot}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const editado: Factura = {
     ...f,
     numero,
@@ -2730,6 +2794,7 @@ export function editarGasto(id: string, c: EdicionGasto, rol: Rol): Factura {
     retencionPorc: retencion ? PORC_RETENCION_RHE : undefined,
     retencionMonto: retencion || undefined,
     netoPagar: neto,
+    ...(cambiaCot ? { cotizacionProveedor: cot, cotizacionAuto: false } : {}),
     editadoPor: usuarioActual(),
     editadoEn: new Date().toISOString(),
     historial: [...f.historial, evento(rol, "Gasto editado", cambios || undefined)],
