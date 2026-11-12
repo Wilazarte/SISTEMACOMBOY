@@ -25,6 +25,8 @@ export interface NotifFlujo {
   fase: number | null;
   href: string | null;
   leida: boolean;
+  /** REQ_ALMACEN: { req_id, numero, evento } (SQL 20261117). */
+  datos?: Record<string, unknown> | null;
 }
 
 interface Estado {
@@ -43,11 +45,13 @@ const avisar = () => oyentes.forEach((f) => f(estado));
 async function recargar(): Promise<void> {
   const { data, error } = await createClient()
     .from("notificaciones")
-    .select("id,created_at,modulo,tipo,titulo,mensaje,asignado_a,codigo_expediente,fase,href,leida")
+    .select("id,created_at,modulo,tipo,titulo,mensaje,asignado_a,codigo_expediente,fase,href,leida,datos")
     .not("tipo", "is", null)
     .order("created_at", { ascending: false })
     .limit(LIMITE);
-  estado = error ? { items: [], disponible: false } : { items: (data ?? []) as NotifFlujo[], disponible: true };
+  // REQ de Almacén: abren Tesorería > NUEVOS REQ (el SQL 20261117 guarda solo /dashboard/compras)
+  const items = ((data ?? []) as NotifFlujo[]).map((n) => (n.tipo === "REQ_ALMACEN" ? { ...n, href: "/dashboard/compras?tab=nuevos" } : n));
+  estado = error ? { items: [], disponible: false } : { items, disponible: true };
   avisar();
 }
 
@@ -79,6 +83,10 @@ export function useNotifFlujo(activo: boolean): Estado {
   }, [activo]);
   return e;
 }
+
+/** Ids de los REQ de Almacén que ya tienen aviso en la tabla (SQL 20261117): la campana no los repite. */
+export const reqsConAviso = (items: NotifFlujo[]): Set<string> =>
+  new Set(items.filter((n) => n.tipo === "REQ_ALMACEN").map((n) => String(n.datos?.req_id ?? "")));
 
 export async function marcarLeidas(ids: string[]): Promise<void> {
   if (!ids.length) return;

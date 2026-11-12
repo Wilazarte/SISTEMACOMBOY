@@ -5,6 +5,8 @@ import { ProductoInput } from "@/components/productos/ProductoInput";
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   AlertTriangle,
+  ClipboardList,
+  Download,
   Check,
   Eye,
   FileCheck2,
@@ -91,7 +93,6 @@ import PlanillaInterna from "@/components/tesoreria/PlanillaTab";
 import { DeclaracionesJuradas } from "@/components/tesoreria/DeclaracionesJuradas";
 import { pdfDeclaracionJurada } from "@/lib/pdf";
 import { EditarReq, permisoEditarReq } from "@/components/compras/EditarReq";
-import TesoreriaLeftDrawer from "@/components/tesoreria/TesoreriaLeftDrawer";
 import QuickActions, { QA_IDS } from "@/components/tesoreria/QuickActions";
 import { BotonNuevo } from "@/components/ui/BotonFiltros";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
@@ -100,7 +101,7 @@ import { FormOrdenServicio, filasOrdenesServicio } from "@/components/compras/Or
 import type { Trabajador } from "@/lib/types";
 import type { Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, OrdenServicio, Proveedor, Requerimiento, Rol, OrdenAGenerar, StockItem, TipoComprobanteCompra } from "@/lib/types";
 
-type Tab = "registrar" | "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias" | "planilla" | "declaraciones";
+type Tab = "nuevos" | "registrar" | "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias" | "planilla" | "declaraciones";
 
 const FORMAS_PAGO: FormaPago[] = ["CONTADO", "CREDITO 15 DIAS", "CREDITO 30 DIAS", "CREDITO 60 DIAS", "ADELANTO 50%"];
 const DIAS_CREDITO: Record<FormaPago, number> = {
@@ -156,7 +157,7 @@ export default function ComprasPage() {
   // Contador de la pestaña Planilla (solo se descarga si el usuario ve planilla)
   const trabajadores = useStore<Trabajador[]>(KEYS.TRABAJADORES, [], vePlanilla);
   const activos = trabajadores.filter((t) => t.activo && !esContratista(t)).length;
-  const tabsPermitidas: Tab[] = [...(veCompras ? (["registrar", "antecedentes", "cotizaciones", "ordenes", "facturas", "declaraciones"] as Tab[]) : []), ...(vePlanilla ? (["planilla"] as Tab[]) : [])];
+  const tabsPermitidas: Tab[] = [...(veCompras ? (["nuevos", "registrar", "antecedentes", "cotizaciones", "ordenes", "facturas", "declaraciones"] as Tab[]) : []), ...(vePlanilla ? (["planilla"] as Tab[]) : [])];
   // Al volver a Tesorería abre la última pestaña usada (salvo que la URL pida otra con ?tab=)
   useEffect(() => {
     try {
@@ -209,7 +210,6 @@ export default function ComprasPage() {
         </div>
       )}
 
-      {veCompras && <Notificaciones pendientes={pendientes} rol={rol} />}
 
       {/* Isla de Tesorería sin Planilla: Planilla abre desde su botón del dock y dibuja su propia isla */}
       <Tabs<Tab>
@@ -220,6 +220,7 @@ export default function ComprasPage() {
           // Isla: Registrar gasto · Cotizaciones · Órdenes compra · Facturas · Declaraciones · Antecedentes
           ...(veCompras
             ? [
+                { id: "nuevos" as const, label: "NUEVOS REQ", icon: <ClipboardList size={16} />, count: pendientes.length },
                 { id: "registrar" as const, label: "Registrar gasto", icon: <PackagePlus size={16} /> },
                 { id: "cotizaciones" as const, label: "Cotizaciones", icon: <FileSpreadsheet size={16} />, count: cotizables.filter((r) => r.estado === "ACEPTADO").length },
                 { id: "ordenes" as const, label: "Órdenes OC / OS", icon: <ShoppingBag size={16} />, count: cotisSinOC.length },
@@ -237,6 +238,14 @@ export default function ComprasPage() {
         ]}
       />
 
+      {tab === "nuevos" && veCompras && (
+        <NuevosReq
+          pendientes={pendientes}
+          porCotizar={procesados.filter((r) => r.estado === "ACEPTADO" && !cotizaciones.some((c) => c.reqId === r.id))}
+          rol={rol}
+          onCotizar={(id) => ir("cotizaciones", { req: id })}
+        />
+      )}
       {tab === "registrar" && <RegistrarCompra rol={rol} proveedores={proveedores} compras={compras} gastos={facturas.filter((f) => f.esGastoTesoreria)} stock={stock} onGenerarOS={(id) => ir("ordenes", { gasto: id })} />}
       {tab === "antecedentes" && <Antecedentes reqs={procesados} ordenes={ordenes} rol={rol} onCotizar={(id) => ir("cotizaciones", { req: id })} onIr={irTab} />}
       {tab === "cotizaciones" && (
@@ -270,9 +279,22 @@ export default function ComprasPage() {
 }
 
 // =====================================================================
-// NOTIFICACIONES (cards amarillas)
+// NUEVOS REQ (Tesorería): requerimientos de Almacén por revisar
+// Ver · Descargar · Editar · Aceptar (→ Ingresar cotización) · Observar · Rechazar
+// Antes vivían en la barra derecha de notificaciones, que el ERP v3.0 ya no dibuja.
 // =====================================================================
-function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requerimiento[]; rol: Rol }) {
+function NuevosReq({
+  pendientes: todosPendientes,
+  porCotizar,
+  rol,
+  onCotizar,
+}: {
+  pendientes: Requerimiento[];
+  /** REQ aceptados que aún no tienen cotización: siguiente paso del flujo. */
+  porCotizar: Requerimiento[];
+  rol: Rol;
+  onCotizar: (reqId: string) => void;
+}) {
   // Cada REQ una sola vez (por número), aunque llegue repetido de la caché
   const pendientes = todosPendientes.filter((r, i, arr) => i === arr.findIndex((x) => x.id === r.id || (!!x.numero && x.numero === r.numero)));
   const [rechazo, setRechazo] = useState<Requerimiento | null>(null);
@@ -298,22 +320,20 @@ function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requ
     if (ejecutar(() => void aceptarMultiple(elegidos, rol), plural(elegidos.length, "aceptado"))) setMarcados(new Set());
   };
 
-  if (pendientes.length === 0)
-    return (
-      <TesoreriaLeftDrawer cantidad={0}>
-        <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-300">
-          <Check size={16} /> No hay requerimientos pendientes de revisión.
-        </div>
-      </TesoreriaLeftDrawer>
-    );
+  const puedeCotizar = puede(rol, "coti.crear");
+  const aceptar = (r: Requerimiento) => {
+    if (ejecutar(() => aceptarRequerimiento(r.id, rol), `${r.numero} ACEPTADO`) && puedeCotizar) onCotizar(r.id);
+  };
 
   return (
-    <>
-      <TesoreriaLeftDrawer
-        cantidad={pendientes.length}
-        acciones={
-          habilitado && (
-            <>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader
+          title={`NUEVOS REQ · por revisar (${pendientes.length})`}
+          subtitle="Requerimientos de Almacén. Al aceptar se abre Ingresar cotización con el REQ elegido."
+          action={
+          habilitado && pendientes.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
               <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-white/10 bg-white/10 px-2 py-1 text-xs font-medium text-white">
                 <input
                   type="checkbox"
@@ -329,10 +349,17 @@ function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requ
               <button className={`${BTN_REQ} h-7 border-[#ff1a1a] bg-[#ff1a1a] px-2 font-bold`} disabled={elegidos.length === 0} onClick={() => setRechazoLote(true)}>
                 <X size={13} /> Rechazar{elegidos.length ? ` (${elegidos.length})` : ""}
               </button>
-            </>
+            </div>
           )
         }
-      >
+        />
+        <div className="p-4">
+        {pendientes.length === 0 ? (
+          <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-300">
+            <Check size={16} /> No hay requerimientos pendientes de revisión.
+          </div>
+        ) : (
+        <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
         {pendientes.map((r) => (
           <div key={r.id} className={cn("flex flex-col rounded-lg border bg-[#212a3a] p-3", marcados.has(r.id) ? "border-[#2a7bff]" : "border-amber-500/30")}>
             <div className="flex items-start justify-between">
@@ -370,6 +397,9 @@ function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requ
               <button className={`${BTN_REQ} border-[#60a5fa] bg-[#1e3a8a] shadow-[0_0_12px_rgba(30,58,138,0.6)]`} onClick={() => abrirDoc({ tipo: "REQ", id: r.id })}>
                 <Eye size={14} /> Ver
               </button>
+              <button className={`${BTN_REQ} border-[#60a5fa] bg-[#1e3a8a] shadow-[0_0_12px_rgba(30,58,138,0.6)]`} onClick={() => pdfRequerimiento(r)}>
+                <Download size={14} /> Descargar
+              </button>
               {(() => {
                 const p = permisoEditarReq(r, sesion);
                 return (
@@ -380,7 +410,7 @@ function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requ
                   </span>
                 );
               })()}
-              <button className={`${BTN_REQ} border-[#2a7bff] grad-azul shadow-[0_0_14px_rgba(42,123,255,0.6)]`} disabled={!habilitado} onClick={() => ejecutar(() => aceptarRequerimiento(r.id, rol), `${r.numero} ACEPTADO`)}>
+              <button className={`${BTN_REQ} border-[#2a7bff] grad-azul shadow-[0_0_14px_rgba(42,123,255,0.6)]`} disabled={!habilitado} onClick={() => aceptar(r)}>
                 <Check size={14} /> Aceptar
               </button>
               <button className={`${BTN_REQ} border-[#2a7bff] bg-[#212a3a] shadow-[0_0_12px_rgba(42,123,255,0.35)]`} disabled={!habilitado} onClick={() => { setMotivo(""); setObs(r); }}>
@@ -392,7 +422,43 @@ function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requ
             </div>
           </div>
         ))}
-      </TesoreriaLeftDrawer>
+        </div>
+        )}
+        </div>
+      </Card>
+
+      {porCotizar.length > 0 && (
+        <Card>
+          <CardHeader title={`Aceptados · por cotizar (${porCotizar.length})`} subtitle="Siguiente paso: ingresar la cotización del proveedor y luego emitir la OC / OS." />
+          <div className="divide-y divide-plomo-100">
+            {porCotizar.map((r) => (
+              <div key={r.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-fg">
+                    {r.numero} <span className="ml-1 inline-block align-middle"><Badge estado={r.estado} /></span>
+                  </p>
+                  <p className="truncate text-xs text-plomo-500">
+                    {fechaPE(r.fecha)} · {r.sede} · {r.solicitante} · {r.items.length} ítem(s)
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "REQ", id: r.id })} title="Ver e historial">
+                    <Eye size={15} />
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => pdfRequerimiento(r)} title="Descargar PDF">
+                    <Download size={15} />
+                  </Button>
+                  {puedeCotizar && (
+                    <Button size="sm" onClick={() => onCotizar(r.id)}>
+                      <FileSpreadsheet size={15} /> Ingresar cotización
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {editReq && <EditarReq req={editReq} rol={rol} onClose={() => setEditReq(null)} />}
 
@@ -451,7 +517,7 @@ function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requ
           </Button>
         </div>
       </Modal>
-    </>
+    </div>
   );
 }
 
