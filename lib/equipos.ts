@@ -223,7 +223,7 @@ export async function ingresarEquipoProduccion(
 export type DatosEquipo = Pick<
   EquipoTerminado,
   "tipo_equipo" | "modelo" | "marca_motor" | "serie_motor" | "codigo_chasis" | "color" | "sede" | "qc_aprobado" | "fecha_qc" | "supervisor_qc" | "observaciones_qc" | "fotos"
->;
+> & { /** Orden de producción de la que sale el equipo (opcional, referencia). */ op_id?: string };
 
 export const equipoVacio = (): DatosEquipo => ({
   tipo_equipo: "",
@@ -238,6 +238,7 @@ export const equipoVacio = (): DatosEquipo => ({
   supervisor_qc: "",
   observaciones_qc: "",
   fotos: [],
+  op_id: "",
 });
 
 /** Completa registros hechos a mano en Supabase (pueden traer solo chasis, tipo, ubicacion_sede y estado). */
@@ -327,8 +328,13 @@ export async function guardarEquipo(d: DatosEquipo, usuario: string, idExistente
     fotos: d.fotos.slice(0, 3),
     creado_por: anterior?.creado_por ?? usuario,
     actualizado: ahora,
+    origen: anterior?.origen ?? "MANUAL",
+    op_id: d.op_id?.trim().toUpperCase() || anterior?.op_id || undefined,
+    fecha_ingreso: anterior?.fecha_ingreso ?? ahora,
   };
   escribir(KEYS.EQUIPOS, [equipo, ...getEquipos().filter((x) => x.id !== id)]);
+  // Ingreso nuevo a almacén: queda en movimientos (kardex de equipos), igual que los que llegan de Producción
+  if (!anterior) registrarMovimiento({ tipo: "INGRESO", chasis: codigo_chasis, equipo_id: id, cantidad: 1, a_sede: d.sede, op: equipo.op_id, usuario });
   return equipo;
 }
 
