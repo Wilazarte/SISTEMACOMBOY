@@ -265,6 +265,11 @@ export interface Factura {
   /** true: el N° lo generó el sistema porque no había cotización del proveedor. */
   cotizacionAuto?: boolean;
   archivos?: ArchivoGasto[];
+  /**
+   * DJ automática de sustento (Williams 2026-11-12): todo gasto sin OC ni OS lleva su declaración jurada (DJ-0042),
+   * aunque tenga factura / boleta. En los gastos con comprobante DJ el N° de la DJ es `numero`.
+   */
+  djNumero?: string;
   /** Declaración jurada de gasto: PENDIENTE (recién emitida), ENVIADA (a Gerencia), APROBADA. */
   djEstado?: "PENDIENTE" | "ENVIADA" | "APROBADA";
   /** Usuario que registró el gasto (perfiles.usuario). Los antiguos no lo tienen. */
