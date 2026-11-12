@@ -2,9 +2,8 @@
 
 import { FiltrosPlegables } from "@/components/ui/BotonFiltros";
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import QRCode from "qrcode";
-import { ArrowRightLeft, Camera, Factory, Pencil, Printer, Search, X } from "lucide-react";
+import { ArrowRightLeft, Camera, Factory, Pencil, Plus, Printer, Search, X } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Td, Textarea, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { EMPRESA } from "@/lib/empresa";
@@ -26,6 +25,7 @@ import {
 import { KEYS, abrirArchivo, fechaPE, hoy, useStore } from "@/lib/storage";
 import { ArchivoImg } from "@/components/ArchivoRef";
 import { trazabilidadEquipo } from "@/lib/trazabilidad";
+import type { OrdenProduccion } from "@/lib/produccion";
 
 const fechaHora = (iso?: string) => {
   const d = iso ? new Date(iso) : null;
@@ -33,8 +33,10 @@ const fechaHora = (iso?: string) => {
 };
 
 /**
- * Sección "Equipos terminados" de Almacén › Stock. Los equipos los ingresa Producción (QC aprobado):
- * aquí se visualizan (filtros por sede / estado), con trazabilidad, QR y transferencia de sede.
+ * Almacén › Equipos de producción (restablecido 2026-11-12, pedido de Williams): Almacén ingresa cada equipo
+ * terminado con tipo, modelo, serie de motor, chasis / VIN, color, sede y el V°B° de control de calidad.
+ * También llegan solos desde Producción (QC aprobado en la OP). Filtros por sede / estado, trazabilidad, QR y
+ * transferencia de sede. Con ?nuevo=1 en la URL (botón del INICIO) el formulario se abre al entrar.
  */
 export function EquiposTerminados({ puedeRegistrar, nuevo, onNuevoCerrado }: { puedeRegistrar: boolean; nuevo: boolean; onNuevoCerrado: () => void }) {
   const equipos = useStore<EquipoTerminado[]>(KEYS.EQUIPOS, []).map(normalizarEquipo);
@@ -47,12 +49,16 @@ export function EquiposTerminados({ puedeRegistrar, nuevo, onNuevoCerrado }: { p
   const [form, setForm] = useState<{ datos: DatosEquipo; id?: string } | null>(null);
   const [ver, setVer] = useState<string | null>(null);
 
+  const abrirNuevo = () => setForm({ datos: { ...equipoVacio(), supervisor_qc: getSesion()?.nombre || getSesion()?.usuario || "" } });
   useEffect(() => {
     if (nuevo) {
-      setForm({ datos: { ...equipoVacio(), supervisor_qc: getSesion()?.usuario ?? "" } });
+      abrirNuevo();
       onNuevoCerrado();
     }
   }, [nuevo, onNuevoCerrado]);
+  useEffect(() => {
+    if (puedeRegistrar && new URLSearchParams(window.location.search).get("nuevo") === "1") abrirNuevo();
+  }, [puedeRegistrar]);
 
   const t = q.trim().toUpperCase().replace(/\s+/g, "");
   const lista = equipos
@@ -66,7 +72,7 @@ export function EquiposTerminados({ puedeRegistrar, nuevo, onNuevoCerrado }: { p
   return (
     <Card>
       <CardHeader
-        title="Equipos terminados"
+        title="Equipos de producción (terminados)"
         subtitle={`${equipos.length} equipo(s) fabricados · ${disponibles} disponible(s) · ${equipos.length - disponibles - vendidos} en control de calidad · ${vendidos} vendido(s)`}
         action={
           <div className="flex flex-wrap items-center gap-2">
@@ -92,15 +98,20 @@ export function EquiposTerminados({ puedeRegistrar, nuevo, onNuevoCerrado }: { p
                 />
               </div>
             </FiltrosPlegables>
-            <Link href="/dashboard/produccion" className="inline-flex items-center gap-1.5 rounded-lg border border-plomo-200 bg-surface px-4 py-2 text-sm font-medium text-fg hover:bg-plomo-50">
-              <Factory size={16} /> Ingresan desde Producción
-            </Link>
+            {puedeRegistrar && (
+              <Button onClick={abrirNuevo}>
+                <Plus size={16} /> Ingresar equipo
+              </Button>
+            )}
           </div>
         }
       />
       {lista.length === 0 ? (
         <div className="p-5">
-          <Empty icon={<Factory size={28} />} text={equipos.length ? "Ningún equipo coincide con la búsqueda." : "Aún no hay equipos terminados registrados."} />
+          <Empty
+            icon={<Factory size={28} />}
+            text={equipos.length ? "Ningún equipo coincide con la búsqueda." : "Aún no hay equipos terminados registrados. Use «Ingresar equipo» para registrar el primero."}
+          />
         </div>
       ) : (
         <Table head={["Código", "Sede", "Modelo", "Chasis / VIN", "Marca motor", "Serie motor", "Origen", "QC", "Estado", "Actualizado"]}>
@@ -121,7 +132,7 @@ export function EquiposTerminados({ puedeRegistrar, nuevo, onNuevoCerrado }: { p
                     PRODUCCIÓN
                   </span>
                 ) : (
-                  <span className="text-xs text-plomo-500">Manual</span>
+                  <span className="text-xs text-plomo-500">{e.op_id ? `Almacén · ${e.op_id}` : "Almacén"}</span>
                 )}
               </Td>
               <Td>
@@ -166,6 +177,27 @@ function FormEquipo({ inicial, id, onClose }: { inicial: DatosEquipo; id?: strin
   const fotoRef = useRef<HTMLInputElement>(null);
   const set = <K extends keyof DatosEquipo>(k: K, v: DatosEquipo[K]) => setD((x) => ({ ...x, [k]: v }));
   const supervisores = Array.from(new Set(useStore<EquipoTerminado[]>(KEYS.EQUIPOS, []).map((e) => e.supervisor_qc).filter(Boolean) as string[]));
+  // OPs en fabricación (sin equipo ingresado): elegir una completa modelo, motor, chasis, color y sede
+  const ops = useStore<OrdenProduccion[]>(KEYS.PRODUCCION, []).filter((o) => o.estado !== "ANULADA" && !o.equipo_id);
+  const elegirOP = (v: string) => {
+    const opId = v.trim().toUpperCase();
+    const o = ops.find((x) => x.id.toUpperCase() === opId);
+    setD((x) =>
+      o
+        ? {
+            ...x,
+            op_id: o.id,
+            tipo_equipo: o.tipo_equipo || x.tipo_equipo,
+            modelo: (o.modelo || x.modelo).toUpperCase(),
+            marca_motor: o.marca_motor || x.marca_motor,
+            serie_motor: (o.serie_motor || x.serie_motor).toUpperCase(),
+            codigo_chasis: (o.codigo_chasis || x.codigo_chasis).toUpperCase(),
+            color: o.color || x.color,
+            sede: o.ubicacion_sede ? sedeEquipo({ sede: o.ubicacion_sede }) || x.sede : x.sede,
+          }
+        : { ...x, op_id: opId }
+    );
+  };
 
   const agregarFotos = async (files: FileList | null) => {
     if (!files) return;
@@ -190,10 +222,18 @@ function FormEquipo({ inicial, id, onClose }: { inicial: DatosEquipo; id?: strin
   };
 
   return (
-    <Modal open onClose={onClose} title={id ? `Editar equipo ${id}` : "Registrar equipo terminado"} wide>
+    <Modal open onClose={onClose} title={id ? `Editar equipo ${id}` : "Ingresar equipo de producción"} wide>
       <div className="space-y-5">
         <p className="text-sm text-plomo-600">Un registro por equipo fabricado. La serie de motor y el código de chasis / VIN no se pueden repetir.</p>
         <div className="grid gap-3 md:grid-cols-3">
+          <Field label="Orden de producción (opcional)" className="md:col-span-3">
+            <Input value={d.op_id ?? ""} list="ops-equipo" onChange={(e) => elegirOP(e.target.value)} placeholder="Ej: OP-2026-0001 · al elegirla se completan los datos del equipo" />
+            <datalist id="ops-equipo">
+              {ops.map((o) => (
+                <option key={o.id} value={o.id}>{`${o.modelo} · chasis ${o.codigo_chasis}`}</option>
+              ))}
+            </datalist>
+          </Field>
           <Field label="Tipo de equipo *">
             <Select value={d.tipo_equipo} onChange={(e) => set("tipo_equipo", e.target.value as TipoEquipo)} placeholder="Selecciona tipo" options={TIPOS_EQUIPO.map((x) => ({ value: x, label: x }))} />
           </Field>
@@ -218,9 +258,9 @@ function FormEquipo({ inicial, id, onClose }: { inicial: DatosEquipo; id?: strin
         </div>
 
         <fieldset className="rounded-xl border border-plomo-200 p-4">
-          <legend className="px-1 text-[12px] font-semibold uppercase tracking-wider text-plomo-500">Control de calidad</legend>
+          <legend className="px-1 text-[12px] font-semibold uppercase tracking-wider text-plomo-500">Control de calidad · visto bueno</legend>
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-sm font-medium text-fg">¿Pasó supervisión QC?</span>
+            <span className="text-sm font-medium text-fg">¿Tiene visto bueno (V°B°) de control de calidad?</span>
             <button
               type="button"
               role="switch"
@@ -238,7 +278,7 @@ function FormEquipo({ inicial, id, onClose }: { inicial: DatosEquipo; id?: strin
               <Field label="Fecha QC *">
                 <Input type="date" value={d.fecha_qc ?? ""} max={hoy()} onChange={(e) => set("fecha_qc", e.target.value)} />
               </Field>
-              <Field label="Supervisor QC *" className="md:col-span-2">
+              <Field label="Supervisor QC (V°B°) *" className="md:col-span-2">
                 <Input value={d.supervisor_qc ?? ""} list="supervisores-qc" onChange={(e) => set("supervisor_qc", e.target.value)} placeholder="Nombre del supervisor" />
                 <datalist id="supervisores-qc">
                   {supervisores.map((s) => (
@@ -353,6 +393,7 @@ function DetalleEquipo({
           {fila("Serie de motor", e.serie_motor)}
           {fila("Color", e.color)}
           {fila("Ubicación / sede", sedeEquipo(e))}
+          {e.op_id && fila("Orden de producción", e.op_id)}
           {e.vendido_od && fila("Vendido (salida de almacén)", `${e.vendido_od}${e.fecha_venta ? ` · ${fechaHora(e.fecha_venta)}` : ""}`)}
           {fila("Fabricado", fechaHora(e.fecha_fabricacion))}
           {e.qc_aprobado && fila("Fecha QC", e.fecha_qc ? fechaPE(e.fecha_qc) : "-")}

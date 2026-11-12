@@ -7,21 +7,24 @@ import { EditarGasto } from "@/components/compras/EditarGasto";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { getSesion } from "@/lib/auth";
 import { imprimirDeclaracionJurada, pdfDeclaracionJurada, urlDeclaracionJurada } from "@/lib/pdf";
-import { cambiarEstadoDJ, esDeclaracionJurada, fechaPE, permisoEditarGasto, soles } from "@/lib/storage";
+import { useDJsAutomaticas } from "@/components/compras/useDJsAutomaticas";
+import { cambiarEstadoDJ, esDJAutomatica, esDeclaracionJurada, fechaPE, numeroDJ, permisoEditarGasto, soles } from "@/lib/storage";
 import type { Factura, Rol } from "@/lib/types";
 
 const estadoDJ = (f: Factura) => f.djEstado ?? "PENDIENTE";
 
 /**
- * Pestaña "Declaraciones juradas" de Tesorería / Compras: los gastos sin comprobante (DJ-0001…) con
+ * Pestaña "Declaraciones juradas" de Tesorería / Compras: los gastos sin comprobante (DJ-0001…) y las DJ
+ * automáticas de los gastos sin OC ni OS (Williams 2026-11-12), con
  * vista previa del PDF, descarga, impresión, edición y envío a aprobar. Son los mismos gastos de Facturas:
  * no hay una tabla aparte (la DJ vive en compras, tipo factura, con comprobante DJ).
  */
 export function DeclaracionesJuradas({ facturas, rol }: { facturas: Factura[]; rol: Rol }) {
   const sesion = getSesion();
+  useDJsAutomaticas(rol);
   const [ver, setVer] = useState<Factura | null>(null);
   const [editar, setEditar] = useState<Factura | null>(null);
-  const djs = facturas.filter(esDeclaracionJurada).sort((a, b) => b.fecha.localeCompare(a.fecha) || b.numero.localeCompare(a.numero));
+  const djs = facturas.filter(esDeclaracionJurada).sort((a, b) => b.fecha.localeCompare(a.fecha) || numeroDJ(b).localeCompare(numeroDJ(a)));
   // El modal muestra siempre la versión al día (tras enviar / aprobar / editar)
   const actual = ver ? djs.find((d) => d.id === ver.id) ?? ver : null;
 
@@ -34,7 +37,7 @@ export function DeclaracionesJuradas({ facturas, rol }: { facturas: Factura[]; r
         contraparte: f.proveedor,
         ref: (
           <>
-            <span className="font-semibold text-fg">{f.numero}</span>
+            <span className="font-semibold text-fg">{numeroDJ(f)}</span>
             {f.codigo && <span className="ml-1.5 text-xs text-plomo-500">{f.codigo}</span>}
             <span className="ml-2 inline-block align-middle">
               <Badge estado={estadoDJ(f)} />
@@ -44,11 +47,12 @@ export function DeclaracionesJuradas({ facturas, rol }: { facturas: Factura[]; r
         extra: (
           <span className="block truncate" title={f.descripcion}>
             {f.descripcion || "-"}
+            {esDJAutomatica(f) && <span className="block text-xs text-plomo-500">Sustenta {f.numero} · sin OC ni OS</span>}
           </span>
         ),
         total: soles(f.total),
-        buscar: `${f.numero} ${f.codigo ?? ""} ${f.descripcion ?? ""} ${f.ruc}`,
-        tipoDoc: f.ocId ? "DJ con OC" : "DJ",
+        buscar: `${numeroDJ(f)} ${f.numero} ${f.codigo ?? ""} ${f.descripcion ?? ""} ${f.ruc}`,
+        tipoDoc: f.ocId ? "DJ con OC" : esDJAutomatica(f) ? "DJ de gasto" : "DJ",
         estado: estadoDJ(f),
         acciones: (
           <div className="flex gap-1">
@@ -95,9 +99,9 @@ function VerDJ({ dj, rol, onClose }: { dj: Factura; rol: Rol; onClose: () => voi
   }, [dj]);
 
   return (
-    <Modal open onClose={onClose} title={`Declaración jurada ${dj.numero}`} wide>
+    <Modal open onClose={onClose} title={`Declaración jurada ${numeroDJ(dj)}`} wide>
       <div className="grid gap-4 md:grid-cols-[1fr_280px]">
-        {url ? <iframe src={url} title={dj.numero} className="h-[60vh] w-full rounded-lg border border-plomo-200" /> : <div className="h-[60vh] rounded-lg bg-plomo-100" />}
+        {url ? <iframe src={url} title={numeroDJ(dj)} className="h-[60vh] w-full rounded-lg border border-plomo-200" /> : <div className="h-[60vh] rounded-lg bg-plomo-100" />}
         <div className="space-y-3 text-sm">
           <dl className="space-y-2">
             {(
@@ -130,12 +134,12 @@ function VerDJ({ dj, rol, onClose }: { dj: Factura; rol: Rol; onClose: () => voi
               <Download size={15} /> Descargar PDF
             </Button>
             {estado === "PENDIENTE" && !sesion?.soloLectura && (
-              <Button onClick={() => ejecutar(() => void cambiarEstadoDJ(dj.id, "ENVIADA", rol), `${dj.numero} enviada a aprobar`)}>
+              <Button onClick={() => ejecutar(() => void cambiarEstadoDJ(dj.id, "ENVIADA", rol), `${numeroDJ(dj)} enviada a aprobar`)}>
                 <Send size={15} /> Enviar a aprobar
               </Button>
             )}
             {estado !== "APROBADA" && puedeAprobar && (
-              <Button variant="success" onClick={() => ejecutar(() => void cambiarEstadoDJ(dj.id, "APROBADA", rol), `${dj.numero} aprobada`)}>
+              <Button variant="success" onClick={() => ejecutar(() => void cambiarEstadoDJ(dj.id, "APROBADA", rol), `${numeroDJ(dj)} aprobada`)}>
                 <Check size={15} /> Aprobar
               </Button>
             )}

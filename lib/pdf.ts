@@ -8,7 +8,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import QRCode from "qrcode";
 import { EMPRESA } from "./empresa";
-import { CUENTAS_ORIGEN_PAGO, codigoContratista, codigoGasto, cotizacionGasto, getFacturas, cuentaBancariaTxt, fechaPE, getTrabajadores, soles } from "./storage";
+import { COMPROBANTES_GASTO, CUENTAS_ORIGEN_PAGO, esDJAutomatica, numeroDJ, codigoContratista, codigoGasto, cotizacionGasto, getFacturas, cuentaBancariaTxt, fechaPE, getTrabajadores, soles } from "./storage";
 import { codigoDesdeNumero, estadoDocumento } from "./utils/codigos";
 import { SEDE_PLANTA_PRINCIPAL, bloqueDocumento, sedeOrigenReq, type DocUnificado, type TipoDocumento } from "./plantillasDocumentos";
 import { equipoDeLinea, sedeEquipo } from "./equipos";
@@ -807,9 +807,14 @@ export function pdfEstadoCuenta(d: {
 
 /** Declaración jurada de gasto (gasto sin comprobante) con su N° correlativo DJ-0001. */
 export function docDeclaracionJurada(f: Factura): jsPDF {
+  const n = numeroDJ(f);
+  // DJ automática (gasto con factura / boleta / recibo, sin OC ni OS): sustenta el gasto, no reemplaza al comprobante
+  const auto = esDJAutomatica(f);
+  const comp = f.comprobanteGasto ? `${COMPROBANTES_GASTO[f.comprobanteGasto] ?? f.comprobanteGasto} ${f.numero}` : f.numero;
+  const motivo = auto ? "Gasto sin orden de compra ni orden de servicio" : "Gasto sin comprobante de pago autorizado";
   const doc = construir({
-    titulo: `DECLARACIÓN JURADA DE GASTO N° ${f.numero}`,
-    numero: f.numero,
+    titulo: `DECLARACIÓN JURADA DE GASTO N° ${n}`,
+    numero: n,
     estado: f.djEstado === "APROBADA" ? "APROBADA" : f.djEstado === "ENVIADA" ? "EN APROBACIÓN" : estadoDocumento(f.estadoPago),
     datos: [
       ["Fecha", fechaPE(f.fecha)],
@@ -818,25 +823,31 @@ export function docDeclaracionJurada(f: Factura): jsPDF {
       ["Proveedor", f.proveedor],
       ["DNI / RUC", f.ruc || "-"],
       ["Código de gasto", f.codigo ?? "-"],
-      ["Motivo", "Gasto sin comprobante de pago autorizado"],
+      ...(auto ? ([["Comprobante", comp]] as [string, string][]) : []),
+      ["Motivo", motivo],
     ],
     head: ["#", "Concepto", "Importe"],
     body: [[1, f.descripcion ?? "-", soles(f.total)]],
     alinearDerecha: [2],
     totales: [["TOTAL", soles(f.total)]],
-    notas: [
-      `Yo, ${f.proveedor}${f.ruc ? `, identificado con ${f.ruc.length === 11 ? "RUC" : "DNI"} ${f.ruc}` : ""}, declaro bajo juramento haber recibido de ${EMPRESA.razonSocial} (RUC ${EMPRESA.ruc}) el importe de ${soles(f.total)} por el concepto indicado, el ${fechaPE(f.fecha)}, sin haber emitido comprobante de pago.`,
-      "Motivo: gasto sin comprobante de pago autorizado. Documento sustentatorio interno; no otorga derecho a crédito fiscal.",
-    ],
+    notas: auto
+      ? [
+          `Declaro bajo juramento que el gasto de ${soles(f.total)} pagado a ${f.proveedor}${f.ruc ? ` (${f.ruc.length === 11 ? "RUC" : "DNI"} ${f.ruc})` : ""} el ${fechaPE(f.fecha)}, por el concepto indicado, fue realizado para ${EMPRESA.razonSocial} (RUC ${EMPRESA.ruc}) y se sustenta con ${comp}.`,
+          `Motivo: ${motivo.toLowerCase()}. Documento sustentatorio interno.`,
+        ]
+      : [
+          `Yo, ${f.proveedor}${f.ruc ? `, identificado con ${f.ruc.length === 11 ? "RUC" : "DNI"} ${f.ruc}` : ""}, declaro bajo juramento haber recibido de ${EMPRESA.razonSocial} (RUC ${EMPRESA.ruc}) el importe de ${soles(f.total)} por el concepto indicado, el ${fechaPE(f.fecha)}, sin haber emitido comprobante de pago.`,
+          "Motivo: gasto sin comprobante de pago autorizado. Documento sustentatorio interno; no otorga derecho a crédito fiscal.",
+        ],
     firmas: ["Firma Solicitante", "Firma Gerencia"],
   });
-  doc.setProperties({ title: f.numero });
+  doc.setProperties({ title: n });
   return doc;
 }
 
 /** Descarga DJ-0005.pdf */
 export function pdfDeclaracionJurada(f: Factura): void {
-  guardar(docDeclaracionJurada(f), f.numero);
+  guardar(docDeclaracionJurada(f), numeroDJ(f));
 }
 
 /** URL blob para ver la DJ dentro de un iframe (vista previa del modal). */
@@ -847,7 +858,7 @@ export function imprimirDeclaracionJurada(f: Factura): void {
   const doc = docDeclaracionJurada(f);
   doc.autoPrint();
   const w = window.open(String(doc.output("bloburl")), "_blank");
-  if (!w) guardar(doc, f.numero);
+  if (!w) guardar(doc, numeroDJ(f));
 }
 
 export function pdfFactura(f: Factura, oc?: OrdenCompra): void {

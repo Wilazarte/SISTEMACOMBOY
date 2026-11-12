@@ -34,6 +34,7 @@ import { SelectorCaja } from "@/components/SelectorCaja";
 import { FormBancarizacion, bancarizacionVacia } from "@/components/compras/FormBancarizacion";
 import { OPCIONES_COMPROBANTE, PROVEEDOR_VARIOS_ID, numeroAutomatico, placeholderComprobante, proveedorVarios } from "@/lib/comprobantes";
 import { SelectorOrden } from "@/components/compras/SelectorOrden";
+import { useDJsAutomaticas } from "@/components/compras/useDJsAutomaticas";
 import { PagoCompraForm, pagoCompraDe, pagoCompraVacio, type FormPagoCompra } from "@/components/compras/PagoCompra";
 import { CAJA_POR_DEFECTO } from "@/lib/cajas";
 import {
@@ -47,6 +48,7 @@ import {
   KEYS,
   esContratista,
   esDeclaracionJurada,
+  numeroDJ,
   MAX_ARCHIVO,
   TOPE_DJ,
   abrirArchivo,
@@ -567,6 +569,8 @@ function RegistrarCompra({
   const [generarOrden, setGenerarOrden] = useState<OrdenAGenerar>("NINGUNA");
   const ordenesServicio = useStore<OrdenServicio[]>(KEYS.ORDENES_SERVICIO, []);
   const gastosConOS = useMemo(() => new Set(ordenesServicio.filter((o) => o.estado !== "ANULADA" && o.gastoId).map((o) => o.gastoId!)), [ordenesServicio]);
+  // Gastos guardados sin OC ni OS: su declaración jurada se genera sola (también los ya registrados)
+  useDJsAutomaticas(rol);
   const [guardandoCompra, setGuardandoCompra] = useState(false);
   const [filas, setFilas] = useState<FilaCompra[]>([filaVacia()]);
   const habilitado = puede(rol, "compra.crear");
@@ -848,14 +852,14 @@ function RegistrarCompra({
                   <span className="whitespace-nowrap">
                     <span className="font-semibold text-fg">{g.codigo ?? "-"}</span>
                     <button type="button" onClick={() => pdfDeclaracionJurada(g)} className="ml-1.5 text-xs font-semibold text-[#2a7bff] underline" title="Ver PDF de la declaración jurada">
-                      {g.numero}
+                      {numeroDJ(g)}
                     </button>
                   </span>
                 ) : (
                   <span className="whitespace-nowrap font-semibold text-fg">{g.codigo ?? g.numero}</span>
                 ),
                 total: soles(g.total),
-                buscar: `${g.codigo ?? ""} ${g.numero} ${g.ruc} ${g.descripcion ?? ""}`,
+                buscar: `${g.codigo ?? ""} ${g.numero} ${g.djNumero ?? ""} ${g.ruc} ${g.descripcion ?? ""}`,
                 tipoDoc: g.tipoGasto === "PLANILLA" ? "PLANILLA" : "GASTO",
                 estado: g.estadoPago,
                 acciones: (
