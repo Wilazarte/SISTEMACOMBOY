@@ -1,4 +1,4 @@
-import type { ComprobanteGasto } from "./types";
+import type { ComprobanteGasto, Proveedor } from "./types";
 
 /**
  * Tipos de comprobante de "Registrar gasto / compra": la misma lista para el gasto sin stock y la compra con
@@ -63,6 +63,17 @@ export const placeholderComprobante = (c: ComprobanteGasto): string =>
  */
 export const PROVEEDOR_VARIOS = "VARIOS/SIN DATOS";
 export const RUC_VARIOS = "010101";
+/** Id fijo del proveedor genérico en los formularios que eligen proveedor de la lista (compra con ingreso a stock). */
+export const PROVEEDOR_VARIOS_ID = "VARIOS";
+export const proveedorVarios = (): Proveedor => ({ id: PROVEEDOR_VARIOS_ID, razonSocial: PROVEEDOR_VARIOS, ruc: RUC_VARIOS });
+/** Documento aceptado: vacío, DNI (8), RUC (11) o 010101 solo con VARIOS/SIN DATOS. Devuelve el error o null. */
+export function errorDocProveedor(proveedor: string, ruc: string): string | null {
+  const n = ruc.trim();
+  if (n === RUC_VARIOS) return esProveedorVarios(proveedor) ? null : `El N° ${RUC_VARIOS} es solo para el proveedor ${PROVEEDOR_VARIOS}.`;
+  if (n && !/^\d{8}$/.test(n) && !/^\d{11}$/.test(n)) return "RUC (11 dígitos) o DNI (8 dígitos) inválido.";
+  if (esProveedorVarios(proveedor) && n) return `Con RUC el registro va a nombre de la razón social de SUNAT, no de ${PROVEEDOR_VARIOS}. Valide el RUC y se completa solo.`;
+  return null;
+}
 export const esProveedorVarios = (p: string | undefined | null) => (p ?? "").trim().toUpperCase() === PROVEEDOR_VARIOS;
 /** El genérico no aplica a la DJ (nombre de quien declara) ni al RHE (persona que emite el recibo). */
 export const admiteProveedorVarios = (c: ComprobanteGasto) => c !== "DJ" && c !== "RXH";

@@ -32,7 +32,7 @@ import { EstadoRuc } from "@/components/EstadoRuc";
 import { FormGasto } from "@/components/compras/FormGasto";
 import { SelectorCaja } from "@/components/SelectorCaja";
 import { FormBancarizacion, bancarizacionVacia } from "@/components/compras/FormBancarizacion";
-import { OPCIONES_COMPROBANTE, numeroAutomatico, placeholderComprobante } from "@/lib/comprobantes";
+import { OPCIONES_COMPROBANTE, PROVEEDOR_VARIOS_ID, numeroAutomatico, placeholderComprobante, proveedorVarios } from "@/lib/comprobantes";
 import { SelectorOrden } from "@/components/compras/SelectorOrden";
 import { PagoCompraForm, pagoCompraDe, pagoCompraVacio, type FormPagoCompra } from "@/components/compras/PagoCompra";
 import { CAJA_POR_DEFECTO } from "@/lib/cajas";
@@ -556,7 +556,8 @@ function RegistrarCompra({
   onGenerarOS: (gastoId: string) => void;
 }) {
   const [modo, setModo] = useState<ModoRegistro>("GASTO");
-  const [proveedorId, setProveedorId] = useState("");
+  // Por defecto VARIOS/SIN DATOS (N° 010101), primera opción de la lista
+  const [proveedorId, setProveedorId] = useState(PROVEEDOR_VARIOS_ID);
   const [nuevoProv, setNuevoProv] = useState<{ razonSocial: string; ruc: string } | null>(null);
   const [fechaTxt, setFechaTxt] = useState(fechaPE(hoy()));
   const [tipo, setTipo] = useState<TipoComprobanteCompra>("FACTURA");
@@ -600,7 +601,8 @@ function RegistrarCompra({
   const fechaError = fechaTxt.length === 10 && !fechaISO ? "Fecha inexistente" : fechaISO > hoy() ? "La fecha no puede ser futura" : undefined;
   const { subtotal, igv, total } = totalesCompra(tipo, filas);
   const conIgv = tipo === "BOLETA";
-  const prov = proveedores.find((p) => p.id === proveedorId);
+  const listaProveedores = useMemo(() => [proveedorVarios(), ...proveedores], [proveedores]);
+  const prov = listaProveedores.find((p) => p.id === proveedorId);
   const set = (id: string, campo: keyof FilaCompra, v: string | number) => setFilas((p) => p.map((i) => (i.id === id ? { ...i, [campo]: v } : i)));
   const productosStock = useMemo(() => Array.from(new Set(stock.map((s) => s.nombre))).sort(), [stock]);
 
@@ -694,13 +696,13 @@ function RegistrarCompra({
             }
           />
           <div className="grid gap-4 p-5 md:grid-cols-3">
-            <Field label="Proveedor" className="md:col-span-2" hint={prov ? `RUC ${prov.ruc}` : undefined}>
+            <Field label="Proveedor" className="md:col-span-2" hint={prov ? (prov.id === PROVEEDOR_VARIOS_ID ? `Por defecto · N° ${prov.ruc}` : `RUC ${prov.ruc}`) : undefined}>
               <div className="flex gap-2">
                 <Select
                   value={proveedorId}
                   onChange={(e) => setProveedorId(e.target.value)}
-                  placeholder={proveedores.length ? "Seleccione proveedor…" : "Registre un proveedor →"}
-                  options={proveedores.map((p) => ({ value: p.id, label: `${p.razonSocial} · ${p.ruc}` }))}
+                  placeholder="Seleccione proveedor…"
+                  options={listaProveedores.map((p) => ({ value: p.id, label: `${p.razonSocial} · ${p.ruc}` }))}
                 />
                 <Button type="button" variant="secondary" onClick={() => setNuevoProv({ razonSocial: "", ruc: "" })} title="Nuevo proveedor">
                   <Plus size={16} />
