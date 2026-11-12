@@ -58,7 +58,8 @@ export const placeholderComprobante = (c: ComprobanteGasto): string =>
  * Proveedor genérico por defecto en "Registrar gasto" (tickets, boletas sin RUC, compras menores).
  * Lleva el documento ficticio 010101 (6 dígitos): no es un RUC de 11, así que no choca con la regla de
  * RUC validado en SUNAT (esa regla solo aplica a RUC de 11 dígitos) ni obliga a bancarizar.
- * Una FACTURA no puede ir a nombre de este genérico: exige el RUC real y su razón social de SUNAT.
+ * Se acepta con cualquier comprobante salvo DJ y RHE (llevan el nombre de una persona). Si se escribe un RUC real,
+ * el nombre pasa a la razón social de SUNAT.
  */
 export const PROVEEDOR_VARIOS = "VARIOS/SIN DATOS";
 export const RUC_VARIOS = "010101";

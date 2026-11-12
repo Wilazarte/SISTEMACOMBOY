@@ -2671,8 +2671,10 @@ function prepararGasto(d: DatosGasto, rol: Rol): Factura {
   // 010101: documento ficticio de VARIOS/SIN DATOS, solo con ese proveedor
   if (ruc === RUC_VARIOS && !esProveedorVarios(proveedor)) throw new ErpError(`El N° ${RUC_VARIOS} es solo para el proveedor ${PROVEEDOR_VARIOS}.`);
   if (ruc && ruc !== RUC_VARIOS && !/^\d{8}$/.test(ruc) && !/^\d{11}$/.test(ruc)) throw new ErpError("RUC (11 dígitos) o DNI (8 dígitos) inválido.");
-  if (d.comprobante === "FACTURA" && ruc.length !== 11) throw new ErpError("La factura requiere el RUC del proveedor.");
-  if (esProveedorVarios(proveedor) && (d.comprobante === "FACTURA" || (ruc && ruc !== RUC_VARIOS)))
+  // VARIOS/SIN DATOS (010101) se acepta con cualquier comprobante salvo DJ / RHE, también con factura
+  if (d.comprobante === "FACTURA" && ruc.length !== 11 && !(esProveedorVarios(proveedor) && ruc === RUC_VARIOS))
+    throw new ErpError("La factura requiere el RUC del proveedor.");
+  if (esProveedorVarios(proveedor) && ruc && ruc !== RUC_VARIOS)
     throw new ErpError(`Con RUC el gasto va a nombre de la razón social de SUNAT, no de ${PROVEEDOR_VARIOS}. Valide el RUC y se completa solo.`);
   if (esProveedorVarios(proveedor) && (d.comprobante === "DJ" || d.comprobante === "RXH"))
     throw new ErpError(d.comprobante === "DJ" ? "Indique el nombre de quien declara." : "Indique la persona que emite el recibo por honorarios.");
@@ -2766,7 +2768,8 @@ export function editarGasto(id: string, c: EdicionGasto, rol: Rol): Factura {
   // 010101: documento ficticio de VARIOS/SIN DATOS, solo con ese proveedor
   if (ruc === RUC_VARIOS && !esProveedorVarios(proveedor)) throw new ErpError(`El N° ${RUC_VARIOS} es solo para el proveedor ${PROVEEDOR_VARIOS}.`);
   if (ruc && ruc !== RUC_VARIOS && !/^\d{8}$/.test(ruc) && !/^\d{11}$/.test(ruc)) throw new ErpError("RUC (11 dígitos) o DNI (8 dígitos) inválido.");
-  if (comp === "FACTURA" && ruc.length !== 11) throw new ErpError("La factura requiere el RUC del proveedor.");
+  if (comp === "FACTURA" && ruc.length !== 11 && !(esProveedorVarios(proveedor) && ruc === RUC_VARIOS))
+    throw new ErpError("La factura requiere el RUC del proveedor.");
   if (ruc.length === 11 && !rucValido(ruc)) throw new ErpError("RUC inválido (dígito verificador).");
   exigirRucSunat(ruc, "del proveedor");
   if (!esProveedorVarios(proveedor) && lista.some((x) => x.id !== id && x.numero === numero && (ruc ? x.ruc === ruc : x.proveedor === proveedor)))
