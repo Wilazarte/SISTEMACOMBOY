@@ -75,7 +75,7 @@ export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadore
     const sel = lista.filter((t) => t.activo);
     if (!sel.length) return toast("No hay contratistas activos en la lista", "error");
     if (sel.length > 1 && !confirm(`¿Descargar ${sel.length} recibos PDF (uno por contratista)?`)) return;
-    for (const t of sel) await descargarRecibo(t, "CONTRATISTA");
+    for (const t of sel) await descargarRecibo(t, "CONTRATISTA", sel.length > 1);
   };
 
   return (
