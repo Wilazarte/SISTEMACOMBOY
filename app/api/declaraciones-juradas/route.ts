@@ -18,10 +18,11 @@ export async function GET() {
 
   const djs = (data ?? [])
     .map((r) => r.data as Record<string, unknown>)
-    .filter((d) => d.comprobanteGasto === "DJ" || d.tipo === "DECLARACION_JURADA" || !!d.djNumero)
+    // DJ automática solo en gastos "Sin comprobante" (con factura / boleta / otro comprobante no hay DJ)
+    .filter((d) => d.comprobanteGasto === "DJ" || d.tipo === "DECLARACION_JURADA" || (!!d.djNumero && d.comprobanteGasto === "SIN_COMPROBANTE"))
     .map((d) => ({
       id: d.id,
-      // DJ automática de un gasto sin OC / OS: su N° va en djNumero y `numero` es el del comprobante
+      // DJ automática de un gasto sin comprobante: su N° va en djNumero y `numero` es el del comprobante
       numero_dj: d.comprobanteGasto === "DJ" || d.tipo === "DECLARACION_JURADA" ? d.numero : d.djNumero,
       comprobante: d.comprobanteGasto === "DJ" || d.tipo === "DECLARACION_JURADA" ? null : d.numero,
       codigo_gasto: d.codigo ?? null,
