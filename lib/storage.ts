@@ -2446,13 +2446,82 @@ export const esDJAutomatica = tieneDJAutomatica;
 export const requiereDJAutomatica = (f: Factura): boolean =>
   !!f.esGastoTesoreria && f.tipoGasto !== "PLANILLA" && f.comprobanteGasto === "SIN_COMPROBANTE" && !f.djNumero;
 
+/** Compra con ingreso a stock marcada "Sin comprobante" que aún no tiene su DJ automática. */
+export const requiereDJCompra = (c: Compra): boolean => c.tipoComprobante === "SIN_COMPROBANTE" && !c.djNumero;
+
 /**
- * Genera la DJ automática (correlativo DJ-0001 del servidor) de los gastos ya registrados que la necesitan.
- * Uno por uno, releyendo el gasto antes de escribir para no numerar dos veces. Devuelve cuántas generó.
+ * DJ de una compra con ingreso a stock vista como gasto, para listarla en Declaraciones y armar su PDF con el mismo
+ * formato. No se guarda: la DJ vive en la compra (djNumero / djEstado).
+ */
+export function djDeCompra(c: Compra): Factura {
+  return {
+    id: c.id,
+    tipo: "FACTURA",
+    numero: c.numero,
+    fecha: c.fecha,
+    fechaVencimiento: c.pago?.fechaVencimiento ?? c.fecha,
+    ocId: c.ordenCompraId ?? "",
+    ocNumero: c.ordenCompraNumero ?? "",
+    reqId: "",
+    reqNumero: "",
+    proveedor: c.proveedor,
+    ruc: c.ruc,
+    subtotal: c.subtotal,
+    igv: c.igv,
+    total: c.total,
+    estadoPago: c.pago && c.pago.estado !== "PAGADO" ? "POR_PAGAR" : "PAGADA",
+    caja: c.caja,
+    aprobadoPor: c.aprobadoPor,
+    historial: c.historial,
+    descripcion: `Compra con ingreso a ${c.sede}: ${c.items.map((i) => `${i.cantidad} ${i.unidad} ${i.nombre}`).join(", ")}`,
+    comprobanteGasto: "SIN_COMPROBANTE",
+    djNumero: c.djNumero,
+    djEstado: c.djEstado,
+    compraDirecta: true,
+  };
+}
+
+/** DJ de las compras con ingreso a stock (solo las que ya tienen su N°). */
+export const djsDeCompras = (compras: Compra[]): Factura[] => compras.filter((c) => c.tipoComprobante === "SIN_COMPROBANTE" && c.djNumero).map(djDeCompra);
+
+/** Pone la DJ automática a una compra "Sin comprobante" (al registrarla o al editarla). Si falla, se genera luego. */
+async function ponerDJCompra(c: Compra, rol: Rol): Promise<void> {
+  if (!requiereDJCompra(c)) return;
+  try {
+    c.djNumero = await siguienteDJ();
+    c.djEstado = "PENDIENTE";
+    c.historial = [...c.historial, evento(rol, "Declaración jurada generada", `${c.djNumero} (compra sin comprobante)`)];
+  } catch {
+    /* se genera luego al abrir Registro de gastos (generarDJsPendientes) */
+  }
+}
+
+/**
+ * Genera la DJ automática (correlativo DJ-0001 del servidor) de los gastos y compras con ingreso a stock ya
+ * registrados que la necesitan. Uno por uno, releyendo el registro antes de escribir para no numerar dos veces.
+ * Devuelve cuántas generó.
  */
 export async function generarDJsPendientes(rol: Rol): Promise<number> {
-  if (!claveCargada(KEYS.FACTURAS)) return 0;
+  if (!claveCargada(KEYS.FACTURAS) || !claveCargada(KEYS.COMPRAS)) return 0;
   let n = 0;
+  const compras = getCompras()
+    .filter(requiereDJCompra)
+    .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.numero.localeCompare(b.numero));
+  for (const p of compras) {
+    if (!requiereDJCompra(getCompras().find((x) => x.id === p.id) ?? { ...p, djNumero: "x" })) continue;
+    const numero = await siguienteDJ();
+    const lista = getCompras();
+    const c = lista.find((x) => x.id === p.id);
+    if (!c || c.djNumero) continue;
+    const nueva: Compra = {
+      ...c,
+      djNumero: numero,
+      djEstado: c.djEstado ?? "PENDIENTE",
+      historial: [...c.historial, evento(rol, "Declaración jurada generada", `${numero} (compra sin comprobante)`)],
+    };
+    escribir(KEYS.COMPRAS, lista.map((x) => (x.id === c.id ? nueva : x)));
+    n++;
+  }
   const pendientes = getFacturas()
     .filter((f) => requiereDJAutomatica(f))
     .sort((a, b) => a.fecha.localeCompare(b.fecha) || (a.codigo ?? a.numero).localeCompare(b.codigo ?? b.numero));
@@ -2478,6 +2547,21 @@ export async function generarDJsPendientes(rol: Rol): Promise<number> {
 export function cambiarEstadoDJ(id: string, estado: "ENVIADA" | "APROBADA", rol: Rol): Factura {
   const lista = getFacturas();
   const f = lista.find((x) => x.id === id);
+  // DJ de una compra con ingreso a stock: el estado se guarda en la compra
+  const compra = f ? undefined : getCompras().find((x) => x.id === id && x.tipoComprobante === "SIN_COMPROBANTE" && x.djNumero);
+  if (compra) {
+    const actual = compra.djEstado ?? "PENDIENTE";
+    if (estado === "ENVIADA" && actual !== "PENDIENTE") throw new ErpError(`La ${compra.djNumero} ya fue ${actual === "APROBADA" ? "aprobada" : "enviada"}.`);
+    if (estado === "APROBADA" && actual === "APROBADA") throw new ErpError(`La ${compra.djNumero} ya está aprobada.`);
+    const nueva: Compra = {
+      ...compra,
+      djEstado: estado,
+      ...(estado === "APROBADA" ? { aprobadoPor: usuarioActual() } : {}),
+      historial: [...compra.historial, evento(rol, estado === "ENVIADA" ? "Declaración jurada enviada a aprobar" : "Declaración jurada aprobada")],
+    };
+    escribir(KEYS.COMPRAS, getCompras().map((x) => (x.id === id ? nueva : x)));
+    return djDeCompra(nueva);
+  }
   if (!f || !esDeclaracionJurada(f)) throw new ErpError("Declaración jurada no encontrada.");
   const actual = f.djEstado ?? "PENDIENTE";
   if (estado === "ENVIADA" && actual !== "PENDIENTE") throw new ErpError(`La ${numeroDJ(f)} ya fue ${actual === "APROBADA" ? "aprobada" : "enviada"}.`);
@@ -3095,6 +3179,7 @@ export async function registrarCompra(data: DatosCompra, rol: Rol): Promise<{ co
   const { oc, os } = orden.armar(compra);
   const n = oc?.numero ?? os?.numero;
   compra.historial = [evento(rol, "Compra registrada", `${compra.numero} · ${compra.proveedor} · ingreso a ${compra.sede} · ${textoPagoCompra(compra)}${n ? ` · ${n}` : ""}`)];
+  await ponerDJCompra(compra, rol);
   escribir(KEYS.COMPRAS, [compra, ...getCompras()]);
   return { compra, oc, os };
 }
@@ -3116,6 +3201,7 @@ export async function editarCompra(id: string, data: DatosCompra, rol: Rol): Pro
   ingresarStock(nueva.sede, nueva.items, { tipo: "INGRESO", documento: `${docCompra(nueva)} (corregida)` });
   const editada = marcarEditado({ ...vieja, ...nueva }, rol, "Compra editada", `${vieja.numero} · ${soles(vieja.total)} → ${nueva.numero} · ${soles(nueva.total)} · ${textoPagoCompra(nueva)}`);
   const { oc, os } = orden.armar(editada);
+  await ponerDJCompra(editada, rol);
   escribir(KEYS.COMPRAS, lista.map((c) => (c.id === id ? editada : c)));
   return { compra: editada, oc, os };
 }

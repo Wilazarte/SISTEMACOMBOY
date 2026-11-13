@@ -272,6 +272,8 @@ export interface Factura {
   djNumero?: string;
   /** Declaración jurada de gasto: PENDIENTE (recién emitida), ENVIADA (a Gerencia), APROBADA. */
   djEstado?: "PENDIENTE" | "ENVIADA" | "APROBADA";
+  /** Solo en la vista de Declaraciones: la DJ es de una compra con ingreso a stock (compras_directas), no de un gasto. */
+  compraDirecta?: boolean;
   /** Usuario que registró el gasto (perfiles.usuario). Los antiguos no lo tienen. */
   creadoPor?: string;
   editadoPor?: string;
@@ -518,6 +520,10 @@ export interface Compra {
   /** OS generada al registrar la compra ("Generar Orden de Servicio OS"); una compra lleva OC u OS, no las dos. */
   ordenServicioId?: string;
   ordenServicioNumero?: string;
+  /** DJ automática (Williams 2026-11-13): compra marcada "Sin comprobante" lleva su declaración jurada (DJ-0042). */
+  djNumero?: string;
+  djEstado?: "PENDIENTE" | "ENVIADA" | "APROBADA";
+  aprobadoPor?: string;
   items: ItemCompra[];
   subtotal: number;
   igv: number;
