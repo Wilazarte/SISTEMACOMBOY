@@ -569,7 +569,7 @@ function RegistrarCompra({
   const [generarOrden, setGenerarOrden] = useState<OrdenAGenerar>("NINGUNA");
   const ordenesServicio = useStore<OrdenServicio[]>(KEYS.ORDENES_SERVICIO, []);
   const gastosConOS = useMemo(() => new Set(ordenesServicio.filter((o) => o.estado !== "ANULADA" && o.gastoId).map((o) => o.gastoId!)), [ordenesServicio]);
-  // Gastos guardados sin OC ni OS: su declaración jurada se genera sola (también los ya registrados)
+  // Gastos marcados "Sin comprobante": su declaración jurada se genera sola (también los ya registrados)
   useDJsAutomaticas(rol);
   const [guardandoCompra, setGuardandoCompra] = useState(false);
   const [filas, setFilas] = useState<FilaCompra[]>([filaVacia()]);

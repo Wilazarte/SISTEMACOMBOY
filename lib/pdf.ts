@@ -8,7 +8,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import QRCode from "qrcode";
 import { EMPRESA } from "./empresa";
-import { COMPROBANTES_GASTO, CUENTAS_ORIGEN_PAGO, esDJAutomatica, numeroDJ, codigoContratista, codigoGasto, cotizacionGasto, getFacturas, cuentaBancariaTxt, fechaPE, getTrabajadores, soles } from "./storage";
+import { CUENTAS_ORIGEN_PAGO, numeroDJ, codigoContratista, codigoGasto, cotizacionGasto, getFacturas, cuentaBancariaTxt, fechaPE, getTrabajadores, soles } from "./storage";
 import { codigoDesdeNumero, estadoDocumento } from "./utils/codigos";
 import { SEDE_PLANTA_PRINCIPAL, bloqueDocumento, sedeOrigenReq, type DocUnificado, type TipoDocumento } from "./plantillasDocumentos";
 import { equipoDeLinea, sedeEquipo } from "./equipos";
@@ -808,10 +808,8 @@ export function pdfEstadoCuenta(d: {
 /** Declaración jurada de gasto (gasto sin comprobante) con su N° correlativo DJ-0001. */
 export function docDeclaracionJurada(f: Factura): jsPDF {
   const n = numeroDJ(f);
-  // DJ automática (gasto con factura / boleta / recibo, sin OC ni OS): sustenta el gasto, no reemplaza al comprobante
-  const auto = esDJAutomatica(f);
-  const comp = f.comprobanteGasto ? `${COMPROBANTES_GASTO[f.comprobanteGasto] ?? f.comprobanteGasto} ${f.numero}` : f.numero;
-  const motivo = auto ? "Gasto sin orden de compra ni orden de servicio" : "Gasto sin comprobante de pago autorizado";
+  // La DJ (comprobante DJ o automática de un gasto "Sin comprobante") siempre es de un gasto sin comprobante de pago
+  const motivo = "Gasto sin comprobante de pago autorizado";
   const doc = construir({
     titulo: `DECLARACIÓN JURADA DE GASTO N° ${n}`,
     numero: n,
@@ -823,22 +821,16 @@ export function docDeclaracionJurada(f: Factura): jsPDF {
       ["Proveedor", f.proveedor],
       ["DNI / RUC", f.ruc || "-"],
       ["Código de gasto", f.codigo ?? "-"],
-      ...(auto ? ([["Comprobante", comp]] as [string, string][]) : []),
       ["Motivo", motivo],
     ],
     head: ["#", "Concepto", "Importe"],
     body: [[1, f.descripcion ?? "-", soles(f.total)]],
     alinearDerecha: [2],
     totales: [["TOTAL", soles(f.total)]],
-    notas: auto
-      ? [
-          `Declaro bajo juramento que el gasto de ${soles(f.total)} pagado a ${f.proveedor}${f.ruc ? ` (${f.ruc.length === 11 ? "RUC" : "DNI"} ${f.ruc})` : ""} el ${fechaPE(f.fecha)}, por el concepto indicado, fue realizado para ${EMPRESA.razonSocial} (RUC ${EMPRESA.ruc}) y se sustenta con ${comp}.`,
-          `Motivo: ${motivo.toLowerCase()}. Documento sustentatorio interno.`,
-        ]
-      : [
-          `Yo, ${f.proveedor}${f.ruc ? `, identificado con ${f.ruc.length === 11 ? "RUC" : "DNI"} ${f.ruc}` : ""}, declaro bajo juramento haber recibido de ${EMPRESA.razonSocial} (RUC ${EMPRESA.ruc}) el importe de ${soles(f.total)} por el concepto indicado, el ${fechaPE(f.fecha)}, sin haber emitido comprobante de pago.`,
-          "Motivo: gasto sin comprobante de pago autorizado. Documento sustentatorio interno; no otorga derecho a crédito fiscal.",
-        ],
+    notas: [
+      `Yo, ${f.proveedor}${f.ruc ? `, identificado con ${f.ruc.length === 11 ? "RUC" : "DNI"} ${f.ruc}` : ""}, declaro bajo juramento haber recibido de ${EMPRESA.razonSocial} (RUC ${EMPRESA.ruc}) el importe de ${soles(f.total)} por el concepto indicado, el ${fechaPE(f.fecha)}, sin haber emitido comprobante de pago.`,
+      "Motivo: gasto sin comprobante de pago autorizado. Documento sustentatorio interno; no otorga derecho a crédito fiscal.",
+    ],
     firmas: ["Firma Solicitante", "Firma Gerencia"],
   });
   doc.setProperties({ title: n });
@@ -901,7 +893,7 @@ export function pdfFactura(f: Factura, oc?: OrdenCompra): void {
       totales: esDJ ? [["TOTAL (sin IGV)", soles(f.total)]] : totales(f.subtotal, f.igv, f.total),
       notas: esDJ
         ? [
-            `Yo, ${f.proveedor}, identificado con DNI ${f.ruc}, declaro bajo juramento haber vendido los bienes detallados a ${EMPRESA.razonSocial} por el importe indicado, no estando obligado a emitir comprobante de pago. Documento sustentatorio interno; no otorga derecho a crédito fiscal.`,
+        `Yo, ${f.proveedor}, identificado con DNI ${f.ruc}, declaro bajo juramento haber vendido los bienes detallados a ${EMPRESA.razonSocial} por el importe indicado, no estando obligado a emitir comprobante de pago. Documento sustentatorio interno; no otorga derecho a crédito fiscal.`,
           ]
         : undefined,
       firmas: esDJ ? ["Vendedor (DNI)", "Comprador", "Aprobado: Gerencia"] : ["Tesorería", "Contabilidad"],

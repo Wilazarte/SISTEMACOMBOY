@@ -15,7 +15,7 @@ const estadoDJ = (f: Factura) => f.djEstado ?? "PENDIENTE";
 
 /**
  * Pestaña "Declaraciones juradas" de Tesorería / Compras: los gastos sin comprobante (DJ-0001…) y las DJ
- * automáticas de los gastos sin OC ni OS (Williams 2026-11-12), con
+ * automáticas de los gastos marcados "Sin comprobante" (Williams 2026-11-13), con
  * vista previa del PDF, descarga, impresión, edición y envío a aprobar. Son los mismos gastos de Facturas:
  * no hay una tabla aparte (la DJ vive en compras, tipo factura, con comprobante DJ).
  */
@@ -47,7 +47,7 @@ export function DeclaracionesJuradas({ facturas, rol }: { facturas: Factura[]; r
         extra: (
           <span className="block truncate" title={f.descripcion}>
             {f.descripcion || "-"}
-            {esDJAutomatica(f) && <span className="block text-xs text-plomo-500">Sustenta {f.numero} · sin OC ni OS</span>}
+            {esDJAutomatica(f) && <span className="block text-xs text-plomo-500">Sustenta {f.numero} · sin comprobante</span>}
           </span>
         ),
         total: soles(f.total),

@@ -2424,37 +2424,40 @@ async function siguienteDJ(): Promise<string> {
   return `DJ-${data}`;
 }
 
-/** Declaraciones juradas de gasto: comprobante DJ (las de la OC también son DJ) o DJ automática de un gasto sin OC / OS. */
-export const esDeclaracionJurada = (f: Factura): boolean => (f.esGastoTesoreria && f.comprobanteGasto === "DJ") || f.tipo === "DECLARACION_JURADA" || !!f.djNumero;
+/**
+ * DJ automática (Williams 2026-11-13): solo la lleva el gasto marcado "Sin comprobante". Si se registró factura, boleta,
+ * recibo u otro comprobante, no hay DJ (una DJ vieja guardada en un gasto con comprobante se ignora).
+ */
+export const tieneDJAutomatica = (f: Factura): boolean => !!f.djNumero && f.comprobanteGasto === "SIN_COMPROBANTE";
+
+/** Declaraciones juradas de gasto: comprobante DJ (las de la OC también son DJ) o DJ automática de un gasto sin comprobante. */
+export const esDeclaracionJurada = (f: Factura): boolean => (f.esGastoTesoreria && f.comprobanteGasto === "DJ") || f.tipo === "DECLARACION_JURADA" || tieneDJAutomatica(f);
 
 /** N° de la declaración jurada del documento (DJ-0042): el comprobante mismo o la DJ automática de sustento. */
-export const numeroDJ = (f: Factura): string => ((f.esGastoTesoreria && f.comprobanteGasto === "DJ") || f.tipo === "DECLARACION_JURADA" ? f.numero : f.djNumero ?? f.numero);
+export const numeroDJ = (f: Factura): string => (tieneDJAutomatica(f) ? f.djNumero! : f.numero);
 
-/** true: la DJ es la automática de sustento (gasto con otro comprobante, sin OC ni OS). */
-export const esDJAutomatica = (f: Factura): boolean => !!f.djNumero && !(f.esGastoTesoreria && f.comprobanteGasto === "DJ") && f.tipo !== "DECLARACION_JURADA";
+/** true: la DJ es la automática de sustento (gasto marcado "Sin comprobante"). */
+export const esDJAutomatica = tieneDJAutomatica;
 
 /**
- * Gasto de Tesorería que debe llevar DJ automática (Williams 2026-11-12): guardado sin OC ni OS, que no sea planilla
- * ni ya una DJ, y sin DJ asignada todavía. `gastosConOS`: ids de gastos con OS vigente.
+ * Gasto de Tesorería que debe llevar DJ automática (Williams 2026-11-13): marcado "Sin comprobante", que no sea planilla
+ * y sin DJ asignada todavía. Con factura, boleta u otro comprobante no se genera DJ.
  */
-export const requiereDJAutomatica = (f: Factura, gastosConOS: Set<string>): boolean =>
-  !!f.esGastoTesoreria && f.tipoGasto !== "PLANILLA" && !f.ocId && !gastosConOS.has(f.id) && f.comprobanteGasto !== "DJ" && f.tipo !== "DECLARACION_JURADA" && !f.djNumero;
-
-const gastosConOSVigente = (): Set<string> => new Set(getOrdenesServicio().filter((o) => o.estado !== "ANULADA" && o.gastoId).map((o) => o.gastoId!));
+export const requiereDJAutomatica = (f: Factura): boolean =>
+  !!f.esGastoTesoreria && f.tipoGasto !== "PLANILLA" && f.comprobanteGasto === "SIN_COMPROBANTE" && !f.djNumero;
 
 /**
  * Genera la DJ automática (correlativo DJ-0001 del servidor) de los gastos ya registrados que la necesitan.
  * Uno por uno, releyendo el gasto antes de escribir para no numerar dos veces. Devuelve cuántas generó.
  */
 export async function generarDJsPendientes(rol: Rol): Promise<number> {
-  // Sin las OS cargadas un gasto con OS parecería "sin OS": no se numera nada hasta tener ambas listas
-  if (!claveCargada(KEYS.FACTURAS) || !claveCargada(KEYS.ORDENES_SERVICIO)) return 0;
+  if (!claveCargada(KEYS.FACTURAS)) return 0;
   let n = 0;
   const pendientes = getFacturas()
-    .filter((f) => requiereDJAutomatica(f, gastosConOSVigente()))
+    .filter((f) => requiereDJAutomatica(f))
     .sort((a, b) => a.fecha.localeCompare(b.fecha) || (a.codigo ?? a.numero).localeCompare(b.codigo ?? b.numero));
   for (const p of pendientes) {
-    if (!requiereDJAutomatica(getFacturas().find((x) => x.id === p.id) ?? { ...p, djNumero: "x" }, gastosConOSVigente())) continue;
+    if (!requiereDJAutomatica(getFacturas().find((x) => x.id === p.id) ?? { ...p, djNumero: "x" })) continue;
     const numero = await siguienteDJ();
     const lista = getFacturas();
     const f = lista.find((x) => x.id === p.id);
@@ -2463,7 +2466,7 @@ export async function generarDJsPendientes(rol: Rol): Promise<number> {
       ...f,
       djNumero: numero,
       djEstado: f.djEstado ?? "PENDIENTE",
-      historial: [...f.historial, evento(rol, "Declaración jurada generada", `${numero} (gasto sin orden de compra ni de servicio)`)],
+      historial: [...f.historial, evento(rol, "Declaración jurada generada", `${numero} (gasto sin comprobante)`)],
     };
     escribir(KEYS.FACTURAS, lista.map((x) => (x.id === f.id ? nueva : x)));
     n++;
@@ -2663,13 +2666,14 @@ export async function registrarGastoCompleto(
     const texto = `Cotización ${f.cotizacionProveedor}${f.cotizacionAuto ? " (generada: el proveedor no entregó cotización)" : " del proveedor"}`;
     f.historial = [...f.historial, evento(rol, "Cotización registrada", texto)];
   }
-  // Gasto sin OC ni OS: se le genera su declaración jurada de sustento (DJ-0042). Si la numeración falla, el gasto
-  // se guarda igual y la DJ se genera después al abrir el Registro de gastos (generarDJsPendientes).
-  if (!oc && !os && !esDJ && f.tipoGasto !== "PLANILLA") {
+  // Gasto marcado "Sin comprobante": se le genera su declaración jurada de sustento (DJ-0042). Con factura, boleta u
+  // otro comprobante no. Si la numeración falla, el gasto se guarda igual y la DJ se genera después al abrir el
+  // Registro de gastos (generarDJsPendientes).
+  if (requiereDJAutomatica(f)) {
     try {
       f.djNumero = await siguienteDJ();
       f.djEstado = "PENDIENTE";
-      f.historial = [...f.historial, evento(rol, "Declaración jurada generada", `${f.djNumero} (gasto sin orden de compra ni de servicio)`)];
+      f.historial = [...f.historial, evento(rol, "Declaración jurada generada", `${f.djNumero} (gasto sin comprobante)`)];
     } catch {
       /* se genera luego */
     }
