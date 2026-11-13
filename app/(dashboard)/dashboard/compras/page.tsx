@@ -48,6 +48,8 @@ import {
   KEYS,
   esContratista,
   esDeclaracionJurada,
+  djDeCompra,
+  djsDeCompras,
   numeroDJ,
   MAX_ARCHIVO,
   TOPE_DJ,
@@ -233,7 +235,7 @@ export default function ComprasPage() {
           ...(vePlanilla ? [{ id: "planilla" as const, label: "Planilla", icon: <Users size={16} />, count: activos }] : []),
           ...(veCompras
             ? [
-                { id: "declaraciones" as const, label: "Declaraciones", icon: <FileText size={16} />, count: facturas.filter(esDeclaracionJurada).length },
+                { id: "declaraciones" as const, label: "Declaraciones", icon: <FileText size={16} />, count: facturas.filter(esDeclaracionJurada).length + djsDeCompras(compras).length },
                 { id: "antecedentes" as const, label: "Antecedentes", icon: <History size={16} /> },
               ]
             : []),
@@ -269,7 +271,7 @@ export default function ComprasPage() {
         />
       )}
       {tab === "facturas" && <Facturas key={pre.oc ?? "f"} rol={rol} ocs={ocsSinFactura} ordenes={ordenes} facturas={facturas} preOc={pre.oc} onIr={irTab} />}
-      {tab === "declaraciones" && veCompras && <DeclaracionesJuradas facturas={facturas} rol={rol} />}
+      {tab === "declaraciones" && veCompras && <DeclaracionesJuradas facturas={facturas} compras={compras} rol={rol} />}
       {tab === "planilla" && vePlanilla && (
         <div>
           <PlanillaInterna />
@@ -569,7 +571,7 @@ function RegistrarCompra({
   const [generarOrden, setGenerarOrden] = useState<OrdenAGenerar>("NINGUNA");
   const ordenesServicio = useStore<OrdenServicio[]>(KEYS.ORDENES_SERVICIO, []);
   const gastosConOS = useMemo(() => new Set(ordenesServicio.filter((o) => o.estado !== "ANULADA" && o.gastoId).map((o) => o.gastoId!)), [ordenesServicio]);
-  // Gastos marcados "Sin comprobante": su declaración jurada se genera sola (también los ya registrados)
+  // Gastos y compras marcados "Sin comprobante": su declaración jurada se genera sola (también los ya registrados)
   useDJsAutomaticas(rol);
   const [guardandoCompra, setGuardandoCompra] = useState(false);
   const [filas, setFilas] = useState<FilaCompra[]>([filaVacia()]);
@@ -893,11 +895,16 @@ function RegistrarCompra({
               ref: (
                 <span className="whitespace-nowrap font-semibold text-fg">
                   {c.numero}
+                  {c.tipoComprobante === "SIN_COMPROBANTE" && c.djNumero && (
+                    <button type="button" onClick={() => pdfDeclaracionJurada(djDeCompra(c))} className="ml-1.5 text-xs font-semibold text-[#2a7bff] underline" title="Ver PDF de la declaración jurada">
+                      {c.djNumero}
+                    </button>
+                  )}
                   {(c.ordenCompraNumero || c.ordenServicioNumero) && <span className="ml-1.5 text-xs font-normal text-plomo-500">{c.ordenCompraNumero ?? c.ordenServicioNumero}</span>}
                 </span>
               ),
               total: soles(c.total),
-              buscar: `${c.numero} ${c.ruc} ${c.sede} ${c.items.map((i) => i.nombre).join(" ")}`,
+              buscar: `${c.numero} ${c.djNumero ?? ""} ${c.ruc} ${c.sede} ${c.items.map((i) => i.nombre).join(" ")}`,
               tipoDoc: "COMPRA",
               ...(c.pago ? { estado: c.pago.estado === "PAGADO" ? "PAGADA" : "POR_PAGAR" } : {}),
               acciones: (

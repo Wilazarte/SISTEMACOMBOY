@@ -822,7 +822,7 @@ export function docDeclaracionJurada(f: Factura): jsPDF {
       ["Importe", soles(f.total)],
       ["Proveedor", f.proveedor],
       ["DNI / RUC", f.ruc || "-"],
-      ["Código de gasto", f.codigo ?? "-"],
+      f.compraDirecta ? ["Compra (ingreso a stock)", f.numero] : ["Código de gasto", f.codigo ?? "-"],
       ["Motivo", motivo],
     ],
     head: ["#", "Concepto", "Importe"],

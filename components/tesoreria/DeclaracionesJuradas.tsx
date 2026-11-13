@@ -8,8 +8,8 @@ import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { getSesion } from "@/lib/auth";
 import { pdfDeclaracionJurada, urlDeclaracionJurada } from "@/lib/pdf";
 import { useDJsAutomaticas } from "@/components/compras/useDJsAutomaticas";
-import { cambiarEstadoDJ, esDJAutomatica, esDeclaracionJurada, fechaPE, numeroDJ, permisoEditarGasto, soles } from "@/lib/storage";
-import type { Factura, Rol } from "@/lib/types";
+import { cambiarEstadoDJ, djsDeCompras, esDJAutomatica, esDeclaracionJurada, fechaPE, numeroDJ, permisoEditarGasto, soles } from "@/lib/storage";
+import type { Compra, Factura, Rol } from "@/lib/types";
 
 const estadoDJ = (f: Factura) => f.djEstado ?? "PENDIENTE";
 
@@ -19,18 +19,19 @@ const estadoDJ = (f: Factura) => f.djEstado ?? "PENDIENTE";
  * vista previa del PDF, descarga, impresión, edición y envío a aprobar. Son los mismos gastos de Facturas:
  * no hay una tabla aparte (la DJ vive en compras, tipo factura, con comprobante DJ).
  */
-export function DeclaracionesJuradas({ facturas, rol }: { facturas: Factura[]; rol: Rol }) {
+export function DeclaracionesJuradas({ facturas, compras = [], rol }: { facturas: Factura[]; compras?: Compra[]; rol: Rol }) {
   const sesion = getSesion();
   useDJsAutomaticas(rol);
   const [ver, setVer] = useState<Factura | null>(null);
   const [editar, setEditar] = useState<Factura | null>(null);
-  const djs = facturas.filter(esDeclaracionJurada).sort((a, b) => b.fecha.localeCompare(a.fecha) || numeroDJ(b).localeCompare(numeroDJ(a)));
+  // También las DJ de compras con ingreso a stock marcadas "Sin comprobante" (Williams 2026-11-13)
+  const djs = [...facturas.filter(esDeclaracionJurada), ...djsDeCompras(compras)].sort((a, b) => b.fecha.localeCompare(a.fecha) || numeroDJ(b).localeCompare(numeroDJ(a)));
   // El modal muestra siempre la versión al día (tras enviar / aprobar / editar)
   const actual = ver ? djs.find((d) => d.id === ver.id) ?? ver : null;
 
   const filas = djs.map(
     (f): FilaDoc => {
-      const p = permisoEditarGasto(f, sesion);
+      const p = f.compraDirecta ? { ok: false, motivo: "Es una compra con ingreso a stock: edítela en Registrar gasto › Compras registradas" } : permisoEditarGasto(f, sesion);
       return {
         id: f.id,
         fecha: f.fecha,
@@ -47,12 +48,12 @@ export function DeclaracionesJuradas({ facturas, rol }: { facturas: Factura[]; r
         extra: (
           <span className="block truncate" title={f.descripcion}>
             {f.descripcion || "-"}
-            {esDJAutomatica(f) && <span className="block text-xs text-plomo-500">Sustenta {f.numero} · sin comprobante</span>}
+            {esDJAutomatica(f) && <span className="block text-xs text-plomo-500">Sustenta {f.compraDirecta ? "compra " : ""}{f.numero} · sin comprobante</span>}
           </span>
         ),
         total: soles(f.total),
         buscar: `${numeroDJ(f)} ${f.numero} ${f.codigo ?? ""} ${f.descripcion ?? ""} ${f.ruc}`,
-        tipoDoc: f.ocId ? "DJ con OC" : esDJAutomatica(f) ? "DJ de gasto" : "DJ",
+        tipoDoc: f.compraDirecta ? "DJ de compra" : f.ocId ? "DJ con OC" : esDJAutomatica(f) ? "DJ de gasto" : "DJ",
         estado: estadoDJ(f),
         acciones: (
           <div className="flex gap-1">
@@ -107,7 +108,7 @@ function VerDJ({ dj, rol, onClose }: { dj: Factura; rol: Rol; onClose: () => voi
                 ["Proveedor", `${dj.proveedor}${dj.ruc ? ` (${dj.ruc})` : ""}`],
                 ["Concepto", dj.descripcion ?? "-"],
                 ["Importe", soles(dj.total)],
-                ["Código de gasto", dj.codigo ?? "-"],
+                [dj.compraDirecta ? "Compra" : "Código de gasto", dj.compraDirecta ? dj.numero : dj.codigo ?? "-"],
                 ["Pago", dj.estadoPago === "PAGADA" ? `Pagada${dj.caja ? ` · ${dj.caja}` : ""}` : "Por pagar"],
               ] as [string, string][]
             ).map(([k, v]) => (
