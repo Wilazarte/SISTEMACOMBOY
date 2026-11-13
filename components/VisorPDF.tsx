@@ -204,7 +204,23 @@ export function VisorPDF() {
     }
   };
 
-  const descargar = () => bytes && descargarBytes(bytes, vista.nombre);
+  // Descargar: ventana "Guardar como" para elegir la carpeta (Chrome / Edge / app Windows).
+  // Donde no existe (celular, Firefox, Safari) se descarga a la carpeta de Descargas.
+  const descargar = async () => {
+    if (!bytes) return;
+    const picker = (window as unknown as { showSaveFilePicker?: (o: unknown) => Promise<FileSystemFileHandle> }).showSaveFilePicker;
+    if (typeof picker !== "function" || esMovil()) return descargarBytes(bytes, vista.nombre);
+    try {
+      const h = await picker.call(window, { suggestedName: archivo, types: [{ description: "Documento PDF", accept: { "application/pdf": [".pdf"] } }] });
+      const w = await h.createWritable();
+      await w.write(bytes as unknown as BufferSource);
+      await w.close();
+      toast(`${h.name} guardado`);
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return; // canceló la ventana
+      descargarBytes(bytes, vista.nombre);
+    }
+  };
 
   const whatsapp = async () => {
     if (!bytes) return;
@@ -290,7 +306,7 @@ export function VisorPDF() {
           <Button size="sm" variant="success" onClick={() => void whatsapp()} disabled={!listo || ocupado} className="!bg-[#128C7E] hover:!bg-[#075E54]">
             <MessageCircle size={14} /> WhatsApp
           </Button>
-          <Button size="sm" variant="secondary" onClick={descargar} disabled={!listo}>
+          <Button size="sm" variant="secondary" onClick={() => void descargar()} disabled={!listo}>
             <Download size={14} /> Descargar
           </Button>
           <Button size="sm" variant="secondary" onClick={panelFirma ? () => setPanelFirma(false) : abrirFirma} disabled={!listo}>
