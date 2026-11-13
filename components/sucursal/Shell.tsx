@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import { AlertTriangle, Loader2, ShieldAlert } from "lucide-react";
 import { Toaster } from "@/components/ui";
+import { VisorPDF } from "@/components/VisorPDF";
 import { ModuloContenido, ModuloLayout } from "@/components/layout/ModuloLayout";
 import { DatalistCatalogo } from "@/components/productos/ProductoInput";
 import { RUTA_LOGIN_SUCURSAL, RUTA_SUCURSAL, logout, perteneceAModulo, useSesion } from "@/lib/auth";
@@ -99,6 +100,7 @@ export function SucursalShell({ children }: { children: ReactNode }) {
         <>
           <DatalistCatalogo />
           <Toaster />
+          <VisorPDF />
         </>
       }
     >

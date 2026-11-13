@@ -20,6 +20,7 @@ import type { ConcesionContratista, LugarEntrega } from "./types";
 import type { ComprobanteVenta, Cotizacion, Factura, Guia, LineaVenta, NotaPedido, OrdenCompra, OrdenDespacho, OrdenServicio, Requerimiento } from "./types";
 import type { Traslado, VentaSucursal } from "./sucursal-modelos";
 import { COMPROBANTES } from "./comprobantes";
+import { mostrarPDF, registrarZonaFirma } from "./visorPdf";
 
 type RGB = [number, number, number];
 // Plantilla corporativa COMBOY VID
@@ -272,8 +273,11 @@ function firmas(doc: jsPDF, y: number, nombres: string[], huellaEn?: number, img
     yy = tope;
   }
   const ancho = (W - 2 * M) / nombres.length;
+  const pagina = doc.getCurrentPageInfo().pageNumber;
   nombres.forEach((n, i) => {
     const cx = M + ancho * i + ancho / 2;
+    // La vista previa (Firmar) ofrece estampar la firma sobre esta línea
+    registrarZonaFirma(doc, { pagina, x: cx, y: yy, etiqueta: n });
     doc.setDrawColor(...AZUL);
     doc.setLineWidth(0.3);
     doc.line(cx - 25, yy, cx + 25, yy);
@@ -390,10 +394,9 @@ export function construir(b: Bloque): jsPDF {
   return doc;
 }
 
-/** Descarga el PDF con nombre = código del documento (BOL-002-2026.pdf). */
+/** Abre la vista previa (Imprimir / WhatsApp / Descargar / Firmar); al descargar se llama como el código (BOL-002-2026.pdf). */
 function guardar(doc: jsPDF, codigo: string): void {
-  doc.setProperties({ title: codigo });
-  doc.save(`${codigo}.pdf`);
+  mostrarPDF(doc, codigo);
 }
 
 /** Ejecuta un PDF que primero reserva su código en Supabase; los errores se muestran como aviso. */
@@ -405,10 +408,9 @@ async function conCodigo(fn: () => Promise<void>): Promise<void> {
   }
 }
 
+/** Antes abría el PDF en otra pestaña; ahora todos pasan por la vista previa. */
 function abrir(doc: jsPDF, nombre: string): void {
-  const url = doc.output("bloburl");
-  const w = window.open(String(url), "_blank");
-  if (!w) doc.save(`${nombre}.pdf`); // popup bloqueado → descarga
+  mostrarPDF(doc, nombre);
 }
 
 const totales = (s: number, igv: number, t: number): [string, string][] => [
@@ -845,7 +847,7 @@ export function docDeclaracionJurada(f: Factura): jsPDF {
   return doc;
 }
 
-/** Descarga DJ-0005.pdf */
+/** Vista previa de DJ-0005.pdf */
 export function pdfDeclaracionJurada(f: Factura): void {
   guardar(docDeclaracionJurada(f), numeroDJ(f));
 }
@@ -853,13 +855,6 @@ export function pdfDeclaracionJurada(f: Factura): void {
 /** URL blob para ver la DJ dentro de un iframe (vista previa del modal). */
 export const urlDeclaracionJurada = (f: Factura): string => String(docDeclaracionJurada(f).output("bloburl"));
 
-/** Abre la DJ e imprime. */
-export function imprimirDeclaracionJurada(f: Factura): void {
-  const doc = docDeclaracionJurada(f);
-  doc.autoPrint();
-  const w = window.open(String(doc.output("bloburl")), "_blank");
-  if (!w) guardar(doc, numeroDJ(f));
-}
 
 export function pdfFactura(f: Factura, oc?: OrdenCompra): void {
   if (f.esGastoTesoreria && f.comprobanteGasto === "DJ") {

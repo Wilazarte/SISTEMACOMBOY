@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Download, Eye, FileText, Pencil, Printer, Send } from "lucide-react";
+import { Check, Eye, FileText, Pencil, Send } from "lucide-react";
 import { Badge, Button, Modal, ejecutar } from "@/components/ui";
 import { EditarGasto } from "@/components/compras/EditarGasto";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { getSesion } from "@/lib/auth";
-import { imprimirDeclaracionJurada, pdfDeclaracionJurada, urlDeclaracionJurada } from "@/lib/pdf";
+import { pdfDeclaracionJurada, urlDeclaracionJurada } from "@/lib/pdf";
 import { useDJsAutomaticas } from "@/components/compras/useDJsAutomaticas";
 import { cambiarEstadoDJ, esDJAutomatica, esDeclaracionJurada, fechaPE, numeroDJ, permisoEditarGasto, soles } from "@/lib/storage";
 import type { Factura, Rol } from "@/lib/types";
@@ -59,11 +59,8 @@ export function DeclaracionesJuradas({ facturas, rol }: { facturas: Factura[]; r
             <Button size="sm" variant="ghost" onClick={() => setVer(f)} title="Ver" aria-label="Ver">
               <Eye size={15} />
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => pdfDeclaracionJurada(f)} title="PDF (descargar)" aria-label="PDF">
+            <Button size="sm" variant="ghost" onClick={() => pdfDeclaracionJurada(f)} title="PDF (vista previa: imprimir, WhatsApp, descargar, firmar)" aria-label="PDF">
               <FileText size={15} />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => imprimirDeclaracionJurada(f)} title="Imprimir" aria-label="Imprimir">
-              <Printer size={15} />
             </Button>
             <span className="tip" data-tip={p.ok ? "Editar" : p.motivo}>
               <Button size="sm" variant="ghost" disabled={!p.ok} onClick={() => setEditar(f)} aria-label="Editar">
@@ -127,11 +124,8 @@ function VerDJ({ dj, rol, onClose }: { dj: Factura; rol: Rol; onClose: () => voi
             </div>
           </dl>
           <div className="flex flex-col gap-2 pt-2">
-            <Button variant="secondary" onClick={() => url && window.open(url, "_blank")}>
-              <Eye size={15} /> Visualizar PDF
-            </Button>
             <Button variant="secondary" onClick={() => pdfDeclaracionJurada(dj)}>
-              <Download size={15} /> Descargar PDF
+              <Eye size={15} /> Imprimir / Compartir / Firmar
             </Button>
             {estado === "PENDIENTE" && !sesion?.soloLectura && (
               <Button onClick={() => ejecutar(() => void cambiarEstadoDJ(dj.id, "ENVIADA", rol), `${numeroDJ(dj)} enviada a aprobar`)}>
