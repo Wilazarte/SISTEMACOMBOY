@@ -24,7 +24,7 @@ export const ALMACEN_DEFECTO = "Taller Principal Aqp";
 /** Ubicaciones donde puede haber stock: los dos almacenes (los nombres viejos se leen con sedeNormalizada). */
 export const SEDES_STOCK = ALMACENES;
 
-export const UNIDADES = ["UND", "PZA", "KG", "M", "M2", "GLN", "LT", "CAJA", "PAR", "JGO", "ROLLO", "BOLSA"];
+export const UNIDADES = ["UND", "PZA", "KG", "M", "M2", "M3", "GLN", "LT", "CAJA", "PAR", "JGO", "ROLLO", "BOLSA"];
 
 /** Sede por defecto del stock de repuestos (importación de saldos del almacén). */
 export const SEDE_REPUESTOS = "Taller Principal Aqp";
