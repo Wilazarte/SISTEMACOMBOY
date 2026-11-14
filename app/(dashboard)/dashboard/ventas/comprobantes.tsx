@@ -32,6 +32,7 @@ const datosVacios = (): DatosComprobante => ({
   clienteId: "",
   items: [lineaVacia()],
   conIgv: true,
+  preciosConIgv: true,
   descuento: 0,
   formaPago: "CONTADO",
   condPagoId: "",
@@ -72,6 +73,7 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
       clienteId: np.clienteId,
       items: np.items.map((l) => ({ ...l })),
       conIgv: cliente?.tipoDoc === "RUC" ? true : np.conIgv,
+      preciosConIgv: np.preciosConIgv === true, // mismos precios que la NP (las anteriores, sin IGV)
       descuento: np.descuento,
       condPagoId: np.condPagoId,
       // Los días que se pactaron en la nota de pedido (crédito / personalizado)
@@ -100,7 +102,7 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
   }, [nuevoPedido]);
 
   const npConOD = form?.npId ? notas.find((n) => n.id === form.npId && n.odId) : undefined;
-  const t = form ? totalesVenta(form.items, form.tipo === "FACTURA" ? true : form.conIgv, form.descuento) : null;
+  const t = form ? totalesVenta(form.items, form.tipo === "FACTURA" ? true : form.conIgv, form.descuento, form.preciosConIgv !== false) : null;
   const cond = condiciones.find((c) => c.id === form?.condPagoId);
 
   const elegirCondicion = (id: string) => {
@@ -144,6 +146,7 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
       npId: c.npId,
       items: c.items,
       conIgv: c.conIgv,
+      preciosConIgv: c.preciosConIgv === true,
       descuento: c.descuento,
       formaPago: c.formaPago,
       condPagoId: c.condPagoId,
@@ -322,7 +325,7 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
                 })()}
               />
             )}
-            <LineasEditor items={form.items} onChange={(items) => setForm({ ...form, items })} stock={stock} />
+            <LineasEditor items={form.items} onChange={(items) => setForm({ ...form, items })} stock={stock} preciosConIgv={form.preciosConIgv !== false} />
             <div className="flex flex-wrap items-start gap-4">
               <div className="space-y-3">
                 {form.tipo === "BOLETA" ? (
@@ -336,7 +339,7 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
                   <Input type="number" min={0} step="0.01" value={form.descuento || ""} onChange={(e) => setForm({ ...form, descuento: parseFloat(e.target.value) || 0 })} className="w-40" />
                 </Field>
               </div>
-              <TotalesVenta items={form.items} conIgv={form.tipo === "FACTURA" ? true : form.conIgv} descuento={form.descuento} />
+              <TotalesVenta items={form.items} conIgv={form.tipo === "FACTURA" ? true : form.conIgv} descuento={form.descuento} preciosConIgv={form.preciosConIgv !== false} />
             </div>
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
               Estado SUNAT: el comprobante queda como NO ENVIADO. El ERP aún no está conectado a un OSE/PSE de facturación electrónica.

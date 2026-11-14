@@ -413,6 +413,9 @@ function abrir(doc: jsPDF, nombre: string): void {
   mostrarPDF(doc, nombre);
 }
 
+/** Encabezado del precio unitario: con IGV incluido (documentos nuevos) o sin IGV (anteriores). */
+const cabPU = (d: { preciosConIgv?: boolean; igv: number }): string => (d.igv > 0 ? (d.preciosConIgv ? "P.U. inc. IGV" : "P.U. sin IGV") : "P. Unit.");
+
 const totales = (s: number, igv: number, t: number): [string, string][] => [
   ["Subtotal (valor venta)", soles(s)],
   ["IGV 18%", soles(igv)],
@@ -644,7 +647,7 @@ export function pdfCotizacion(c: Cotizacion): void {
         ["Fecha emisión", fechaPE(c.fechaEmision)],
         ["Requerimiento", c.reqNumero],
       ],
-      head: ["#", "Producto", "Marca", "Cant.", "Und.", "P. Unit.", "Subtotal"],
+      head: ["#", "Producto", "Marca", "Cant.", "Und.", cabPU(c), "Subtotal"],
       body: c.items.map((i, k) => [k + 1, i.nombre, i.marca || "-", i.cantidad, i.unidad, soles(i.precioUnit), soles(i.subtotal)]),
       alinearDerecha: [3, 5, 6],
       totales: totales(c.subtotal, c.igv, c.total),
@@ -676,7 +679,7 @@ export function pdfOrdenCompra(o: OrdenCompra): void {
         ...(o.voucherUrl ? ([["Baucher", `${o.voucherNombre ?? "adjunto"}${o.voucherMonto !== undefined ? ` · ${soles(o.voucherMonto)}` : ""}`]] as [string, string][]) : []),
         ...(o.bancarizacion ? ([["Bancarización", `${o.bancarizacion.tipo}${o.bancarizacion.nroOperacion ? ` · N° ${o.bancarizacion.nroOperacion}` : ""}`]] as [string, string][]) : []),
       ],
-      head: ["#", "Descripción", "Marca", "Cant.", "Und.", "P. Unit.", "Importe"],
+      head: ["#", "Descripción", "Marca", "Cant.", "Und.", cabPU(o), "Importe"],
       body: o.items.map((i, k) => [k + 1, i.nombre, i.marca || "-", i.cantidad, i.unidad, soles(i.precioUnit), soles(i.subtotal)]),
       alinearDerecha: [3, 5, 6],
       totales: totales(o.subtotal, o.igv, o.total),
@@ -713,7 +716,7 @@ export function pdfOrdenServicio(o: OrdenServicio): void {
         ...(o.adjuntoNombre ? ([["Adjunto", o.adjuntoNombre]] as [string, string][]) : []),
         ...(o.estado === "ANULADA" && o.motivoAnulacion ? ([["Motivo anulación", o.motivoAnulacion]] as [string, string][]) : []),
       ],
-      head: ["#", "Descripción del servicio", "Cant.", "Und.", "P. Unit.", "Importe"],
+      head: ["#", "Descripción del servicio", "Cant.", "Und.", cabPU(o), "Importe"],
       body: o.items.map((i, k) => [k + 1, i.descripcion, i.cantidad, i.unidad, soles(i.precioUnit), soles(i.subtotal)]),
       alinearDerecha: [2, 4, 5],
       totales: totales(o.subtotal, o.igv, o.total),
@@ -882,7 +885,7 @@ export function pdfFactura(f: Factura, oc?: OrdenCompra): void {
             ] as [string, string][])
           : []),
       ],
-      head: ["#", "Descripción", "Cant.", "Und.", "P. Unit.", "Importe"],
+      head: ["#", "Descripción", "Cant.", "Und.", oc && !esDJ ? cabPU(oc) : "P. Unit.", "Importe"],
       body: (oc?.items ?? []).map((i, k) => [k + 1, i.nombre, i.cantidad, i.unidad, soles(i.precioUnit), soles(i.subtotal)]),
       alinearDerecha: [2, 4, 5],
       totales: esDJ ? [["TOTAL (sin IGV)", soles(f.total)]] : totales(f.subtotal, f.igv, f.total),
@@ -969,12 +972,12 @@ export function pdfNotaPedido(n: NotaPedido): void {
         ],
         ["Vendedor", n.vendedor],
       ],
-      head: ["#", "Descripción", "Medidas", "Cant.", "m²", "Precio", "Total"],
+      head: ["#", "Descripción", "Medidas", "Cant.", "m²", n.preciosConIgv && n.conIgv ? "Precio inc. IGV" : "Precio", "Total"],
       body: cuerpoVenta(n.items),
       alinearDerecha: [3, 4, 5, 6],
       totales: [
         ...(n.descuento > 0 ? ([["Descuento", `- ${soles(n.descuento)}`]] as [string, string][]) : []),
-        [n.conIgv ? "Subtotal" : "Subtotal (sin IGV)", soles(n.subtotal)],
+        [n.conIgv ? (n.preciosConIgv ? "Base imponible" : "Subtotal") : "Subtotal (sin IGV)", soles(n.subtotal)],
         ...(n.conIgv ? ([["IGV 18%", soles(n.igv)]] as [string, string][]) : []),
         ["TOTAL", soles(n.total)],
       ],
@@ -1012,7 +1015,7 @@ export function pdfComprobanteVenta(c: ComprobanteVenta): void {
         ["Orden despacho", c.odNumero ?? "-"],
         ["Moneda", "Soles (PEN)"],
       ],
-      head: ["#", "Descripción", "Medidas", "Cant.", "m²", "V. unit.", "Valor venta"],
+      head: ["#", "Descripción", "Medidas", "Cant.", "m²", c.preciosConIgv ? (c.conIgv ? "P. unit. inc. IGV" : "P. unit.") : "V. unit.", c.preciosConIgv ? "Importe" : "Valor venta"],
       body: cuerpoVenta(c.items),
       alinearDerecha: [3, 4, 5, 6],
       totales: [

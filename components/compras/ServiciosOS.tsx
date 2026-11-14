@@ -3,7 +3,7 @@
 import { Plus, Trash2 } from "lucide-react";
 import { UNIDADES } from "@/lib/empresa";
 import { Button, Input, Select, Textarea, cn } from "@/components/ui";
-import { IGV, r2, soles } from "@/lib/storage";
+import { desglosarIgv, r2, soles } from "@/lib/storage";
 
 /** Línea de servicio de la OS: texto libre, sin catálogo ni almacén. */
 export type FilaServicio = { id: string; descripcion: string; cantidad: number; unidad: string; precioUnit: number; descTocada?: boolean };
@@ -13,17 +13,16 @@ const UNIDADES_SERVICIO = ["SERVICIO", ...UNIDADES];
 
 /**
  * Líneas que se guardan: la primera toma la descripción del gasto mientras no se escriba otra; con una sola
- * línea el precio sale del importe del gasto (sin IGV si es factura), así el total de la OS siempre cuadra.
+ * línea el precio sale del importe del gasto (con IGV incluido, como el importe), así el total de la OS siempre cuadra.
  */
 export function lineasServicio(filas: FilaServicio[], descripcionGasto: string, importe: number, conIgv: boolean): FilaServicio[] {
   const lineas = filas.map((f, k) => (k === 0 && !f.descTocada ? { ...f, descripcion: descripcionGasto } : f));
   if (lineas.length !== 1) return lineas;
-  const base = conIgv ? r2((importe || 0) / (1 + IGV)) : r2(importe || 0);
   const cantidad = lineas[0].cantidad > 0 ? lineas[0].cantidad : 1;
-  return [{ ...lineas[0], cantidad, precioUnit: r2(base / cantidad) }];
+  return [{ ...lineas[0], cantidad, precioUnit: r2(r2(importe || 0) / cantidad) }];
 }
 
-/** Formulario de la OS del gasto: descripción libre, cantidad, unidad y precio sin IGV. */
+/** Formulario de la OS del gasto: descripción libre, cantidad, unidad y precio con IGV incluido (factura) o final. */
 export function ServiciosOS({
   filas,
   onChange,
@@ -41,11 +40,12 @@ export function ServiciosOS({
   const una = filas.length === 1;
   const set = (id: string, cambios: Partial<FilaServicio>) => onChange(filas.map((f) => (f.id === id ? { ...f, ...cambios } : f)));
   const sub = r2(lineas.reduce((a, f) => a + (f.cantidad || 0) * (f.precioUnit || 0), 0));
-  const total = una ? r2(importe || 0) : conIgv ? r2(sub * (1 + IGV)) : sub;
+  const total = una ? r2(importe || 0) : sub;
+  const igvOS = conIgv ? desglosarIgv(total).igv : 0;
   return (
     <div className="mt-3 space-y-3">
       <p className="text-xs text-plomo-500">
-        Servicio en texto libre (no es producto de almacén ni toca el kardex). Precios {conIgv ? "sin IGV" : "finales"}.
+        Servicio en texto libre (no es producto de almacén ni toca el kardex). Precios {conIgv ? "CON IGV incluido" : "finales"}.
         {una ? " Con una sola línea el total de la OS es el importe del gasto." : ""}
       </p>
       <div className="overflow-x-auto">
@@ -55,8 +55,8 @@ export function ServiciosOS({
               <th className="px-2 py-2 text-left">Descripción del servicio *</th>
               <th className="w-24 px-2 py-2 text-left">Cantidad *</th>
               <th className="w-32 px-2 py-2 text-left">Unidad</th>
-              <th className="w-32 px-2 py-2 text-left">P. unit. {conIgv ? "sin IGV" : ""} *</th>
-              <th className="w-28 px-2 py-2 text-right">Subtotal</th>
+              <th className="w-32 px-2 py-2 text-left">P. unit. {conIgv ? "inc. IGV" : ""} *</th>
+              <th className="w-28 px-2 py-2 text-right">Importe</th>
               <th className="w-10" />
             </tr>
           </thead>
@@ -111,6 +111,7 @@ export function ServiciosOS({
         </Button>
         <p className={cn("text-sm", Math.abs(total - (importe || 0)) > 0.05 ? "text-red-600" : "text-emerald-700")}>
           Total OS <b>{soles(total)}</b>
+          {conIgv ? ` (incluye IGV ${soles(igvOS)})` : ""}
           {!una && <> · debe coincidir con el importe {soles(importe || 0)}</>}
         </p>
       </div>

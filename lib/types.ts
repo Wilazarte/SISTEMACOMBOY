@@ -83,7 +83,7 @@ export interface ItemPrecio {
   cantidad: number;
   unidad: string;
   marca: string;
-  precioUnit: number; // valor unitario SIN IGV
+  precioUnit: number; // valor unitario: CON IGV si el documento tiene preciosConIgv; si no (anteriores), SIN IGV
   subtotal: number;
   /** Producto del catálogo maestro (productos_maestro.id) y su SKU. */
   productoId?: string;
@@ -98,6 +98,8 @@ export interface Cotizacion {
   reqNumero: string;
   proveedor: string;
   ruc: string;
+  /** Precios de las líneas con IGV incluido (Williams 2026-11-14). Los anteriores no lo tienen: valores sin IGV. */
+  preciosConIgv?: boolean;
   items: ItemPrecio[];
   subtotal: number;
   igv: number;
@@ -139,6 +141,8 @@ export interface OrdenCompra {
   lugarEntrega: string;
   /** Almacén donde ingresa la mercadería (repuestos) al dar el V°B°. */
   almacenIngreso?: string;
+  /** Precios de las líneas con IGV incluido (Williams 2026-11-14). Los anteriores no lo tienen: valores sin IGV. */
+  preciosConIgv?: boolean;
   items: ItemPrecio[];
   subtotal: number;
   igv: number;
@@ -174,7 +178,7 @@ export interface ItemServicio {
   descripcion: string;
   cantidad: number;
   unidad: string;
-  precioUnit: number; // valor unitario SIN IGV
+  precioUnit: number; // valor unitario: CON IGV si la OS tiene preciosConIgv; si no (anteriores), SIN IGV
   subtotal: number;
   /** Si la línea es un producto del catálogo maestro. */
   productoId?: string;
@@ -190,6 +194,8 @@ export interface OrdenServicio {
   proveedor: string;
   ruc: string;
   concepto: string;
+  /** Precios de las líneas con IGV incluido (Williams 2026-11-14). Los anteriores no lo tienen: valores sin IGV. */
+  preciosConIgv?: boolean;
   items: ItemServicio[];
   subtotal: number;
   igv: number;
@@ -485,7 +491,7 @@ export interface ItemCompra {
   nombre: string;
   unidad: string;
   cantidad: number;
-  precioUnit: number; // FACTURA: sin IGV · BOLETA: con IGV incluido
+  precioUnit: number; // con IGV incluido (preciosConIgv) · compras anteriores: FACTURA sin IGV, BOLETA con IGV
   subtotal: number; // cantidad × precioUnit (mismo criterio que precioUnit)
 }
 
@@ -524,6 +530,8 @@ export interface Compra {
   djNumero?: string;
   djEstado?: "PENDIENTE" | "ENVIADA" | "APROBADA";
   aprobadoPor?: string;
+  /** Precios de las líneas con IGV incluido (Williams 2026-11-14). Los anteriores no lo tienen: valores sin IGV. */
+  preciosConIgv?: boolean;
   items: ItemCompra[];
   subtotal: number;
   igv: number;
@@ -656,8 +664,8 @@ export interface LineaVenta {
   alto: number; // metros
   m2: number; // ancho × alto × cantidad (0 si no tiene medidas)
   cantidad: number;
-  precio: number; // por m² si tiene medidas, si no por unidad (sin IGV)
-  total: number; // sin IGV
+  precio: number; // por m² si tiene medidas, si no por unidad. Con IGV si el documento tiene preciosConIgv; si no, sin IGV
+  total: number; // cantidad × precio (mismo criterio que precio)
 }
 
 /** PENDIENTE_COSTEO: NP creada al aceptar un requerimiento / derivación de Secocha; Ventas pone los costos y pasa a PENDIENTE. */
@@ -709,7 +717,9 @@ export interface NotaPedido {
   vendedor: string; // usuario logueado
   items: LineaVenta[];
   conIgv: boolean;
-  descuento: number; // S/ sobre el subtotal
+  /** Precios de las líneas con IGV incluido (Williams 2026-11-14). Las NP anteriores no lo tienen: precios sin IGV. */
+  preciosConIgv?: boolean;
+  descuento: number; // S/ sobre el subtotal (sobre el total con IGV si preciosConIgv)
   subtotal: number;
   igv: number;
   total: number;
@@ -770,6 +780,8 @@ export interface ComprobanteVenta {
   npNumero?: string;
   items: LineaVenta[];
   conIgv: boolean;
+  /** Precios de las líneas con IGV incluido (Williams 2026-11-14). Los anteriores no lo tienen: precios sin IGV. */
+  preciosConIgv?: boolean;
   descuento: number;
   base: number;
   igv: number;

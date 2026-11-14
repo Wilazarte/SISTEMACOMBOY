@@ -47,7 +47,7 @@ import {
   type RespuestaRuc,
 } from "@/lib/expedientes";
 import { MOTIVOS_RETIRO, requiereChasis, type MotivoRetiro } from "@/lib/inventario";
-import { IGV, getStock, hoy, r2, rucValido, soles } from "@/lib/storage";
+import { IGV, desglosarIgv, getStock, hoy, r2, rucValido, soles } from "@/lib/storage";
 import { Boton, Dato } from "./comun";
 
 const opciones = (l: readonly string[]) => l.map((v) => ({ value: v, label: v }));
@@ -392,7 +392,7 @@ const cotiVacia = (): DatosCotizacion => ({
   fecha_cotizacion: hoy(),
   validez_dias: 15,
   moneda: "PEN",
-  subtotal: 0,
+  total: 0,
 });
 
 export function FormCotizacion({ x, onClose }: { x: Expediente; onClose: () => void }) {
@@ -427,7 +427,7 @@ export function FormCotizacion({ x, onClose }: { x: Expediente; onClose: () => v
       setConsultando(false);
     }
   };
-  const sub = Number(d.subtotal) || 0;
+  const des = desglosarIgv(Number(d.total) || 0);
   return (
     <Modal open onClose={onClose} title={`Fase 4 · ${x.codigo_expediente} · subir cotización del proveedor`} wide>
       <form onSubmit={(e) => (e.preventDefault(), enviar(async () => {
@@ -497,11 +497,11 @@ export function FormCotizacion({ x, onClose }: { x: Expediente; onClose: () => v
           <Field label="Moneda">
             <Select value={d.moneda} onChange={(e) => set("moneda", e.target.value)} options={[{ value: "PEN", label: "Soles (S/)" }, { value: "USD", label: "Dólares (US$)" }]} />
           </Field>
-          <Field label="Subtotal sin IGV">
-            <Input type="number" min="0" step="0.01" value={d.subtotal || ""} onChange={(e) => set("subtotal", num(e.target.value))} />
+          <Field label="Total con IGV incluido">
+            <Input type="number" min="0" step="0.01" value={d.total || ""} onChange={(e) => set("total", num(e.target.value))} />
           </Field>
           <div className="pt-6 text-[13px] text-[#d4d4d8]">
-            IGV 18 %: {r2(sub * IGV).toFixed(2)} · Total: <b className="text-white">{r2(sub * (1 + IGV)).toFixed(2)}</b>
+            Base imponible: {des.subtotal.toFixed(2)} · IGV 18 %: {des.igv.toFixed(2)} · Total: <b className="text-white">{des.total.toFixed(2)}</b>
           </div>
           <Field label="Motivo de la compra" className="sm:col-span-2">
             <Input value={d.motivo_compra ?? ""} onChange={(e) => set("motivo_compra", e.target.value)} />
@@ -663,7 +663,7 @@ export function FormTransporte({ x, onClose }: { x: Expediente; onClose: () => v
   const set = (k: keyof typeof t, v: string | number | boolean) => setT({ ...t, [k]: v });
   return (
     <Modal open onClose={onClose} title={`Fase 6 · ${x.codigo_expediente} · transporte`} wide>
-      <form onSubmit={(e) => (e.preventDefault(), enviar(() => registrarTransporte(x, t), "Transporte registrado · se avisó a Almacén y Producción"))} className="space-y-3">
+      <form onSubmit={(e) => (e.preventDefault(), enviar(() => registrarTransporte(x, { ...t, costoFlete: desglosarIgv(t.costoFlete).subtotal, costoFleteConIgv: t.costoFlete }), "Transporte registrado · se avisó a Almacén y Producción"))} className="space-y-3">
         <label className="flex items-center gap-2 text-[13px] text-white">
           <input type="checkbox" checked={t.sinFlete} onChange={(e) => set("sinFlete", e.target.checked)} /> Sin flete: el proveedor entrega directo en planta
         </label>
@@ -688,7 +688,7 @@ export function FormTransporte({ x, onClose }: { x: Expediente; onClose: () => v
             <Field label="Placa">
               <Input value={t.placa} onChange={(e) => set("placa", e.target.value)} />
             </Field>
-            <Field label="Costo del flete S/ (sin IGV)">
+            <Field label="Costo del flete S/ (con IGV incluido)">
               <Input type="number" min="0" step="0.01" value={t.costoFlete || ""} onChange={(e) => set("costoFlete", num(e.target.value))} />
             </Field>
             <Field label="Factura del transporte">
