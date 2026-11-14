@@ -51,7 +51,18 @@ export function AvisoCondiciones({ carga, activas }: { carga: ReturnType<typeof 
 }
 
 // ---------------------------------------------------------------- Líneas
-export function LineasEditor({ items, onChange, stock }: { items: LineaVenta[]; onChange: (l: LineaVenta[]) => void; stock: StockItem[] }) {
+export function LineasEditor({
+  items,
+  onChange,
+  stock,
+  preciosConIgv = true,
+}: {
+  items: LineaVenta[];
+  onChange: (l: LineaVenta[]) => void;
+  stock: StockItem[];
+  /** Precios con IGV incluido (por defecto). false: documento anterior con precios sin IGV. */
+  preciosConIgv?: boolean;
+}) {
   // Productos de Almacén (nombre + unidad), sin repetir por sede
   const productos = useMemo(() => {
     const m = new Map<string, { nombre: string; unidad: string; cantidad: number }>();
@@ -89,7 +100,7 @@ export function LineasEditor({ items, onChange, stock }: { items: LineaVenta[]; 
               <th className="w-20 px-2 py-2 text-left">Alto m</th>
               <th className="w-20 px-2 py-2 text-left">Cant. *</th>
               <th className="w-16 px-2 py-2 text-right">m²</th>
-              <th className="w-28 px-2 py-2 text-left">Precio *</th>
+              <th className="w-28 px-2 py-2 text-left">{preciosConIgv ? "Precio inc. IGV *" : "Precio sin IGV *"}</th>
               <th className="w-28 px-2 py-2 text-right">Total</th>
               <th className="w-8" />
             </tr>
@@ -146,19 +157,22 @@ export function LineasEditor({ items, onChange, stock }: { items: LineaVenta[]; 
         <Button size="sm" variant="secondary" onClick={() => onChange([...items, lineaVacia()])}>
           <Plus size={14} /> Agregar línea
         </Button>
-        <p className="text-xs text-plomo-500">Con medidas: m² = ancho × alto × cantidad y precio por m². Sin medidas (ej. instalación): precio por unidad.</p>
+        <p className="text-xs text-plomo-500">
+          Con medidas: m² = ancho × alto × cantidad y precio por m². Sin medidas (ej. instalación): precio por unidad.{" "}
+          {preciosConIgv ? "Escriba el precio CON IGV incluido: el sistema desglosa base imponible e IGV." : "Documento anterior: precios sin IGV."}
+        </p>
       </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------- Totales
-export function TotalesVenta({ items, conIgv, descuento }: { items: LineaVenta[]; conIgv: boolean; descuento: number }) {
-  const t = totalesVenta(items, conIgv, descuento);
+export function TotalesVenta({ items, conIgv, descuento, preciosConIgv = true }: { items: LineaVenta[]; conIgv: boolean; descuento: number; preciosConIgv?: boolean }) {
+  const t = totalesVenta(items, conIgv, descuento, preciosConIgv);
   return (
     <dl className="ml-auto w-72 space-y-1 text-sm">
       <div className="flex justify-between text-plomo-600">
-        <dt>Subtotal</dt>
+        <dt>{preciosConIgv && conIgv ? "Suma (inc. IGV)" : "Subtotal"}</dt>
         <dd>{soles(t.bruto)}</dd>
       </div>
       {t.descuento > 0 && (

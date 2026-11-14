@@ -17,7 +17,7 @@ import { getEquipos } from "./equipos";
 import { consumosDeChasis, retiroProduccion, type MotivoRetiro } from "./inventario";
 import { perfilPlanta, type PerfilPlanta } from "./permisosPlanta";
 import { getOrdenesProduccion, type OrdenProduccion } from "./produccion";
-import { ErpError, IGV, TOPE_BANCARIZACION, crearRequerimiento, getPendientes, getProcesados, getStock, getValesProduccion, hoy, r2, rucValido, siguienteNumero, uid } from "./storage";
+import { ErpError, IGV, TOPE_BANCARIZACION, desglosarIgv, crearRequerimiento, getPendientes, getProcesados, getStock, getValesProduccion, hoy, r2, rucValido, siguienteNumero, uid } from "./storage";
 import { exigirRucSunat, validarRuc } from "./ruc";
 import { createClient } from "./supabase/client";
 import type { Requerimiento, StockItem, ValeProduccion } from "./types";
@@ -113,7 +113,9 @@ export interface Transporte {
   guiaTransportista: string;
   ticket: string;
   placa: string;
-  costoFlete: number; // sin IGV
+  costoFlete: number; // sin IGV (base imponible; se ingresa con IGV y se desglosa)
+  /** Lo que se ingresó: costo del flete con IGV incluido (desde 2026-11-14). */
+  costoFleteConIgv?: number;
   facturaFlete: string;
   fechaEntrega: string;
   registrado: string;
@@ -916,7 +918,7 @@ export async function abrirArchivoExp(ruta: string): Promise<void> {
   if (w) w.location.href = data.signedUrl;
 }
 
-export type DatosCotizacion = Pick<CotizacionExp, "ruc" | "razon_social" | "direccion" | "celular" | "asesor_ventas" | "nro_cotizacion" | "banco" | "cuenta_bancaria" | "cci" | "condicion_pago" | "motivo_compra" | "fecha_cotizacion" | "validez_dias" | "moneda" | "subtotal">;
+export type DatosCotizacion = Pick<CotizacionExp, "ruc" | "razon_social" | "direccion" | "celular" | "asesor_ventas" | "nro_cotizacion" | "banco" | "cuenta_bancaria" | "cci" | "condicion_pago" | "motivo_compra" | "fecha_cotizacion" | "validez_dias" | "moneda" | "total">;
 
 export interface RespuestaRuc {
   ruc: string;
@@ -946,9 +948,9 @@ export async function registrarCotizacion(x: Expediente, d: DatosCotizacion, arc
   if (!d.nro_cotizacion?.trim()) throw new ErpError("Indique el N° de cotización.");
   if (d.cci && d.cci.replace(/\D/g, "").length !== 20) throw new ErpError("El CCI debe tener 20 dígitos.");
   if (d.celular && !/^9\d{8}$/.test(d.celular.replace(/\D/g, ""))) throw new ErpError("El celular debe tener 9 dígitos y empezar con 9.");
-  if (!(Number(d.subtotal) > 0)) throw new ErpError("Indique el subtotal (sin IGV) de la cotización.");
-  const subtotal = r2(Number(d.subtotal));
-  const igv = r2(subtotal * IGV);
+  // Precio con IGV incluido (Williams 2026-11-14): base = total / 1.18, IGV = total − base
+  if (!(Number(d.total) > 0)) throw new ErpError("Indique el total (con IGV incluido) de la cotización.");
+  const { subtotal, igv, total } = desglosarIgv(Number(d.total));
   const ruta = await subirArchivoExp(x.codigo_expediente, archivo, "cotizacion");
   const { data, error } = await createClient()
     .from("cotizaciones")
@@ -962,7 +964,7 @@ export async function registrarCotizacion(x: Expediente, d: DatosCotizacion, arc
       nro_cotizacion: d.nro_cotizacion.trim().toUpperCase(),
       subtotal,
       igv,
-      total: r2(subtotal + igv),
+      total,
       archivo_url: ruta,
       archivo_nombre: archivo.name,
       created_by: usuario,
