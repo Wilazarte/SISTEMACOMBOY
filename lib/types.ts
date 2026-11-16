@@ -818,6 +818,8 @@ export interface CobroVenta {
   medio: "CAJA" | "BANCO";
   cuenta: string; // Caja General · Interbank Soles / Caja Chica (efectivo) / Fondo de Reserva (efectivo); antiguos: Caja principal, BCP…
   referencia: string; // N° operación
+  /** Observación libre del cobro (opcional). */
+  observacion?: string;
   usuario: string;
   created_at: string;
 }

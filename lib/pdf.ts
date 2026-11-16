@@ -213,9 +213,16 @@ function datosGrid(doc: jsPDF, y: number, datos: [string, string][], columnas = 
 }
 
 /** Tabla corporativa: cabecera azul 7.5 pt, filas 7.5 pt con borde #D1D5DB y alternado #F8FAFC. */
-function tabla(doc: jsPDF, y: number, head: string[], body: (string | number)[][], alinearDerecha: number[] = []): number {
-  const columnStyles: Record<number, { halign: "right" }> = {};
-  alinearDerecha.forEach((c) => (columnStyles[c] = { halign: "right" }));
+function tabla(
+  doc: jsPDF,
+  y: number,
+  head: string[],
+  body: (string | number)[][],
+  alinearDerecha: number[] = [],
+  anchos: Record<number, { cellWidth: number }> = {}
+): number {
+  const columnStyles: Record<number, { halign?: "right"; cellWidth?: number }> = { ...anchos };
+  alinearDerecha.forEach((c) => (columnStyles[c] = { ...columnStyles[c], halign: "right" }));
   autoTable(doc, {
     startY: y,
     head: [head.map((h) => h.toUpperCase())],
@@ -1000,6 +1007,7 @@ export interface PagoVentaPDF {
   monto: number;
   cuenta: string;
   referencia: string;
+  observacion?: string;
   documento: string; // NP-0001 / F001-0001 (dónde se registró el cobro)
 }
 
@@ -1075,10 +1083,14 @@ export function pdfNotaPedidoActualizada(d: {
         const filas: (string | number)[][] = d.pagos
           .slice()
           .sort((a, b) => a.fecha.localeCompare(b.fecha))
-          .map((p, i) => [i + 1, fechaPE(p.fecha), p.referencia || "-", p.cuenta || "-", p.documento, soles(p.monto)]);
-        if (sinDetalle > 0.009) filas.push([filas.length + 1, "-", "Pagos anteriores (sin detalle)", "-", "-", soles(sinDetalle)]);
-        if (!filas.length) filas.push(["", "", "Aún no se registran adelantos", "", "", soles(0)]);
-        y = tabla(doc, y, ["#", "Fecha", "N° operación", "Caja / Banco", "Registrado en", "Monto"], filas, [5]);
+          .map((p, i) => [i + 1, fechaPE(p.fecha), p.referencia || "-", p.cuenta || "-", p.documento, p.observacion || "-", soles(p.monto)]);
+        if (sinDetalle > 0.009) filas.push([filas.length + 1, "-", "Pagos anteriores (sin detalle)", "-", "-", "-", soles(sinDetalle)]);
+        if (!filas.length) filas.push(["", "", "Aún no se registran adelantos", "", "", "", soles(0)]);
+        y = tabla(doc, y, ["#", "Fecha", "N° operación", "Caja / Banco", "Registrado en", "Observación", "Monto"], filas, [6], {
+          0: { cellWidth: 7 },
+          1: { cellWidth: 19 },
+          6: { cellWidth: 25 },
+        });
         return bloqueTotales(doc, y, [
           ["Total de la venta", soles(d.total)],
           ["(-) Adelantos / pagos", `- ${soles(d.pagado)}`],

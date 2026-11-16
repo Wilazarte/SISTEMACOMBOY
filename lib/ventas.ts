@@ -1305,7 +1305,7 @@ export function reporteDeuda(filas: FilaCxC[], por: AgruparDeuda): GrupoDeuda[] 
 /** Cobro a cuenta de una NP aprobada: DEBE Caja/Banco / HABER 1212 (la venta ya se registró al aprobar). */
 export function registrarCobroNP(
   npId: string,
-  datos: { monto: number; medio: CobroVenta["medio"]; cuenta: string; referencia: string; fecha: string },
+  datos: { monto: number; medio: CobroVenta["medio"]; cuenta: string; referencia: string; fecha: string; observacion?: string },
   usuario: string,
   rol: Rol
 ): void {
@@ -1332,6 +1332,7 @@ export function registrarCobroNP(
     medio: datos.medio,
     cuenta,
     referencia: datos.referencia.trim(),
+    ...(datos.observacion?.trim() ? { observacion: datos.observacion.trim() } : {}),
     usuario,
     created_at: new Date().toISOString(),
   };
@@ -1420,7 +1421,7 @@ export function registrarComprobanteExterno(
 
 export function registrarCobro(
   comprobanteId: string,
-  datos: { monto: number; medio: CobroVenta["medio"]; cuenta: string; referencia: string; fecha: string },
+  datos: { monto: number; medio: CobroVenta["medio"]; cuenta: string; referencia: string; fecha: string; observacion?: string },
   usuario: string,
   rol: Rol
 ): void {
@@ -1443,6 +1444,7 @@ export function registrarCobro(
     medio: datos.medio,
     cuenta: datos.cuenta.trim(),
     referencia: datos.referencia.trim(),
+    ...(datos.observacion?.trim() ? { observacion: datos.observacion.trim() } : {}),
     usuario,
     created_at: new Date().toISOString(),
   };
