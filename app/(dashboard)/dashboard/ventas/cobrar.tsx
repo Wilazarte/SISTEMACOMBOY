@@ -4,7 +4,7 @@ import { BotonFiltros } from "@/components/ui/BotonFiltros";
 import { useState } from "react";
 import { BarChart3, FileCheck2, FileSpreadsheet, FileText, Wallet, X } from "lucide-react";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
-import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, cn, ejecutar } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, Textarea, cn, ejecutar } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { KEYS, fechaPE, hoy, puede, r2, soles, useRol, useStore } from "@/lib/storage";
 import {
@@ -51,7 +51,7 @@ export function CuentasPorCobrar() {
   const [reporte, setReporte] = useState<AgruparDeuda | null>(null);
   const [sel, setSel] = useState<FilaCxC | null>(null);
   const [externo, setExterno] = useState<FilaCxC | null>(null);
-  const [datos, setDatos] = useState({ monto: 0, cuenta: CUENTAS_COBRO[0], referencia: "", fecha: hoy() });
+  const [datos, setDatos] = useState({ monto: 0, cuenta: CUENTAS_COBRO[0], referencia: "", fecha: hoy(), observacion: "" });
   const habilitado = puede(rol, "venta.cobrar");
   const puedeReferir = habilitado || puede(rol, "venta.gestionar");
 
@@ -118,12 +118,12 @@ export function CuentasPorCobrar() {
     const v = ventaActualizada(f, notas, comprobantes, cobros);
     pdfNotaPedidoActualizada({
       ...v,
-      pagos: v.pagos.map((c) => ({ fecha: c.fecha, monto: c.monto, cuenta: c.cuenta, referencia: c.referencia, documento: c.npId ? c.npNumero ?? "" : c.comprobanteNumero })),
+      pagos: v.pagos.map((c) => ({ fecha: c.fecha, monto: c.monto, cuenta: c.cuenta, referencia: c.referencia, observacion: c.observacion ?? "", documento: c.npId ? c.npNumero ?? "" : c.comprobanteNumero })),
     });
   };
 
   const abrir = (f: FilaCxC) => {
-    setDatos({ monto: f.saldo, cuenta: CUENTAS_COBRO[0], referencia: "", fecha: hoy() });
+    setDatos({ monto: f.saldo, cuenta: CUENTAS_COBRO[0], referencia: "", fecha: hoy(), observacion: "" });
     setSel(f);
   };
 
@@ -344,7 +344,7 @@ export function CuentasPorCobrar() {
 
       <Card>
         <CardHeader title="Cobros registrados" />
-        <Table head={["Fecha", "Documento", "Comprobante", "Cliente", "Monto", "Caja / Banco", "Referencia", "Usuario"]} empty={cobros.length === 0}>
+        <Table head={["Fecha", "Documento", "Comprobante", "Cliente", "Monto", "Caja / Banco", "Referencia", "Observación", "Usuario"]} empty={cobros.length === 0}>
           {cobros.slice(0, 100).map((c) => (
             <tr key={c.id}>
               <Td>{fechaPE(c.fecha)}</Td>
@@ -354,6 +354,7 @@ export function CuentasPorCobrar() {
               <Td className="text-right font-semibold text-emerald-700">{soles(c.monto)}</Td>
               <Td>{c.cuenta}</Td>
               <Td>{c.referencia || "-"}</Td>
+              <Td className="max-w-[16rem] whitespace-normal text-xs">{c.observacion || "-"}</Td>
               <Td>{c.usuario}</Td>
             </tr>
           ))}
@@ -391,6 +392,14 @@ export function CuentasPorCobrar() {
               </Field>
               <Field label="N° operación / referencia">
                 <Input value={datos.referencia} onChange={(e) => setDatos({ ...datos, referencia: e.target.value })} />
+              </Field>
+              <Field label="Observación (opcional)" className="sm:col-span-2">
+                <Textarea
+                  rows={2}
+                  value={datos.observacion}
+                  placeholder="Ej: depósito en efectivo del cliente, pago parcial acordado con Gerencia…"
+                  onChange={(e) => setDatos({ ...datos, observacion: e.target.value })}
+                />
               </Field>
             </div>
             <div className="flex justify-end gap-2">
