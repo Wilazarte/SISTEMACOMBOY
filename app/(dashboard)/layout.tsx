@@ -14,6 +14,7 @@ import { useIr } from "@/components/shell/ir";
 import { accionesDe, hrefSub, moduloDe, navDe } from "@/components/shell/nav";
 import { ModuloContenido, ModuloLayout, SEDE_PLANTA_PRINCIPAL } from "@/components/layout/ModuloLayout";
 import { PiePestana } from "@/components/inicio/ModoPestana";
+import { BarraAccesos } from "@/components/inicio/BarraAccesos";
 import { NavegacionERP, type MigaERP } from "@/components/NavegacionERP";
 import { DatalistCatalogo } from "@/components/productos/ProductoInput";
 import { detenerCatalogo, iniciarCatalogo } from "@/lib/productos";
@@ -295,6 +296,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     <ModuloLayout
       moduleName={nombreModulo}
       sinMapa={esInicio}
+      // Barra azul de accesos rápidos a la derecha: deja su espacio en PC
+      mainClassName={moduloNav ? "lg:pr-24" : ""}
       sede={SEDE_PLANTA_PRINCIPAL}
       // El logo vuelve al INICIO del módulo actual
       inicio={pestanaAccion ? RUTA_INICIO[pestanaAccion.modulo] : (homePlantaDe(path) ?? inicioDe(sesion))}
@@ -334,6 +337,18 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           {/* ERP v3.0: sin dock, sin barra lateral ni botón de acciones; la navegación son los botones del INICIO.
               Avisos: la campana del encabezado. En la pestaña de una acción, el pie Cancelar / Guardar y Cerrar. */}
           {pestanaAccion && <PiePestana modulo={pestanaAccion.modulo} />}
+          {/* Barra azul de accesos rápidos (Williams 2026-11-16): derecha, en todas las pantallas del módulo */}
+          {moduloNav && sesion.modulos.length > 0 && (
+            <BarraAccesos
+              sesion={sesion}
+              modulo={moduloNav}
+              esInicio={esInicio}
+              accionActiva={new URLSearchParams(busqueda).get("accion") ?? path.split("/")[2] ?? null}
+              avisos={notifs.filter((n) => !(prefs.notifVistas ?? []).includes(n.clave)).length}
+              onBuscar={() => setPaleta(true)}
+              onSalir={salir}
+            />
+          )}
           <CommandPalette abierto={paleta} onCerrar={() => setPaleta(false)} comandos={comandos} documentos={documentos} />
           <DocViewerHost />
           <DatalistCatalogo />
