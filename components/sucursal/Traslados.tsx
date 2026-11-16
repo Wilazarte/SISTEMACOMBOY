@@ -19,7 +19,7 @@ import {
   numeroProbableSuc,
   reqDeSucursal,
   observarTraslado,
-  operaSucursal,
+  operaAlmacenSede,
   type ReqSucursal,
   type StockLocal,
   type Traslado,
@@ -31,7 +31,7 @@ import { Acciones, EstadoSuc, LineasEditor, deLineas, lineaVacia, type LineaEdit
 // =====================================================================
 export function Requerimientos({ reqs, stock }: { reqs: ReqSucursal[]; stock: StockLocal[] }) {
   const { showForm, setShowForm } = useTogglePanel();
-  const opera = operaSucursal();
+  const opera = operaAlmacenSede();
   const taller = esTaller();
   const [ot, setOt] = useState<ReqSucursal | null>(null);
 
@@ -126,7 +126,7 @@ function FormReq({ numeroProbable, onListo }: { numeroProbable: string; onListo:
 // =====================================================================
 export function Traslados({ traslados, stock, reqs }: { traslados: Traslado[]; stock: StockLocal[]; reqs: ReqSucursal[] }) {
   const { showForm, setShowForm } = useTogglePanel();
-  const opera = operaSucursal();
+  const opera = operaAlmacenSede();
   const taller = esTaller();
   const [recibir, setRecibir] = useState<Traslado | null>(null);
   const [observar, setObservar] = useState<Traslado | null>(null);

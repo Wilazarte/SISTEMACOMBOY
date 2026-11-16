@@ -22,6 +22,7 @@ import {
   nuevoEvento,
   r2,
   rucValido,
+  serieSede,
   siguienteNumero,
   sumarDias,
   uid,
@@ -894,7 +895,7 @@ function armarComprobante(data: DatosComprobante, existente?: ComprobanteVenta):
     ...(existente ?? ({} as ComprobanteVenta)),
     id: existente?.id ?? uid(),
     tipo: data.tipo,
-    serie: SERIE[data.tipo],
+    serie: serieSede(SERIE[data.tipo]), // Secocha: F002 / B002
     numero: existente?.numero ?? "",
     fecha: data.fecha,
     clienteId: cliente.id,

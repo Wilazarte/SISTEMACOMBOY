@@ -357,6 +357,57 @@ const clonar = <T,>(v: T): T => (typeof structuredClone === "function" ? structu
 const avisar = (key: StoreKey) => window.dispatchEvent(new CustomEvent(EVENTO, { detail: key }));
 const avisarError = (msg: string) => window.dispatchEvent(new CustomEvent("erp:toast", { detail: { msg, tipo: "error" } }));
 
+// ---------------------------------------------------------------------
+// Vista por sede (Secocha con submódulos, 2026-11-16)
+// Las tablas de datos tienen sede_id (20261023_sedes_multisede.sql). Un usuario de Secocha ya recibe solo
+// lo suyo por RLS; el ERP central recibe TODO. Aquí se decide qué ve cada pantalla:
+//   central  : ERP de Arequipa (Planta Principal) -> oculta las filas de las sucursales.
+//   sucursal : app /secocha -> solo las filas de Secocha; lo nuevo se graba con data.sedeId = Secocha.
+// Al guardar, las filas ocultas se conservan (no se borran del servidor).
+// ---------------------------------------------------------------------
+
+export type VistaSede = { modo: "central"; ajenas: string[] } | { modo: "sucursal"; propia: string };
+const TABLAS_POR_SEDE = new Set<string>(["compras", "almacen", "planilla", "ventas", "contable"]);
+let vistaSede: VistaSede | null = null;
+
+const filtraSede = (key: StoreKey): boolean => {
+  const d = DESTINOS[key];
+  return !!vistaSede && d.forma === "lista" && TABLAS_POR_SEDE.has(d.tabla);
+};
+const visibleEnSede = (x: unknown): boolean => {
+  const sede = (x as { sedeId?: string } | null)?.sedeId;
+  if (!vistaSede) return true;
+  if (vistaSede.modo === "sucursal") return sede === vistaSede.propia;
+  return !sede || !vistaSede.ajenas.includes(sede);
+};
+
+/** Fija la sede de las pantallas (la llama lib/sedes al cargar las sedes) y refresca las listas abiertas. */
+export function fijarVistaSede(v: VistaSede | null): void {
+  vistaSede = v;
+  if (typeof window === "undefined") return;
+  (Object.keys(DESTINOS) as StoreKey[]).filter((k) => cache.has(k) && DESTINOS[k].forma === "lista" && TABLAS_POR_SEDE.has(DESTINOS[k].tabla)).forEach(avisar);
+}
+export const getVistaSede = (): VistaSede | null => vistaSede;
+/** Las pantallas trabajan para una sucursal (Secocha): numeración y series propias. */
+export const enSucursal = (): boolean => vistaSede?.modo === "sucursal";
+
+/** Serie de comprobante de la sede: Secocha emite F002 / B002 (y FC02, BC02, FD02, BD02, T002). */
+export function serieSede<S extends string>(serie: S): S {
+  if (!enSucursal()) return serie;
+  const m = serie.match(/^([A-Z]{1,2})(\d)(\d)(\d)$|^([A-Z]{2})(\d{2})$/);
+  if (!m) return serie;
+  if (m[1]) return `${m[1]}${m[2]}${m[3]}2` as S; // F001 -> F002, B001 -> B002, T001 -> T002
+  return `${m[5]}02` as S; // FC01 -> FC02, BD01 -> BD02
+}
+
+/** Número formateado de la sucursal: NP-0001 -> NP-SEC-0001, F001-0001 -> F002-0001, REQ-ALM-001 -> REQ-SEC-001. */
+function marcarSede(texto: string): string {
+  if (!enSucursal()) return texto;
+  const f = texto.match(/^([A-Z]{1,2}\d{3}|[A-Z]{2}\d{2})-(.*)$/);
+  if (f) return `${serieSede(f[1])}-${f[2]}`;
+  return texto.replace(/^([A-Z]+)-(?:ALM-)?/, "$1-SEC-");
+}
+
 /** Fila de public.condiciones_pago <-> CondicionPago. */
 // Acepta tablas creadas a mano: nombre/descripcion, tipo en minúsculas, dias/dias_credito, activo/estado...
 function condicionDeFila(f: Fila): CondicionPago {
@@ -704,7 +755,9 @@ export function leer<T>(key: StoreKey, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   if (!cargadas.has(key)) void cargarClave(key); // de otro módulo: se baja ahora y la pantalla se refresca
   if (!cache.has(key)) return fallback;
-  return clonar(cache.get(key) as T);
+  const v = cache.get(key);
+  if (filtraSede(key) && Array.isArray(v)) return clonar(v.filter(visibleEnSede)) as T;
+  return clonar(v as T);
 }
 
 /**
@@ -722,6 +775,14 @@ export function escribir<T>(key: StoreKey, value: T): void {
   if (sinCargar && d.forma !== "lista") {
     void cargarClave(key);
     throw new ErpError("Cargando datos del servidor. Intente de nuevo en unos segundos.");
+  }
+  if (filtraSede(key) && Array.isArray(value)) {
+    // Lo nuevo de la sucursal lleva su sede; las filas de otras sedes (ocultas en pantalla) se conservan
+    const propia = vistaSede!.modo === "sucursal" ? vistaSede!.propia : "";
+    const visibles = (value as { sedeId?: string }[]).map((x) => (propia && x && !x.sedeId ? { ...x, sedeId: propia } : x));
+    const ids = new Set(visibles.map((x) => String((x as { id?: unknown }).id)));
+    const ocultas = ((cache.get(key) ?? []) as { id: string }[]).filter((x) => !visibleEnSede(x) && !ids.has(String(x.id)));
+    value = [...visibles, ...ocultas] as T;
   }
   const filas = aFilas(key, value);
   const antes = servidor.get(key) ?? new Map<string, string>();
@@ -837,6 +898,7 @@ function fijarContador(serie: Serie, n: number): void {
  * dos PCs emitiendo a la vez nunca reciben el mismo número.
  */
 async function siguiente(serie: Serie): Promise<number> {
+  if (vistaSede?.modo === "sucursal") return siguienteSede(serie, vistaSede.propia);
   const { data, error } = await createClient().rpc("siguiente_numero", { serie });
   if (error) {
     if (error.code === "42501") throw new ErpError(error.message);
@@ -849,6 +911,21 @@ async function siguiente(serie: Serie): Promise<number> {
   return n;
 }
 
+/** Correlativos propios de la sucursal (public.contadores_sede, 20261129_secocha_submodulos.sql). */
+const contadoresSede = new Map<string, number>();
+async function siguienteSede(serie: Serie, sede: string): Promise<number> {
+  const { data, error } = await createClient().rpc("siguiente_numero_sede", { p_serie: serie, p_sede: sede });
+  if (error) {
+    if (error.code === "42501") throw new ErpError(error.message);
+    if (error.code === "PGRST202" || /could not find the function/i.test(error.message))
+      throw new ErpError("Falta la numeración de Secocha en Supabase: ejecute supabase/migrations/20261129_secocha_submodulos.sql.");
+    throw new ErpError(`No se pudo obtener el número: ${error.message}`);
+  }
+  const n = Number(data);
+  contadoresSede.set(serie, Math.max(n, contadoresSede.get(serie) ?? 0));
+  return n;
+}
+
 /** Sube un contador a un mínimo (migración de datos antiguos). Nunca lo baja. */
 export async function asegurarNumeroMinimo(serie: Serie, minimo: number): Promise<void> {
   const { data, error } = await createClient().rpc("asegurar_numero_minimo", { serie, minimo });
@@ -858,6 +935,7 @@ export async function asegurarNumeroMinimo(serie: Serie, minimo: number): Promis
 
 /** Número probable (referencial): el definitivo lo asigna Supabase al guardar. */
 export function previewNumero(serie: Serie): string {
+  if (enSucursal()) return marcarSede(formatear(serie, (contadoresSede.get(serie) ?? 0) + 1));
   const c = leer<Record<string, number>>(KEYS.CONTADORES, {});
   return formatear(serie, (c[serie] ?? 0) + 1);
 }
@@ -884,7 +962,7 @@ async function reservarCodigo(tipo: "BOL" | "GST" | "RCT"): Promise<{ codigo: st
     throw e;
   }
   const anio = new Date().getFullYear();
-  return { codigo: generarCodigo(tipo, n, anio), correlativo: n, anio };
+  return { codigo: marcarSede(generarCodigo(tipo, n, anio)), correlativo: n, anio };
 }
 
 /** Boleta de pago emitida: un código por trabajador y periodo (al volver a descargarla se reutiliza). */
@@ -938,7 +1016,7 @@ async function reservarBoletaAnual(periodo: string): Promise<{ codigo: string; c
     const g = await reservarCodigo("BOL");
     return { codigo: generarCodigo("BOL", g.correlativo, anio), correlativo: g.correlativo, anio };
   }
-  return { codigo: generarCodigo("BOL", n, anio), correlativo: n, anio };
+  return { codigo: marcarSede(generarCodigo("BOL", n, anio)), correlativo: n, anio };
 }
 
 /** Código GST del gasto de Tesorería (se asigna una sola vez). */
@@ -964,7 +1042,7 @@ export async function codigoContratista(id: string): Promise<string> {
 
 /** Número formateado reservado en Supabase (para ventas y despachos). */
 export async function siguienteNumero(serie: Serie): Promise<string> {
-  return formatear(serie, await siguiente(serie));
+  return marcarSede(formatear(serie, await siguiente(serie)));
 }
 
 // ---------------------------------------------------------------------

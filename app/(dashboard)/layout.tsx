@@ -18,7 +18,7 @@ import { BarraAccesos } from "@/components/inicio/BarraAccesos";
 import { NavegacionERP, type MigaERP } from "@/components/NavegacionERP";
 import { DatalistCatalogo } from "@/components/productos/ProductoInput";
 import { detenerCatalogo, iniciarCatalogo } from "@/lib/productos";
-import { olvidarSedes } from "@/lib/sedes";
+import { cargarSedes, olvidarSedes } from "@/lib/sedes";
 import { RUTA_GERENCIA, RUTA_SUCURSAL, inicioDe, soloSecocha, logout, puedeVer, useSesion, veTesoreria } from "@/lib/auth";
 import { RUTA_NO_AUTORIZADO, homeAsignado, homePlantaDe, isAdmin } from "@/lib/permisosPlanta";
 import { RUTA_INICIO, TITULO_INICIO, buscarAccion, esModuloInicio, type ModuloInicio } from "@/lib/inicioModulos";
@@ -118,6 +118,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     // Usuario solo de Secocha (modulos = ["/secocha"]): no usa el ERP
     if (soloSecocha(sesion)) router.replace(RUTA_SUCURSAL);
   }, [listo, sesion, router]);
+
+  // ERP de Arequipa: las pantallas ocultan lo de Secocha (ventas, compras, almacén y planilla de la sucursal)
+  const usaErp = !!sesion && !soloSecocha(sesion);
+  useEffect(() => {
+    if (usaErp) void cargarSedes("central");
+  }, [usaErp]);
 
   // RBAC de la planta: la home de otro perfil (ej. Almacén entrando a /finanzas) va a /no-autorizado.
   // GERENCIA (visor) entra siempre por /gerencia.

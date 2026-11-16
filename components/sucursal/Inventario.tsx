@@ -9,7 +9,7 @@ import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { UNIDADES } from "@/lib/empresa";
 import { ProductoInput } from "@/components/productos/ProductoInput";
 import { fechaPE, r2, soles } from "@/lib/storage";
-import { bajoMinimo, eliminarCliente, eliminarStock, guardarCliente, guardarStock, operaSucursal, resumenCliente, solicitarReposicion, valorizado, type ClienteSuc, type StockLocal, type VentaSucursal } from "@/lib/sucursal";
+import { bajoMinimo, eliminarCliente, eliminarStock, guardarCliente, guardarStock, operaAlmacenSede, operaSucursal, resumenCliente, solicitarReposicion, valorizado, type ClienteSuc, type StockLocal, type VentaSucursal } from "@/lib/sucursal";
 import { Acciones, EstadoSuc, Indicador } from "./comun";
 
 const contiene = (t: string, q: string) => t.toLowerCase().includes(q.trim().toLowerCase());
@@ -19,7 +19,7 @@ const contiene = (t: string, q: string) => t.toLowerCase().includes(q.trim().toL
 // =====================================================================
 export function StockLocalTab({ stock }: { stock: StockLocal[] }) {
   const { showForm, setShowForm, showFiltros, setShowFiltros } = useTogglePanel();
-  const opera = operaSucursal();
+  const opera = operaAlmacenSede();
   const [editar, setEditar] = useState<StockLocal | null>(null);
   const [q, setQ] = useState("");
   const [soloBajos, setSoloBajos] = useState(false);

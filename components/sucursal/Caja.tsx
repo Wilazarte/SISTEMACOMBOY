@@ -6,7 +6,7 @@ import { Badge, Button, Card, CardHeader, Field, Input, Select, Table, Td, ejecu
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { fechaPE, hoy, r2, soles } from "@/lib/storage";
-import { CATEGORIAS_EGRESO, declararCierre, esTesoreria, operaSucursal, recibirCierre, registrarMovCaja, saldoCaja, type CategoriaCaja, type CierreCaja, type MovCaja } from "@/lib/sucursal";
+import { CATEGORIAS_EGRESO, declararCierre, esTesoreria, operaCajaSede, recibirCierre, registrarMovCaja, saldoCaja, type CategoriaCaja, type CierreCaja, type MovCaja } from "@/lib/sucursal";
 import { Indicador } from "./comun";
 
 const CATEGORIA: Record<CategoriaCaja, string> = { APERTURA: "Apertura / reposición", VENTA: "Venta", COBRO: "Cobro", GASTO_LOCAL: "Gasto local", MOVILIDAD: "Movilidad", OTRO: "Otro" };
@@ -17,7 +17,7 @@ const CATEGORIA: Record<CategoriaCaja, string> = { APERTURA: "Apertura / reposic
 export function CajaChica({ movs, cierres }: { movs: MovCaja[]; cierres: CierreCaja[] }) {
   const { showForm, setShowForm } = useTogglePanel();
   const [tipo, setTipo] = useState<"INGRESO" | "EGRESO">("EGRESO");
-  const opera = operaSucursal();
+  const opera = operaCajaSede();
   const tesoreria = esTesoreria();
   const saldo = saldoCaja(movs);
   const hoyStr = hoy();
