@@ -11,7 +11,7 @@ import { getSesion, nombreDe, type Sesion } from "./auth";
 import { createClient } from "./supabase/client";
 import { canonizar } from "./productos";
 import { exigirRucSunat } from "./ruc";
-import { deSede, esDeSede, getSedeActual, sedeActualId } from "./sedes";
+import { deSede, esDeSede, esUsuarioDeSede, getSedeActual, sedeActualId } from "./sedes";
 import { ErpError, KEYS, escribir, hoy, leer, r2, uid } from "./storage";
 import type { EventoHistorial, ItemReq, Requerimiento, Rol } from "./types";
 import {
@@ -42,10 +42,17 @@ export * from "./sucursal-modelos";
 const rolDe = (s: Sesion | null) => (s && !s.soloLectura ? s.rol : null);
 /** Opera la sucursal: ventas, entregas, caja, stock, clientes, REQ-SUC, recepción de traslados. */
 export const operaSucursal = (s: Sesion | null = getSesion()) => ["creador", "sucursal"].includes(rolDe(s) ?? "");
-/** Taller Principal (almacén): prepara derivaciones y emite OT con guía de remisión. */
-export const esTaller = (s: Sesion | null = getSesion()) => ["creador", "almacen"].includes(rolDe(s) ?? "");
-/** Tesorería Principal: recibe los cierres de caja. */
-export const esTesoreria = (s: Sesion | null = getSesion()) => ["creador", "tesoreria"].includes(rolDe(s) ?? "");
+/**
+ * Taller Principal (almacén de Arequipa): prepara derivaciones y emite OT con guía de remisión.
+ * Un almacenero asignado a Secocha (usuarios_sedes) NO es el Taller: es el Almacén de Secocha.
+ */
+export const esTaller = (s: Sesion | null = getSesion()) => ["creador", "almacen"].includes(rolDe(s) ?? "") && !esUsuarioDeSede();
+/** Tesorería Principal (Arequipa): recibe los cierres de caja. La Tesorería de Secocha no. */
+export const esTesoreria = (s: Sesion | null = getSesion()) => ["creador", "tesoreria"].includes(rolDe(s) ?? "") && !esUsuarioDeSede();
+/** Submódulo Almacén de Secocha: REQ, recepción de traslados y stock local (jefe de sede o almacenero de Secocha). */
+export const operaAlmacenSede = (s: Sesion | null = getSesion()) => operaSucursal(s) || (esUsuarioDeSede() && rolDe(s) === "almacen");
+/** Submódulo Tesorería de Secocha: caja chica y cierre (jefe de sede o tesorero de Secocha). */
+export const operaCajaSede = (s: Sesion | null = getSesion()) => operaSucursal(s) || (esUsuarioDeSede() && rolDe(s) === "tesoreria");
 
 const usuario = () => getSesion()?.usuario ?? "sistema";
 /** Evento del historial con el usuario real (el historial muestra quién lo hizo). */
@@ -361,7 +368,7 @@ export async function crearTraslado(d: DatosTraslado): Promise<Traslado> {
 
 /** Recepción conforme: suma al stock local, cierra el REQ-SUC y devuelve la venta derivada a "por entregar". */
 export function confirmarRecepcion(id: string, recibidoPor: string): void {
-  exigir(operaSucursal(), "Solo la sucursal confirma la recepción.");
+  exigir(operaAlmacenSede(), "Solo la sucursal confirma la recepción.");
   exigir(!!recibidoPor.trim(), "Ingrese quién recibe.");
   const t = getTraslados().find((x) => x.id === id);
   exigir(!!t && t.estado !== "recibido", "El traslado ya fue recibido.");
@@ -390,7 +397,7 @@ export function confirmarRecepcion(id: string, recibidoPor: string): void {
 }
 
 export function observarTraslado(id: string, tipo: "FALTANTE" | "DANADO", detalle: string): void {
-  exigir(operaSucursal(), "Solo la sucursal observa traslados.");
+  exigir(operaAlmacenSede(), "Solo la sucursal observa traslados.");
   exigir(!!detalle.trim(), "Describa el faltante o daño.");
   const t = getTraslados().find((x) => x.id === id);
   exigir(!!t && t.estado === "en-camino", "Solo se observan traslados en camino.");
@@ -410,7 +417,7 @@ export async function crearReqSucursal(
   automatico = false,
   datos: { solicitante?: string; fecha?: string } = {}
 ): Promise<ReqSucursal> {
-  exigir(operaSucursal(), "Su usuario no puede emitir requerimientos de la sucursal.");
+  exigir(operaAlmacenSede(), "Su usuario no puede emitir requerimientos de la sucursal.");
   exigir(!!motivo.trim(), "Ingrese el motivo del requerimiento.");
   const lista = items.filter((i) => i.producto.trim()).map((i) => ({ ...i, ...oficial(i.producto), cantidad: Number(i.cantidad) }));
   exigir(lista.length > 0, "Agregue al menos un producto.");
@@ -493,7 +500,7 @@ function movimientoCaja(m: Omit<MovCaja, "id" | "fecha" | "sucursalId" | "usuari
 }
 
 export function registrarMovCaja(d: { tipo: "INGRESO" | "EGRESO"; categoria: CategoriaCaja; concepto: string; monto: number }): void {
-  exigir(operaSucursal(), "Su usuario no puede mover la caja chica.");
+  exigir(operaCajaSede(), "Su usuario no puede mover la caja chica.");
   exigir(!!d.concepto.trim(), "Ingrese el concepto.");
   exigir(Number(d.monto) > 0, "El monto debe ser mayor a 0.");
   if (d.tipo === "EGRESO") exigir(Number(d.monto) <= saldoCaja(getCaja()), "El egreso supera el saldo de caja chica.");
@@ -502,7 +509,7 @@ export function registrarMovCaja(d: { tipo: "INGRESO" | "EGRESO"; categoria: Cat
 
 /** Cierre diario: totaliza lo no cerrado y lo envía a Tesorería Principal. */
 export async function declararCierre(): Promise<CierreCaja> {
-  exigir(operaSucursal(), "Su usuario no puede declarar el cierre de caja.");
+  exigir(operaCajaSede(), "Su usuario no puede declarar el cierre de caja.");
   const movs = getCaja();
   const abiertos = movs.filter((m) => !m.cierreId);
   exigir(abiertos.length > 0, "No hay movimientos nuevos desde el último cierre.");
@@ -542,7 +549,7 @@ export function recibirCierre(id: string): void {
 // ---------------------------------------------------------------------
 
 export function guardarStock(d: Omit<StockLocal, "id" | "sucursalId"> & { id?: string }): void {
-  exigir(operaSucursal(), "Su usuario no puede editar el stock local.");
+  exigir(operaAlmacenSede(), "Su usuario no puede editar el stock local.");
   exigir(!!d.producto.trim(), "Ingrese el producto.");
   exigir(d.stock >= 0 && d.minimo >= 0 && d.costo >= 0 && d.precio >= 0, "Los valores no pueden ser negativos.");
   const lista = getStockLocal();
@@ -553,7 +560,7 @@ export function guardarStock(d: Omit<StockLocal, "id" | "sucursalId"> & { id?: s
 }
 
 export function eliminarStock(id: string): void {
-  exigir(operaSucursal(), "Su usuario no puede editar el stock local.");
+  exigir(operaAlmacenSede(), "Su usuario no puede editar el stock local.");
   escribirSede(KEYS.SUC_STOCK, getStockLocal().filter((s) => s.id !== id));
 }
 

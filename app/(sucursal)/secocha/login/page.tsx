@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Eye, EyeOff, Loader2, Lock, LogIn, User } from "lucide-react";
 import { LogoComboy } from "@/components/LogoComboy";
-import { CLAVE_MODULO, CLAVE_USUARIO, RUTA_SUCURSAL, login, logout, perteneceAModulo, useSesion } from "@/lib/auth";
+import { CLAVE_MODULO, CLAVE_USUARIO, RUTA_SUCURSAL, login, logout, perteneceAModulo, soloSecocha, useSesion } from "@/lib/auth";
 import { cargarSedes, getSedeActual, olvidarSedes } from "@/lib/sedes";
 import { createClient } from "@/lib/supabase/client";
 
@@ -52,8 +52,8 @@ export default function LoginSucursal() {
     };
     if (!r.sesion) return negar(r.error ?? "Usuario o contraseña incorrectos.");
     if (!perteneceAModulo(r.sesion, "sucursal")) return negar("Este usuario no tiene acceso al módulo Secocha.");
-    // Un usuario de sucursal debe tener su sede asignada (usuarios_sedes): sin sede no ve nada
-    if (r.sesion.rol === "sucursal") {
+    // Un usuario de sucursal (jefe de sede o de un submódulo de Secocha) debe tener su sede asignada (usuarios_sedes): sin sede no ve nada
+    if (r.sesion.rol === "sucursal" || soloSecocha(r.sesion)) {
       const sb = createClient();
       const {
         data: { user },

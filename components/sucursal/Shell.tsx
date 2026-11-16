@@ -10,7 +10,7 @@ import { DatalistCatalogo } from "@/components/productos/ProductoInput";
 import { RUTA_LOGIN_SUCURSAL, RUTA_SUCURSAL, logout, perteneceAModulo, useSesion } from "@/lib/auth";
 import { detenerCatalogo, iniciarCatalogo } from "@/lib/productos";
 import { cargarSedes, olvidarSedes, sedeSucursal, useSedes } from "@/lib/sedes";
-import { detenerDatos, useDatos } from "@/lib/storage";
+import { detenerDatos, enSucursal, useDatos } from "@/lib/storage";
 
 /**
  * Marco del módulo Secocha (/secocha): el mismo ModuloLayout de Arequipa (colores, header, spacing), con Sede: Secocha.
@@ -30,7 +30,7 @@ export function SucursalShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!permitido) return;
-    void cargarSedes();
+    void cargarSedes("sucursal");
     void iniciarCatalogo();
   }, [permitido]);
 
@@ -85,6 +85,15 @@ export function SucursalShell({ children }: { children: ReactNode }) {
             Cerrar sesión
           </button>
         </div>
+      </Centro>
+    );
+
+  // Las pantallas muestran solo lo de Secocha (lib/storage fijarVistaSede): se espera a que quede fijada
+  if (!enSucursal())
+    return (
+      <Centro>
+        <Loader2 size={22} className="animate-spin text-slate-400" />
+        <p className="mt-3 text-sm text-plomo-500">Cargando datos de la sede…</p>
       </Centro>
     );
 
