@@ -67,10 +67,10 @@ grant select on public.sunat_cpe, public.sunat_envios to authenticated;
 drop policy if exists sunat_cpe_select on public.sunat_cpe;
 create policy sunat_cpe_select on public.sunat_cpe for select to authenticated
   using (public.puede_ver('/dashboard/ventas') or public.puede_ver('/dashboard/contable')
-         or public.mi_rol() in ('creador', 'soporte', 'gerencia', 'tesoreria', 'logistica'));
+         or public.mi_rol() in ('creador', 'soporte', 'gerencia', 'tesoreria', 'logistica', 'ventas'));
 drop policy if exists sunat_envios_select on public.sunat_envios;
 create policy sunat_envios_select on public.sunat_envios for select to authenticated
-  using (public.puede_ver('/dashboard/ventas') or public.mi_rol() in ('creador', 'soporte', 'gerencia', 'tesoreria', 'logistica'));
+  using (public.puede_ver('/dashboard/ventas') or public.mi_rol() in ('creador', 'soporte', 'gerencia', 'tesoreria', 'logistica', 'ventas'));
 
 -- Realtime: la lista de comprobantes se actualiza sola cuando SUNAT responde
 do $$
@@ -89,7 +89,7 @@ begin
   if serie not in ('FC01', 'BC01', 'FD01', 'BD01') then
     raise exception 'Serie inválida: %', serie using errcode = '22023';
   end if;
-  if rol is null or rol not in ('creador', 'soporte', 'tesoreria', 'logistica') then
+  if rol is null or rol not in ('creador', 'soporte', 'tesoreria', 'logistica', 'ventas') then
     raise exception 'Su usuario no puede emitir notas de crédito ni de débito' using errcode = '42501';
   end if;
   insert into public.compras (tipo, id, data)

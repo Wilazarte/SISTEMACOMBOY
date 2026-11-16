@@ -24,8 +24,8 @@ const CORS = {
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
-/** Roles que emiten comprobantes de venta (mismos que escriben en public.ventas). */
-const ROLES = ["creador", "soporte", "tesoreria", "logistica"];
+/** Roles que emiten comprobantes de venta (mismos que escriben en public.ventas, más el perfil Ventas). */
+const ROLES = ["creador", "soporte", "tesoreria", "logistica", "ventas"];
 
 let certCache: Certificado | undefined;
 function certificado(): Certificado {
