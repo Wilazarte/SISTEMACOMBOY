@@ -115,6 +115,14 @@ export function BarraAccesos({
     setMovilAbierta(false);
     irA(href);
   };
+  // Expediente 26W elegido en el INICIO del módulo: las fases se abren en ese expediente
+  const docElegido = () => {
+    try {
+      return window.localStorage.getItem(`erp-inicio-doc:${modulo}`) || undefined;
+    } catch {
+      return undefined;
+    }
+  };
   const lista = abierto ? grupos.find(([g]) => g === abierto)?.[1] ?? [] : [];
 
   return (
@@ -172,7 +180,7 @@ export function BarraAccesos({
                 key={a.slug}
                 type="button"
                 role="menuitem"
-                onClick={() => ir(urlBoton(modulo, a))}
+                onClick={() => ir(urlBoton(modulo, a, docElegido()))}
                 className={`rounded-xl px-3 py-2 text-left text-[13px] leading-snug transition ${
                   a.slug === accionActiva ? "bg-white font-semibold text-[#1e2a5a]" : "text-white/90 hover:bg-white/10 hover:text-white"
                 }`}
