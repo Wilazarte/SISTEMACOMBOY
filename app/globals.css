@@ -392,13 +392,16 @@ body[data-modo-pestana] [data-guardar-pestana] {
   50% { opacity: 0.5; box-shadow: 0 0 20px 5px rgba(255, 42, 60, 0.9); }
 }
 .chat-parpadeo { animation: chat-parpadeo 1s ease-in-out infinite; }
-.chat-resaltado { background: rgba(0, 242, 254, 0.14); }
+.chat-resaltado { background: rgba(196, 0, 28, 0.12); }
+.chat-claro { background-color: #e5e7eb; }
 .chat-fondo {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(0, 0, 0, 0.06) 1px, transparent 1px);
   background-size: 18px 18px;
 }
 /* Fondo rojo de la barra del chat (pedido de Williams 2026-11-16: izquierda, fondo rojo) */
-.chat-rojo { background: linear-gradient(180deg, #8a0014 0%, #5e000e 55%, #3d0009 100%); }
+.chat-rojo { background-color: #4a0710; }
+.tema-planta .chat-rojo.seccion { position: fixed; background-color: rgba(74, 7, 16, 0.94); border-color: rgb(var(--sec) / 0.55); }
+@media (max-width: 1023px) { .tema-planta .chat-rojo.seccion { background-color: #4a0710; } }
 /* Pestaña "Guardar y Cerrar" (barra fija abajo, z-60): el chat termina encima de ella */
 @media (min-width: 1024px) {
   body[data-modo-pestana] aside.chat-barra { bottom: 64px; }
