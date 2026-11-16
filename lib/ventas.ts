@@ -9,6 +9,7 @@
 import {
   ErpError,
   IGV,
+  desglosarIgv,
   KEYS,
   descontarStock,
   escribir,
@@ -92,10 +93,19 @@ export const lineaVacia = (): LineaVenta => ({
   total: 0,
 });
 
-/** Subtotal (con descuento), IGV 18 % opcional y total. Precios sin IGV. */
-export function totalesVenta(items: LineaVenta[], conIgv: boolean, descuento: number) {
+/**
+ * Subtotal (con descuento), IGV 18 % opcional y total.
+ * `preciosConIgv` (por defecto, Williams 2026-11-14): los precios se ingresan CON IGV; el descuento se resta del total
+ * y se desglosa base = total / 1.18, IGV = total − base. Sin IGV (`conIgv = false`) el precio es final, sin desglose.
+ * Documentos anteriores (`preciosConIgv = false`): precios sin IGV y se suma el 18 %.
+ */
+export function totalesVenta(items: LineaVenta[], conIgv: boolean, descuento: number, preciosConIgv = true) {
   const bruto = r2(items.reduce((a, l) => a + calcularLinea(l).total, 0));
   const desc = Math.min(Math.max(0, Number(descuento) || 0), bruto);
+  if (preciosConIgv) {
+    const t = desglosarIgv(bruto - desc, conIgv);
+    return { bruto, descuento: desc, base: t.subtotal, igv: t.igv, total: t.total };
+  }
   const base = r2(bruto - desc);
   const igv = conIgv ? r2(base * IGV) : 0;
   return { bruto, descuento: desc, base, igv, total: r2(base + igv) };
@@ -284,7 +294,7 @@ export type DatosNP = Pick<
   NotaPedido,
   "fecha" | "clienteId" | "condPagoId" | "validezDias" | "fechaEntrega" | "lugarObra" | "items" | "conIgv" | "descuento" | "observaciones"
 > &
-  Partial<Pick<NotaPedido, "diasCredito" | "condPagoDetalle">>;
+  Partial<Pick<NotaPedido, "diasCredito" | "condPagoDetalle" | "preciosConIgv">>;
 
 function prepararLineas(items: LineaVenta[]): LineaVenta[] {
   const lineas = items.map(calcularLinea).filter((l) => l.descripcion.trim() || l.productoNombre.trim());
@@ -351,10 +361,12 @@ function armarNP(data: DatosNP): Omit<NotaPedido, "id" | "numero" | "vendedor" |
   const plazo = plazoNP(cond, data.fecha, data.diasCredito, data.condPagoDetalle);
   if (!(data.validezDias > 0)) throw new ErpError("La validez de la oferta debe ser mayor a 0 días.");
   const items = prepararLineas(data.items);
-  const t = totalesVenta(items, data.conIgv, data.descuento);
+  const preciosConIgv = data.preciosConIgv !== false;
+  const t = totalesVenta(items, data.conIgv, data.descuento, preciosConIgv);
   if (!(t.total > 0)) throw new ErpError("El total debe ser mayor a 0.");
   return {
     ...data,
+    preciosConIgv,
     cliente: cliente.razonSocial,
     clienteDoc: `${cliente.tipoDoc} ${cliente.numDoc}`,
     condPagoNombre: cond.nombre,
@@ -608,7 +620,7 @@ export function guardarCostosNP(id: string, precios: Record<string, number>, rol
     const sinPrecio = n.items.filter((l) => !((Number(precios[l.id]) || 0) > 0));
     if (sinPrecio.length > 0) throw new ErpError(`Ponga el precio unitario de: ${sinPrecio.map((l) => l.descripcion || l.productoNombre).join(", ")}.`);
     const items = n.items.map((l) => calcularLinea({ ...l, ancho: 0, alto: 0, precio: r2(Number(precios[l.id])) }));
-    const t = totalesVenta(items, n.conIgv, n.descuento);
+    const t = totalesVenta(items, n.conIgv, n.descuento, n.preciosConIgv === true);
     const costos: CostosNP = {
       req_id: n.origenId ?? "",
       np_id: n.numero,
@@ -687,7 +699,7 @@ export async function clonarNP(id: string, vendedor: string, rol: Rol): Promise<
   const o = getNotasPedido().find((n) => n.id === id);
   if (!o) throw new ErpError("Nota de pedido no encontrada.");
   return crearNotaPedido(
-    { ...o, fecha: hoy(), items: o.items.map((l) => ({ ...l, id: uid() })) },
+    { ...o, fecha: hoy(), preciosConIgv: o.preciosConIgv === true, items: o.items.map((l) => ({ ...l, id: uid() })) },
     vendedor,
     rol
   );
@@ -706,6 +718,8 @@ export interface DatosComprobante {
   npId?: string;
   items: LineaVenta[];
   conIgv: boolean;
+  /** Precios de las líneas con IGV incluido (por defecto). false solo al editar un borrador anterior. */
+  preciosConIgv?: boolean;
   descuento: number;
   formaPago: FormaPagoVenta;
   condPagoId: string;
@@ -861,7 +875,8 @@ function armarComprobante(data: DatosComprobante, existente?: ComprobanteVenta):
   if (np && np.estado !== "APROBADA" && np.comprobanteId !== existente?.id) throw new ErpError(`La ${np.numero} está ${np.estado}: solo se facturan notas APROBADAS.`);
   const items = prepararLineas(data.items);
   const conIgv = data.tipo === "FACTURA" ? true : data.conIgv; // factura: siempre gravada
-  const t = totalesVenta(items, conIgv, data.descuento);
+  const preciosConIgv = data.preciosConIgv !== false;
+  const t = totalesVenta(items, conIgv, data.descuento, preciosConIgv);
   if (!(t.total > 0)) throw new ErpError("El total debe ser mayor a 0.");
 
   const credito = data.formaPago !== "CONTADO";
@@ -889,6 +904,7 @@ function armarComprobante(data: DatosComprobante, existente?: ComprobanteVenta):
     npNumero: np?.numero,
     items,
     conIgv,
+    preciosConIgv,
     descuento: t.descuento,
     base: t.base,
     igv: t.igv,
@@ -1217,6 +1233,31 @@ export function filasCxC(notas: NotaPedido[], comprobantes: ComprobanteVenta[]):
       })
     );
   return [...deNP, ...deComp];
+}
+
+/**
+ * Datos de la "nota de pedido actualizada" de una fila de Cuentas por cobrar: la NP (o el comprobante directo),
+ * sus cobros a cuenta (de la NP y del comprobante que la facturó), lo pagado y el saldo.
+ */
+export function ventaActualizada(
+  fila: FilaCxC,
+  notas: NotaPedido[],
+  comprobantes: ComprobanteVenta[],
+  cobros: CobroVenta[]
+): { np?: NotaPedido; comprobante?: ComprobanteVenta; pagos: CobroVenta[]; total: number; pagado: number; saldo: number; vencimiento: string } {
+  const comprobante = fila.origen === "COMPROBANTE" ? comprobantes.find((c) => c.id === fila.id) : undefined;
+  const npId = fila.origen === "NP" ? fila.id : comprobante?.npId;
+  const np = npId ? notas.find((n) => n.id === npId) : undefined;
+  const pagos = cobros.filter((c) => (np && c.npId === np.id) || (comprobante && c.comprobanteId === comprobante.id));
+  return {
+    np,
+    comprobante,
+    pagos,
+    total: fila.total,
+    pagado: r2(fila.total - fila.saldo),
+    saldo: fila.saldo,
+    vencimiento: fila.vencimiento,
+  };
 }
 
 export type AgruparDeuda = "cliente" | "vendedor" | "mes" | "equipo";

@@ -19,7 +19,7 @@ import {
   fechaPE,
   hoy,
   parseFechaPE,
-  IGV,
+  desglosarIgv,
   TOPE_BANCARIZACION,
   r2,
   registrarGastoCompleto,
@@ -109,7 +109,9 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
   const neto = r2(netoDetraccion - retencion);
   const rucMal = d.ruc.length === 11 && !rucValido(d.ruc);
   const subOC = r2(filas.reduce((a, f) => a + (f.cantidad || 0) * (f.precioUnit || 0), 0));
-  const totalOC = d.comprobante === "FACTURA" ? r2(subOC * (1 + IGV)) : subOC;
+  // Precios de la OC con IGV incluido: su total es la suma de las líneas (la factura desglosa base e IGV)
+  const totalOC = subOC;
+  const igvOC = d.comprobante === "FACTURA" ? desglosarIgv(subOC).igv : 0;
   const bancObligatoria = requiereBancarizacion(d.importe || 0, d.ruc);
   const setFila = (id: string, cambios: Partial<FilaOC>) => setFilas((p) => p.map((f) => (f.id === id ? { ...f, ...cambios } : f)));
   const elegirProducto = (id: string, nombre: string) => {
@@ -229,7 +231,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
             ) : (
             <div className="mt-3 space-y-3">
               <p className="text-xs text-plomo-500">
-                La OC se emite a nombre del proveedor de abajo. Busque los productos en el almacén o escríbalos; precios {d.comprobante === "FACTURA" ? "sin IGV" : "finales"}.
+                La OC se emite a nombre del proveedor de abajo. Busque los productos en el almacén o escríbalos; precios {d.comprobante === "FACTURA" ? "CON IGV incluido" : "finales"}.
               </p>
               <datalist id="productos-oc-gasto">
                 {productos.map((p) => (
@@ -245,8 +247,8 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
                       <th className="px-2 py-2 text-left">Producto</th>
                       <th className="w-24 px-2 py-2 text-left">Cantidad</th>
                       <th className="w-28 px-2 py-2 text-left">Unidad</th>
-                      <th className="w-32 px-2 py-2 text-left">Precio unit.</th>
-                      <th className="w-28 px-2 py-2 text-right">Subtotal</th>
+                      <th className="w-32 px-2 py-2 text-left">{d.comprobante === "FACTURA" ? "P. unit. inc. IGV" : "Precio unit."}</th>
+                      <th className="w-28 px-2 py-2 text-right">Importe</th>
                       <th className="w-10" />
                     </tr>
                   </thead>
@@ -287,7 +289,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
                 </Button>
                 <p className={cn("text-sm", Math.abs(totalOC - (d.importe || 0)) > 0.05 ? "text-red-600" : "text-emerald-700")}>
                   Total OC <b>{soles(totalOC)}</b>
-                  {d.comprobante === "FACTURA" ? ` (${soles(subOC)} + IGV)` : ""} · debe coincidir con el importe {soles(d.importe || 0)}
+                  {d.comprobante === "FACTURA" ? ` (incluye IGV ${soles(igvOC)})` : ""} · debe coincidir con el importe {soles(d.importe || 0)}
                 </p>
               </div>
             </div>

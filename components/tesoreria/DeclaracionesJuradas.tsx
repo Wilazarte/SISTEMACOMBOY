@@ -1,40 +1,44 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Download, Eye, FileText, Pencil, Printer, Send } from "lucide-react";
+import { Check, Eye, FileText, Pencil, Send } from "lucide-react";
 import { Badge, Button, Modal, ejecutar } from "@/components/ui";
 import { EditarGasto } from "@/components/compras/EditarGasto";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { getSesion } from "@/lib/auth";
-import { imprimirDeclaracionJurada, pdfDeclaracionJurada, urlDeclaracionJurada } from "@/lib/pdf";
-import { cambiarEstadoDJ, esDeclaracionJurada, fechaPE, permisoEditarGasto, soles } from "@/lib/storage";
-import type { Factura, Rol } from "@/lib/types";
+import { pdfDeclaracionJurada, urlDeclaracionJurada } from "@/lib/pdf";
+import { useDJsAutomaticas } from "@/components/compras/useDJsAutomaticas";
+import { cambiarEstadoDJ, djsDeCompras, esDJAutomatica, esDeclaracionJurada, fechaPE, numeroDJ, permisoEditarGasto, soles } from "@/lib/storage";
+import type { Compra, Factura, Rol } from "@/lib/types";
 
 const estadoDJ = (f: Factura) => f.djEstado ?? "PENDIENTE";
 
 /**
- * Pestaña "Declaraciones juradas" de Tesorería / Compras: los gastos sin comprobante (DJ-0001…) con
+ * Pestaña "Declaraciones juradas" de Tesorería / Compras: los gastos sin comprobante (DJ-0001…) y las DJ
+ * automáticas de los gastos marcados "Sin comprobante" (Williams 2026-11-13), con
  * vista previa del PDF, descarga, impresión, edición y envío a aprobar. Son los mismos gastos de Facturas:
  * no hay una tabla aparte (la DJ vive en compras, tipo factura, con comprobante DJ).
  */
-export function DeclaracionesJuradas({ facturas, rol }: { facturas: Factura[]; rol: Rol }) {
+export function DeclaracionesJuradas({ facturas, compras = [], rol }: { facturas: Factura[]; compras?: Compra[]; rol: Rol }) {
   const sesion = getSesion();
+  useDJsAutomaticas(rol);
   const [ver, setVer] = useState<Factura | null>(null);
   const [editar, setEditar] = useState<Factura | null>(null);
-  const djs = facturas.filter(esDeclaracionJurada).sort((a, b) => b.fecha.localeCompare(a.fecha) || b.numero.localeCompare(a.numero));
+  // También las DJ de compras con ingreso a stock marcadas "Sin comprobante" (Williams 2026-11-13)
+  const djs = [...facturas.filter(esDeclaracionJurada), ...djsDeCompras(compras)].sort((a, b) => b.fecha.localeCompare(a.fecha) || numeroDJ(b).localeCompare(numeroDJ(a)));
   // El modal muestra siempre la versión al día (tras enviar / aprobar / editar)
   const actual = ver ? djs.find((d) => d.id === ver.id) ?? ver : null;
 
   const filas = djs.map(
     (f): FilaDoc => {
-      const p = permisoEditarGasto(f, sesion);
+      const p = f.compraDirecta ? { ok: false, motivo: "Es una compra con ingreso a stock: edítela en Registrar gasto › Compras registradas" } : permisoEditarGasto(f, sesion);
       return {
         id: f.id,
         fecha: f.fecha,
         contraparte: f.proveedor,
         ref: (
           <>
-            <span className="font-semibold text-fg">{f.numero}</span>
+            <span className="font-semibold text-fg">{numeroDJ(f)}</span>
             {f.codigo && <span className="ml-1.5 text-xs text-plomo-500">{f.codigo}</span>}
             <span className="ml-2 inline-block align-middle">
               <Badge estado={estadoDJ(f)} />
@@ -44,22 +48,20 @@ export function DeclaracionesJuradas({ facturas, rol }: { facturas: Factura[]; r
         extra: (
           <span className="block truncate" title={f.descripcion}>
             {f.descripcion || "-"}
+            {esDJAutomatica(f) && <span className="block text-xs text-plomo-500">Sustenta {f.compraDirecta ? "compra " : ""}{f.numero} · sin comprobante</span>}
           </span>
         ),
         total: soles(f.total),
-        buscar: `${f.numero} ${f.codigo ?? ""} ${f.descripcion ?? ""} ${f.ruc}`,
-        tipoDoc: f.ocId ? "DJ con OC" : "DJ",
+        buscar: `${numeroDJ(f)} ${f.numero} ${f.codigo ?? ""} ${f.descripcion ?? ""} ${f.ruc}`,
+        tipoDoc: f.compraDirecta ? "DJ de compra" : f.ocId ? "DJ con OC" : esDJAutomatica(f) ? "DJ de gasto" : "DJ",
         estado: estadoDJ(f),
         acciones: (
           <div className="flex gap-1">
             <Button size="sm" variant="ghost" onClick={() => setVer(f)} title="Ver" aria-label="Ver">
               <Eye size={15} />
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => pdfDeclaracionJurada(f)} title="PDF (descargar)" aria-label="PDF">
+            <Button size="sm" variant="ghost" onClick={() => pdfDeclaracionJurada(f)} title="PDF (vista previa: imprimir, WhatsApp, descargar, firmar)" aria-label="PDF">
               <FileText size={15} />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => imprimirDeclaracionJurada(f)} title="Imprimir" aria-label="Imprimir">
-              <Printer size={15} />
             </Button>
             <span className="tip" data-tip={p.ok ? "Editar" : p.motivo}>
               <Button size="sm" variant="ghost" disabled={!p.ok} onClick={() => setEditar(f)} aria-label="Editar">
@@ -95,9 +97,9 @@ function VerDJ({ dj, rol, onClose }: { dj: Factura; rol: Rol; onClose: () => voi
   }, [dj]);
 
   return (
-    <Modal open onClose={onClose} title={`Declaración jurada ${dj.numero}`} wide>
+    <Modal open onClose={onClose} title={`Declaración jurada ${numeroDJ(dj)}`} wide>
       <div className="grid gap-4 md:grid-cols-[1fr_280px]">
-        {url ? <iframe src={url} title={dj.numero} className="h-[60vh] w-full rounded-lg border border-plomo-200" /> : <div className="h-[60vh] rounded-lg bg-plomo-100" />}
+        {url ? <iframe src={url} title={numeroDJ(dj)} className="h-[60vh] w-full rounded-lg border border-plomo-200" /> : <div className="h-[60vh] rounded-lg bg-plomo-100" />}
         <div className="space-y-3 text-sm">
           <dl className="space-y-2">
             {(
@@ -106,7 +108,7 @@ function VerDJ({ dj, rol, onClose }: { dj: Factura; rol: Rol; onClose: () => voi
                 ["Proveedor", `${dj.proveedor}${dj.ruc ? ` (${dj.ruc})` : ""}`],
                 ["Concepto", dj.descripcion ?? "-"],
                 ["Importe", soles(dj.total)],
-                ["Código de gasto", dj.codigo ?? "-"],
+                [dj.compraDirecta ? "Compra" : "Código de gasto", dj.compraDirecta ? dj.numero : dj.codigo ?? "-"],
                 ["Pago", dj.estadoPago === "PAGADA" ? `Pagada${dj.caja ? ` · ${dj.caja}` : ""}` : "Por pagar"],
               ] as [string, string][]
             ).map(([k, v]) => (
@@ -123,19 +125,16 @@ function VerDJ({ dj, rol, onClose }: { dj: Factura; rol: Rol; onClose: () => voi
             </div>
           </dl>
           <div className="flex flex-col gap-2 pt-2">
-            <Button variant="secondary" onClick={() => url && window.open(url, "_blank")}>
-              <Eye size={15} /> Visualizar PDF
-            </Button>
             <Button variant="secondary" onClick={() => pdfDeclaracionJurada(dj)}>
-              <Download size={15} /> Descargar PDF
+              <Eye size={15} /> Imprimir / Compartir / Firmar
             </Button>
             {estado === "PENDIENTE" && !sesion?.soloLectura && (
-              <Button onClick={() => ejecutar(() => void cambiarEstadoDJ(dj.id, "ENVIADA", rol), `${dj.numero} enviada a aprobar`)}>
+              <Button onClick={() => ejecutar(() => void cambiarEstadoDJ(dj.id, "ENVIADA", rol), `${numeroDJ(dj)} enviada a aprobar`)}>
                 <Send size={15} /> Enviar a aprobar
               </Button>
             )}
             {estado !== "APROBADA" && puedeAprobar && (
-              <Button variant="success" onClick={() => ejecutar(() => void cambiarEstadoDJ(dj.id, "APROBADA", rol), `${dj.numero} aprobada`)}>
+              <Button variant="success" onClick={() => ejecutar(() => void cambiarEstadoDJ(dj.id, "APROBADA", rol), `${numeroDJ(dj)} aprobada`)}>
                 <Check size={15} /> Aprobar
               </Button>
             )}

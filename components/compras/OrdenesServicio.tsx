@@ -127,7 +127,7 @@ export function FormOrdenServicio({
     setFecha(gasto.fecha.slice(0, 10));
     setConcepto(gasto.descripcion ?? "");
     setConIgv(gasto.igv > 0);
-    setLineas([{ id: uid(), descripcion: gasto.descripcion || "Servicio", cantidad: 1, unidad: "SERV", precioUnit: gasto.igv > 0 ? gasto.subtotal : gasto.total }]);
+    setLineas([{ id: uid(), descripcion: gasto.descripcion || "Servicio", cantidad: 1, unidad: "SERV", precioUnit: gasto.total }]); // precio con IGV incluido (como el importe del gasto)
   }, [origen, gasto]);
 
   const elegirProveedor = (nombre: string) => {
@@ -283,7 +283,7 @@ export function FormOrdenServicio({
                 <th className="px-2 py-2 text-left">Detalle del servicio *</th>
                 <th className="w-24 px-2 py-2 text-left">Cant. *</th>
                 <th className="w-28 px-2 py-2 text-left">Und.</th>
-                <th className="w-32 px-2 py-2 text-left">P. Unit. (sin IGV)</th>
+                <th className="w-32 px-2 py-2 text-left">{conIgv ? "P. Unit. (inc. IGV)" : "P. Unit."}</th>
                 <th className="w-28 px-2 py-2 text-right">Importe</th>
                 <th className="w-10" />
               </tr>
@@ -330,7 +330,7 @@ export function FormOrdenServicio({
               <Plus size={14} /> Agregar línea
             </Button>
             <label className="flex items-center gap-2 text-sm text-plomo-600">
-              <input type="checkbox" checked={conIgv} onChange={(e) => setConIgv(e.target.checked)} /> Afecto a IGV 18%
+              <input type="checkbox" checked={conIgv} onChange={(e) => setConIgv(e.target.checked)} /> Afecto a IGV 18% (precio incluye IGV)
             </label>
           </div>
         </div>
@@ -338,7 +338,7 @@ export function FormOrdenServicio({
         <div className="flex justify-end px-5 py-3">
           <dl className="w-72 space-y-1 text-sm">
             <div className="flex justify-between text-plomo-600">
-              <dt>Subtotal</dt>
+              <dt>{conIgv ? "Base imponible" : "Subtotal"}</dt>
               <dd>{soles(tot.subtotal)}</dd>
             </div>
             <div className="flex justify-between text-plomo-600">
@@ -436,7 +436,7 @@ function AccionesOS({ os, rol }: { os: OrdenServicio; rol: Rol }) {
               </div>
             ))}
           </dl>
-          <Table head={["Detalle", "Cant.", "Und.", "P. Unit.", "Importe"]}>
+          <Table head={["Detalle", "Cant.", "Und.", os.igv > 0 ? (os.preciosConIgv ? "P. Unit. (inc. IGV)" : "P. Unit. (sin IGV)") : "P. Unit.", "Importe"]}>
             {os.items.map((i) => (
               <tr key={i.id}>
                 <Td className="font-medium">{i.descripcion}</Td>
@@ -448,7 +448,7 @@ function AccionesOS({ os, rol }: { os: OrdenServicio; rol: Rol }) {
             ))}
           </Table>
           <p className="text-right">
-            Subtotal {soles(os.subtotal)} · IGV {soles(os.igv)} · <b>Total {soles(os.total)}</b>
+            {os.igv > 0 ? "Base imponible" : "Subtotal"} {soles(os.subtotal)} · IGV {soles(os.igv)} · <b>Total {soles(os.total)}</b>
           </p>
           <ul className="space-y-1 border-t border-plomo-100 pt-3 text-xs text-plomo-600">
             {os.historial.map((h, k) => (

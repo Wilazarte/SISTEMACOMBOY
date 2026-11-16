@@ -34,10 +34,13 @@ import { SelectorCaja } from "@/components/SelectorCaja";
 import { FormBancarizacion, bancarizacionVacia } from "@/components/compras/FormBancarizacion";
 import { OPCIONES_COMPROBANTE, PROVEEDOR_VARIOS_ID, numeroAutomatico, placeholderComprobante, proveedorVarios } from "@/lib/comprobantes";
 import { SelectorOrden } from "@/components/compras/SelectorOrden";
+import { useDJsAutomaticas } from "@/components/compras/useDJsAutomaticas";
 import { PagoCompraForm, pagoCompraDe, pagoCompraVacio, type FormPagoCompra } from "@/components/compras/PagoCompra";
 import { CAJA_POR_DEFECTO } from "@/lib/cajas";
 import {
   IGV,
+  desglosarIgv,
+  totalesLineas,
   COMPROBANTES_GASTO,
   docCompra,
   cuentaOrigenDeCaja,
@@ -47,6 +50,9 @@ import {
   KEYS,
   esContratista,
   esDeclaracionJurada,
+  djDeCompra,
+  djsDeCompras,
+  numeroDJ,
   MAX_ARCHIVO,
   TOPE_DJ,
   abrirArchivo,
@@ -231,7 +237,7 @@ export default function ComprasPage() {
           ...(vePlanilla ? [{ id: "planilla" as const, label: "Planilla", icon: <Users size={16} />, count: activos }] : []),
           ...(veCompras
             ? [
-                { id: "declaraciones" as const, label: "Declaraciones", icon: <FileText size={16} />, count: facturas.filter(esDeclaracionJurada).length },
+                { id: "declaraciones" as const, label: "Declaraciones", icon: <FileText size={16} />, count: facturas.filter(esDeclaracionJurada).length + djsDeCompras(compras).length },
                 { id: "antecedentes" as const, label: "Antecedentes", icon: <History size={16} /> },
               ]
             : []),
@@ -267,7 +273,7 @@ export default function ComprasPage() {
         />
       )}
       {tab === "facturas" && <Facturas key={pre.oc ?? "f"} rol={rol} ocs={ocsSinFactura} ordenes={ordenes} facturas={facturas} preOc={pre.oc} onIr={irTab} />}
-      {tab === "declaraciones" && veCompras && <DeclaracionesJuradas facturas={facturas} rol={rol} />}
+      {tab === "declaraciones" && veCompras && <DeclaracionesJuradas facturas={facturas} compras={compras} rol={rol} />}
       {tab === "planilla" && vePlanilla && (
         <div>
           <PlanillaInterna />
@@ -567,8 +573,12 @@ function RegistrarCompra({
   const [generarOrden, setGenerarOrden] = useState<OrdenAGenerar>("NINGUNA");
   const ordenesServicio = useStore<OrdenServicio[]>(KEYS.ORDENES_SERVICIO, []);
   const gastosConOS = useMemo(() => new Set(ordenesServicio.filter((o) => o.estado !== "ANULADA" && o.gastoId).map((o) => o.gastoId!)), [ordenesServicio]);
+  // Gastos y compras marcados "Sin comprobante": su declaración jurada se genera sola (también los ya registrados)
+  useDJsAutomaticas(rol);
   const [guardandoCompra, setGuardandoCompra] = useState(false);
   const [filas, setFilas] = useState<FilaCompra[]>([filaVacia()]);
+  // Precios con IGV incluido (Williams 2026-11-14). false solo al editar una compra con factura anterior (sin IGV)
+  const [preciosConIgv, setPreciosConIgv] = useState(true);
   const habilitado = puede(rol, "compra.crear");
   const sesion = getSesion();
   // Edición: el mismo formulario de "Registrar compra" con los datos de la compra
@@ -587,20 +597,23 @@ function RegistrarCompra({
     setPago(pagoCompraDe(c));
     setGenerarOrden(c.ordenCompraId ? "OC" : c.ordenServicioId ? "OS" : "NINGUNA");
     setFilas(c.items.map((i) => ({ id: uid(), nombre: i.nombre, unidad: i.unidad, cantidad: i.cantidad, precioUnit: i.precioUnit })));
+    setPreciosConIgv(c.preciosConIgv === true || c.tipoComprobante !== "FACTURA");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const cancelarEdicion = () => {
     setEditando(null);
     setNumero("");
     setFilas([filaVacia()]);
+    setPreciosConIgv(true);
     setPago(pagoCompraVacio());
     setGenerarOrden("NINGUNA");
   };
 
   const fechaISO = parseFechaPE(fechaTxt);
   const fechaError = fechaTxt.length === 10 && !fechaISO ? "Fecha inexistente" : fechaISO > hoy() ? "La fecha no puede ser futura" : undefined;
-  const { subtotal, igv, total } = totalesCompra(tipo, filas);
-  const conIgv = tipo === "BOLETA";
+  const { subtotal, igv, total } = totalesCompra(tipo, filas, preciosConIgv);
+  // Factura y boleta: precio con IGV incluido (salvo una factura anterior que se está editando)
+  const conIgv = tipo === "BOLETA" || (tipo === "FACTURA" && preciosConIgv);
   const listaProveedores = useMemo(() => [proveedorVarios(), ...proveedores], [proveedores]);
   const prov = listaProveedores.find((p) => p.id === proveedorId);
   const set = (id: string, campo: keyof FilaCompra, v: string | number) => setFilas((p) => p.map((i) => (i.id === id ? { ...i, [campo]: v } : i)));
@@ -627,6 +640,7 @@ function RegistrarCompra({
       pago: { ...resto, ...(pago.estado === "PAGADO" ? { bancarizacion } : {}) },
       generarOrden,
       items: filas,
+      preciosConIgv,
     };
     setGuardandoCompra(true);
     let ordenNumero = "";
@@ -692,7 +706,7 @@ function RegistrarCompra({
             subtitle={
               editando
                 ? "Al guardar se devuelve al almacén lo que ingresó esta compra y entra lo corregido (queda como AJUSTE en el kardex)."
-                : "Factura: precios sin IGV (se suma 18 %). Boleta: precios con IGV incluido. Recibos, DJ, ticket y sin comprobante: sin IGV. Al guardar, los productos ingresan al stock del almacén seleccionado."
+                : "Factura y boleta: escriba los precios CON IGV incluido (el sistema desglosa base e IGV). Recibos, DJ, ticket y sin comprobante: sin IGV. Al guardar, los productos ingresan al stock del almacén seleccionado."
             }
           />
           <div className="grid gap-4 p-5 md:grid-cols-3">
@@ -797,7 +811,8 @@ function RegistrarCompra({
               <Plus size={14} /> Agregar producto
             </Button>
           </div>
-          {conIgv && <p className="px-5 pt-3 text-right text-xs text-plomo-500">Boleta: los precios incluyen IGV; la base imponible se obtiene dividiendo el total entre 1.18.</p>}
+          {conIgv && <p className="px-5 pt-3 text-right text-xs text-plomo-500">Los precios incluyen IGV: base imponible = total / 1.18 e IGV = total − base.</p>}
+          {tipo === "FACTURA" && !preciosConIgv && <p className="px-5 pt-3 text-right text-xs text-amber-600">Compra registrada antes del cambio: sus precios están sin IGV (se suma 18 %).</p>}
           <Totales subtotal={subtotal} igv={igv} total={total} />
           <div className="space-y-4 px-5 pb-5">
             {/* OC u OS opcional (una sola): se genera con los productos de esta compra */}
@@ -848,14 +863,14 @@ function RegistrarCompra({
                   <span className="whitespace-nowrap">
                     <span className="font-semibold text-fg">{g.codigo ?? "-"}</span>
                     <button type="button" onClick={() => pdfDeclaracionJurada(g)} className="ml-1.5 text-xs font-semibold text-[#2a7bff] underline" title="Ver PDF de la declaración jurada">
-                      {g.numero}
+                      {numeroDJ(g)}
                     </button>
                   </span>
                 ) : (
                   <span className="whitespace-nowrap font-semibold text-fg">{g.codigo ?? g.numero}</span>
                 ),
                 total: soles(g.total),
-                buscar: `${g.codigo ?? ""} ${g.numero} ${g.ruc} ${g.descripcion ?? ""}`,
+                buscar: `${g.codigo ?? ""} ${g.numero} ${g.djNumero ?? ""} ${g.ruc} ${g.descripcion ?? ""}`,
                 tipoDoc: g.tipoGasto === "PLANILLA" ? "PLANILLA" : "GASTO",
                 estado: g.estadoPago,
                 acciones: (
@@ -889,11 +904,16 @@ function RegistrarCompra({
               ref: (
                 <span className="whitespace-nowrap font-semibold text-fg">
                   {c.numero}
+                  {c.tipoComprobante === "SIN_COMPROBANTE" && c.djNumero && (
+                    <button type="button" onClick={() => pdfDeclaracionJurada(djDeCompra(c))} className="ml-1.5 text-xs font-semibold text-[#2a7bff] underline" title="Ver PDF de la declaración jurada">
+                      {c.djNumero}
+                    </button>
+                  )}
                   {(c.ordenCompraNumero || c.ordenServicioNumero) && <span className="ml-1.5 text-xs font-normal text-plomo-500">{c.ordenCompraNumero ?? c.ordenServicioNumero}</span>}
                 </span>
               ),
               total: soles(c.total),
-              buscar: `${c.numero} ${c.ruc} ${c.sede} ${c.items.map((i) => i.nombre).join(" ")}`,
+              buscar: `${c.numero} ${c.djNumero ?? ""} ${c.ruc} ${c.sede} ${c.items.map((i) => i.nombre).join(" ")}`,
               tipoDoc: "COMPRA",
               ...(c.pago ? { estado: c.pago.estado === "PAGADO" ? "PAGADA" : "POR_PAGAR" } : {}),
               acciones: (
@@ -955,7 +975,7 @@ function RegistrarCompra({
                 </div>
               ))}
             </dl>
-            <Table head={["Producto", "Unidad", "Cantidad", "P. unit.", "Subtotal"]}>
+            <Table head={["Producto", "Unidad", "Cantidad", verCompra.igv > 0 ? (verCompra.tipoComprobante === "BOLETA" || verCompra.preciosConIgv ? "P. unit. (inc. IGV)" : "P. unit. (sin IGV)") : "P. unit.", "Importe"]}>
               {verCompra.items.map((i) => (
                 <tr key={i.id}>
                   <Td>{i.nombre}</Td>
@@ -1126,8 +1146,8 @@ function Cotizaciones({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reqId]);
 
-  const subtotal = r2(items.reduce((a, i) => a + i.cantidad * (i.precioUnit || 0), 0));
-  const igv = r2(subtotal * IGV);
+  // Precios con IGV incluido: se desglosa base e IGV
+  const { subtotal, igv, total } = totalesLineas(items, true, true);
 
   const guardar = () => {
     const ok = ejecutar(() => crearCotizacion({ reqId, proveedor, ruc, numero, fechaEmision: fecha, items }, rol), "Cotización registrada");
@@ -1199,7 +1219,7 @@ function Cotizaciones({
           </div>
           {items.length > 0 && (
             <>
-              <Table head={["Producto", "Marca", "Cant.", "Und.", "P. Unit. (sin IGV)", "Subtotal"]}>
+              <Table head={["Producto", "Marca", "Cant.", "Und.", "P. Unit. (inc. IGV)", "Importe"]}>
                 {items.map((i, k) => (
                   <tr key={i.itemReqId}>
                     <Td className="font-medium">{i.nombre}</Td>
@@ -1223,7 +1243,8 @@ function Cotizaciones({
                   </tr>
                 ))}
               </Table>
-              <Totales subtotal={subtotal} igv={igv} />
+              <p className="px-5 pt-3 text-right text-xs text-plomo-500">Escriba los precios CON IGV incluido: base imponible = total / 1.18.</p>
+              <Totales subtotal={subtotal} igv={igv} total={total} />
             </>
           )}
           <div className="flex justify-end border-t border-plomo-100 px-5 py-4">
@@ -1291,7 +1312,7 @@ function Totales({ subtotal, igv, total = r2(subtotal + igv) }: { subtotal: numb
     <div className="flex justify-end px-5 py-3">
       <dl className="w-72 space-y-1 text-sm">
         <div className="flex justify-between text-plomo-600">
-          <dt>Subtotal</dt>
+          <dt>{igv > 0 ? "Base imponible" : "Subtotal"}</dt>
           <dd>{soles(subtotal)}</dd>
         </div>
         <div className="flex justify-between text-plomo-600">
@@ -1515,7 +1536,7 @@ function Ordenes({
                 <AlertTriangle size={16} /> Existe una cotización más barata para {coti.reqNumero} ({soles(minimo)}).
               </div>
             )}
-            <Table head={["Producto", "Marca", "Cant.", "Und.", "P. Unit.", "Subtotal"]}>
+            <Table head={["Producto", "Marca", "Cant.", "Und.", coti.preciosConIgv ? "P. Unit. (inc. IGV)" : "P. Unit. (sin IGV)", "Importe"]}>
               {coti.items.map((i) => (
                 <tr key={i.itemReqId}>
                   <Td className="font-medium">{i.nombre}</Td>
@@ -1527,7 +1548,7 @@ function Ordenes({
                 </tr>
               ))}
             </Table>
-            <Totales subtotal={coti.subtotal} igv={coti.igv} />
+            <Totales subtotal={coti.subtotal} igv={coti.igv} total={coti.total} />
           </>
         )}
         <div className="flex justify-end border-t border-plomo-100 px-5 py-4">
@@ -1682,8 +1703,10 @@ function EditarOC({ oc, rol, cotizaciones, onClose }: { oc: OrdenCompra; rol: Ro
   const [guardando, setGuardando] = useState(false);
   const opcionesCoti = cotizaciones.filter((c) => c.id === oc.cotizacionId || c.estado !== "CON_OC");
   const coti = cotizaciones.find((c) => c.id === d.cotizacionId);
-  const subtotal = r2(d.items.reduce((a, i) => a + r2(i.cantidad * i.precioUnit), 0));
-  const igv = r2(subtotal * IGV);
+  // Mismo criterio que editarOrdenCompra: OC / cotización nuevas con IGV incluido; las anteriores sin IGV
+  const cambiaCoti = d.cotizacionId !== oc.cotizacionId;
+  const conIgvIncluido = cambiaCoti ? coti?.preciosConIgv === true : oc.preciosConIgv === true;
+  const { subtotal, igv, total } = totalesLineas(d.items, cambiaCoti || oc.igv > 0, conIgvIncluido);
   const set = <K extends keyof EdicionOC>(k: K, v: EdicionOC[K]) => setD((x) => ({ ...x, [k]: v }));
   const setItem = (n: number, cambio: Partial<ItemPrecio>) => set("items", d.items.map((i, j) => (j === n ? { ...i, ...cambio } : i)));
 
@@ -1738,7 +1761,7 @@ function EditarOC({ oc, rol, cotizaciones, onClose }: { oc: OrdenCompra; rol: Ro
         </Field>
       </div>
 
-      <Table head={["Producto", "Cant.", "Und", "Marca", "P. unit (sin IGV)", "Subtotal", ""]}>
+      <Table head={["Producto", "Cant.", "Und", "Marca", conIgvIncluido ? "P. unit (inc. IGV)" : "P. unit (sin IGV)", "Importe", ""]}>
         {d.items.map((i, n) => (
           <tr key={n}>
             <Td>
@@ -1768,7 +1791,7 @@ function EditarOC({ oc, rol, cotizaciones, onClose }: { oc: OrdenCompra; rol: Ro
       <Button size="sm" variant="secondary" onClick={() => set("items", [...d.items, { itemReqId: uid(), nombre: "", cantidad: 1, unidad: "UND", marca: "", precioUnit: 0, subtotal: 0 }])}>
         <Plus size={14} /> Agregar producto
       </Button>
-      <Totales subtotal={subtotal} igv={igv} />
+      <Totales subtotal={subtotal} igv={igv} total={total} />
 
       <div className="flex justify-end gap-2 border-t border-plomo-100 pt-4">
         <Button variant="secondary" onClick={onClose}>
@@ -1807,7 +1830,8 @@ function Facturas({
   const [numero, setNumero] = useState("");
   const [fecha, setFecha] = useState(hoy());
   const [venc, setVenc] = useState(hoy());
-  const [subtotal, setSubtotal] = useState(0);
+  // Total de la factura CON IGV incluido (Williams 2026-11-14): el sistema desglosa base e IGV
+  const [totalFac, setTotalFac] = useState(0);
   // DJ
   const [dni, setDni] = useState("");
   const [vendedor, setVendedor] = useState("");
@@ -1824,12 +1848,12 @@ function Facturas({
   };
 
   const oc = ocs.find((o) => o.id === ocId);
-  const igv = r2(subtotal * IGV);
-  const difiere = oc && Math.abs(subtotal - oc.subtotal) > 0.01;
+  const { subtotal, igv } = desglosarIgv(totalFac);
+  const difiere = oc && Math.abs(totalFac - oc.total) > 0.01;
 
   useEffect(() => {
     if (oc) {
-      setSubtotal(oc.subtotal);
+      setTotalFac(oc.total);
       setVenc(sumarDias(fecha, diasCredito(oc.formaPago)));
     }
   }, [oc, fecha]);
@@ -1839,7 +1863,7 @@ function Facturas({
     setEnviando(true);
     const ok =
       modo === "FACTURA"
-        ? ejecutar(() => crearFactura({ ocId, numero, fecha, fechaVencimiento: venc, subtotal }, rol), "Factura registrada")
+        ? ejecutar(() => crearFactura({ ocId, numero, fecha, fechaVencimiento: venc, total: totalFac }, rol), "Factura registrada")
         : await ejecutarAsync(
             () => crearDeclaracionJurada({ ocId, fecha, dniVendedor: dni, nombreVendedor: vendedor, motivoSinComprobante: motivoDJ, aprobadoPor: aprobador }, rol),
             "Declaración jurada registrada"
@@ -1907,15 +1931,15 @@ function Facturas({
                   <Input value={oc ? `${oc.proveedor} (${oc.ruc})` : ""} disabled />
                   {oc && <EstadoRuc ruc={oc.ruc} />}
                 </Field>
-                <Field label="Subtotal (base imponible)" hint={difiere ? `⚠ Difiere de la OC (${soles(oc!.subtotal)})` : undefined}>
-                  <Input type="number" step="0.01" value={subtotal || ""} onChange={(e) => setSubtotal(parseFloat(e.target.value) || 0)} className={cn("text-right", difiere && "border-amber-400")} />
+                <Field label="Total con IGV incluido" hint={difiere ? `⚠ Difiere de la OC (${soles(oc!.total)})` : undefined}>
+                  <Input type="number" step="0.01" value={totalFac || ""} onChange={(e) => setTotalFac(parseFloat(e.target.value) || 0)} className={cn("text-right font-bold", difiere && "border-amber-400")} />
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
+                  <Field label="Base imponible">
+                    <Input value={soles(subtotal)} disabled className="text-right" />
+                  </Field>
                   <Field label="IGV 18%">
                     <Input value={soles(igv)} disabled className="text-right" />
-                  </Field>
-                  <Field label="Total">
-                    <Input value={soles(r2(subtotal + igv))} disabled className="text-right font-bold" />
                   </Field>
                 </div>
               </>

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, CloudUpload, Eye, Loader2, Search, ShieldAlert } from "lucide-react";
 import { EV_PESTANA, Kbd, Toaster, toast, type PestanaActiva } from "@/components/ui";
+import { VisorPDF } from "@/components/VisorPDF";
 import { DocViewerHost, abrirDoc, type DocRef } from "@/components/doc-viewer";
 import { ObservacionesGerencia } from "@/components/ObservacionesGerencia";
 import { Campana } from "@/components/shell/Campana";
@@ -336,6 +337,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <DocViewerHost />
           <DatalistCatalogo />
           <Toaster />
+          <VisorPDF />
         </>
       }
     >

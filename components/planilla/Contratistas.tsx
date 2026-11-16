@@ -63,7 +63,7 @@ export function Contratistas({ soloLectura }: { soloLectura: boolean }) {
     const sel = visibles.filter((c) => c.estado !== "ANULADO");
     if (!sel.length) return toast("No hay concesiones en la lista", "error");
     if (sel.length > 1 && !confirm(`¿Descargar ${sel.length} recibos PDF (uno por concesión)?`)) return;
-    for (const c of sel) await descargarRecibo(c, "CONCESION");
+    for (const c of sel) await descargarRecibo(c, "CONCESION", sel.length > 1);
   };
   const activos = lista.filter((c) => c.estado === "ACTIVO");
   const sel = lista.find((c) => c.id === detalle) ?? null;

@@ -3,9 +3,16 @@
 // El export estático no admite middleware, headers ni redirects, por eso solo se activa para Tauri.
 const exportTauri = process.env.TAURI_EXPORT === "1";
 
+// pdf.js (vista previa de PDF, components/VisorPDF) trae un require opcional de "canvas" solo para Node: en el navegador no se usa.
+const webpack = (config) => {
+  config.resolve.alias = { ...config.resolve.alias, canvas: false };
+  return config;
+};
+
 /** @type {import('next').NextConfig} */
 const webConfig = {
   reactStrictMode: true,
+  webpack,
   // ERP privado: nunca se muestra embebido en otra web (siempre en su propia pestaña) y los buscadores no lo indexan.
   async headers() {
     return [
@@ -39,6 +46,6 @@ const webConfig = {
   },
 };
 /** @type {import('next').NextConfig} */
-const tauriConfig = { reactStrictMode: true, output: "export", images: { unoptimized: true } };
+const tauriConfig = { reactStrictMode: true, webpack, output: "export", images: { unoptimized: true } };
 
 export default exportTauri ? tauriConfig : webConfig;

@@ -104,6 +104,8 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "requerimientos", label: "Requerimientos emitidos", grupo: "Requerimientos", destino: `${A}?tab=lista` },
 
     { slug: "recepcion", label: "Recepción MP (Ingresos · V°B° de guía)", grupo: "Ingresos y stock", destino: `${A}?tab=ingresos` },
+    { slug: "ingresar-equipo", label: "Ingresar equipo de producción (modelo, N° serie, V°B° QC)", grupo: "Ingresos y stock", destino: `${A}?tab=equipos&nuevo=1` },
+    { slug: "equipos-produccion", label: "Equipos de producción (terminados)", grupo: "Ingresos y stock", destino: `${A}?tab=equipos` },
     { slug: "stock", label: "Stock y Kardex", grupo: "Ingresos y stock", destino: `${A}?tab=stock` },
     { slug: "catalogo-productos", label: "Catálogo de Productos", grupo: "Ingresos y stock", destino: `${V}?tab=productos` },
 

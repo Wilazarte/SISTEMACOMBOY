@@ -8,7 +8,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import QRCode from "qrcode";
 import { EMPRESA } from "./empresa";
-import { CUENTAS_ORIGEN_PAGO, codigoContratista, codigoGasto, cotizacionGasto, getFacturas, cuentaBancariaTxt, fechaPE, getTrabajadores, soles } from "./storage";
+import { CUENTAS_ORIGEN_PAGO, numeroDJ, codigoContratista, codigoGasto, cotizacionGasto, getFacturas, cuentaBancariaTxt, fechaPE, getTrabajadores, soles } from "./storage";
 import { codigoDesdeNumero, estadoDocumento } from "./utils/codigos";
 import { SEDE_PLANTA_PRINCIPAL, bloqueDocumento, sedeOrigenReq, type DocUnificado, type TipoDocumento } from "./plantillasDocumentos";
 import { equipoDeLinea, sedeEquipo } from "./equipos";
@@ -20,6 +20,7 @@ import type { ConcesionContratista, LugarEntrega } from "./types";
 import type { ComprobanteVenta, Cotizacion, Factura, Guia, LineaVenta, NotaPedido, OrdenCompra, OrdenDespacho, OrdenServicio, Requerimiento } from "./types";
 import type { Traslado, VentaSucursal } from "./sucursal-modelos";
 import { COMPROBANTES } from "./comprobantes";
+import { mostrarPDF, registrarZonaFirma } from "./visorPdf";
 
 type RGB = [number, number, number];
 // Plantilla corporativa COMBOY VID
@@ -272,8 +273,11 @@ function firmas(doc: jsPDF, y: number, nombres: string[], huellaEn?: number, img
     yy = tope;
   }
   const ancho = (W - 2 * M) / nombres.length;
+  const pagina = doc.getCurrentPageInfo().pageNumber;
   nombres.forEach((n, i) => {
     const cx = M + ancho * i + ancho / 2;
+    // La vista previa (Firmar) ofrece estampar la firma sobre esta línea
+    registrarZonaFirma(doc, { pagina, x: cx, y: yy, etiqueta: n });
     doc.setDrawColor(...AZUL);
     doc.setLineWidth(0.3);
     doc.line(cx - 25, yy, cx + 25, yy);
@@ -390,10 +394,9 @@ export function construir(b: Bloque): jsPDF {
   return doc;
 }
 
-/** Descarga el PDF con nombre = código del documento (BOL-002-2026.pdf). */
+/** Abre la vista previa (Imprimir / WhatsApp / Descargar / Firmar); al descargar se llama como el código (BOL-002-2026.pdf). */
 function guardar(doc: jsPDF, codigo: string): void {
-  doc.setProperties({ title: codigo });
-  doc.save(`${codigo}.pdf`);
+  mostrarPDF(doc, codigo);
 }
 
 /** Ejecuta un PDF que primero reserva su código en Supabase; los errores se muestran como aviso. */
@@ -405,11 +408,13 @@ async function conCodigo(fn: () => Promise<void>): Promise<void> {
   }
 }
 
+/** Antes abría el PDF en otra pestaña; ahora todos pasan por la vista previa. */
 function abrir(doc: jsPDF, nombre: string): void {
-  const url = doc.output("bloburl");
-  const w = window.open(String(url), "_blank");
-  if (!w) doc.save(`${nombre}.pdf`); // popup bloqueado → descarga
+  mostrarPDF(doc, nombre);
 }
+
+/** Encabezado del precio unitario: con IGV incluido (documentos nuevos) o sin IGV (anteriores). */
+const cabPU = (d: { preciosConIgv?: boolean; igv: number }): string => (d.igv > 0 ? (d.preciosConIgv ? "P.U. inc. IGV" : "P.U. sin IGV") : "P. Unit.");
 
 const totales = (s: number, igv: number, t: number): [string, string][] => [
   ["Subtotal (valor venta)", soles(s)],
@@ -642,7 +647,7 @@ export function pdfCotizacion(c: Cotizacion): void {
         ["Fecha emisión", fechaPE(c.fechaEmision)],
         ["Requerimiento", c.reqNumero],
       ],
-      head: ["#", "Producto", "Marca", "Cant.", "Und.", "P. Unit.", "Subtotal"],
+      head: ["#", "Producto", "Marca", "Cant.", "Und.", cabPU(c), "Subtotal"],
       body: c.items.map((i, k) => [k + 1, i.nombre, i.marca || "-", i.cantidad, i.unidad, soles(i.precioUnit), soles(i.subtotal)]),
       alinearDerecha: [3, 5, 6],
       totales: totales(c.subtotal, c.igv, c.total),
@@ -674,7 +679,7 @@ export function pdfOrdenCompra(o: OrdenCompra): void {
         ...(o.voucherUrl ? ([["Baucher", `${o.voucherNombre ?? "adjunto"}${o.voucherMonto !== undefined ? ` · ${soles(o.voucherMonto)}` : ""}`]] as [string, string][]) : []),
         ...(o.bancarizacion ? ([["Bancarización", `${o.bancarizacion.tipo}${o.bancarizacion.nroOperacion ? ` · N° ${o.bancarizacion.nroOperacion}` : ""}`]] as [string, string][]) : []),
       ],
-      head: ["#", "Descripción", "Marca", "Cant.", "Und.", "P. Unit.", "Importe"],
+      head: ["#", "Descripción", "Marca", "Cant.", "Und.", cabPU(o), "Importe"],
       body: o.items.map((i, k) => [k + 1, i.nombre, i.marca || "-", i.cantidad, i.unidad, soles(i.precioUnit), soles(i.subtotal)]),
       alinearDerecha: [3, 5, 6],
       totales: totales(o.subtotal, o.igv, o.total),
@@ -711,7 +716,7 @@ export function pdfOrdenServicio(o: OrdenServicio): void {
         ...(o.adjuntoNombre ? ([["Adjunto", o.adjuntoNombre]] as [string, string][]) : []),
         ...(o.estado === "ANULADA" && o.motivoAnulacion ? ([["Motivo anulación", o.motivoAnulacion]] as [string, string][]) : []),
       ],
-      head: ["#", "Descripción del servicio", "Cant.", "Und.", "P. Unit.", "Importe"],
+      head: ["#", "Descripción del servicio", "Cant.", "Und.", cabPU(o), "Importe"],
       body: o.items.map((i, k) => [k + 1, i.descripcion, i.cantidad, i.unidad, soles(i.precioUnit), soles(i.subtotal)]),
       alinearDerecha: [2, 4, 5],
       totales: totales(o.subtotal, o.igv, o.total),
@@ -807,9 +812,12 @@ export function pdfEstadoCuenta(d: {
 
 /** Declaración jurada de gasto (gasto sin comprobante) con su N° correlativo DJ-0001. */
 export function docDeclaracionJurada(f: Factura): jsPDF {
+  const n = numeroDJ(f);
+  // La DJ (comprobante DJ o automática de un gasto "Sin comprobante") siempre es de un gasto sin comprobante de pago
+  const motivo = "Gasto sin comprobante de pago autorizado";
   const doc = construir({
-    titulo: `DECLARACIÓN JURADA DE GASTO N° ${f.numero}`,
-    numero: f.numero,
+    titulo: `DECLARACIÓN JURADA DE GASTO N° ${n}`,
+    numero: n,
     estado: f.djEstado === "APROBADA" ? "APROBADA" : f.djEstado === "ENVIADA" ? "EN APROBACIÓN" : estadoDocumento(f.estadoPago),
     datos: [
       ["Fecha", fechaPE(f.fecha)],
@@ -817,8 +825,8 @@ export function docDeclaracionJurada(f: Factura): jsPDF {
       ["Importe", soles(f.total)],
       ["Proveedor", f.proveedor],
       ["DNI / RUC", f.ruc || "-"],
-      ["Código de gasto", f.codigo ?? "-"],
-      ["Motivo", "Gasto sin comprobante de pago autorizado"],
+      f.compraDirecta ? ["Compra (ingreso a stock)", f.numero] : ["Código de gasto", f.codigo ?? "-"],
+      ["Motivo", motivo],
     ],
     head: ["#", "Concepto", "Importe"],
     body: [[1, f.descripcion ?? "-", soles(f.total)]],
@@ -830,25 +838,18 @@ export function docDeclaracionJurada(f: Factura): jsPDF {
     ],
     firmas: ["Firma Solicitante", "Firma Gerencia"],
   });
-  doc.setProperties({ title: f.numero });
+  doc.setProperties({ title: n });
   return doc;
 }
 
-/** Descarga DJ-0005.pdf */
+/** Vista previa de DJ-0005.pdf */
 export function pdfDeclaracionJurada(f: Factura): void {
-  guardar(docDeclaracionJurada(f), f.numero);
+  guardar(docDeclaracionJurada(f), numeroDJ(f));
 }
 
 /** URL blob para ver la DJ dentro de un iframe (vista previa del modal). */
 export const urlDeclaracionJurada = (f: Factura): string => String(docDeclaracionJurada(f).output("bloburl"));
 
-/** Abre la DJ e imprime. */
-export function imprimirDeclaracionJurada(f: Factura): void {
-  const doc = docDeclaracionJurada(f);
-  doc.autoPrint();
-  const w = window.open(String(doc.output("bloburl")), "_blank");
-  if (!w) guardar(doc, f.numero);
-}
 
 export function pdfFactura(f: Factura, oc?: OrdenCompra): void {
   if (f.esGastoTesoreria && f.comprobanteGasto === "DJ") {
@@ -884,13 +885,13 @@ export function pdfFactura(f: Factura, oc?: OrdenCompra): void {
             ] as [string, string][])
           : []),
       ],
-      head: ["#", "Descripción", "Cant.", "Und.", "P. Unit.", "Importe"],
+      head: ["#", "Descripción", "Cant.", "Und.", oc && !esDJ ? cabPU(oc) : "P. Unit.", "Importe"],
       body: (oc?.items ?? []).map((i, k) => [k + 1, i.nombre, i.cantidad, i.unidad, soles(i.precioUnit), soles(i.subtotal)]),
       alinearDerecha: [2, 4, 5],
       totales: esDJ ? [["TOTAL (sin IGV)", soles(f.total)]] : totales(f.subtotal, f.igv, f.total),
       notas: esDJ
         ? [
-            `Yo, ${f.proveedor}, identificado con DNI ${f.ruc}, declaro bajo juramento haber vendido los bienes detallados a ${EMPRESA.razonSocial} por el importe indicado, no estando obligado a emitir comprobante de pago. Documento sustentatorio interno; no otorga derecho a crédito fiscal.`,
+        `Yo, ${f.proveedor}, identificado con DNI ${f.ruc}, declaro bajo juramento haber vendido los bienes detallados a ${EMPRESA.razonSocial} por el importe indicado, no estando obligado a emitir comprobante de pago. Documento sustentatorio interno; no otorga derecho a crédito fiscal.`,
           ]
         : undefined,
       firmas: esDJ ? ["Vendedor (DNI)", "Comprador", "Aprobado: Gerencia"] : ["Tesorería", "Contabilidad"],
@@ -949,11 +950,14 @@ const cuerpoVenta = (items: LineaVenta[]) =>
 const tipoDocSunat = (doc: string) => (doc.startsWith("RUC") ? "6" : doc.startsWith("DNI") ? "1" : "4");
 
 export function pdfNotaPedido(n: NotaPedido): void {
+  guardar(construir(bloqueNotaPedido(n)), codigoDesdeNumero("NP", n.numero, n.fecha));
+}
+
+function bloqueNotaPedido(n: NotaPedido): Bloque {
   const vence = new Date(`${n.fecha}T12:00:00`);
   vence.setDate(vence.getDate() + n.validezDias);
   const codigo = codigoDesdeNumero("NP", n.numero, n.fecha);
-  guardar(
-    construir({
+  return {
       titulo: "NOTA DE PEDIDO",
       numero: codigo,
       estado: estadoDocumento(n.estado),
@@ -971,12 +975,12 @@ export function pdfNotaPedido(n: NotaPedido): void {
         ],
         ["Vendedor", n.vendedor],
       ],
-      head: ["#", "Descripción", "Medidas", "Cant.", "m²", "Precio", "Total"],
+      head: ["#", "Descripción", "Medidas", "Cant.", "m²", n.preciosConIgv && n.conIgv ? "Precio inc. IGV" : "Precio", "Total"],
       body: cuerpoVenta(n.items),
       alinearDerecha: [3, 4, 5, 6],
       totales: [
         ...(n.descuento > 0 ? ([["Descuento", `- ${soles(n.descuento)}`]] as [string, string][]) : []),
-        [n.conIgv ? "Subtotal" : "Subtotal (sin IGV)", soles(n.subtotal)],
+        [n.conIgv ? (n.preciosConIgv ? "Base imponible" : "Subtotal") : "Subtotal (sin IGV)", soles(n.subtotal)],
         ...(n.conIgv ? ([["IGV 18%", soles(n.igv)]] as [string, string][]) : []),
         ["TOTAL", soles(n.total)],
       ],
@@ -987,8 +991,106 @@ export function pdfNotaPedido(n: NotaPedido): void {
       qr: `${EMPRESA.ruc}|NP|${n.numero}|${n.total.toFixed(2)}|${n.fecha}|${n.clienteDoc}`,
       qrTexto: [`Pagos a nombre de ${EMPRESA.razonSocial} · RUC ${EMPRESA.ruc}:`, ...lineasCuentas(), `Enviar constancia indicando la ${n.numero}.`],
       firmas: [`Vendedor: ${n.vendedor}`, "Aceptado: Cliente"],
+  };
+}
+
+/** Pago a cuenta que se muestra en la nota de pedido actualizada. */
+export interface PagoVentaPDF {
+  fecha: string;
+  monto: number;
+  cuenta: string;
+  referencia: string;
+  documento: string; // NP-0001 / F001-0001 (dónde se registró el cobro)
+}
+
+/**
+ * Nota de pedido ACTUALIZADA (Cuentas por cobrar): la NP con sus adelantos (fecha, N° de operación, caja/banco),
+ * total pagado y saldo pendiente. Sin NP (comprobante directo) se arma con los datos del comprobante.
+ */
+export function pdfNotaPedidoActualizada(d: {
+  np?: NotaPedido;
+  comprobante?: ComprobanteVenta;
+  pagos: PagoVentaPDF[];
+  total: number;
+  pagado: number;
+  saldo: number;
+  vencimiento: string;
+}): void {
+  const { np, comprobante: c } = d;
+  const hoyIso = new Date().toISOString().slice(0, 10);
+  const base: Bloque = np
+    ? bloqueNotaPedido(np)
+    : {
+        titulo: "NOTA DE PEDIDO",
+        numero: c!.numero,
+        datos: [
+          ["Comprobante", c!.numero],
+          ["Cliente", c!.cliente],
+          ["Documento", c!.clienteDoc],
+          ["Fecha", fechaPE(c!.fecha)],
+          ["Forma de pago", c!.formaPago === "CONTADO" ? "Contado" : `${c!.condPagoNombre} · vence ${fechaPE(c!.fechaVenc)}`],
+          ["Vendedor", c!.vendedor || "-"],
+        ],
+        head: ["#", "Descripción", "Medidas", "Cant.", "m²", c!.preciosConIgv && c!.conIgv ? "Precio inc. IGV" : "Precio", "Total"],
+        body: cuerpoVenta(c!.items),
+        alinearDerecha: [3, 4, 5, 6],
+        totales: [
+          ...(c!.descuento > 0 ? ([["Descuento", `- ${soles(c!.descuento)}`]] as [string, string][]) : []),
+          [c!.conIgv ? "Op. gravada" : "Op. inafecta", soles(c!.base)],
+          ...(c!.conIgv ? ([["IGV 18%", soles(c!.igv)]] as [string, string][]) : []),
+          ["TOTAL", soles(c!.total)],
+        ],
+        firmas: [`Vendedor: ${c!.vendedor || "-"}`, "Aceptado: Cliente"],
+      };
+  const numero = base.numero;
+  const ext = np?.comprobanteExterno ?? c?.comprobanteExterno;
+  const datos: [string, string][] = [
+    ...base.datos,
+    ...(c && np ? ([["Comprobante", c.numero]] as [string, string][]) : []),
+    ...(ext ? ([["Comp. externo", ext.numero]] as [string, string][]) : []),
+    ["Actualizada al", fechaPE(hoyIso)],
+  ];
+  const r2 = (x: number) => Math.round(x * 100) / 100;
+  const conDetalle = r2(d.pagos.reduce((a, p) => a + p.monto, 0));
+  // Cobros antiguos sin registro individual: se muestran juntos para que cuadre con lo pagado
+  const sinDetalle = r2(d.pagado - conDetalle);
+  guardar(
+    construir({
+      ...base,
+      titulo: "NOTA DE PEDIDO · ACTUALIZADA",
+      estado: d.saldo <= 0.001 ? "CANCELADA" : d.pagado > 0 ? "CON ADELANTOS" : "POR COBRAR",
+      datos,
+      extra: (doc, y) => {
+        const H = doc.internal.pageSize.getHeight();
+        if (y + 30 > H - ALTO_PIE - 6) {
+          doc.addPage();
+          y = 20;
+        }
+        y += 2;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(...AZUL);
+        doc.text("ADELANTOS Y PAGOS A CUENTA", M, y);
+        y += 2;
+        const filas: (string | number)[][] = d.pagos
+          .slice()
+          .sort((a, b) => a.fecha.localeCompare(b.fecha))
+          .map((p, i) => [i + 1, fechaPE(p.fecha), p.referencia || "-", p.cuenta || "-", p.documento, soles(p.monto)]);
+        if (sinDetalle > 0.009) filas.push([filas.length + 1, "-", "Pagos anteriores (sin detalle)", "-", "-", soles(sinDetalle)]);
+        if (!filas.length) filas.push(["", "", "Aún no se registran adelantos", "", "", soles(0)]);
+        y = tabla(doc, y, ["#", "Fecha", "N° operación", "Caja / Banco", "Registrado en", "Monto"], filas, [5]);
+        return bloqueTotales(doc, y, [
+          ["Total de la venta", soles(d.total)],
+          ["(-) Adelantos / pagos", `- ${soles(d.pagado)}`],
+          [d.saldo <= 0.001 ? "SALDO (CANCELADO)" : "SALDO PENDIENTE", soles(Math.max(0, d.saldo))],
+        ]);
+      },
+      notas: [
+        `Saldo calculado al ${fechaPE(hoyIso)}${d.saldo > 0.001 ? ` · vence ${fechaPE(d.vencimiento)}` : ""}. Los adelantos se descuentan del total de la venta.`,
+        ...(base.notas ?? []),
+      ],
     }),
-    codigo
+    `${numero}-ACTUALIZADA`
   );
 }
 
@@ -1014,7 +1116,7 @@ export function pdfComprobanteVenta(c: ComprobanteVenta): void {
         ["Orden despacho", c.odNumero ?? "-"],
         ["Moneda", "Soles (PEN)"],
       ],
-      head: ["#", "Descripción", "Medidas", "Cant.", "m²", "V. unit.", "Valor venta"],
+      head: ["#", "Descripción", "Medidas", "Cant.", "m²", c.preciosConIgv ? (c.conIgv ? "P. unit. inc. IGV" : "P. unit.") : "V. unit.", c.preciosConIgv ? "Importe" : "Valor venta"],
       body: cuerpoVenta(c.items),
       alinearDerecha: [3, 4, 5, 6],
       totales: [

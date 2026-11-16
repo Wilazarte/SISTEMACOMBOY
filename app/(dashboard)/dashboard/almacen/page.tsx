@@ -4,7 +4,7 @@ import { BotonNuevo } from "@/components/ui/BotonFiltros";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useCallback, useEffect, useState } from "react";
-import { Boxes, CheckCircle2, Truck, ClipboardList, Eye, FilePlus2, FileText, MessageSquareWarning, PackageCheck, Pencil, Plus, Trash2 } from "lucide-react";
+import { Boxes, CheckCircle2, Factory, Truck, ClipboardList, Eye, FilePlus2, FileText, MessageSquareWarning, PackageCheck, Pencil, Plus, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
 import { EditarReq, permisoEditarReq } from "@/components/compras/EditarReq";
@@ -34,7 +34,7 @@ import { EquiposTerminados } from "@/components/almacen/EquiposTerminados";
 import { StockAlmacen } from "@/components/almacen/StockAlmacen";
 import { estadoOD } from "@/lib/ventas";
 
-type Tab = "nuevo" | "lista" | "ingresos" | "stock" | "despacho";
+type Tab = "nuevo" | "lista" | "ingresos" | "equipos" | "stock" | "despacho";
 
 
 export default function AlmacenPage() {
@@ -81,6 +81,7 @@ export default function AlmacenPage() {
           { id: "nuevo", label: "Nuevo requerimiento", icon: <FilePlus2 size={16} /> },
           { id: "lista", label: "Requerimientos emitidos", icon: <ClipboardList size={16} />, count: observados },
           { id: "ingresos", label: "Ingresos", icon: <PackageCheck size={16} />, count: porVB.length },
+          { id: "equipos", label: "Equipos de producción", icon: <Factory size={16} /> },
           { id: "stock", label: "Stock", icon: <Boxes size={16} /> },
           {
             id: "despacho",
@@ -99,6 +100,7 @@ export default function AlmacenPage() {
           <Ingresos rol={rol} porVB={porVB} ordenes={ordenes} facturas={facturas} guias={guias} />
         </div>
       )}
+      {tab === "equipos" && <EquiposProduccion rol={rol} />}
       {tab === "stock" && <Stock stock={stock} rol={rol} onIrDespacho={() => setTab("despacho")} />}
       {tab === "despacho" && <OrdenesDespacho />}
     </div>
@@ -562,13 +564,20 @@ function RegistrarIngreso({ rol, stock, ordenes }: { rol: Rol; stock: StockItem[
 // STOCK (alimentado por las compras registradas y por el V°B° de ingresos)
 // =====================================================================
 function Stock({ stock, rol, onIrDespacho }: { stock: StockItem[]; rol: Rol; onIrDespacho: () => void }) {
-  const [nuevoEquipo, setNuevoEquipo] = useState(false);
-  const cerrarNuevo = useCallback(() => setNuevoEquipo(false), []);
   const puedeRegistrar = puede(rol, "req.crear") && !getSesion()?.soloLectura; // Almacén y creador
   return (
     <div className="space-y-6">
-      <EquiposTerminados puedeRegistrar={puedeRegistrar} nuevo={nuevoEquipo} onNuevoCerrado={cerrarNuevo} />
       <StockAlmacen stock={stock} puedeOperar={puedeRegistrar} onIrDespacho={onIrDespacho} />
     </div>
   );
+}
+
+// =====================================================================
+// EQUIPOS DE PRODUCCIÓN: ingreso de equipos terminados (modelo, serie, chasis, V°B° de QC)
+// =====================================================================
+function EquiposProduccion({ rol }: { rol: Rol }) {
+  const [nuevoEquipo, setNuevoEquipo] = useState(false);
+  const cerrarNuevo = useCallback(() => setNuevoEquipo(false), []);
+  const puedeRegistrar = puede(rol, "req.crear") && !getSesion()?.soloLectura; // Almacén y creador
+  return <EquiposTerminados puedeRegistrar={puedeRegistrar} nuevo={nuevoEquipo} onNuevoCerrado={cerrarNuevo} />;
 }
