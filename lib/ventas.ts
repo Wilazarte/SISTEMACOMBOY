@@ -27,6 +27,7 @@ import {
   uid,
 } from "./storage";
 import { exigirRucSunat } from "./ruc";
+import { esSoporte, getSesion } from "./auth";
 import { disponibleEquipo, equipoDeLinea, marcarEquiposVendidos, sedeEquipo } from "./equipos";
 import { getDerivaciones, getReqsSuc, getSucursal, marcarAceptadoVentas, type ProductoTraslado, type Traslado } from "./sucursal";
 import { asientoAjusteVenta, asientoDe, asientoNotaPedido, esAsientoContable, revertirAsiento, revertirAsientoId } from "./contable";
@@ -1451,6 +1452,122 @@ export function registrarCobro(
   escribir(KEYS.COMPROBANTES, lista.map((x) => (x.id === c.id ? nuevo : x)));
   escribir(KEYS.COBROS, [cobro, ...getCobros()]);
   escribir(KEYS.ASIENTOS, [asientoCobro(c, monto, datos.medio, datos.cuenta.trim()), ...getAsientos()]);
+}
+
+// ---------------------------------------------------------------------
+// Corrección de cobros (solo SOPORTE, con PIN)
+// ---------------------------------------------------------------------
+
+/** PIN que pide Cuentas por cobrar para editar o eliminar un cobro (Williams 2026-11-16). */
+const PIN_EDITAR_COBRO = "012810";
+
+export type DatosCobroEditado = { monto: number; medio: CobroVenta["medio"]; cuenta: string; referencia: string; fecha: string; observacion?: string };
+
+function exigirSoporteYPin(pin: string): string {
+  const sesion = getSesion();
+  if (!esSoporte(sesion)) throw new ErpError("Solo SOPORTE puede editar o eliminar cobros.");
+  if (pin.trim() !== PIN_EDITAR_COBRO) throw new ErpError("PIN de validación incorrecto.");
+  return sesion?.usuario ?? "soporte";
+}
+
+/** Asiento del cobro (DEBE Caja/Banco · HABER 1212) o su reversa (signo -1). */
+function asientoCobroManual(cobro: CobroVenta, glosa: string, signo: 1 | -1): AsientoContable {
+  const caja = { cuenta: cobro.medio === "CAJA" ? "1011" : "1041", nombre: cobro.medio === "CAJA" ? "Caja" : `Cuenta corriente ${cobro.cuenta}` };
+  const cxc = { cuenta: "1212", nombre: "Emitidas en cartera (cuentas por cobrar)" };
+  const m = cobro.monto;
+  return {
+    id: uid(),
+    fecha: hoy(),
+    glosa,
+    comprobanteId: cobro.npId || cobro.comprobanteId,
+    lineas:
+      signo === 1
+        ? [{ ...caja, debe: m, haber: 0 }, { ...cxc, debe: 0, haber: m }]
+        : [{ ...cxc, debe: m, haber: 0 }, { ...caja, debe: 0, haber: m }],
+  };
+}
+
+/**
+ * Aplica la diferencia de un cobro corregido (delta = nuevo - anterior) a la NP y/o al comprobante:
+ * NP.cobrado sube con el delta y el saldo del comprobante baja. Valida que el saldo no quede negativo.
+ */
+function aplicarDeltaCobro(cobro: CobroVenta, delta: number, evento: string, detalle: string, rolEv: Rol): void {
+  const comps = getComprobantes();
+  let compId = cobro.comprobanteId;
+  if (cobro.npId) {
+    const np = getNotasPedido().find((n) => n.id === cobro.npId);
+    if (!np) throw new ErpError("No se encontró la nota de pedido del cobro.");
+    const cobrado = r2((np.cobrado ?? 0) + delta);
+    if (cobrado < -0.001) throw new ErpError("El cobro corregido deja lo cobrado de la NP en negativo.");
+    if (cobrado > np.total + 0.001) throw new ErpError(`El monto supera el total de la ${np.numero} (S/ ${np.total.toFixed(2)}).`);
+    actualizarNP(np.id, (n) => ({ ...n, cobrado: Math.max(0, cobrado), historial: [...n.historial, nuevoEvento(rolEv, evento, detalle)] }));
+    // NP ya facturada en el ERP: el saldo vive en el comprobante
+    compId = np.comprobanteId && comps.some((c) => c.id === np.comprobanteId && c.estado === "EMITIDO") ? np.comprobanteId : "";
+  }
+  if (compId) {
+    const c = comps.find((x) => x.id === compId);
+    if (!c) throw new ErpError("No se encontró el comprobante del cobro.");
+    const saldo = r2(c.saldo - delta);
+    if (saldo < -0.001) throw new ErpError(`El monto supera el saldo del ${c.numero} (S/ ${(c.saldo + Math.max(0, -delta)).toFixed(2)} disponible).`);
+    if (saldo > c.total + 0.001) throw new ErpError(`El saldo del ${c.numero} superaría su total.`);
+    escribir(
+      KEYS.COMPROBANTES,
+      comps.map((x) => (x.id === c.id ? { ...x, saldo: Math.max(0, saldo), historial: [...x.historial, nuevoEvento(rolEv, evento, detalle)] } : x))
+    );
+  }
+}
+
+/** SOPORTE + PIN: corrige monto, fecha, caja/banco, N° de operación u observación de un cobro (con asiento de corrección). */
+export function editarCobro(cobroId: string, datos: DatosCobroEditado, pin: string, rol: Rol): void {
+  const usuario = exigirSoporteYPin(pin);
+  const lista = getCobros();
+  const viejo = lista.find((c) => c.id === cobroId);
+  if (!viejo) throw new ErpError("Cobro no encontrado.");
+  const monto = r2(Number(datos.monto) || 0);
+  if (!(monto > 0)) throw new ErpError("El monto debe ser mayor a 0. Para quitarlo use Eliminar.");
+  if (!datos.cuenta.trim()) throw new ErpError("Indique la caja o banco.");
+  if (!datos.fecha) throw new ErpError("Indique la fecha.");
+  const nuevo: CobroVenta = {
+    ...viejo,
+    monto,
+    fecha: datos.fecha,
+    medio: datos.medio,
+    cuenta: datos.cuenta.trim(),
+    referencia: datos.referencia.trim(),
+    observacion: datos.observacion?.trim() || undefined,
+    editadoPor: usuario,
+    editadoEn: new Date().toISOString(),
+  };
+  const doc = viejo.npNumero || viejo.comprobanteNumero;
+  const cambios = [
+    viejo.monto !== monto && `monto S/ ${viejo.monto.toFixed(2)} → S/ ${monto.toFixed(2)}`,
+    viejo.fecha !== nuevo.fecha && `fecha ${viejo.fecha} → ${nuevo.fecha}`,
+    viejo.cuenta !== nuevo.cuenta && `caja ${viejo.cuenta} → ${nuevo.cuenta}`,
+    viejo.referencia !== nuevo.referencia && `ref. ${viejo.referencia || "-"} → ${nuevo.referencia || "-"}`,
+    (viejo.observacion ?? "") !== (nuevo.observacion ?? "") && "observación",
+  ].filter(Boolean) as string[];
+  if (!cambios.length) throw new ErpError("No hay cambios que guardar.");
+  aplicarDeltaCobro(viejo, r2(monto - viejo.monto), "Cobro corregido (SOPORTE)", cambios.join(" · "), rol);
+  escribir(KEYS.COBROS, lista.map((c) => (c.id === cobroId ? nuevo : c)));
+  // Asiento: si cambió el monto o la caja/banco, se revierte el anterior y se registra el corregido
+  if (viejo.monto !== monto || viejo.cuenta !== nuevo.cuenta || viejo.medio !== nuevo.medio)
+    escribir(KEYS.ASIENTOS, [
+      asientoCobroManual(nuevo, `Cobro corregido ${doc} · ${nuevo.cliente} · ${nuevo.cuenta}`, 1),
+      asientoCobroManual(viejo, `Reversa cobro ${doc} (corrección) · ${viejo.cliente} · ${viejo.cuenta}`, -1),
+      ...getAsientos(),
+    ]);
+}
+
+/** SOPORTE + PIN: elimina un cobro; el monto vuelve al saldo de la NP / comprobante y se revierte su asiento. */
+export function eliminarCobro(cobroId: string, pin: string, rol: Rol): void {
+  exigirSoporteYPin(pin);
+  const lista = getCobros();
+  const c = lista.find((x) => x.id === cobroId);
+  if (!c) throw new ErpError("Cobro no encontrado.");
+  const doc = c.npNumero || c.comprobanteNumero;
+  aplicarDeltaCobro(c, -c.monto, "Cobro eliminado (SOPORTE)", `S/ ${c.monto.toFixed(2)} · ${c.fecha} · ref. ${c.referencia || "-"}`, rol);
+  escribir(KEYS.COBROS, lista.filter((x) => x.id !== cobroId));
+  escribir(KEYS.ASIENTOS, [asientoCobroManual(c, `Reversa cobro eliminado ${doc} · ${c.cliente} · ${c.cuenta}`, -1), ...getAsientos()]);
 }
 
 // ---------------------------------------------------------------------

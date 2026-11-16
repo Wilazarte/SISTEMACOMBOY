@@ -820,6 +820,9 @@ export interface CobroVenta {
   referencia: string; // N° operación
   /** Observación libre del cobro (opcional). */
   observacion?: string;
+  /** Última corrección hecha por SOPORTE (editar cobro con PIN). */
+  editadoPor?: string;
+  editadoEn?: string;
   usuario: string;
   created_at: string;
 }

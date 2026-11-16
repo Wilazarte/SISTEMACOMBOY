@@ -2,10 +2,10 @@
 
 import { BotonFiltros } from "@/components/ui/BotonFiltros";
 import { useState } from "react";
-import { BarChart3, FileCheck2, FileSpreadsheet, FileText, Wallet, X } from "lucide-react";
+import { BarChart3, FileCheck2, FileSpreadsheet, FileText, Lock, Pencil, Trash2, Wallet, X } from "lucide-react";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, Textarea, cn, ejecutar } from "@/components/ui";
-import { getSesion } from "@/lib/auth";
+import { esSoporte, getSesion } from "@/lib/auth";
 import { KEYS, fechaPE, hoy, puede, r2, soles, useRol, useStore } from "@/lib/storage";
 import {
   TIPOS_COMPROBANTE_EXTERNO,
@@ -13,6 +13,8 @@ import {
   registrarCobro,
   registrarCobroNP,
   registrarComprobanteExterno,
+  editarCobro,
+  eliminarCobro,
   reporteDeuda,
   ventaActualizada,
   type AgruparDeuda,
@@ -50,6 +52,9 @@ export function CuentasPorCobrar() {
   const { showFiltros, setShowFiltros } = useTogglePanel();
   const [reporte, setReporte] = useState<AgruparDeuda | null>(null);
   const [sel, setSel] = useState<FilaCxC | null>(null);
+  const [corregir, setCorregir] = useState<{ cobro: CobroVenta; eliminar: boolean } | null>(null);
+  // Editar / eliminar cobros: solo SOPORTE y con PIN
+  const soporte = esSoporte(getSesion());
   const [externo, setExterno] = useState<FilaCxC | null>(null);
   const [datos, setDatos] = useState({ monto: 0, cuenta: CUENTAS_COBRO[0], referencia: "", fecha: hoy(), observacion: "" });
   const habilitado = puede(rol, "venta.cobrar");
@@ -344,7 +349,7 @@ export function CuentasPorCobrar() {
 
       <Card>
         <CardHeader title="Cobros registrados" />
-        <Table head={["Fecha", "Documento", "Comprobante", "Cliente", "Monto", "Caja / Banco", "Referencia", "Observación", "Usuario"]} empty={cobros.length === 0}>
+        <Table compacto head={["Fecha", "Documento", "Comprobante", "Cliente", "Monto", "Caja / Banco", "Referencia", "Observación", "Usuario", ...(soporte ? [""] : [])]} empty={cobros.length === 0}>
           {cobros.slice(0, 100).map((c) => (
             <tr key={c.id}>
               <Td>{fechaPE(c.fecha)}</Td>
@@ -354,8 +359,31 @@ export function CuentasPorCobrar() {
               <Td className="text-right font-semibold text-emerald-700">{soles(c.monto)}</Td>
               <Td>{c.cuenta}</Td>
               <Td>{c.referencia || "-"}</Td>
-              <Td className="max-w-[16rem] whitespace-normal text-xs">{c.observacion || "-"}</Td>
-              <Td>{c.usuario}</Td>
+              <Td className="text-xs">
+                <span className="block max-w-[12rem] truncate" title={c.observacion}>
+                  {c.observacion || "-"}
+                </span>
+              </Td>
+              <Td>
+                {c.usuario}
+                {c.editadoPor && <p className="text-xs text-amber-600">Editado por {c.editadoPor}</p>}
+              </Td>
+              {soporte && (
+                <Td>
+                  <div className="flex gap-1">
+                    <span className="tip" data-tip="Editar cobro (SOPORTE · PIN)">
+                      <Button size="sm" variant="ghost" onClick={() => setCorregir({ cobro: c, eliminar: false })} aria-label="Editar cobro">
+                        <Pencil size={14} />
+                      </Button>
+                    </span>
+                    <span className="tip" data-tip="Eliminar cobro (SOPORTE · PIN)">
+                      <Button size="sm" variant="ghost" onClick={() => setCorregir({ cobro: c, eliminar: true })} aria-label="Eliminar cobro">
+                        <Trash2 size={14} className="text-red-600" />
+                      </Button>
+                    </span>
+                  </div>
+                </Td>
+              )}
             </tr>
           ))}
         </Table>
@@ -413,6 +441,8 @@ export function CuentasPorCobrar() {
           </form>
         )}
       </Modal>
+
+      {soporte && <ModalCorregirCobro corregir={corregir} onClose={() => setCorregir(null)} />}
 
       <ModalComprobanteExterno
         doc={externo && { origen: externo.origen, id: externo.id, documento: externo.documento, externo: externo.externo }}
@@ -496,6 +526,90 @@ export function ModalComprobanteExterno({
           </div>
         </form>
       )}
+    </Modal>
+  );
+}
+
+/** SOPORTE: editar (monto, fecha, caja/banco, N° operación, observación) o eliminar un cobro, validado con PIN. */
+function ModalCorregirCobro({ corregir, onClose }: { corregir: { cobro: CobroVenta; eliminar: boolean } | null; onClose: () => void }) {
+  const [rol] = useRol();
+  const [form, setForm] = useState({ monto: 0, fecha: "", cuenta: "", referencia: "", observacion: "" });
+  const [pin, setPin] = useState("");
+  const [abiertoPara, setAbiertoPara] = useState("");
+  const clave = corregir ? `${corregir.cobro.id}-${corregir.eliminar}` : "";
+  if (clave !== abiertoPara) {
+    setAbiertoPara(clave);
+    setPin("");
+    if (corregir) {
+      const c = corregir.cobro;
+      setForm({ monto: c.monto, fecha: c.fecha, cuenta: c.cuenta, referencia: c.referencia, observacion: c.observacion ?? "" });
+    }
+  }
+  if (!corregir) return null;
+  const { cobro: c, eliminar } = corregir;
+  const doc = c.npId ? c.npNumero : c.comprobanteNumero;
+  const cuentas = CUENTAS_COBRO.includes(form.cuenta) || !form.cuenta ? CUENTAS_COBRO : [form.cuenta, ...CUENTAS_COBRO];
+  const guardar = () => {
+    const ok = eliminar
+      ? ejecutar(() => eliminarCobro(c.id, pin, rol), "Cobro eliminado")
+      : ejecutar(() => editarCobro(c.id, { ...form, medio: medioCobro(form.cuenta) }, pin, rol), "Cobro actualizado");
+    if (ok) onClose();
+  };
+  return (
+    <Modal open onClose={onClose} title={`${eliminar ? "Eliminar" : "Editar"} cobro · ${doc ?? ""}`}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          guardar();
+        }}
+        className="space-y-3"
+      >
+        <p className="text-sm text-plomo-600">
+          {c.cliente} · {fechaPE(c.fecha)} · <b>{soles(c.monto)}</b> · {c.cuenta} · ref. {c.referencia || "-"}
+        </p>
+        {eliminar ? (
+          <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            El monto de este cobro vuelve al saldo por cobrar de {doc} y se registra el asiento de reversa. No se puede deshacer.
+          </p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Monto S/">
+              <Input type="number" min={0} step="0.01" value={form.monto || ""} onChange={(e) => setForm({ ...form, monto: parseFloat(e.target.value) || 0 })} autoFocus />
+            </Field>
+            <Field label="Fecha">
+              <Input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
+            </Field>
+            <Field label="Caja / Banco">
+              <Select value={form.cuenta} onChange={(e) => setForm({ ...form, cuenta: e.target.value })} options={cuentas.map((x) => ({ value: x, label: x }))} />
+            </Field>
+            <Field label="N° operación / referencia">
+              <Input value={form.referencia} onChange={(e) => setForm({ ...form, referencia: e.target.value })} />
+            </Field>
+            <Field label="Observación" className="sm:col-span-2">
+              <Textarea rows={2} value={form.observacion} onChange={(e) => setForm({ ...form, observacion: e.target.value })} />
+            </Field>
+          </div>
+        )}
+        <Field label="PIN de validación (SOPORTE) *">
+          <Input
+            type="password"
+            inputMode="numeric"
+            autoComplete="off"
+            value={pin}
+            placeholder="••••••"
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+            autoFocus={eliminar}
+          />
+        </Field>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button type="submit" variant={eliminar ? "danger" : "warning"} disabled={!pin}>
+            <Lock size={14} /> {eliminar ? "Eliminar cobro" : "Guardar cambios"}
+          </Button>
+        </div>
+      </form>
     </Modal>
   );
 }
