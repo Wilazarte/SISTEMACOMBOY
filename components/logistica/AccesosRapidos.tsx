@@ -51,17 +51,21 @@ interface Accion {
 
 const ACCIONES: Record<ModuloPlanta, Accion[]> = {
   logistica: [
-    { label: "Mundo Ventas", href: RUTA_MUNDO_VENTAS, permiso: "/dashboard/ventas", requiere: "canAccessMundoVentas", destacado: true, icono: <Store size={30} /> },
     { label: "Crear OC", href: "/dashboard/compras?tab=ordenes", icono: <ShoppingCart size={26} /> },
     { label: "Cotizar Proveedor", href: "/dashboard/compras?tab=cotizaciones", icono: <FileSpreadsheet size={26} /> },
     { label: "Confirmar Guía", href: "/dashboard/almacen?tab=ingresos", icono: <PackageCheck size={26} /> },
     { label: "Bancarizar Voucher", href: "/dashboard/compras?tab=ordenes", icono: <Landmark size={26} /> },
     { label: "Pagar Proveedor", href: "/dashboard/compras?tab=facturas", icono: <Banknote size={26} /> },
-    { label: "Emitir Factura F001", href: "/dashboard/ventas?tab=comprobantes", requiere: "canEmitFactura", icono: <FileCheck2 size={26} /> },
     { label: "Emitir Guía Remisión", href: "/dashboard/almacen?tab=despacho", requiere: "canEmitGuia", icono: <FileText size={26} /> },
     { label: "Liquidar Flete", href: "/logistica/cotizar-flete", icono: <Truck size={26} /> },
+  ],
+  // Ventas: módulo propio desde 2026-11-16 (antes estas acciones estaban en Logística)
+  ventas: [
+    { label: "Mundo Ventas", href: RUTA_MUNDO_VENTAS, permiso: "/dashboard/ventas", requiere: "canAccessMundoVentas", destacado: true, icono: <Store size={30} /> },
     { label: "Cotizar Cliente", href: "/dashboard/ventas?tab=notas", requiere: "canEmitFactura", icono: <HandCoins size={26} /> },
     { label: "Generar Pedido Venta", href: "/dashboard/ventas?tab=notas", requiere: "canEmitFactura", icono: <ClipboardList size={26} /> },
+    { label: "Emitir Factura F001", href: "/dashboard/ventas?tab=comprobantes", requiere: "canEmitFactura", icono: <FileCheck2 size={26} /> },
+    { label: "Cuentas por cobrar", href: "/dashboard/ventas?tab=cobrar", icono: <Banknote size={26} /> },
   ],
   almacen: [
     { label: "Capturar Foto", href: "/dashboard/almacen?tab=ingresos", icono: <Camera size={26} /> },

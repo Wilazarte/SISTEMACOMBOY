@@ -34,7 +34,7 @@ export const tarjetaDe = (id: ModuloLogin): TarjetaModulo => [...MODULOS_SELECCI
 
 /** Encargado que se muestra en la bienvenida del login según el módulo. */
 export const ENCARGADOS_LOGIN: Record<ModuloLogin, { nombre: string; cargo: string }> = {
-  ventas: { nombre: "LIZBETH CAHUANA APFATA", cargo: "Tesorera - Módulo de Ventas" },
+  ventas: { nombre: "Área de Ventas", cargo: "Ventas - pedidos, facturación y cobranza" },
   contable: { nombre: "Área Contable", cargo: "Contabilidad - COMBOY VID" },
   tesoreria: { nombre: "LIZBETH CAHUANA APFATA", cargo: "Tesorera - Módulo de Compras" },
   produccion: { nombre: "MANUEL CORNEJO APAZA", cargo: "Producción - permisos limitados" },

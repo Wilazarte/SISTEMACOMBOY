@@ -61,6 +61,7 @@ const NOMBRE_MODULO: [string, string][] = [
   ["/almacen", "ALMACEN"],
   ["/finanzas", "FINANZAS"],
   ["/produccion", "PRODUCCION"],
+  ["/ventas", "VENTAS"],
   ["/erp", "EXPEDIENTES"],
   ["/no-autorizado", "NO AUTORIZADO"],
 ];

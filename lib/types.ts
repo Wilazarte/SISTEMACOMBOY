@@ -2,7 +2,7 @@
 // ERP COMBOY VID — Tipos del módulo de Compras
 // =====================================================================
 
-export type Rol = "ALMACEN" | "TESORERIA" | "GERENCIA" | "CONTADOR";
+export type Rol = "ALMACEN" | "TESORERIA" | "GERENCIA" | "CONTADOR" | "VENTAS";
 
 export type EstadoReq =
   | "PENDIENTE"

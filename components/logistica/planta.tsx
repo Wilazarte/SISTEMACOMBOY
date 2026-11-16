@@ -2,7 +2,7 @@
 
 import { estiloSeccion } from "@/lib/seccionColor";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { AlertTriangle, Bell, CircleDollarSign, Clock, Cog, Lock, MessageSquare, Package, Plus, Send, Timer, Truck, Users, Video } from "lucide-react";
+import { AlertTriangle, Bell, CircleDollarSign, Clock, Cog, Lock, MessageSquare, Package, Plus, Receipt, Send, Timer, Truck, Users, Video } from "lucide-react";
 import { useChat } from "@/lib/chat";
 import { consumosDeChasis } from "@/lib/inventario";
 import type { OrdenProduccion } from "@/lib/produccion";
@@ -20,7 +20,7 @@ import { Panel } from "./piezas";
 // Piezas comunes de las 4 homes de la planta (Logística, Almacén, Finanzas, Producción).
 // Mismo diseño que Logística: fondo #0e1219, tarjetas #1a212e, naranja #2a7bff.
 
-export type ModuloPlanta = "logistica" | "almacen" | "finanzas" | "produccion";
+export type ModuloPlanta = "logistica" | "almacen" | "finanzas" | "produccion" | "ventas";
 
 /** `home`: página de inicio del módulo. `trabajo`: el módulo de siempre (se abre desde la tarjeta del módulo actual). */
 export const MODULOS_PLANTA: { id: ModuloPlanta; titulo: string; home: string; trabajo: string; icono: (grande: boolean) => ReactNode }[] = [
@@ -28,6 +28,8 @@ export const MODULOS_PLANTA: { id: ModuloPlanta; titulo: string; home: string; t
   { id: "almacen", titulo: "Almacén", home: "/almacen", trabajo: "/dashboard/almacen", icono: (g) => <Package size={g ? 40 : 56} strokeWidth={1.6} /> },
   { id: "finanzas", titulo: "Finanzas", home: "/finanzas", trabajo: "/dashboard/compras", icono: (g) => <CircleDollarSign size={g ? 40 : 56} strokeWidth={1.6} /> },
   { id: "produccion", titulo: "Producción", home: "/produccion", trabajo: "/dashboard/produccion", icono: (g) => <Cog size={g ? 40 : 56} strokeWidth={1.6} /> },
+  // Ventas: módulo propio desde 2026-11-16 (antes dentro de Logística)
+  { id: "ventas", titulo: "Ventas", home: "/ventas", trabajo: "/dashboard/ventas", icono: (g) => <Receipt size={g ? 40 : 56} strokeWidth={1.6} /> },
 ];
 
 /** Grilla de la home: contenido a la izquierda y panel derecho fijo en escritorio (fondo y pie: ErpLayout). */

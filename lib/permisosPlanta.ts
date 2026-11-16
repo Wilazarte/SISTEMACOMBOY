@@ -5,7 +5,7 @@
 import type { Sesion } from "./permisos";
 
 /** gerencia: visor general (Dashboard Gerencia /gerencia), no es admin ni opera. */
-export type PerfilPlanta = "soporte" | "logistica" | "almacen" | "finanzas" | "produccion" | "gerencia";
+export type PerfilPlanta = "soporte" | "logistica" | "almacen" | "finanzas" | "produccion" | "ventas" | "gerencia";
 
 /**
  * ADMIN = únicamente SOPORTE (regla de Williams, 2026-10-29). En la BD SOPORTE es el rol "creador"
@@ -21,8 +21,8 @@ export const isModulador = (sesion: Sesion | null): boolean => !!sesion && !isAd
 
 /**
  * - soporte: solo isAdmin (SOPORTE).
- * - moduladores: logistica, almacen, finanzas (tesorería, planilla), produccion.
- * Los roles logistica / finanzas / produccion se reconocen si existen en la tabla perfiles.
+ * - moduladores: logistica, almacen, finanzas (tesorería, planilla), produccion, ventas.
+ * Los roles logistica / finanzas / produccion / ventas se reconocen si existen en la tabla perfiles.
  */
 export function perfilPlanta(sesion: Sesion | null): PerfilPlanta | null {
   if (!sesion) return null;
@@ -32,12 +32,13 @@ export function perfilPlanta(sesion: Sesion | null): PerfilPlanta | null {
   if (rol === "logistica") return "logistica";
   if (rol === "almacen") return "almacen";
   if (rol === "produccion") return "produccion";
+  if (rol === "ventas") return "ventas";
   if (rol === "tesoreria" || rol === "planilla" || rol === "finanzas") return "finanzas";
   return null;
 }
 
 /**
- * INICIO asignado a un modulador (perfiles.modulo_asignado / rol): /logistica, /almacen, /finanzas, /produccion o /gerencia.
+ * INICIO asignado a un modulador (perfiles.modulo_asignado / rol): /logistica, /almacen, /finanzas, /produccion, /ventas o /gerencia.
  * SOPORTE no tiene uno fijo (entra a todo): null. El middleware y el login llevan ahí a cada usuario.
  */
 export function homeAsignado(sesion: Sesion | null): string | null {
@@ -59,7 +60,7 @@ export function inicialesDe(nombre: string, iniciales?: string): string {
 }
 
 export interface PermisosPlanta {
-  /** Emitir factura / boleta (Ventas › Comprobantes). */
+  /** Emitir factura / boleta (Ventas › Comprobantes). Solo VENTAS y SOPORTE (Ventas ya no es de Logística, 2026-11-16). */
   canEmitFactura: boolean;
   /** Ver facturas, IGV, balance y PDT (solo lectura). */
   canViewFacturas: boolean;
@@ -78,7 +79,9 @@ const NINGUNO: PermisosPlanta = { canEmitFactura: false, canViewFacturas: false,
 
 const PERMISOS: Record<PerfilPlanta, PermisosPlanta> = {
   soporte: { canEmitFactura: true, canViewFacturas: true, canEmitGuia: true, canAccessMundoVentas: true, canViewOtherModules: true },
-  logistica: { canEmitFactura: true, canViewFacturas: true, canEmitGuia: true, canAccessMundoVentas: true, canViewOtherModules: false },
+  // Logística ya no es dueña de Ventas (módulo propio desde 2026-11-16): sigue emitiendo guías de remisión
+  logistica: { ...NINGUNO, canEmitGuia: true },
+  ventas: { canEmitFactura: true, canViewFacturas: true, canEmitGuia: false, canAccessMundoVentas: true, canViewOtherModules: false },
   finanzas: { ...NINGUNO, canViewFacturas: true },
   almacen: { ...NINGUNO, canEmitGuia: true },
   produccion: NINGUNO,
@@ -90,25 +93,27 @@ export const permisosPlanta = (sesion: Sesion | null): PermisosPlanta => {
   return p ? PERMISOS[p] : NINGUNO;
 };
 
-/** Ruta del botón Mundo Ventas (redirige a /dashboard/ventas, ver next.config.mjs). */
+/** Ruta del botón Mundo Ventas (redirige al INICIO VENTAS /ventas, ver next.config.mjs). */
 export const RUTA_MUNDO_VENTAS = "/mundo-ventas";
 
 /** Cómo se muestra cada perfil en el encabezado: avatar = 2 primeras letras de `label`. */
 export const ETIQUETA_PERFIL: Record<PerfilPlanta, { label: string; titulo: string; badge?: string }> = {
   soporte: { label: "SOPORTE", titulo: "SOPORTE (Dueño) · acceso a todos los módulos", badge: "Soporte Dueño" },
-  logistica: { label: "LOGISTICA", titulo: "Logística · dueña de ventas", badge: "Dueño de Ventas" },
+  logistica: { label: "LOGISTICA", titulo: "Logística · compras, transporte y OP" },
+  ventas: { label: "VENTAS", titulo: "Ventas · pedidos, facturación y cobranza" },
   almacen: { label: "ALMACEN", titulo: "Almacén · acceso solo a su módulo" },
   finanzas: { label: "FINANZAS", titulo: "Finanzas · acceso solo a su módulo" },
   produccion: { label: "PRODUCCION", titulo: "Producción · acceso solo a su módulo" },
   gerencia: { label: "GERENCIA", titulo: "Gerencia · visor general (solo lectura)", badge: "Visor General" },
 };
 
-/** Home de cada perfil de la planta (solo SOPORTE entra a las 4). */
+/** Home de cada perfil de la planta (solo SOPORTE entra a todas). */
 export const HOME_PERFIL: Record<Exclude<PerfilPlanta, "soporte">, string> = {
   logistica: "/logistica",
   almacen: "/almacen",
   finanzas: "/finanzas",
   produccion: "/produccion",
+  ventas: "/ventas",
   gerencia: "/gerencia",
 };
 

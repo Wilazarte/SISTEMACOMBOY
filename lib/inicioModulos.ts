@@ -7,7 +7,7 @@ import { puedeVer, type Sesion } from "./auth";
 import { permisosPlanta, type PermisosPlanta } from "./permisosPlanta";
 import { FASES, NOMBRE_PERFIL, RESPONSABLE, TITULO_FASE, type Fase } from "./expedientes";
 
-export type ModuloInicio = "logistica" | "almacen" | "finanzas" | "produccion" | "soporte";
+export type ModuloInicio = "logistica" | "almacen" | "finanzas" | "produccion" | "ventas" | "soporte";
 
 export interface AccionInicio {
   /** Segmento de la URL: /{modulo}/{slug}. */
@@ -32,6 +32,7 @@ export const TITULO_INICIO: Record<ModuloInicio, string> = {
   almacen: "ALMACEN",
   finanzas: "FINANZAS",
   produccion: "PRODUCCION",
+  ventas: "VENTAS",
   soporte: "SOPORTE",
 };
 
@@ -41,6 +42,7 @@ export const RUTA_INICIO: Record<ModuloInicio, string> = {
   almacen: "/almacen",
   finanzas: "/finanzas",
   produccion: "/produccion",
+  ventas: "/ventas",
   soporte: "/dashboard",
 };
 
@@ -50,6 +52,7 @@ export const SALA_MODULO: Record<ModuloInicio, string> = {
   almacen: "Almacén",
   finanzas: "Finanzas",
   produccion: "Producción",
+  ventas: "Ventas",
   soporte: "Soporte",
 };
 
@@ -74,16 +77,6 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "facturas-compra", label: "Facturas de compra", grupo: "Compras nacionales", destino: `${C}?tab=facturas` },
     { slug: "antecedentes", label: "Antecedentes (REQ procesados)", grupo: "Compras nacionales", destino: `${C}?tab=antecedentes` },
     { slug: "proveedores", label: "Proveedores Nacionales", grupo: "Compras nacionales", destino: "/logistica/proveedores" },
-
-    { slug: "requerimientos-secocha", label: "Requerimientos de Secocha", grupo: "Ventas", destino: `${V}?tab=secocha` },
-    { slug: "notas-pedido", label: "Notas de pedido", grupo: "Ventas", destino: `${V}?tab=notas` },
-    { slug: "comprobantes", label: "Emitir Factura / Boleta (Comprobantes)", grupo: "Ventas", destino: `${V}?tab=comprobantes`, requiere: "canEmitFactura" },
-    { slug: "despachos", label: "Despachos (seguimiento)", grupo: "Ventas", destino: `${V}?tab=despachos` },
-    { slug: "clientes", label: "Clientes", grupo: "Ventas", destino: `${V}?tab=clientes` },
-    { slug: "cuentas-por-cobrar", label: "Cuentas por cobrar", grupo: "Ventas", destino: `${V}?tab=cobrar` },
-    { slug: "catalogo-productos", label: "Catálogo de Productos", grupo: "Ventas", destino: `${V}?tab=productos` },
-    { slug: "solicitudes-productos", label: "Solicitudes de productos", grupo: "Ventas", destino: `${V}?tab=productos&sub=solicitudes` },
-    { slug: "configuracion-ventas", label: "Configuración (condiciones de pago)", grupo: "Ventas", destino: `${V}?tab=condiciones` },
 
     { slug: "agencias", label: "Agencias (Marvisur · Grael · Shalom)", grupo: "Transporte", destino: "/logistica/agencias" },
     { slug: "cotizar-flete", label: "Cotizar Flete", grupo: "Transporte", destino: "/logistica/cotizar-flete" },
@@ -142,6 +135,21 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
 
     { slug: "panel", label: "Panel Finanzas (CxC, CxP, IGV, cajas, costeo)", grupo: "Seguimiento", destino: "/finanzas/panel" },
   ],
+  // VENTAS (módulo propio, Williams 2026-11-16; antes era el grupo "Ventas" de Logística): pedidos, facturación,
+  // cobranza, clientes y catálogo. No participa del flujo 26W de fabricación.
+  ventas: [
+    { slug: "notas-pedido", label: "Notas de pedido (cotizar cliente)", grupo: "Pedidos", destino: `${V}?tab=notas` },
+    { slug: "requerimientos-secocha", label: "Requerimientos de Secocha", grupo: "Pedidos", destino: `${V}?tab=secocha` },
+    { slug: "despachos", label: "Despachos (seguimiento)", grupo: "Pedidos", destino: `${V}?tab=despachos` },
+
+    { slug: "comprobantes", label: "Emitir Factura / Boleta (Comprobantes)", grupo: "Facturación y cobranza", destino: `${V}?tab=comprobantes`, requiere: "canEmitFactura" },
+    { slug: "cuentas-por-cobrar", label: "Cuentas por cobrar", grupo: "Facturación y cobranza", destino: `${V}?tab=cobrar` },
+    { slug: "configuracion-ventas", label: "Configuración (condiciones de pago)", grupo: "Facturación y cobranza", destino: `${V}?tab=condiciones` },
+
+    { slug: "clientes", label: "Clientes", grupo: "Clientes y productos", destino: `${V}?tab=clientes` },
+    { slug: "catalogo-productos", label: "Catálogo de Productos", grupo: "Clientes y productos", destino: `${V}?tab=productos` },
+    { slug: "solicitudes-productos", label: "Solicitudes de productos", grupo: "Clientes y productos", destino: `${V}?tab=productos&sub=solicitudes` },
+  ],
   // PRODUCCION (permisos limitados, Williams 2026-10-30): no emite OP (solo Logística), no ve Finanzas ni Gerencia;
   // en Almacén solo entrega PT. Solo Panel, sus OPs, Control de calidad y Entregar PT (Fase 8), más su flujo 26W.
   produccion: [
@@ -157,7 +165,7 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
   ],
 };
 
-/** SOPORTE: funciones globales (los 4 INICIO van en el acceso rápido a los módulos, arriba del INICIO). */
+/** SOPORTE: funciones globales (los INICIO de cada módulo van en el acceso rápido a los módulos, arriba del INICIO). */
 export const ACCIONES_SOPORTE: AccionInicio[] = [
   { slug: "gerencia", label: "Dashboard Gerencia", grupo: "Módulos", destino: "/gerencia" },
   { slug: "secocha", label: "Secocha (sucursal)", grupo: "Módulos", destino: "/secocha" },
