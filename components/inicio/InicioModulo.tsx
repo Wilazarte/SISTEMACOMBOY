@@ -104,10 +104,13 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
         )}
       </header>
 
-      {/* Rediseño 2026-10-30: izquierda (3/12) KPIs y notificaciones en vivo (el chat es la barra derecha global); derecha (9/12) acciones por flujo */}
+      {/* KPIs del módulo en una fila (Williams 2026-11-16: la columna izquierda queda solo para los avisos) */}
+      <FilaKpis key={modulo} modulo={modulo} />
+
+      {/* Izquierda (3/12): avisos del módulo en una columna FIJA al hacer scroll (sticky bajo la barra superior, la lista
+          con scroll propio); derecha (9/12) acciones por flujo */}
       <div className="grid gap-4 lg:grid-cols-12">
-        <div className="space-y-4 lg:col-span-3">
-          <FilaKpis key={modulo} modulo={modulo} />
+        <div className="lg:col-span-3 lg:sticky lg:top-20 lg:self-start">
           <NotificacionesEnVivo sesion={sesion} modulo={modulo} />
         </div>
 
@@ -194,7 +197,7 @@ function FilaKpis({ modulo }: { modulo: ModuloInicio }) {
   const useKpis = HOOK_KPIS[modulo];
   const kpis = useKpis(true);
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
       {kpis.map((k, i) => (
         <TarjetaKpi key={k.titulo} k={k} i={i} />
       ))}

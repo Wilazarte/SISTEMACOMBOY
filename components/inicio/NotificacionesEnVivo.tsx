@@ -11,7 +11,8 @@ import { NOMBRE_MODULO_NOTIF, marcarLeidas, useNotifFlujo } from "@/lib/notifica
 // Fuente: tabla notificaciones (avisos del flujo 26W, en vivo por Realtime; RLS: su módulo o asignadas a él).
 // Sin el SQL 20261107_notificaciones_flujo.sql, los avisos calculados del ERP (los mismos de la campana).
 
-const MAX = 6;
+/** Avisos que muestra la columna fija del INICIO (con scroll propio). */
+const MAX = 20;
 
 interface Aviso {
   id: string;
@@ -82,7 +83,7 @@ export function NotificacionesEnVivo({ sesion, modulo }: { sesion: Sesion | null
       {avisos.length === 0 ? (
         <p className="text-[13px] text-[#9CA3AF]">Sin avisos pendientes.</p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-2 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto lg:pr-1">
           {avisos.map((a) => (
             <li key={a.id} className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.04] p-3 hover-cian">
               <div className="min-w-0">
