@@ -403,3 +403,6 @@ body[data-modo-pestana] [data-guardar-pestana] {
 @media (min-width: 1024px) {
   body[data-modo-pestana] aside.chat-barra { bottom: 64px; }
 }
+
+/* Barra azul de accesos rápidos (Williams 2026-11-16, color de su imagen de referencia) */
+.barra-accesos { background: linear-gradient(180deg, #2b3b7a 0%, #1e2a5a 45%, #161f45 100%); border: 1px solid rgba(255, 255, 255, 0.08); }
