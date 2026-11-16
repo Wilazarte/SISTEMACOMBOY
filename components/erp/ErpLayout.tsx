@@ -1,13 +1,16 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { ID_BARRA_PESTANAS } from "@/components/ui";
 import type { Sesion } from "@/lib/auth";
 import { VERSION_LOGISTICA } from "@/lib/logistica";
 import { ETIQUETA_PERFIL, inicialesDe, perfilPlanta } from "@/lib/permisosPlanta";
+import { ChatGlobal, ANCHO_CHAT } from "@/components/chat/ChatGlobal";
 import { ErpHeader, NOMBRE_EMPRESA } from "./ErpHeader";
+
+const CLAVE_CHAT = "erp-chat-abierto";
 
 const horaActual = () => new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", hour12: false });
 
@@ -46,6 +49,26 @@ export function ErpLayout({
   const ruta = usePathname();
   const [sync, setSync] = useState("");
   useEffect(() => setSync(horaActual()), [ruta]);
+  // Chat grupal único (barra derecha): abierto por defecto en PC, plegado en celular; se recuerda por navegador
+  const [chatAbierto, setChatAbiertoState] = useState(false);
+  useEffect(() => {
+    let v: string | null = null;
+    try {
+      v = window.localStorage.getItem(CLAVE_CHAT);
+    } catch {
+      /* almacenamiento bloqueado */
+    }
+    setChatAbiertoState(v ? v === "1" : window.matchMedia("(min-width: 1024px)").matches);
+  }, []);
+  const setChatAbierto = useCallback((v: boolean) => {
+    setChatAbiertoState(v);
+    try {
+      window.localStorage.setItem(CLAVE_CHAT, v ? "1" : "0");
+    } catch {
+      /* almacenamiento bloqueado */
+    }
+  }, []);
+  const conChat = chatAbierto ? ANCHO_CHAT : "";
   const perfil = perfilPlanta(sesion);
   const etiqueta = perfil ? ETIQUETA_PERFIL[perfil] : undefined;
   // Usuario asignado: "JO - Jose Ortiz Arapa • ALMACEN" (perfiles.avatar_iniciales, nombre_completo, modulo_asignado)
@@ -71,10 +94,10 @@ export function ErpLayout({
         extra={extra}
       />
 
-      <main className={`w-full flex-1 transition-[padding] duration-300 ${mainClassName}`}>
+      <main className={`w-full flex-1 transition-[padding] duration-300 ${conChat} ${mainClassName}`}>
         <div className="mx-auto w-full max-w-[1600px] px-4 pt-20 sm:px-6 lg:px-8">{children}</div>
       </main>
-      <footer className="mt-8 flex flex-wrap items-center justify-between gap-2 glass-blur border-t border-white/[0.08] px-4 py-4 text-xs text-[#a1a1aa] sm:px-6 lg:px-8">
+      <footer className={`mt-8 flex flex-wrap items-center justify-between gap-2 glass-blur border-t border-white/[0.08] px-4 py-4 text-xs text-[#a1a1aa] sm:px-6 lg:px-8 ${chatAbierto ? "lg:pl-[376px]" : ""}`}>
         <span>
           <span className="font-semibold text-white">{NOMBRE_EMPRESA}</span> © 2025 · ERP COMBOY VID · Sede {sede} · Área Informática
         </span>
@@ -82,6 +105,7 @@ export function ErpLayout({
           {VERSION_LOGISTICA} · Última sincronización: Hoy {sync}
         </span>
       </footer>
+      <ChatGlobal sesion={sesion} modulo={moduleName} abierto={chatAbierto} setAbierto={setChatAbierto} />
       {overlays}
     </div>
   );

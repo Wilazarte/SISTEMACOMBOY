@@ -1,16 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { BadgeCheck, Boxes, ClipboardList, FilePlus, FileSearch, FolderOpen, Landmark, LayoutGrid, MessageSquare, PackageCheck, Send, Truck, Video, type LucideIcon } from "lucide-react";
-import { useSesion, type Sesion } from "@/lib/auth";
-import { useChat } from "@/lib/chat";
+import { useEffect, useMemo, useState } from "react";
+import { BadgeCheck, Boxes, ClipboardList, FilePlus, FileSearch, FolderOpen, Landmark, LayoutGrid, PackageCheck, Truck, Video, type LucideIcon } from "lucide-react";
+import { useSesion } from "@/lib/auth";
 import { recargarExpedientes, useExpedientes } from "@/lib/expedientes";
 import { GRUPO_EXPEDIENTE, SALA_MODULO, TITULO_INICIO, accionesPermitidas, fasePrincipal, fasesFlujo, urlBoton, type AccionInicio, type ModuloInicio } from "@/lib/inicioModulos";
 import { irA } from "@/lib/navegacion";
 import { urlSala } from "@/lib/presencia";
 import { recargarDatos, type StoreKey, KEYS } from "@/lib/storage";
 import { AccesosModulos, type ModuloPlanta } from "@/components/logistica/planta";
-import { isAdmin, permisosPlanta } from "@/lib/permisosPlanta";
+import { permisosPlanta } from "@/lib/permisosPlanta";
 import { estiloSeccion } from "@/lib/seccionColor";
 import { HOOK_KPIS, type KpiInicio } from "./kpis";
 import { NotificacionesEnVivo } from "./NotificacionesEnVivo";
@@ -105,12 +104,11 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
         )}
       </header>
 
-      {/* Rediseño 2026-10-30: izquierda (3/12) KPIs, notificaciones en vivo y mensajes; derecha (9/12) acciones por flujo */}
+      {/* Rediseño 2026-10-30: izquierda (3/12) KPIs y notificaciones en vivo (el chat es la barra derecha global); derecha (9/12) acciones por flujo */}
       <div className="grid gap-4 lg:grid-cols-12">
         <div className="space-y-4 lg:col-span-3">
           <FilaKpis key={modulo} modulo={modulo} />
           <NotificacionesEnVivo sesion={sesion} modulo={modulo} />
-          <ChatModulo sesion={sesion} modulo={modulo} todos={modulo === "soporte" && isAdmin(sesion)} />
         </div>
 
         <section className="space-y-5 rounded-xl border border-white/[0.08] glass-card glass-blur p-5 lg:col-span-9">
@@ -211,113 +209,6 @@ function TarjetaKpi({ k, i }: { k: KpiInicio; i: number }) {
       <span className="mt-0.5 block truncate text-xl font-bold text-white">{k.valor}</span>
       <span className={`mt-0.5 block truncate text-[11px] ${k.alerta ? "text-[#ff6a5f]" : "text-[#4ade80]"}`}>{k.detalle}</span>
     </button>
-  );
-}
-
-const CLAVE_LEIDO = "erp-chat-leido";
-
-/** Mensajes del grupo del módulo (tabla chat_mensajes, columna modulo). "Sin leer": lo nuevo desde la última vez que se abrió. */
-/** Grupos que SOPORTE ve en pestañas (cada modulador ve solo el de su módulo; RLS chat_leer hace lo mismo en la base). */
-const SALAS_SOPORTE = [SALA_MODULO.soporte, SALA_MODULO.logistica, SALA_MODULO.almacen, SALA_MODULO.finanzas, SALA_MODULO.produccion, SALA_MODULO.ventas, "Gerencia"];
-
-function ChatModulo({ sesion, modulo, todos }: { sesion: Sesion | null; modulo: ModuloInicio; todos?: boolean }) {
-  const [sala, setSala] = useState(SALA_MODULO[modulo]);
-  const { mensajes, enviar, faltaTabla } = useChat(sesion, sala, true);
-  const [texto, setTexto] = useState("");
-  const [error, setError] = useState("");
-  const [leido, setLeido] = useState<string | null>(null);
-  const lista = useRef<HTMLUListElement>(null);
-
-  useEffect(() => {
-    lista.current?.scrollTo({ top: lista.current.scrollHeight });
-  }, [mensajes]);
-
-  // Última lectura (por navegador): se marca leído al abrir el INICIO y al escribir
-  useEffect(() => {
-    try {
-      setLeido(window.localStorage.getItem(`${CLAVE_LEIDO}:${sala}`) ?? "");
-    } catch {
-      setLeido("");
-    }
-  }, [sala]);
-  const ultimo = mensajes[mensajes.length - 1]?.creado;
-  useEffect(() => {
-    if (!ultimo || leido === null) return;
-    const t = setTimeout(() => {
-      try {
-        window.localStorage.setItem(`${CLAVE_LEIDO}:${sala}`, ultimo);
-      } catch {
-        /* almacenamiento bloqueado */
-      }
-    }, 4000);
-    return () => clearTimeout(t);
-  }, [ultimo, leido, sala]);
-  const sinLeer = leido ? mensajes.filter((m) => m.creado > leido && m.usuario !== sesion?.usuario).length : 0;
-
-  const mandar = async (e: FormEvent) => {
-    e.preventDefault();
-    const err = await enviar(texto);
-    setError(err ?? "");
-    if (!err) setTexto("");
-  };
-
-  return (
-    <section className="aviso-glass glass-blur flex min-h-[320px] flex-col rounded-xl p-4 pl-5" data-sin-guardar>
-      <h2 className="mb-3 flex items-center justify-between gap-2 text-[15px] font-semibold text-white">
-        <span className="flex items-center gap-2">
-          <MessageSquare size={17} /> Mensajes del grupo {sala}
-        </span>
-        {sinLeer > 0 && <span className="rounded-full grad-fuego px-2 py-0.5 text-[11px] font-bold">{sinLeer} sin leer</span>}
-      </h2>
-      {todos && (
-        <div className="mb-3 flex flex-wrap gap-1.5" role="tablist" aria-label="Grupos de chat">
-          {SALAS_SOPORTE.map((s) => (
-            <button
-              key={s}
-              type="button"
-              role="tab"
-              aria-selected={s === sala}
-              onClick={() => setSala(s)}
-              className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition ${s === sala ? "grad-azul" : "border-white/[0.08] bg-white/[0.04] text-[#D1D5DB] hover:border-[#00f2fe] hover:text-white"}`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
-      {faltaTabla ? (
-        <p className="rounded-lg bg-white/[0.04] px-3 py-2 text-[12px] italic text-[#a1a1aa]">Falta activar el chat: ejecute supabase/migrations/20261104_chat_grupal.sql en Supabase.</p>
-      ) : (
-        <>
-          <ul ref={lista} className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1 lg:max-h-[520px]">
-            {mensajes.length === 0 && <li className="text-[12px] text-[#a1a1aa]">Sin mensajes todavía.</li>}
-            {mensajes.map((m) => (
-              <li key={m.id} className={`rounded-lg px-3 py-1.5 ${leido && m.creado > leido && m.usuario !== sesion?.usuario ? "border border-[#ff2a5f]/60 bg-[#ff2a5f]/[0.06]" : "bg-white/[0.04]"}`}>
-                <span className="flex justify-between gap-2 text-[11px] text-[#a1a1aa]">
-                  <span className="truncate font-semibold text-[#7dd3fc]">{m.nombre || m.usuario}</span>
-                  <span>{new Date(m.creado).toLocaleString("es-PE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false })}</span>
-                </span>
-                <span className="block break-words text-[13px] text-white">{m.texto}</span>
-              </li>
-            ))}
-          </ul>
-          <form onSubmit={mandar} className="mt-3 flex gap-2">
-            <input
-              value={texto}
-              onChange={(e) => setTexto(e.target.value)}
-              maxLength={1000}
-              placeholder="Nuevo mensaje para el grupo…"
-              aria-label={`Mensaje para el grupo ${sala}`}
-              className="min-w-0 flex-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-[13px] text-white placeholder:text-[#71717a] focus:border-[#00f2fe] focus:outline-none"
-            />
-            <button type="submit" disabled={!texto.trim()} aria-label="Enviar" className="grad-azul rounded-lg px-3 disabled:opacity-50">
-              <Send size={15} />
-            </button>
-          </form>
-          {error && <p className="mt-1 text-[11px] text-[#fca5a5]">{error}</p>}
-        </>
-      )}
-    </section>
   );
 }
 

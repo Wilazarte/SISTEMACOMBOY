@@ -12,12 +12,12 @@ export interface Conectado {
   modulo: string;
 }
 
-export function usePresencia(sesion: Sesion | null, modulo: string): Conectado[] {
+export function usePresencia(sesion: Sesion | null, modulo: string, nombreCanal = "erp-presencia"): Conectado[] {
   const [conectados, setConectados] = useState<Conectado[]>([]);
   useEffect(() => {
     if (!sesion) return;
     const sb = createClient();
-    const canal = sb.channel("erp-presencia", { config: { presence: { key: sesion.usuario } } });
+    const canal = sb.channel(nombreCanal, { config: { presence: { key: sesion.usuario } } });
     canal
       .on("presence", { event: "sync" }, () => {
         const estado = canal.presenceState<Conectado>();
@@ -30,7 +30,7 @@ export function usePresencia(sesion: Sesion | null, modulo: string): Conectado[]
     return () => {
       void sb.removeChannel(canal);
     };
-  }, [sesion, modulo]);
+  }, [sesion, modulo, nombreCanal]);
   return conectados;
 }
 

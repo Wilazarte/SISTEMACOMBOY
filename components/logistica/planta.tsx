@@ -1,9 +1,8 @@
 "use client";
 
 import { estiloSeccion } from "@/lib/seccionColor";
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { AlertTriangle, Bell, CircleDollarSign, Clock, Cog, Lock, MessageSquare, Package, Plus, Receipt, Send, Timer, Truck, Users, Video } from "lucide-react";
-import { useChat } from "@/lib/chat";
+import { useMemo, useState, type ReactNode } from "react";
+import { AlertTriangle, Bell, CircleDollarSign, Clock, Cog, Lock, Package, Plus, Receipt, Timer, Truck, Users, Video } from "lucide-react";
 import { consumosDeChasis } from "@/lib/inventario";
 import type { OrdenProduccion } from "@/lib/produccion";
 import { KEYS, r2, soles, useStore } from "@/lib/storage";
@@ -143,12 +142,11 @@ const PESTANAS_PANEL = [
   { id: "notificaciones", label: "Notificaciones" },
   { id: "alertas", label: "Alertas" },
   { id: "recordatorios", label: "Recordatorios" },
-  { id: "chat", label: "Chat" },
   { id: "reunion", label: "Reunión grupal" },
 ] as const;
 
 /**
- * Panel derecho de las homes (diseños de Williams): pestañas Notificaciones · Alertas · Recordatorios · Chat ·
+ * Panel derecho de las homes (diseños de Williams): pestañas Notificaciones · Alertas · Recordatorios ·
  * Reunión grupal; cada pestaña lleva a su sección. `notifs`: avisos de la campana; las de stock van a Alertas.
  */
 export function PanelLateral({
@@ -195,9 +193,6 @@ export function PanelLateral({
       </div>
       <div id="panel-recordatorios" className="scroll-mt-24">
         <Bloque titulo="Recordatorios" icono={<Clock size={15} />} items={recordatorios} vacio="Sin pendientes." tono={3} />
-      </div>
-      <div id="panel-chat" className="scroll-mt-24" data-sin-guardar>
-        <ChatGrupal sesion={sesion} modulo={modulo} />
       </div>
       <div id="panel-reunion" className="scroll-mt-24">
         <ReunionGrupal sesion={sesion} modulo={modulo} />
@@ -267,64 +262,6 @@ export const montoCorto = (n: number): string =>
 
 export const horaActual = () => new Date().toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", hour12: false });
 
-/** Chat grupal en vivo (tabla chat_mensajes). Si aún no se corrió el SQL, lo indica. */
-export function ChatGrupal({ sesion, modulo }: { sesion: Sesion | null; modulo: string }) {
-  const { mensajes, enviar, faltaTabla } = useChat(sesion, modulo);
-  const [texto, setTexto] = useState("");
-  const [error, setError] = useState("");
-  const lista = useRef<HTMLUListElement>(null);
-  useEffect(() => {
-    lista.current?.scrollTo({ top: lista.current.scrollHeight });
-  }, [mensajes]);
-  const mandar = async (e: FormEvent) => {
-    e.preventDefault();
-    const err = await enviar(texto);
-    setError(err ?? "");
-    if (!err) setTexto("");
-  };
-  return (
-    <div>
-      <p className="seccion-titulo mb-2 text-[13px] font-bold uppercase" style={estiloSeccion(0)}>
-        <MessageSquare size={15} /> Chat grupal
-      </p>
-      {faltaTabla ? (
-        <p className="rounded-lg bg-white/[0.03] px-3 py-2 text-[12px] italic text-[#a1a1aa]">Falta activar el chat: ejecute supabase/migrations/20261104_chat_grupal.sql en Supabase.</p>
-      ) : (
-        <>
-          <ul ref={lista} className="max-h-56 space-y-1.5 overflow-y-auto pr-1">
-            {mensajes.length === 0 && <li className="text-[12px] text-[#71717a]">Sin mensajes todavía.</li>}
-            {mensajes.map((m) => (
-              <li key={m.id} className="aviso-glass py-1.5 pl-4 pr-3">
-                <span className="flex justify-between gap-2 text-[11px] text-[#a1a1aa]">
-                  <span className="truncate font-semibold text-[#93c5fd]">
-                    {m.usuario}
-                    {m.modulo ? ` · ${m.modulo}` : ""}
-                  </span>
-                  <span>{new Date(m.creado).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", hour12: false })}</span>
-                </span>
-                <span className="block break-words text-[13px] text-white">{m.texto}</span>
-              </li>
-            ))}
-          </ul>
-          <form onSubmit={mandar} className="mt-2 flex gap-2">
-            <input
-              value={texto}
-              onChange={(e) => setTexto(e.target.value)}
-              maxLength={1000}
-              placeholder="Escribir mensaje…"
-              aria-label="Mensaje para el chat grupal"
-              className="min-w-0 flex-1 rounded-lg border border-[#3a4558] bg-[#212a3a] px-3 py-1.5 text-[13px] text-white placeholder:text-[#71717a] focus:border-[#00f2fe] focus:outline-none"
-            />
-            <button type="submit" disabled={!texto.trim()} aria-label="Enviar" className="rounded-lg grad-azul px-3 text-white disabled:opacity-50">
-              <Send size={15} />
-            </button>
-          </form>
-          {error && <p className="mt-1 text-[11px] text-[#fca5a5]">{error}</p>}
-        </>
-      )}
-    </div>
-  );
-}
 
 /** Tiempos reales y costo: costo de MP de cada OP en fabricación (vales × último costo). Las horas por estación aún no se registran. */
 export function TiemposCosto() {
