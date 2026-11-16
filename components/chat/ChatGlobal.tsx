@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { ChevronDown, ChevronLeft, Download, FileText, MessageSquare, Paperclip, Pin, PinOff, Send, Users, Video, X } from "lucide-react";
 import type { Sesion } from "@/lib/auth";
+import { estiloSeccion } from "@/lib/seccionColor";
 import { MAX_ADJUNTO, esAudio, esImagen, esVideo, tamanoLegible, useChatGlobal, type MensajeChat } from "@/lib/chat";
 import { usePresencia } from "@/lib/presencia";
 
@@ -160,7 +161,7 @@ export function ChatGlobal({ sesion, modulo, abierto, setAbierto }: { sesion: Se
         aria-label={sinLeer ? `Abrir chat grupal: ${sinLeer} mensajes sin leer` : "Abrir chat grupal"}
         title="Chat grupal COMBOY VID"
         className={`chat-barra fixed z-30 flex items-center justify-center gap-2 text-white shadow-2xl print:hidden ${
-          movil ? "bottom-20 left-4 h-14 w-14 rounded-full" : "left-0 top-1/2 h-auto w-11 -translate-y-1/2 flex-col rounded-r-xl border border-l-0 px-1 py-4"
+          movil ? "bottom-20 left-4 h-14 w-14 rounded-full" : "left-0 top-1/2 h-auto w-11 -translate-y-1/2 flex-col rounded-r-2xl border border-l-0 px-1 py-4"
         } ${sinLeer ? "chat-parpadeo border-white/40 bg-[#e0001b]" : "border-white/[0.15] bg-[#9b0016] hover:bg-[#c4001c]"}`}
       >
         <MessageSquare size={movil ? 24 : 19} />
@@ -181,17 +182,18 @@ export function ChatGlobal({ sesion, modulo, abierto, setAbierto }: { sesion: Se
     <aside
       aria-label="Chat grupal"
       data-sin-guardar
-      className={`chat-barra chat-rojo fixed z-30 flex flex-col border-white/[0.12] print:hidden ${
-        movil ? "inset-0 z-[75]" : "bottom-0 left-0 top-16 w-[360px] border-r"
+      style={estiloSeccion(1)}
+      className={`chat-barra chat-rojo seccion fixed z-30 flex flex-col border print:hidden ${
+        movil ? "inset-0 z-[75]" : "bottom-3 left-3 top-[76px] w-[340px] rounded-2xl shadow-2xl"
       }`}
     >
       {/* Encabezado */}
-      <header className="flex items-center gap-2 border-b border-white/[0.12] bg-black/25 px-3 py-2.5">
+      <header className="flex items-center gap-2 px-3 pb-2 pt-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[#c4001c]">
           <MessageSquare size={18} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[14px] font-bold text-white">Chat COMBOY VID</p>
+          <p className="seccion-titulo truncate text-[13px] font-bold uppercase tracking-wide">Chat grupal</p>
           <p className="flex items-center gap-1 truncate text-[11px] text-[#fecdd3]" title={conectados.map((c) => `${c.nombre || c.usuario} (${c.modulo})`).join(", ")}>
             <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]" aria-hidden />
             <Users size={11} /> {conectados.length} en línea · toda la empresa
@@ -211,7 +213,7 @@ export function ChatGlobal({ sesion, modulo, abierto, setAbierto }: { sesion: Se
 
       {/* Último fijado (como WhatsApp) */}
       {fijados.length > 0 && !verFijados && (
-        <button type="button" onClick={() => irA(fijados[0].id)} className="flex items-center gap-2 border-b border-white/[0.12] bg-black/20 px-3 py-2 text-left hover:bg-black/30">
+        <button type="button" onClick={() => irA(fijados[0].id)} className="mx-2 mb-2 flex items-center gap-2 rounded-xl border border-white/[0.12] bg-black/25 px-3 py-2 text-left hover:bg-black/35">
           <Pin size={14} className="shrink-0 text-[#fde68a]" />
           <span className="min-w-0 flex-1">
             <span className="block text-[10px] font-bold uppercase tracking-wide text-[#fde68a]">Fijado{fijados.length > 1 ? ` · 1 de ${fijados.length}` : ""}</span>
@@ -221,7 +223,7 @@ export function ChatGlobal({ sesion, modulo, abierto, setAbierto }: { sesion: Se
       )}
 
       {verFijados ? (
-        <div className="chat-claro min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+        <div className="chat-claro mx-2 min-h-0 flex-1 space-y-2 overflow-y-auto rounded-2xl p-3">
           <p className="text-[12px] font-bold uppercase tracking-wide text-[#4b5563]">Mensajes fijados ({fijados.length})</p>
           {fijados.length === 0 && <p className="text-[12px] text-[#4b5563]">No hay mensajes fijados. Pase el mouse sobre un mensaje y toque el pin.</p>}
           {fijados.map((m) => (
@@ -248,7 +250,7 @@ export function ChatGlobal({ sesion, modulo, abierto, setAbierto }: { sesion: Se
             const el = e.currentTarget;
             setAbajo(el.scrollHeight - el.scrollTop - el.clientHeight < 60);
           }}
-          className="chat-fondo chat-claro relative min-h-0 flex-1 overflow-y-auto px-3 py-2"
+          className="chat-fondo chat-claro relative mx-2 min-h-0 flex-1 overflow-y-auto rounded-2xl px-3 py-2 shadow-inner"
         >
           {faltaTabla && (
             <p className="my-2 rounded-lg bg-white px-3 py-2 text-[12px] italic text-[#4b5563]">Falta activar el chat: ejecute supabase/migrations/20261128_chat_global.sql en Supabase.</p>
@@ -293,7 +295,7 @@ export function ChatGlobal({ sesion, modulo, abierto, setAbierto }: { sesion: Se
       )}
 
       {/* Redactar */}
-      <form onSubmit={mandar} className="border-t border-white/[0.12] bg-black/25 p-2.5">
+      <form onSubmit={mandar} className="p-2.5">
         {archivo && (
           <div className="mb-2 flex items-center gap-2 rounded-lg border border-white/[0.1] bg-white/[0.05] px-2.5 py-1.5 text-[12px] text-white">
             <FileText size={15} className="shrink-0 text-[#7dd3fc]" />
@@ -319,7 +321,7 @@ export function ChatGlobal({ sesion, modulo, abierto, setAbierto }: { sesion: Se
             disabled={faltaTabla}
             placeholder={archivo ? "Agregar un comentario…" : "Escriba un mensaje"}
             aria-label="Mensaje para el chat grupal"
-            className="max-h-32 min-h-[38px] min-w-0 flex-1 resize-none rounded-lg border border-white/[0.08] bg-black/30 px-3 py-2 text-[13px] text-white placeholder:text-[#fca5a5]/70 focus:border-white focus:outline-none"
+            className="max-h-32 min-h-[38px] min-w-0 flex-1 resize-none rounded-2xl border border-white/[0.12] bg-black/30 px-3.5 py-2 text-[13px] text-white placeholder:text-[#fca5a5]/70 focus:border-white focus:outline-none"
           />
           <button type="submit" disabled={enviando || (!texto.trim() && !archivo)} aria-label="Enviar" className="rounded-full bg-white p-2.5 text-[#c4001c] disabled:opacity-50">
             <Send size={16} />
