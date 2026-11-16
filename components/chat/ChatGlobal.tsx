@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { ChevronDown, ChevronRight, Download, FileText, MessageSquare, Paperclip, Pin, PinOff, Send, Users, Video, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, Download, FileText, MessageSquare, Paperclip, Pin, PinOff, Send, Users, Video, X } from "lucide-react";
 import type { Sesion } from "@/lib/auth";
 import { MAX_ADJUNTO, esAudio, esImagen, esVideo, tamanoLegible, useChatGlobal, type MensajeChat } from "@/lib/chat";
 import { usePresencia } from "@/lib/presencia";
 
 /** Evento para abrir la barra del chat desde cualquier pantalla: window.dispatchEvent(new Event(EV_ABRIR_CHAT)). */
 export const EV_ABRIR_CHAT = "erp:abrir-chat";
-export const ANCHO_CHAT = "lg:pr-[360px]";
+export const ANCHO_CHAT = "lg:pl-[360px]";
 
 const hora = (iso: string) => new Date(iso).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", hour12: false });
 const dia = (iso: string) => {
@@ -160,11 +160,11 @@ export function ChatGlobal({ sesion, modulo, abierto, setAbierto }: { sesion: Se
         aria-label={sinLeer ? `Abrir chat grupal: ${sinLeer} mensajes sin leer` : "Abrir chat grupal"}
         title="Chat grupal COMBOY VID"
         className={`chat-barra fixed z-30 flex items-center justify-center gap-2 text-white shadow-2xl print:hidden ${
-          movil ? "bottom-20 right-4 h-14 w-14 rounded-full" : "right-0 top-1/2 h-auto w-11 -translate-y-1/2 flex-col rounded-l-xl border border-r-0 px-1 py-4"
-        } ${sinLeer ? "chat-parpadeo grad-fuego border-[#ff6a00]" : "glass-barra border-white/[0.12] hover-cian"}`}
+          movil ? "bottom-20 left-4 h-14 w-14 rounded-full" : "left-0 top-1/2 h-auto w-11 -translate-y-1/2 flex-col rounded-r-xl border border-l-0 px-1 py-4"
+        } ${sinLeer ? "chat-parpadeo border-white/40 bg-[#e0001b]" : "border-white/[0.15] bg-[#9b0016] hover:bg-[#c4001c]"}`}
       >
         <MessageSquare size={movil ? 24 : 19} />
-        {!movil && <span className="text-[11px] font-bold uppercase tracking-[0.2em] [writing-mode:vertical-rl]">Chat grupal</span>}
+        {!movil && <span className="text-[11px] font-bold uppercase tracking-[0.2em] [writing-mode:vertical-rl] rotate-180">Chat grupal</span>}
         {sinLeer > 0 && (
           <span className={`${movil ? "absolute -right-1 -top-1" : ""} min-w-[22px] rounded-full bg-white px-1.5 text-center text-[11px] font-bold leading-[22px] text-[#ff2a5f]`}>{sinLeer > 99 ? "99+" : sinLeer}</span>
         )}
@@ -181,23 +181,23 @@ export function ChatGlobal({ sesion, modulo, abierto, setAbierto }: { sesion: Se
     <aside
       aria-label="Chat grupal"
       data-sin-guardar
-      className={`chat-barra fixed z-30 flex flex-col border-white/[0.1] bg-[#0b0e14]/95 backdrop-blur-xl print:hidden ${
-        movil ? "inset-0 z-[75]" : "bottom-0 right-0 top-16 w-[360px] border-l"
+      className={`chat-barra chat-rojo fixed z-30 flex flex-col border-white/[0.12] print:hidden ${
+        movil ? "inset-0 z-[75]" : "bottom-0 left-0 top-16 w-[360px] border-r"
       }`}
     >
       {/* Encabezado */}
-      <header className="flex items-center gap-2 border-b border-white/[0.08] px-3 py-2.5">
-        <span className="grad-azul flex h-9 w-9 shrink-0 items-center justify-center rounded-full">
+      <header className="flex items-center gap-2 border-b border-white/[0.12] bg-black/25 px-3 py-2.5">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[#c4001c]">
           <MessageSquare size={18} />
         </span>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[14px] font-bold text-white">Chat COMBOY VID</p>
-          <p className="flex items-center gap-1 truncate text-[11px] text-[#a1a1aa]" title={conectados.map((c) => `${c.nombre || c.usuario} (${c.modulo})`).join(", ")}>
+          <p className="flex items-center gap-1 truncate text-[11px] text-[#fecdd3]" title={conectados.map((c) => `${c.nombre || c.usuario} (${c.modulo})`).join(", ")}>
             <span className="h-1.5 w-1.5 rounded-full bg-[#22c55e]" aria-hidden />
             <Users size={11} /> {conectados.length} en línea · toda la empresa
           </p>
         </div>
-        <button type="button" onClick={videollamada} disabled={faltaTabla} title="Iniciar videollamada del grupo" aria-label="Iniciar videollamada" className="rounded-lg p-2 text-[#7dd3fc] hover:bg-white/[0.06] disabled:opacity-40">
+        <button type="button" onClick={videollamada} disabled={faltaTabla} title="Iniciar videollamada del grupo" aria-label="Iniciar videollamada" className="rounded-lg p-2 text-white hover:bg-white/[0.12] disabled:opacity-40">
           <Video size={19} />
         </button>
         <button type="button" onClick={() => setVerFijados((v) => !v)} title="Mensajes fijados" aria-label="Mensajes fijados" aria-pressed={verFijados} className={`relative rounded-lg p-2 hover:bg-white/[0.06] ${verFijados ? "text-[#00f2fe]" : "text-[#d4d4d8]"}`}>
@@ -205,16 +205,16 @@ export function ChatGlobal({ sesion, modulo, abierto, setAbierto }: { sesion: Se
           {fijados.length > 0 && <span className="absolute right-0.5 top-0.5 rounded-full bg-[#0066ff] px-1 text-[9px] font-bold leading-[14px] text-white">{fijados.length}</span>}
         </button>
         <button type="button" onClick={() => setAbierto(false)} title="Ocultar chat" aria-label="Ocultar chat" className="rounded-lg p-2 text-[#d4d4d8] hover:bg-white/[0.06]">
-          {movil ? <X size={19} /> : <ChevronRight size={19} />}
+          {movil ? <X size={19} /> : <ChevronLeft size={19} />}
         </button>
       </header>
 
       {/* Último fijado (como WhatsApp) */}
       {fijados.length > 0 && !verFijados && (
-        <button type="button" onClick={() => irA(fijados[0].id)} className="flex items-center gap-2 border-b border-white/[0.08] bg-white/[0.03] px-3 py-2 text-left hover:bg-white/[0.06]">
-          <Pin size={14} className="shrink-0 text-[#00f2fe]" />
+        <button type="button" onClick={() => irA(fijados[0].id)} className="flex items-center gap-2 border-b border-white/[0.12] bg-black/20 px-3 py-2 text-left hover:bg-black/30">
+          <Pin size={14} className="shrink-0 text-[#fde68a]" />
           <span className="min-w-0 flex-1">
-            <span className="block text-[10px] font-bold uppercase tracking-wide text-[#00f2fe]">Fijado{fijados.length > 1 ? ` · 1 de ${fijados.length}` : ""}</span>
+            <span className="block text-[10px] font-bold uppercase tracking-wide text-[#fde68a]">Fijado{fijados.length > 1 ? ` · 1 de ${fijados.length}` : ""}</span>
             <span className="block truncate text-[12px] text-[#e4e4e7]">{resumen(fijados[0])}</span>
           </span>
         </button>
@@ -223,9 +223,9 @@ export function ChatGlobal({ sesion, modulo, abierto, setAbierto }: { sesion: Se
       {verFijados ? (
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
           <p className="text-[12px] font-bold uppercase tracking-wide text-[#a1a1aa]">Mensajes fijados ({fijados.length})</p>
-          {fijados.length === 0 && <p className="text-[12px] text-[#a1a1aa]">No hay mensajes fijados. Pase el mouse sobre un mensaje y toque el pin.</p>}
+          {fijados.length === 0 && <p className="text-[12px] text-[#fecdd3]">No hay mensajes fijados. Pase el mouse sobre un mensaje y toque el pin.</p>}
           {fijados.map((m) => (
-            <div key={m.id} className="rounded-lg border border-white/[0.08] bg-white/[0.04] p-2.5">
+            <div key={m.id} className="rounded-lg border border-white/[0.12] bg-black/30 p-2.5">
               <button type="button" onClick={() => irA(m.id)} className="block w-full text-left">
                 <span className="block text-[11px] font-semibold" style={{ color: colorDe(m.usuario) }}>
                   {m.nombre || m.usuario} · {dia(m.creado)} {hora(m.creado)}
@@ -270,7 +270,7 @@ export function ChatGlobal({ sesion, modulo, abierto, setAbierto }: { sesion: Se
                 )}
                 {sepNuevo && (
                   <p className="my-2 text-center">
-                    <span className="rounded-full bg-[#ff2a5f]/20 px-3 py-0.5 text-[11px] font-semibold text-[#fda4af]">
+                    <span className="rounded-full bg-white px-3 py-0.5 text-[11px] font-bold text-[#c4001c]">
                       {nuevosAlAbrir} {nuevosAlAbrir === 1 ? "mensaje sin leer" : "mensajes sin leer"}
                     </span>
                   </p>
@@ -286,14 +286,14 @@ export function ChatGlobal({ sesion, modulo, abierto, setAbierto }: { sesion: Se
         <button
           type="button"
           onClick={() => lista.current?.scrollTo({ top: lista.current.scrollHeight, behavior: "smooth" })}
-          className={`absolute bottom-24 right-4 flex items-center gap-1 rounded-full px-3 py-1.5 text-[12px] font-semibold text-white shadow-lg ${sinLeer ? "chat-parpadeo grad-fuego" : "bg-[#212a3a]"}`}
+          className={`absolute bottom-24 right-4 flex items-center gap-1 rounded-full px-3 py-1.5 text-[12px] font-semibold text-white shadow-lg ${sinLeer ? "chat-parpadeo bg-white !text-[#c4001c]" : "bg-black/50"}`}
         >
           <ChevronDown size={14} /> {sinLeer ? `${sinLeer} nuevos` : "Bajar"}
         </button>
       )}
 
       {/* Redactar */}
-      <form onSubmit={mandar} className="border-t border-white/[0.08] p-2.5">
+      <form onSubmit={mandar} className="border-t border-white/[0.12] bg-black/25 p-2.5">
         {archivo && (
           <div className="mb-2 flex items-center gap-2 rounded-lg border border-white/[0.1] bg-white/[0.05] px-2.5 py-1.5 text-[12px] text-white">
             <FileText size={15} className="shrink-0 text-[#7dd3fc]" />
@@ -319,9 +319,9 @@ export function ChatGlobal({ sesion, modulo, abierto, setAbierto }: { sesion: Se
             disabled={faltaTabla}
             placeholder={archivo ? "Agregar un comentario…" : "Escriba un mensaje"}
             aria-label="Mensaje para el chat grupal"
-            className="max-h-32 min-h-[38px] min-w-0 flex-1 resize-none rounded-lg border border-white/[0.08] bg-white/[0.05] px-3 py-2 text-[13px] text-white placeholder:text-[#71717a] focus:border-[#00f2fe] focus:outline-none"
+            className="max-h-32 min-h-[38px] min-w-0 flex-1 resize-none rounded-lg border border-white/[0.08] bg-black/30 px-3 py-2 text-[13px] text-white placeholder:text-[#fca5a5]/70 focus:border-white focus:outline-none"
           />
-          <button type="submit" disabled={enviando || (!texto.trim() && !archivo)} aria-label="Enviar" className="grad-azul rounded-full p-2.5 disabled:opacity-40">
+          <button type="submit" disabled={enviando || (!texto.trim() && !archivo)} aria-label="Enviar" className="rounded-full bg-white p-2.5 text-[#c4001c] disabled:opacity-50">
             <Send size={16} />
           </button>
         </div>
@@ -340,7 +340,7 @@ function resumen(m: MensajeChat): string {
 function Burbuja({ m, mio, url, onFijar, onCarga }: { m: MensajeChat; mio: boolean; url?: string; onFijar: () => void; onCarga: () => void }) {
   return (
     <div id={`chat-msg-${m.id}`} className={`group my-1 flex ${mio ? "justify-end" : "justify-start"} rounded-lg transition-colors`}>
-      <div className={`relative max-w-[85%] rounded-xl px-2.5 py-1.5 shadow ${mio ? "rounded-tr-sm bg-[#0b4fb3]/70" : "rounded-tl-sm bg-[#1c2230]"} ${m.fijado ? "ring-1 ring-[#00f2fe]/60" : ""}`}>
+      <div className={`relative max-w-[85%] rounded-xl px-2.5 py-1.5 shadow ${mio ? "rounded-tr-sm bg-[#0b4fb3]/80" : "rounded-tl-sm bg-black/40"} ${m.fijado ? "ring-1 ring-[#fde68a]/70" : ""}`}>
         {!mio && (
           <span className="flex items-baseline gap-1.5">
             <span className="truncate text-[12px] font-semibold" style={{ color: colorDe(m.usuario) }}>
@@ -368,7 +368,7 @@ function Burbuja({ m, mio, url, onFijar, onCarga }: { m: MensajeChat; mio: boole
           </>
         )}
         <span className="mt-0.5 flex items-center justify-end gap-1 text-[10px] text-[#a1a1aa]">
-          {m.fijado && <Pin size={10} className="text-[#00f2fe]" aria-label="Fijado" />}
+          {m.fijado && <Pin size={10} className="text-[#fde68a]" aria-label="Fijado" />}
           {hora(m.creado)}
         </span>
         <button

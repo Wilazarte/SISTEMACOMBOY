@@ -97,7 +97,7 @@ export function ErpLayout({
       <main className={`w-full flex-1 transition-[padding] duration-300 ${conChat} ${mainClassName}`}>
         <div className="mx-auto w-full max-w-[1600px] px-4 pt-20 sm:px-6 lg:px-8">{children}</div>
       </main>
-      <footer className={`mt-8 flex flex-wrap items-center justify-between gap-2 glass-blur border-t border-white/[0.08] px-4 py-4 text-xs text-[#a1a1aa] sm:px-6 lg:px-8 ${chatAbierto ? "lg:pr-[376px]" : ""}`}>
+      <footer className={`mt-8 flex flex-wrap items-center justify-between gap-2 glass-blur border-t border-white/[0.08] px-4 py-4 text-xs text-[#a1a1aa] sm:px-6 lg:px-8 ${chatAbierto ? "lg:pl-[376px]" : ""}`}>
         <span>
           <span className="font-semibold text-white">{NOMBRE_EMPRESA}</span> © 2025 · ERP COMBOY VID · Sede {sede} · Área Informática
         </span>
