@@ -1235,6 +1235,31 @@ export function filasCxC(notas: NotaPedido[], comprobantes: ComprobanteVenta[]):
   return [...deNP, ...deComp];
 }
 
+/**
+ * Datos de la "nota de pedido actualizada" de una fila de Cuentas por cobrar: la NP (o el comprobante directo),
+ * sus cobros a cuenta (de la NP y del comprobante que la facturó), lo pagado y el saldo.
+ */
+export function ventaActualizada(
+  fila: FilaCxC,
+  notas: NotaPedido[],
+  comprobantes: ComprobanteVenta[],
+  cobros: CobroVenta[]
+): { np?: NotaPedido; comprobante?: ComprobanteVenta; pagos: CobroVenta[]; total: number; pagado: number; saldo: number; vencimiento: string } {
+  const comprobante = fila.origen === "COMPROBANTE" ? comprobantes.find((c) => c.id === fila.id) : undefined;
+  const npId = fila.origen === "NP" ? fila.id : comprobante?.npId;
+  const np = npId ? notas.find((n) => n.id === npId) : undefined;
+  const pagos = cobros.filter((c) => (np && c.npId === np.id) || (comprobante && c.comprobanteId === comprobante.id));
+  return {
+    np,
+    comprobante,
+    pagos,
+    total: fila.total,
+    pagado: r2(fila.total - fila.saldo),
+    saldo: fila.saldo,
+    vencimiento: fila.vencimiento,
+  };
+}
+
 export type AgruparDeuda = "cliente" | "vendedor" | "mes" | "equipo";
 
 export interface GrupoDeuda {

@@ -2,7 +2,7 @@
 
 import { BotonFiltros } from "@/components/ui/BotonFiltros";
 import { useState } from "react";
-import { BarChart3, FileCheck2, FileSpreadsheet, Wallet, X } from "lucide-react";
+import { BarChart3, FileCheck2, FileSpreadsheet, FileText, Wallet, X } from "lucide-react";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, cn, ejecutar } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
@@ -14,12 +14,14 @@ import {
   registrarCobroNP,
   registrarComprobanteExterno,
   reporteDeuda,
+  ventaActualizada,
   type AgruparDeuda,
   type EstadoCxC,
   type FilaCxC,
 } from "@/lib/ventas";
 import type { CobroVenta, ComprobanteExterno, ComprobanteVenta, NotaPedido, TipoComprobanteExterno } from "@/lib/types";
 import { CUENTAS_COBRO, medioCobro } from "./comun";
+import { pdfNotaPedidoActualizada } from "@/lib/pdf";
 
 const filtrosVacios = {
   buscar: "",
@@ -109,6 +111,15 @@ export function CuentasPorCobrar() {
         `Deuda por ${AGRUPAR[reporte].toLowerCase()}`.slice(0, 31)
       );
     XLSX.writeFile(libro, `Cuentas-por-cobrar-${hoy()}.xlsx`);
+  };
+
+  // Nota de pedido actualizada: adelantos con fecha y N° de operación, total pagado y saldo
+  const verActualizada = (f: FilaCxC) => {
+    const v = ventaActualizada(f, notas, comprobantes, cobros);
+    pdfNotaPedidoActualizada({
+      ...v,
+      pagos: v.pagos.map((c) => ({ fecha: c.fecha, monto: c.monto, cuenta: c.cuenta, referencia: c.referencia, documento: c.npId ? c.npNumero ?? "" : c.comprobanteNumero })),
+    });
   };
 
   const abrir = (f: FilaCxC) => {
@@ -305,6 +316,11 @@ export function CuentasPorCobrar() {
               </Td>
               <Td>
                 <div className="flex gap-1">
+                  <span className="tip" data-tip="Ver nota de pedido actualizada (adelantos y saldo)">
+                    <Button size="sm" variant="secondary" onClick={() => verActualizada(f)} aria-label="Ver nota de pedido actualizada">
+                      <FileText size={14} />
+                    </Button>
+                  </span>
                   {habilitado && f.saldo > 0 && (
                     <span className="tip" data-tip="Registrar cobro">
                       <Button size="sm" variant="warning" onClick={() => abrir(f)} aria-label="Registrar cobro">

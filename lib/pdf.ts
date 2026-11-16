@@ -950,11 +950,14 @@ const cuerpoVenta = (items: LineaVenta[]) =>
 const tipoDocSunat = (doc: string) => (doc.startsWith("RUC") ? "6" : doc.startsWith("DNI") ? "1" : "4");
 
 export function pdfNotaPedido(n: NotaPedido): void {
+  guardar(construir(bloqueNotaPedido(n)), codigoDesdeNumero("NP", n.numero, n.fecha));
+}
+
+function bloqueNotaPedido(n: NotaPedido): Bloque {
   const vence = new Date(`${n.fecha}T12:00:00`);
   vence.setDate(vence.getDate() + n.validezDias);
   const codigo = codigoDesdeNumero("NP", n.numero, n.fecha);
-  guardar(
-    construir({
+  return {
       titulo: "NOTA DE PEDIDO",
       numero: codigo,
       estado: estadoDocumento(n.estado),
@@ -988,8 +991,106 @@ export function pdfNotaPedido(n: NotaPedido): void {
       qr: `${EMPRESA.ruc}|NP|${n.numero}|${n.total.toFixed(2)}|${n.fecha}|${n.clienteDoc}`,
       qrTexto: [`Pagos a nombre de ${EMPRESA.razonSocial} · RUC ${EMPRESA.ruc}:`, ...lineasCuentas(), `Enviar constancia indicando la ${n.numero}.`],
       firmas: [`Vendedor: ${n.vendedor}`, "Aceptado: Cliente"],
+  };
+}
+
+/** Pago a cuenta que se muestra en la nota de pedido actualizada. */
+export interface PagoVentaPDF {
+  fecha: string;
+  monto: number;
+  cuenta: string;
+  referencia: string;
+  documento: string; // NP-0001 / F001-0001 (dónde se registró el cobro)
+}
+
+/**
+ * Nota de pedido ACTUALIZADA (Cuentas por cobrar): la NP con sus adelantos (fecha, N° de operación, caja/banco),
+ * total pagado y saldo pendiente. Sin NP (comprobante directo) se arma con los datos del comprobante.
+ */
+export function pdfNotaPedidoActualizada(d: {
+  np?: NotaPedido;
+  comprobante?: ComprobanteVenta;
+  pagos: PagoVentaPDF[];
+  total: number;
+  pagado: number;
+  saldo: number;
+  vencimiento: string;
+}): void {
+  const { np, comprobante: c } = d;
+  const hoyIso = new Date().toISOString().slice(0, 10);
+  const base: Bloque = np
+    ? bloqueNotaPedido(np)
+    : {
+        titulo: "NOTA DE PEDIDO",
+        numero: c!.numero,
+        datos: [
+          ["Comprobante", c!.numero],
+          ["Cliente", c!.cliente],
+          ["Documento", c!.clienteDoc],
+          ["Fecha", fechaPE(c!.fecha)],
+          ["Forma de pago", c!.formaPago === "CONTADO" ? "Contado" : `${c!.condPagoNombre} · vence ${fechaPE(c!.fechaVenc)}`],
+          ["Vendedor", c!.vendedor || "-"],
+        ],
+        head: ["#", "Descripción", "Medidas", "Cant.", "m²", c!.preciosConIgv && c!.conIgv ? "Precio inc. IGV" : "Precio", "Total"],
+        body: cuerpoVenta(c!.items),
+        alinearDerecha: [3, 4, 5, 6],
+        totales: [
+          ...(c!.descuento > 0 ? ([["Descuento", `- ${soles(c!.descuento)}`]] as [string, string][]) : []),
+          [c!.conIgv ? "Op. gravada" : "Op. inafecta", soles(c!.base)],
+          ...(c!.conIgv ? ([["IGV 18%", soles(c!.igv)]] as [string, string][]) : []),
+          ["TOTAL", soles(c!.total)],
+        ],
+        firmas: [`Vendedor: ${c!.vendedor || "-"}`, "Aceptado: Cliente"],
+      };
+  const numero = base.numero;
+  const ext = np?.comprobanteExterno ?? c?.comprobanteExterno;
+  const datos: [string, string][] = [
+    ...base.datos,
+    ...(c && np ? ([["Comprobante", c.numero]] as [string, string][]) : []),
+    ...(ext ? ([["Comp. externo", ext.numero]] as [string, string][]) : []),
+    ["Actualizada al", fechaPE(hoyIso)],
+  ];
+  const r2 = (x: number) => Math.round(x * 100) / 100;
+  const conDetalle = r2(d.pagos.reduce((a, p) => a + p.monto, 0));
+  // Cobros antiguos sin registro individual: se muestran juntos para que cuadre con lo pagado
+  const sinDetalle = r2(d.pagado - conDetalle);
+  guardar(
+    construir({
+      ...base,
+      titulo: "NOTA DE PEDIDO · ACTUALIZADA",
+      estado: d.saldo <= 0.001 ? "CANCELADA" : d.pagado > 0 ? "CON ADELANTOS" : "POR COBRAR",
+      datos,
+      extra: (doc, y) => {
+        const H = doc.internal.pageSize.getHeight();
+        if (y + 30 > H - ALTO_PIE - 6) {
+          doc.addPage();
+          y = 20;
+        }
+        y += 2;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(...AZUL);
+        doc.text("ADELANTOS Y PAGOS A CUENTA", M, y);
+        y += 2;
+        const filas: (string | number)[][] = d.pagos
+          .slice()
+          .sort((a, b) => a.fecha.localeCompare(b.fecha))
+          .map((p, i) => [i + 1, fechaPE(p.fecha), p.referencia || "-", p.cuenta || "-", p.documento, soles(p.monto)]);
+        if (sinDetalle > 0.009) filas.push([filas.length + 1, "-", "Pagos anteriores (sin detalle)", "-", "-", soles(sinDetalle)]);
+        if (!filas.length) filas.push(["", "", "Aún no se registran adelantos", "", "", soles(0)]);
+        y = tabla(doc, y, ["#", "Fecha", "N° operación", "Caja / Banco", "Registrado en", "Monto"], filas, [5]);
+        return bloqueTotales(doc, y, [
+          ["Total de la venta", soles(d.total)],
+          ["(-) Adelantos / pagos", `- ${soles(d.pagado)}`],
+          [d.saldo <= 0.001 ? "SALDO (CANCELADO)" : "SALDO PENDIENTE", soles(Math.max(0, d.saldo))],
+        ]);
+      },
+      notas: [
+        `Saldo calculado al ${fechaPE(hoyIso)}${d.saldo > 0.001 ? ` · vence ${fechaPE(d.vencimiento)}` : ""}. Los adelantos se descuentan del total de la venta.`,
+        ...(base.notas ?? []),
+      ],
     }),
-    codigo
+    `${numero}-ACTUALIZADA`
   );
 }
 
