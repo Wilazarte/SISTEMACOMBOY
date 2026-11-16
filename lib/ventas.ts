@@ -1110,9 +1110,7 @@ export function anularComprobante(id: string, motivo: string, rol: Rol, opciones
   if (c.estado === "ANULADO") throw new ErpError("Ya está anulado.");
   if (!opciones.porSunat && (c.estadoSunat === "ACEPTADO" || c.estadoSunat === "OBSERVADO"))
     throw new ErpError(
-      c.tipo === "BOLETA" || c.serie.startsWith("B")
-        ? `${c.numero} ya fue aceptado por SUNAT: anúlelo con una nota de crédito (motivo 01).`
-        : `${c.numero} ya fue aceptado por SUNAT: anúlelo con "Baja SUNAT" (comunicación de baja) o con una nota de crédito (motivo 01).`
+      `${c.numero} ya fue aceptado por SUNAT: anúlelo con "Baja" (anulación ante SUNAT) o con una nota de crédito (motivo 01).`
     );
   // Las notas de crédito / débito no tienen asiento ni orden de despacho propios
   if (c.tipo === "NOTA_CREDITO" || c.tipo === "NOTA_DEBITO") {

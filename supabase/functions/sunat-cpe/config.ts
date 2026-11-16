@@ -60,3 +60,19 @@ export function certificadoConfigurado(): { pfx: string; clave: string } {
 }
 
 export const algoritmoFirma = (): "sha1" | "sha256" => (env("SUNAT_FIRMA_ALG").toLowerCase() === "sha256" ? "sha256" : "sha1");
+
+/**
+ * Modo de emisión:
+ *   SUNAT_MODO=nubefact (por defecto) -> PSE Nubefact: firma con su certificado y envía a SUNAT (secretos NUBEFACT_RUTA y NUBEFACT_TOKEN)
+ *   SUNAT_MODO=directo                -> SEE del contribuyente: firma con el certificado propio (secretos SUNAT_CERT_* y SUNAT_SOL_*)
+ */
+export type Modo = "nubefact" | "directo";
+export const modo = (): Modo => (env("SUNAT_MODO").toLowerCase() === "directo" ? "directo" : "nubefact");
+
+export function nubefact(): { ruta: string; token: string } {
+  const ruta = env("NUBEFACT_RUTA");
+  const token = env("NUBEFACT_TOKEN");
+  if (!ruta || !token) throw new Error("Falta configurar NUBEFACT_RUTA y NUBEFACT_TOKEN (panel de Nubefact › API - Integración) en los Secrets del Edge Function.");
+  if (!/^https:\/\//.test(ruta)) throw new Error("NUBEFACT_RUTA debe ser la URL https que da Nubefact.");
+  return { ruta, token };
+}

@@ -756,8 +756,8 @@ export interface ComprobanteExterno {
 }
 
 export type TipoComprobanteVenta = "FACTURA" | "BOLETA" | "NOTA_CREDITO" | "NOTA_DEBITO";
-/** NO_ENVIADO (aún no se manda) · ACEPTADO / OBSERVADO (válido) · RECHAZADO · EXCEPCION (no recibido, reenviar) · ANULADO (baja aceptada). */
-export type EstadoSunat = "NO_ENVIADO" | "ACEPTADO" | "OBSERVADO" | "RECHAZADO" | "EXCEPCION" | "ANULADO";
+/** NO_ENVIADO (aún no se manda) · ENVIADO (en el PSE, esperando a SUNAT) · ACEPTADO / OBSERVADO (válido) · RECHAZADO · EXCEPCION (no recibido, reenviar) · ANULADO (baja aceptada). */
+export type EstadoSunat = "NO_ENVIADO" | "ENVIADO" | "ACEPTADO" | "OBSERVADO" | "RECHAZADO" | "EXCEPCION" | "ANULADO";
 export type FormaPagoVenta = "CONTADO" | "CREDITO" | "CREDITO_CUOTAS";
 
 export interface Cuota {

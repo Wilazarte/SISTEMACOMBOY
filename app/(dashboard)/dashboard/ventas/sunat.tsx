@@ -3,7 +3,7 @@
 // Facturación electrónica en la lista de comprobantes: estado SUNAT, envío, XML / CDR, notas y baja.
 
 import { useEffect, useState } from "react";
-import { Ban, FileCode2, FileMinus2, FileCheck2, RefreshCw, ShieldAlert, ShieldCheck, UploadCloud } from "lucide-react";
+import { Ban, FileCode2, FileMinus2, FileCheck2, FileText, RefreshCw, ShieldAlert, ShieldCheck, UploadCloud } from "lucide-react";
 import { Button, Field, Input, Modal, Select, Textarea, cn, toast } from "@/components/ui";
 import { soles } from "@/lib/storage";
 import {
@@ -11,6 +11,7 @@ import {
   SERIE_NOTA,
   bajaSunat,
   configSunat,
+  consultarSunat,
   crearNota,
   descargarSunat,
   enviarSunat,
@@ -56,6 +57,7 @@ export function BarraSunat({ error }: { error: string }) {
       <span className="flex items-center gap-1.5 font-semibold">
         <ShieldCheck size={14} /> SUNAT {cfg.entorno === "beta" ? "BETA (pruebas / homologación, sin valor legal)" : "PRODUCCIÓN"}
       </span>
+      <span>{cfg.modo === "nubefact" ? "Emisión vía PSE Nubefact (firma con su certificado)" : "Envío directo a SUNAT"}</span>
       <span>RUC emisor {cfg.ruc}</span>
       {cfg.certificado && (
         <span className={cn(dias < 30 && "font-semibold text-red-700")}>
@@ -75,6 +77,7 @@ const TONO: Record<string, string> = {
   EXCEPCION: "bg-amber-50 text-amber-800 ring-amber-600/30",
   ANULADO: "bg-plomo-100 text-plomo-600 ring-plomo-400/30",
   NO_ENVIADO: "bg-amber-50 text-amber-800 ring-amber-600/30",
+  ENVIADO: "bg-sky-50 text-sky-800 ring-sky-600/30",
 };
 const ETIQUETA: Record<string, string> = {
   ACEPTADO: "SUNAT ✓",
@@ -83,6 +86,7 @@ const ETIQUETA: Record<string, string> = {
   EXCEPCION: "SUNAT no recibido",
   ANULADO: "SUNAT baja",
   NO_ENVIADO: "SUNAT pendiente",
+  ENVIADO: "SUNAT en proceso",
 };
 
 /** Chip con el estado SUNAT (el detalle del CDR al pasar el mouse). */
@@ -96,6 +100,7 @@ export function EstadoSunatChip({ c, f }: { c: ComprobanteVenta; f?: FilaSunat }
         ...(f.observaciones ?? []),
         f.baja_estado ? `Baja ${f.baja_id}: ${f.baja_estado} ${f.baja_descripcion ?? ""}` : "",
         f.entorno === "beta" ? "Entorno BETA (pruebas)" : "",
+        f.pse ? `Emitido vía ${f.pse}` : "",
       ]
         .filter(Boolean)
         .join("\n")
@@ -152,7 +157,28 @@ export function AccionesSunat({
     });
   return (
     <>
-      {habilitado && c.estado === "EMITIDO" && !valido && (
+      {habilitado && f?.estado === "ENVIADO" && (
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={ocupado}
+          title="Consultar si SUNAT ya respondió"
+          onClick={() =>
+            correr(async () => {
+              const r = await consultarSunat(c, rol);
+              toast(`${c.numero}: ${r.estado} ${r.descripcion ?? ""}`.trim(), r.estado === "RECHAZADO" ? "error" : "ok");
+            })
+          }
+        >
+          <RefreshCw size={14} /> Consultar
+        </Button>
+      )}
+      {f?.enlace_pdf && (
+        <Button size="sm" variant="ghost" title="PDF emitido por el PSE" onClick={() => window.open(f.enlace_pdf!, "_blank", "noopener")}>
+          <FileText size={14} /> PDF PSE
+        </Button>
+      )}
+      {habilitado && c.estado === "EMITIDO" && !valido && f?.estado !== "ENVIADO" && (
         <Button size="sm" variant="warning" onClick={enviar} disabled={ocupado} title="Enviar a SUNAT">
           <UploadCloud size={14} /> {ocupado ? "Enviando…" : f ? "Reenviar SUNAT" : "Enviar SUNAT"}
         </Button>
@@ -193,7 +219,7 @@ export function AccionesSunat({
           <FileMinus2 size={14} /> Nota
         </Button>
       )}
-      {habilitado && valido && c.estado === "EMITIDO" && c.serie.startsWith("F") && !f?.baja_estado && (
+      {habilitado && valido && c.estado === "EMITIDO" && (c.serie.startsWith("F") || f?.pse) && !f?.baja_estado && (
         <Button size="sm" variant="ghost" title="Comunicación de baja (anular ante SUNAT)" onClick={() => onBaja(c)}>
           <Ban size={14} className="text-red-600" /> Baja
         </Button>
@@ -292,7 +318,7 @@ export function ModalNota({ origen, onClose, rol, vendedor, recargar }: { origen
   );
 }
 
-/** Comunicación de baja (facturas y sus notas aceptadas). */
+/** Anulación ante SUNAT: comunicación de baja (facturas) o, vía PSE, también boletas. */
 export function ModalBaja({ c, onClose, rol, recargar }: { c: ComprobanteVenta | null; onClose: () => void; rol: Rol; recargar: () => void }) {
   const [motivo, setMotivo] = useState("");
   const [ocupado, setOcupado] = useState(false);

@@ -248,7 +248,7 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
                   </>
                 )}
                 <AccionesSunat c={c} f={sunat.filas[c.id]} rol={rol} habilitado={habilitado} onNota={setNota} onBaja={setBaja} recargar={sunat.recargar} />
-                {habilitado && c.estado === "EMITIDO" && !sunatValido(sunat.filas[c.id]?.estado ?? c.estadoSunat) && (
+                {habilitado && c.estado === "EMITIDO" && !sunatValido(sunat.filas[c.id]?.estado ?? c.estadoSunat) && sunat.filas[c.id]?.estado !== "ENVIADO" && (
                   <Button size="sm" variant="ghost" title="Anular (solo comprobantes que SUNAT no aceptó)" onClick={() => { setMotivo(""); setAnular(c); }}>
                     <Ban size={14} className="text-red-600" />
                   </Button>

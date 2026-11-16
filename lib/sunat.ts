@@ -13,7 +13,7 @@ import { ErpError, KEYS, escribir, esperarGuardado, hoy, nuevoEvento, puede, r2,
 import { anularComprobante, getComprobantes, totalesVenta } from "./ventas";
 import type { ComprobanteVenta, EstadoSunat, LineaVenta, Rol } from "./types";
 
-export type EstadoCpe = "PENDIENTE" | "ACEPTADO" | "OBSERVADO" | "RECHAZADO" | "EXCEPCION" | "ANULADO";
+export type EstadoCpe = "PENDIENTE" | "ENVIADO" | "ACEPTADO" | "OBSERVADO" | "RECHAZADO" | "EXCEPCION" | "ANULADO";
 
 /** Fila de public.sunat_cpe (sin el XML ni el CDR, que se piden aparte al descargar). */
 export interface FilaSunat {
@@ -30,6 +30,11 @@ export interface FilaSunat {
   hash: string | null;
   nombre_archivo: string | null;
   entorno: "beta" | "produccion";
+  /** "nubefact" si lo emitió el PSE; null en envío directo. */
+  pse: string | null;
+  enlace_pdf: string | null;
+  enlace_xml: string | null;
+  enlace_cdr: string | null;
   intentos: number;
   enviado_at: string | null;
   baja_id: string | null;
@@ -40,6 +45,7 @@ export interface FilaSunat {
 }
 
 export interface ConfigSunat {
+  modo: "nubefact" | "directo";
   entorno: "beta" | "produccion";
   ruc: string;
   certificado: { titular: string; vence: string } | null;
@@ -49,7 +55,7 @@ export interface ConfigSunat {
 }
 
 const COLUMNAS =
-  "id,tipo_doc,serie,numero,fecha_emision,total,estado,codigo,descripcion,observaciones,hash,nombre_archivo,entorno,intentos,enviado_at,baja_id,baja_estado,baja_codigo,baja_descripcion,updated_at";
+  "id,tipo_doc,serie,numero,fecha_emision,total,estado,codigo,descripcion,observaciones,hash,nombre_archivo,entorno,pse,enlace_pdf,enlace_xml,enlace_cdr,intentos,enviado_at,baja_id,baja_estado,baja_codigo,baja_descripcion,updated_at";
 
 /** Series de notas: la nota lleva la letra del comprobante que modifica (F… factura, B… boleta). */
 export const SERIE_NOTA = {
@@ -159,6 +165,12 @@ export async function enviarSunat(c: ComprobanteVenta, rol: Rol): Promise<FilaSu
   if (pendiente) throw new ErpError(`El comprobante aún no se guardó en Supabase: ${pendiente}`);
   const f = await invocar<FilaSunat>("enviar", { id: c.id });
   reflejar(c.id, f);
+  trasAceptar(c, f, rol);
+  return f;
+}
+
+/** Nota de crédito que anula la operación: al ser aceptada, el comprobante original se anula en el ERP. */
+function trasAceptar(c: ComprobanteVenta, f: FilaSunat, rol: Rol): void {
   // Nota de crédito que anula la operación: al ser aceptada, el comprobante original se anula en el ERP
   if (sunatValido(f.estado) && c.tipo === "NOTA_CREDITO" && c.ref && ["01", "02", "06"].includes(c.motivoCodigo ?? "")) {
     const orig = getComprobantes().find((x) => x.id === c.ref!.id);
@@ -170,17 +182,17 @@ export async function enviarSunat(c: ComprobanteVenta, rol: Rol): Promise<FilaSu
       }
     }
   }
-  return f;
 }
 
-/** Recupera el CDR desde SUNAT (solo producción). */
-export async function consultarSunat(c: ComprobanteVenta): Promise<FilaSunat> {
+/** Vuelve a consultar el estado (PSE: siempre; envío directo: solo producción). */
+export async function consultarSunat(c: ComprobanteVenta, rol: Rol): Promise<FilaSunat> {
   const f = await invocar<FilaSunat>("consultar", { id: c.id });
   reflejar(c.id, f);
+  trasAceptar(c, f, rol);
   return f;
 }
 
-/** Comunicación de baja (facturas y sus notas). Si SUNAT la acepta, el comprobante se anula en el ERP. */
+/** Anulación ante SUNAT (PSE: facturas y boletas; envío directo: facturas y sus notas). Si SUNAT la acepta, el comprobante se anula en el ERP. */
 export async function bajaSunat(c: ComprobanteVenta, motivo: string, rol: Rol): Promise<FilaSunat> {
   if (!puede(rol, "venta.gestionar")) throw new ErpError("Su usuario no puede anular comprobantes.");
   if (!motivo.trim()) throw new ErpError("Indique el motivo de la baja.");
@@ -221,10 +233,16 @@ const deBase64 = (b64: string) => Uint8Array.from(atob(b64), (ch) => ch.charCode
 
 export async function descargarSunat(id: string, que: "xml" | "cdr" | "baja_cdr"): Promise<void> {
   const col = que === "xml" ? "xml" : que === "cdr" ? "cdr_zip" : "baja_cdr_zip";
-  const { data, error } = await createClient().from("sunat_cpe").select(`nombre_archivo,baja_id,${col}`).eq("id", id).maybeSingle();
+  const { data, error } = await createClient().from("sunat_cpe").select(`nombre_archivo,baja_id,enlace_xml,enlace_cdr,${col}`).eq("id", id).maybeSingle();
   if (error) throw new ErpError(error.message);
   const fila = data as Record<string, string | null> | null;
   const contenido = fila?.[col];
+  // PSE: si la copia aún no se guardó, se abre el enlace del PSE
+  const enlace = que === "xml" ? fila?.enlace_xml : que === "cdr" ? fila?.enlace_cdr : null;
+  if (!contenido && enlace) {
+    window.open(enlace, "_blank", "noopener");
+    return;
+  }
   if (!fila || !contenido) throw new ErpError(que === "xml" ? "Aún no hay XML firmado." : "SUNAT aún no devolvió la constancia (CDR).");
   if (que === "xml") bajar(`${fila.nombre_archivo}.xml`, contenido, "application/xml");
   else if (que === "cdr") bajar(`R-${fila.nombre_archivo}.zip`, deBase64(contenido), "application/zip");

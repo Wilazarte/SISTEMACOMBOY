@@ -1,5 +1,5 @@
 -- =====================================================================
--- Facturación electrónica SUNAT (SEE - del contribuyente)
+-- Facturación electrónica SUNAT (PSE Nubefact o SEE - del contribuyente)
 --  1) public.sunat_cpe: estado SUNAT de cada comprobante, XML firmado, hash y CDR (constancia de recepción)
 --  2) public.sunat_envios: bitácora de cada envío / consulta / baja (auditoría)
 --  3) public.siguiente_numero_cpe(serie): correlativos de notas de crédito y débito (FC01, BC01, FD01, BD01)
@@ -41,6 +41,17 @@ create table if not exists public.sunat_cpe (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+-- PSE (Nubefact): enlaces que devuelve el PSE y estado ENVIADO (recibido por el PSE, SUNAT aún no responde).
+-- Con "add column if not exists" se puede volver a correr aunque la tabla ya exista.
+alter table public.sunat_cpe
+  add column if not exists pse text,
+  add column if not exists enlace_pdf text,
+  add column if not exists enlace_xml text,
+  add column if not exists enlace_cdr text;
+alter table public.sunat_cpe drop constraint if exists sunat_cpe_estado_check;
+alter table public.sunat_cpe add constraint sunat_cpe_estado_check
+  check (estado in ('PENDIENTE', 'ENVIADO', 'ACEPTADO', 'OBSERVADO', 'RECHAZADO', 'EXCEPCION', 'ANULADO'));
+
 create unique index if not exists sunat_cpe_numero_uidx on public.sunat_cpe (tipo_doc, numero, entorno);
 create index if not exists sunat_cpe_estado_idx on public.sunat_cpe (estado);
 create index if not exists sunat_cpe_baja_idx on public.sunat_cpe (baja_id);
