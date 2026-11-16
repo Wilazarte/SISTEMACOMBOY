@@ -1098,12 +1098,27 @@ export async function emitirComprobante(
   return c;
 }
 
-export function anularComprobante(id: string, motivo: string, rol: Rol): void {
+/**
+ * `porSunat`: la anulación ya la aceptó SUNAT (comunicación de baja o nota de crédito por anulación / devolución
+ * total). Un comprobante ACEPTADO por SUNAT no se puede anular solo en el ERP: sigue vigente para SUNAT.
+ */
+export function anularComprobante(id: string, motivo: string, rol: Rol, opciones: { porSunat?: boolean } = {}): void {
   if (!motivo.trim()) throw new ErpError("Indique el motivo de la anulación.");
   const lista = getComprobantes();
   const c = lista.find((x) => x.id === id);
   if (!c) throw new ErpError("Comprobante no encontrado.");
   if (c.estado === "ANULADO") throw new ErpError("Ya está anulado.");
+  if (!opciones.porSunat && (c.estadoSunat === "ACEPTADO" || c.estadoSunat === "OBSERVADO"))
+    throw new ErpError(
+      c.tipo === "BOLETA" || c.serie.startsWith("B")
+        ? `${c.numero} ya fue aceptado por SUNAT: anúlelo con una nota de crédito (motivo 01).`
+        : `${c.numero} ya fue aceptado por SUNAT: anúlelo con "Baja SUNAT" (comunicación de baja) o con una nota de crédito (motivo 01).`
+    );
+  // Las notas de crédito / débito no tienen asiento ni orden de despacho propios
+  if (c.tipo === "NOTA_CREDITO" || c.tipo === "NOTA_DEBITO") {
+    escribir(KEYS.COMPROBANTES, lista.map((x) => (x.id === id ? { ...c, estado: "ANULADO" as const, historial: [...c.historial, nuevoEvento(rol, "Anulado", motivo.trim())] } : x)));
+    return;
+  }
   const od = c.odId ? getDespachos().find((o) => o.id === c.odId) : undefined;
   if (od && od.despachos.length > 0) throw new ErpError(`La ${od.numero} ya tiene despachos: no se puede anular el comprobante.`);
   const emitido = c.estado === "EMITIDO";
@@ -1600,3 +1615,6 @@ export const tipoLabel: Record<TipoComprobanteVenta, string> = {
   NOTA_CREDITO: "Nota de crédito",
   NOTA_DEBITO: "Nota de débito",
 };
+
+/** Factura o boleta vigente (para KPIs de ventas). Las notas de crédito / débito no suman como venta. */
+export const esVentaEmitida = (c: Pick<ComprobanteVenta, "estado" | "tipo">) => c.estado === "EMITIDO" && (c.tipo === "FACTURA" || c.tipo === "BOLETA");

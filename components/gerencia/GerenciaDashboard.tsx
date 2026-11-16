@@ -14,7 +14,7 @@ import { useNotificaciones } from "@/lib/notificaciones";
 import type { OrdenProduccion } from "@/lib/produccion";
 import { KEYS, fechaPE, hoy, r2, soles, useStore } from "@/lib/storage";
 import type { ComprobanteVenta, NotaPedido, StockItem } from "@/lib/types";
-import { npPorCobrar, saldoNP, vencimientoNP } from "@/lib/ventas";
+import { esVentaEmitida, npPorCobrar, saldoNP, vencimientoNP } from "@/lib/ventas";
 
 const ESTADO_OT: Record<OrdenProduccion["estado"], { label: string; tono: "verde" | "naranja" | "azul" }> = {
   EN_FABRICACION: { label: "En fabricación", tono: "azul" },
@@ -43,7 +43,7 @@ export function GerenciaDashboard() {
   const d = useMemo(() => {
     const hoyStr = hoy();
     const mes = hoyStr.slice(0, 7);
-    const emitidosMes = comprobantes.filter((c) => c.estado === "EMITIDO" && c.fecha.startsWith(mes));
+    const emitidosMes = comprobantes.filter((c) => esVentaEmitida(c) && c.fecha.startsWith(mes));
     const ventasMes = r2(emitidosMes.reduce((a, c) => a + (c.total || 0), 0));
     const enFabricacion = ops.filter((o) => o.estado === "EN_FABRICACION").length;
     const qcMes = ops.filter((o) => o.estado === "QC_APROBADO" && (o.qc?.fecha || o.fecha).startsWith(mes)).length;

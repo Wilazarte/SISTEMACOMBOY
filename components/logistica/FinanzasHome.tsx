@@ -11,7 +11,7 @@ import { permisosPlanta } from "@/lib/permisosPlanta";
 import type { OrdenProduccion } from "@/lib/produccion";
 import { KEYS, fechaPE, hoy, r2, soles, useStore, useTrabajadores } from "@/lib/storage";
 import type { ComprobanteVenta, Factura, NotaPedido, OrdenCompra, OrdenDespacho, StockItem, ValeProduccion } from "@/lib/types";
-import { npPorCobrar, saldoNP, vencimientoNP } from "@/lib/ventas";
+import { esVentaEmitida, npPorCobrar, saldoNP, vencimientoNP } from "@/lib/ventas";
 import { ErpTable, ErpTd } from "@/components/erp/ErpTable";
 import { BotonAccion, BotonVer, Etiqueta, Panel, SinRegistro } from "./piezas";
 import { BarraAcciones, EncabezadoPlanta, Filas, MarcoPlanta, PanelLateral, horaActual, montoCorto } from "./planta";
@@ -70,7 +70,7 @@ export function FinanzasHome() {
     const porCobrar = notas.filter((n) => npPorCobrar(n) && saldoNP(n) > 0);
     const cxc = r2(porCobrar.reduce((a, n) => a + saldoNP(n), 0));
     const cxcVencidas = porCobrar.filter((n) => vencimientoNP(n) < hoyStr).length;
-    const emitidosMes = comprobantes.filter((c) => c.estado === "EMITIDO" && c.fecha.startsWith(mes));
+    const emitidosMes = comprobantes.filter((c) => esVentaEmitida(c) && c.fecha.startsWith(mes));
     const recibidasMes = facturas.filter((f) => f.fecha.startsWith(mes));
     const igvVentas = r2(emitidosMes.reduce((a, c) => a + (c.igv || 0), 0));
     const igvCompras = r2(recibidasMes.reduce((a, f) => a + (f.igv || 0), 0));
@@ -80,7 +80,7 @@ export function FinanzasHome() {
     const bancarizadasMes = ordenes.filter((o) => o.estado === "BANCARIZADA" && o.fecha.startsWith(mes)).length;
     const fletesMes = ods.filter((o) => o.lugar === "ENVIO_AGENCIA" && (o.costoEnvio ?? 0) > 0 && o.fecha.startsWith(mes));
     const totalFletes = r2(fletesMes.reduce((a, o) => a + (o.costoEnvio ?? 0), 0));
-    const ultimosEmitidos = [...comprobantes.filter((c) => c.estado === "EMITIDO")].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.numero.localeCompare(a.numero)).slice(0, 4);
+    const ultimosEmitidos = [...comprobantes.filter((c) => esVentaEmitida(c))].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.numero.localeCompare(a.numero)).slice(0, 4);
     const ultimasRecibidas = [...facturas].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 4);
     // Costeo: costo de MP de las últimas OP (vales del chasis × último costo del almacén)
     const costoDe = new Map(stock.map((s) => [s.id, s.costoUnit || 0]));

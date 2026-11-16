@@ -8,7 +8,7 @@ import { useLogistica } from "@/lib/logistica";
 import type { OrdenProduccion } from "@/lib/produccion";
 import { KEYS, hoy, r2, soles, useStore } from "@/lib/storage";
 import type { ComprobanteVenta, Factura, Guia, NotaPedido, OrdenCompra, OrdenDespacho, StockItem } from "@/lib/types";
-import { estadoOD, npPorCobrar, saldoNP, vencimientoNP } from "@/lib/ventas";
+import { esVentaEmitida, estadoOD, npPorCobrar, saldoNP, vencimientoNP } from "@/lib/ventas";
 import { montoCorto } from "@/components/logistica/planta";
 import type { ModuloInicio } from "@/lib/inicioModulos";
 
@@ -76,7 +76,7 @@ function useKpisFinanzas(activo: boolean): KpiInicio[] {
     const porCobrar = notas.filter((n) => npPorCobrar(n) && saldoNP(n) > 0);
     const cxc = r2(porCobrar.reduce((a, n) => a + saldoNP(n), 0));
     const vencidas = porCobrar.filter((n) => vencimientoNP(n) < hoyStr).length;
-    const igvVentas = comprobantes.filter((c) => c.estado === "EMITIDO" && c.fecha.startsWith(mes)).reduce((a, c) => a + (c.igv || 0), 0);
+    const igvVentas = comprobantes.filter((c) => esVentaEmitida(c) && c.fecha.startsWith(mes)).reduce((a, c) => a + (c.igv || 0), 0);
     const igvCompras = facturas.filter((f) => f.fecha.startsWith(mes)).reduce((a, f) => a + (f.igv || 0), 0);
     const igv = r2(igvVentas - igvCompras);
     const saldo = r2((cajas ?? []).reduce((a, c) => a + (c.saldo_actual || 0), 0));
@@ -117,7 +117,7 @@ function useKpisSoporte(activo: boolean): KpiInicio[] {
   return useMemo(() => {
     if (!activo) return [];
     const mes = hoy().slice(0, 7);
-    const ventas = r2(comprobantes.filter((c) => c.estado === "EMITIDO" && c.fecha.startsWith(mes)).reduce((a, c) => a + c.total, 0));
+    const ventas = r2(comprobantes.filter((c) => esVentaEmitida(c) && c.fecha.startsWith(mes)).reduce((a, c) => a + c.total, 0));
     const ocMes = ordenes.filter((o) => o.fecha.startsWith(mes));
     const compras = r2(ocMes.reduce((a, o) => a + o.total, 0));
     const criticos = stock.filter((s) => s.cantidad <= STOCK_CRITICO).length;
