@@ -335,6 +335,9 @@ function GuiaSunat({ d }: { d: DatosLogistica }) {
 }
 
 function CotizarFlete({ d }: { d: DatosLogistica }) {
+  // "Nueva venta con envío" abre Ventas: solo quien puede emitir (VENTAS / SOPORTE); Logística ya no vende
+  const { sesion } = useSesion();
+  const puedeVentas = permisosPlanta(sesion).canEmitFactura;
   const destinos = Object.values(
     d.odsAgencia
       .filter((o) => (o.costoEnvio ?? 0) > 0)
@@ -349,7 +352,7 @@ function CotizarFlete({ d }: { d: DatosLogistica }) {
       }, {})
   ).sort((a, b) => b.n - a.n);
   return (
-    <Panel titulo="Cotizar flete" icono={<Container size={17} />} accion={<BotonAccion href="/dashboard/ventas?tab=notas" lleno>Nueva venta con envío</BotonAccion>}>
+    <Panel titulo="Cotizar flete" icono={<Container size={17} />} accion={puedeVentas ? <BotonAccion href="/dashboard/ventas?tab=notas" lleno>Nueva venta con envío</BotonAccion> : undefined}>
       <p className="mb-3 text-[12px] text-[#a1a1aa]">Referencia de fletes pagados por agencia y destino (costo de envío registrado en las órdenes de despacho).</p>
       <div className="mb-4 grid gap-2 sm:grid-cols-3">
         {d.agencias.slice(0, 3).map((a) => (

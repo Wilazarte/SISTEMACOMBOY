@@ -3551,6 +3551,8 @@ export const PERMISOS: Record<Rol, { label: string; puede: string[] }> = {
     ],
   },
   CONTADOR: { label: "Contador (lectura)", puede: [] },
+  // Módulo Ventas (2026-11-16): notas de pedido, comprobantes, clientes y cobranza; no compra ni paga
+  VENTAS: { label: "Ventas", puede: ["venta.gestionar", "venta.cobrar"] },
 };
 
 export const puede = (rol: Rol, permiso: string): boolean => PERMISOS[rol].puede.includes(permiso);

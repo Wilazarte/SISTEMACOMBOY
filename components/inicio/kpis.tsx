@@ -35,7 +35,7 @@ function useKpisLogistica(activo: boolean): KpiInicio[] {
     { titulo: "Compras activas", valor: montoCorto(d.totalOcActivas), detalle: oc ? `${d.ocActivas.length} OC · mayor ${oc.numero} ${soles(oc.total)}` : "Sin órdenes de compra en curso", href: "/dashboard/compras?tab=ordenes" },
     { titulo: "En tránsito", valor: `${enTransito} ${enTransito === 1 ? "envío" : "envíos"}`, detalle: `${d.odsTransito.length} OD en agencia · ${d.trasladosCamino.length} traslado(s)`, href: "/logistica/transferencias" },
     { titulo: "OT activas", valor: String(d.opsActivas.length), detalle: "Órdenes de producción en fabricación", href: "/dashboard/produccion" },
-    { titulo: "PT disponible", valor: `${d.ptDisponible.length} ${d.ptDisponible.length === 1 ? "equipo" : "equipos"}`, detalle: d.ptPorTipo.map(([t, n]) => `${n} ${t}`).join(" · ") || "Sin equipos listos para despacho", href: "/dashboard/ventas?tab=despachos" },
+    { titulo: "PT disponible", valor: `${d.ptDisponible.length} ${d.ptDisponible.length === 1 ? "equipo" : "equipos"}`, detalle: d.ptPorTipo.map(([t, n]) => `${n} ${t}`).join(" · ") || "Sin equipos listos para despacho", href: "/erp/lotes" },
   ];
 }
 
@@ -109,6 +109,31 @@ function useKpisProduccion(activo: boolean): KpiInicio[] {
   }, [activo, ops, equipos, exp]);
 }
 
+/** VENTAS (módulo propio desde 2026-11-16): ventas del mes, pedidos por atender, por cobrar y vencidas. */
+function useKpisVentas(activo: boolean): KpiInicio[] {
+  const notas = useStore<NotaPedido[]>(KEYS.NOTAS_PEDIDO, [], activo);
+  const comprobantes = useStore<ComprobanteVenta[]>(KEYS.COMPROBANTES, [], activo);
+  const ods = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, [], activo);
+  return useMemo(() => {
+    if (!activo) return [];
+    const hoyStr = hoy();
+    const mes = hoyStr.slice(0, 7);
+    const emitidos = comprobantes.filter((c) => c.estado === "EMITIDO" && c.fecha.startsWith(mes));
+    const ventas = r2(emitidos.reduce((a, c) => a + c.total, 0));
+    const porAtender = notas.filter((n) => n.estado === "PENDIENTE" || n.estado === "PENDIENTE_COSTEO");
+    const porCobrar = notas.filter((n) => npPorCobrar(n) && saldoNP(n) > 0);
+    const cxc = r2(porCobrar.reduce((a, n) => a + saldoNP(n), 0));
+    const vencidas = porCobrar.filter((n) => vencimientoNP(n) < hoyStr).length;
+    const enDespacho = ods.filter((o) => ["PENDIENTE", "PEDIDO_ALISTADO"].includes(estadoOD(o))).length;
+    return [
+      { titulo: "Ventas del mes", valor: montoCorto(ventas), detalle: `${emitidos.length} comprobante(s) emitido(s)`, href: "/dashboard/ventas?tab=comprobantes" },
+      { titulo: "Pedidos por atender", valor: String(porAtender.length), detalle: "Notas de pedido pendientes o por costear", href: "/dashboard/ventas?tab=notas", alerta: porAtender.length > 0 },
+      { titulo: "Cuentas por cobrar", valor: montoCorto(cxc), detalle: vencidas ? `${vencidas} vencida(s)` : `${porCobrar.length} nota(s) de pedido`, href: "/dashboard/ventas?tab=cobrar", alerta: vencidas > 0 },
+      { titulo: "En despacho", valor: String(enDespacho), detalle: "Órdenes de despacho pendientes o alistadas", href: "/dashboard/ventas?tab=despachos" },
+    ];
+  }, [activo, notas, comprobantes, ods]);
+}
+
 function useKpisSoporte(activo: boolean): KpiInicio[] {
   const comprobantes = useStore<ComprobanteVenta[]>(KEYS.COMPROBANTES, [], activo);
   const ordenes = useStore<OrdenCompra[]>(KEYS.ORDENES, [], activo);
@@ -137,5 +162,6 @@ export const HOOK_KPIS: Record<ModuloInicio, (activo: boolean) => KpiInicio[]> =
   almacen: useKpisAlmacen,
   finanzas: useKpisFinanzas,
   produccion: useKpisProduccion,
+  ventas: useKpisVentas,
   soporte: useKpisSoporte,
 };

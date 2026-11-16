@@ -31,7 +31,8 @@ const RECARGAR: StoreKey[] = [KEYS.ORDENES, KEYS.FACTURAS, KEYS.COTIZACIONES, KE
 export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
   const { sesion } = useSesion();
   const acciones = useMemo(() => accionesPermitidas(sesion, modulo), [sesion, modulo]);
-  const exp = useExpedientes(modulo !== "soporte" || acciones.some((a) => a.destino.startsWith("/erp")));
+  // VENTAS no trabaja expedientes 26W: solo se descargan si el módulo tiene botones del flujo
+  const exp = useExpedientes((modulo !== "soporte" && modulo !== "ventas") || acciones.some((a) => a.destino.startsWith("/erp")));
   const abiertos = exp.expedientes.filter((x) => x.estado === "ABIERTO").sort((a, b) => b.codigo_expediente.localeCompare(a.codigo_expediente));
   const [doc, setDoc] = useState("");
 
@@ -217,7 +218,7 @@ const CLAVE_LEIDO = "erp-chat-leido";
 
 /** Mensajes del grupo del módulo (tabla chat_mensajes, columna modulo). "Sin leer": lo nuevo desde la última vez que se abrió. */
 /** Grupos que SOPORTE ve en pestañas (cada modulador ve solo el de su módulo; RLS chat_leer hace lo mismo en la base). */
-const SALAS_SOPORTE = [SALA_MODULO.soporte, SALA_MODULO.logistica, SALA_MODULO.almacen, SALA_MODULO.finanzas, SALA_MODULO.produccion, "Gerencia"];
+const SALAS_SOPORTE = [SALA_MODULO.soporte, SALA_MODULO.logistica, SALA_MODULO.almacen, SALA_MODULO.finanzas, SALA_MODULO.produccion, SALA_MODULO.ventas, "Gerencia"];
 
 function ChatModulo({ sesion, modulo, todos }: { sesion: Sesion | null; modulo: ModuloInicio; todos?: boolean }) {
   const [sala, setSala] = useState(SALA_MODULO[modulo]);

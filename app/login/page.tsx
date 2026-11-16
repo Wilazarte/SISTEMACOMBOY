@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertCircle, BarChart3, Eye, EyeOff, Factory, Landmark, Loader2, Lock, LogIn, Store, Truck, User, X, type LucideIcon } from "lucide-react";
+import { AlertCircle, BarChart3, Eye, EyeOff, Factory, Landmark, Loader2, Lock, LogIn, Receipt, Store, Truck, User, X, type LucideIcon } from "lucide-react";
 import { CLAVE_MODULO, CLAVE_USUARIO, MODULOS_LOGIN, RUTA_LOGIN_SUCURSAL, RUTA_SUCURSAL, soloSecocha, login, logout, moduloGuardado, perteneceAModulo, puedeVer, rutaDeModulo, useSesion, type ModuloLogin } from "@/lib/auth";
 import { CLAVE_SELECCION, ENCARGADOS_LOGIN, tarjetaDe } from "@/components/modulos-login";
 import { homeAsignado } from "@/lib/permisosPlanta";
@@ -17,6 +17,8 @@ const DOCK: { id: ModuloLogin; slug: string; titulo: string; iniciales: string; 
   { id: "finanzas", slug: "finanzas", titulo: "FINANZAS", iniciales: "LF", persona: "Lizbeth", icon: Factory },
   { id: "almacen", slug: "almacen", titulo: "ALMACEN", iniciales: "JA", persona: "Jose", icon: Landmark },
   { id: "logistica", slug: "logistica", titulo: "LOGISTICA", iniciales: "WL", persona: "Williams", icon: Truck },
+  // VENTAS: módulo propio desde 2026-11-16 (antes dentro de Logística)
+  { id: "ventas", slug: "ventas", titulo: "VENTAS", iniciales: "VE", persona: "Ventas", icon: Receipt },
   { id: "produccion", slug: "produccion", titulo: "PRODUCCION", iniciales: "MP", persona: "Manuel", icon: Store, badge: { texto: "Permisos limitados", clase: "bg-white/10 text-white/80" } },
   { id: "gerencia", slug: "gerencia", titulo: "GERENCIA GENERAL", iniciales: "GG", persona: "Gerencia General", icon: BarChart3, badge: { texto: "NEW · Read-Only", clase: "bg-[#facc15] text-black" } },
 ];

@@ -11,7 +11,7 @@ import { createClient } from "./supabase/client";
 
 export const MODULOS_NOTIF = ["LOGISTICA", "PRODUCCION", "ALMACEN", "FINANZAS"] as const;
 export type ModuloNotif = (typeof MODULOS_NOTIF)[number];
-export const NOMBRE_MODULO_NOTIF: Record<string, string> = { LOGISTICA: "Logística", PRODUCCION: "Producción", ALMACEN: "Almacén", FINANZAS: "Finanzas" };
+export const NOMBRE_MODULO_NOTIF: Record<string, string> = { LOGISTICA: "Logística", PRODUCCION: "Producción", ALMACEN: "Almacén", FINANZAS: "Finanzas", VENTAS: "Ventas" };
 
 export interface NotifFlujo {
   id: string;

@@ -27,6 +27,7 @@ const ROL_NEGOCIO: Record<RolAuth, Rol> = {
   planilla: "CONTADOR",
   gerencia: "CONTADOR",
   sucursal: "CONTADOR", // escribe solo en su módulo (lib/sucursal.ts) y sus REQ-SUC
+  ventas: "VENTAS", // módulo Ventas: pedidos, comprobantes y cobranza (2026-11-16)
 };
 
 const EVENTO = "erp:sesion";
@@ -193,7 +194,8 @@ export type ModuloLogin = "ventas" | "contable" | "tesoreria" | "produccion" | "
  * `roles`: roles que también pertenecen al módulo (además del rol con el mismo nombre y creador).
  */
 export const MODULOS_LOGIN: Record<ModuloLogin, { nombre: string; ruta: string; rutas: string[]; roles?: RolAuth[] }> = {
-  ventas: { nombre: "Ventas", ruta: "/dashboard/ventas", rutas: ["/dashboard/ventas"] },
+  // VENTAS: módulo propio desde 2026-11-16 (antes dentro de Logística); entra a su INICIO /ventas
+  ventas: { nombre: "Ventas", ruta: "/ventas", rutas: ["/ventas", "/dashboard/ventas"] },
   contable: { nombre: "Área Contable", ruta: "/dashboard/contable", rutas: ["/dashboard/contable"] },
   tesoreria: { nombre: "Tesorería (Planilla - Compras)", ruta: "/dashboard/compras", rutas: ["/dashboard/compras", "/dashboard/planilla"], roles: ["planilla"] },
   produccion: { nombre: "Producción", ruta: "/produccion", rutas: ["/produccion", "/dashboard/produccion", "/dashboard/almacen"], roles: ["almacen"] },
@@ -244,6 +246,7 @@ const CARGOS: Record<RolAuth, string> = {
   planilla: "Jefe de RRHH",
   gerencia: "Gerente General",
   sucursal: "Jefe de Sucursal - COMBOY VID SUCURSAL",
+  ventas: "Ventas - pedidos, facturación y cobranza",
 };
 export const cargoDe = (s: Sesion): string => (s.rol === "creador" ? CARGOS.creador : s.cargo?.trim() || CARGOS[s.rol] || s.rol);
 
