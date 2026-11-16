@@ -407,5 +407,43 @@ body[data-modo-pestana] [data-guardar-pestana] {
   body[data-modo-pestana] aside.chat-barra { bottom: 64px; }
 }
 
-/* Barra azul de accesos rápidos (Williams 2026-11-16, color de su imagen de referencia) */
-.barra-accesos { background: linear-gradient(180deg, #2b3b7a 0%, #1e2a5a 45%, #161f45 100%); border: 1px solid rgba(255, 255, 255, 0.08); }
+/* Barra azul de accesos rápidos (Williams 2026-11-16, color de su imagen de referencia) con el estilo abstracto del
+   tema GLASS: manchas de luz, arcos y trazo diagonal en azul eléctrico sobre el azul marino. */
+.barra-accesos {
+  background-color: #1e2a5a;
+  background-image:
+    radial-gradient(140% 22% at 100% 0%, transparent 52%, rgba(120, 160, 255, 0.28) 53%, transparent 55%),
+    radial-gradient(140% 22% at 100% 0%, transparent 30%, rgba(120, 160, 255, 0.18) 31%, transparent 33%),
+    radial-gradient(160% 26% at 0% 100%, transparent 50%, rgba(0, 242, 254, 0.2) 51%, transparent 53%),
+    repeating-linear-gradient(135deg, rgba(150, 180, 255, 0.07) 0 1px, transparent 1px 11px),
+    radial-gradient(120% 40% at 50% 0%, rgba(61, 139, 255, 0.35) 0%, transparent 70%),
+    radial-gradient(120% 35% at 50% 100%, rgba(0, 242, 254, 0.14) 0%, transparent 70%),
+    linear-gradient(180deg, #2b3b7a 0%, #1e2a5a 45%, #161f45 100%);
+  border: 1px solid rgba(120, 160, 255, 0.35);
+}
+
+/* Barra superior con el rojo abstracto del chat grupal (Williams 2026-11-16): mismo fondo #4a0710, línea de luz,
+   manchas y trazo diagonal en rojo COMBOY; las letras van en blanco/dorado para resaltar. */
+.tema-planta .cabecera-roja {
+  background-color: rgba(74, 7, 16, 0.96);
+  background-image:
+    linear-gradient(90deg, transparent 0%, rgb(227 6 19) 30%, rgb(255 106 0) 70%, transparent 100%),
+    radial-gradient(60% 220% at 100% 0%, transparent 52%, rgb(227 6 19 / 0.35) 53%, transparent 54.5%),
+    radial-gradient(60% 220% at 100% 0%, transparent 32%, rgb(227 6 19 / 0.22) 33%, transparent 34.5%),
+    radial-gradient(40% 200% at 0% 100%, transparent 50%, rgb(255 106 0 / 0.22) 51%, transparent 52.5%),
+    repeating-linear-gradient(135deg, rgb(227 6 19 / 0.16) 0 1px, transparent 1px 11px),
+    radial-gradient(80% 160% at 50% 0%, rgb(227 6 19 / 0.35) 0%, transparent 70%);
+  background-size: 100% 2px, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  background-position: bottom, center, center, center, center, center;
+  background-repeat: no-repeat;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgb(227 6 19 / 0.55);
+}
+.cabecera-roja .texto-modulo {
+  color: #ffffff;
+  text-shadow: 0 0 18px rgba(255, 214, 102, 0.55), 0 2px 0 rgba(0, 0, 0, 0.45);
+  letter-spacing: 0.06em;
+}
+/* El logo (rojo y azul) se pierde sobre el rojo: va sobre una placa grafito como en el tema anterior */
+.cabecera-roja .logo-placa { background: rgba(10, 11, 14, 0.88); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 10px; padding: 3px 8px; }

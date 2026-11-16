@@ -10,7 +10,7 @@ export const NOMBRE_EMPRESA = "COMBOY VID";
 
 /**
  * Barra superior de todos los módulos (pedido de Williams, 2026-10-29): izquierda logo + "ERP COMBOY VID",
- * centro el nombre del módulo actual en degradado azul eléctrico (tema GLASS; ocupa el espacio libre y no se monta sobre el buscador) (ALMACEN, LOGISTICA, FINANZAS, PRODUCCION…; viene de la ruta),
+ * centro el nombre del módulo actual en blanco con brillo dorado sobre el rojo abstracto del chat (Williams 2026-11-16; ocupa el espacio libre y no se monta sobre el buscador) (ALMACEN, LOGISTICA, FINANZAS, PRODUCCION…; viene de la ruta),
  * derecha buscador (Ctrl K), campana (`extra`), usuario (SO SOPORTE…) y salir.
  * No lleva botones a otros módulos: esos van en el dock y en Accesos rápidos, filtrados por permiso.
  */
@@ -37,9 +37,9 @@ export function ErpHeader({
   extra?: ReactNode;
 }) {
   return (
-    <header className="fixed inset-x-0 top-0 z-40 flex h-[64px] items-center justify-between gap-3 glass-barra px-4 print:hidden lg:px-6">
+    <header className="fixed inset-x-0 top-0 z-40 flex h-[64px] items-center justify-between gap-3 cabecera-roja px-4 print:hidden lg:px-6">
       <Link href={inicio} className="z-10 flex shrink-0 items-center gap-3" aria-label="Inicio">
-        <Image src="/comboy-logo.png" alt="COMBOY VID" width={110} height={36} priority className="h-9 w-auto bg-transparent object-contain" />
+        <Image src="/comboy-logo.png" alt="COMBOY VID" width={110} height={36} priority className="logo-placa h-9 w-auto object-contain" />
         <span className="hidden whitespace-nowrap text-[18px] font-extrabold uppercase text-white lg:block" style={{ fontFamily: TIMES }}>
           ERP COMBOY VID
         </span>
@@ -47,7 +47,7 @@ export function ErpHeader({
 
       {modulo && (
         <h1
-          className="pointer-events-none hidden min-w-0 flex-1 truncate px-2 text-center text-[20px] font-extrabold uppercase texto-azul sm:block sm:text-[28px]"
+          className="pointer-events-none hidden min-w-0 flex-1 truncate px-2 text-center text-[20px] font-extrabold uppercase texto-modulo sm:block sm:text-[28px]"
           style={{ fontFamily: TIMES }}
         >
           {modulo}

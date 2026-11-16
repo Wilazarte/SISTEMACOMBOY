@@ -297,7 +297,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       moduleName={nombreModulo}
       sinMapa={esInicio}
       // Barra azul de accesos rápidos a la derecha: deja su espacio en PC
-      mainClassName={moduloNav ? "lg:pr-20" : ""}
+      mainClassName={moduloNav ? "lg:pr-24" : ""}
       sede={SEDE_PLANTA_PRINCIPAL}
       // El logo vuelve al INICIO del módulo actual
       inicio={pestanaAccion ? RUTA_INICIO[pestanaAccion.modulo] : (homePlantaDe(path) ?? inicioDe(sesion))}

@@ -132,14 +132,14 @@ export function BarraAccesos({
 
       <nav
         aria-label={`Accesos rápidos ${TITULO_INICIO[modulo]}`}
-        className={`barra-accesos fixed z-40 w-[60px] flex-col items-center rounded-full py-4 shadow-[0_20px_50px_-12px_rgba(10,16,48,0.75)] ${
-          movilAbierta ? "bottom-[152px] right-[14px] flex max-h-[calc(100vh-220px)] overflow-y-auto" : "hidden"
-        } lg:right-3 lg:top-1/2 lg:bottom-auto lg:flex lg:max-h-[calc(100vh-150px)] lg:-translate-y-1/2 lg:overflow-visible`}
+        className={`barra-accesos fixed z-40 w-[76px] flex-col items-center rounded-full py-5 shadow-[0_20px_50px_-12px_rgba(10,16,48,0.75)] ${
+          movilAbierta ? "bottom-[152px] right-[6px] flex max-h-[calc(100vh-220px)] overflow-y-auto" : "hidden"
+        } lg:right-3 lg:top-[84px] lg:bottom-6 lg:flex lg:max-h-none lg:overflow-visible`}
       >
         <Icono icono={Home} label={`INICIO ${TITULO_INICIO[modulo]}`} activo={esInicio && !abierto} onClick={() => ir(RUTA_INICIO[modulo])} />
-        <span className="my-2 h-px w-7 bg-white/15" />
+        <span className="my-3 h-px w-9 bg-white/20" />
 
-        <div className="flex flex-col items-center gap-1.5">
+        <div className="flex flex-col items-center gap-3 lg:flex-1 lg:justify-center">
           {grupos.map(([g]) => (
             <Icono
               key={g}
@@ -151,8 +151,8 @@ export function BarraAccesos({
           ))}
         </div>
 
-        <span className="my-3 h-px w-7 bg-white/15 lg:mt-auto" />
-        <div className="flex flex-col items-center gap-1.5">
+        <span className="my-3 h-px w-9 bg-white/20" />
+        <div className="flex flex-col items-center gap-3">
           <Icono icono={Search} label="Buscar (Ctrl K)" onClick={onBuscar} />
           <Icono icono={Bell} label={avisos > 0 ? `${avisos} aviso(s) sin leer` : "Avisos"} onClick={() => ir(RUTA_INICIO[modulo])} burbuja={avisos} />
           <Icono icono={LogOut} label="Cerrar sesión" onClick={onSalir} />
@@ -163,7 +163,7 @@ export function BarraAccesos({
       {abierto && (
         <div
           role="menu"
-          className="barra-accesos fixed z-40 w-[min(320px,calc(100vw-100px))] rounded-2xl p-3 text-white shadow-[0_20px_50px_-12px_rgba(10,16,48,0.75)] max-lg:bottom-[152px] max-lg:right-[86px] lg:right-[84px] lg:top-1/2 lg:-translate-y-1/2"
+          className="barra-accesos fixed z-40 w-[min(340px,calc(100vw-110px))] rounded-2xl p-3 text-white shadow-[0_20px_50px_-12px_rgba(10,16,48,0.75)] max-lg:bottom-[152px] max-lg:right-[92px] lg:right-[100px] lg:top-1/2 lg:-translate-y-1/2"
         >
           <p className="mb-2 px-2 text-[11px] font-bold uppercase tracking-wider text-white/60">{corto(abierto)}</p>
           <div className="flex max-h-[60vh] flex-col gap-1 overflow-y-auto">
@@ -191,7 +191,7 @@ function Icono({ icono: I, label, activo, onClick, burbuja = 0 }: { icono: Lucid
   return (
     <div className="group relative flex items-center justify-center">
       {/* Muesca del activo (hacia el contenido) */}
-      {activo && <span aria-hidden className="absolute -left-[13px] h-6 w-[5px] rounded-full bg-white/90" />}
+      {activo && <span aria-hidden className="absolute -left-[12px] h-8 w-[5px] rounded-full bg-white/90" />}
       <button
         type="button"
         onClick={onClick}
@@ -199,15 +199,15 @@ function Icono({ icono: I, label, activo, onClick, burbuja = 0 }: { icono: Lucid
         aria-current={activo ? "page" : undefined}
         className={`relative flex items-center justify-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
           activo
-            ? "h-11 w-11 bg-gradient-to-b from-white to-[#dfe6ff] text-[#1e2a5a] shadow-[0_6px_18px_-4px_rgba(150,175,255,0.8)]"
-            : "h-10 w-10 text-white/80 hover:bg-white/10 hover:text-white"
+            ? "h-14 w-14 bg-gradient-to-b from-white to-[#dfe6ff] text-[#1e2a5a] shadow-[0_6px_18px_-4px_rgba(150,175,255,0.8)]"
+            : "h-12 w-12 text-white/80 hover:bg-white/10 hover:text-white"
         }`}
       >
-        <I size={19} strokeWidth={1.6} />
+        <I size={24} strokeWidth={1.6} />
         {burbuja > 0 && <Burbuja n={burbuja} />}
       </button>
       {/* Tooltip (solo PC) */}
-      <span className="pointer-events-none absolute right-[calc(100%+14px)] hidden whitespace-nowrap rounded-md bg-[#141a33] px-2.5 py-1 text-[12px] font-medium text-white opacity-0 shadow-lg transition group-hover:opacity-100 lg:block">
+      <span className="pointer-events-none absolute right-[calc(100%+18px)] hidden whitespace-nowrap rounded-md bg-[#141a33] px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-lg transition group-hover:opacity-100 lg:block">
         {label}
       </span>
     </div>
