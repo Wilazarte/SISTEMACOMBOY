@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ClipboardList, Factory, Gauge, HandCoins, Layers, Package, ShoppingCart, TrendingUp } from "lucide-react";
 import { ErpAlertList, type ErpAlerta } from "@/components/erp/ErpAlertList";
+import { PanelResumen } from "@/components/inicio/PanelResumen";
+import type { ModuloInicio } from "@/lib/inicioModulos";
 import { ErpStatsCard } from "@/components/erp/ErpStatsCard";
 import { ErpTable, ErpTd } from "@/components/erp/ErpTable";
 import { Etiqueta, Panel } from "@/components/logistica/piezas";
@@ -81,7 +83,7 @@ export function GerenciaDashboard() {
 
       {/* KPIs de todos los módulos (solo lectura, sin botones de acción) */}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <ErpStatsCard icono={<ShoppingCart size={18} />} titulo="Compras activas" valor={`${g.ticker.comprasActivas} OC`} detalle="Órdenes de compra en curso" />
+        <ErpStatsCard icono={<ShoppingCart size={18} />} titulo="Compras activas" valor={montoCorto(g.ticker.comprasActivas)} detalle="Monto de órdenes de compra en curso" />
         <ErpStatsCard
           icono={<Layers size={18} />}
           titulo="Lotes activos"
@@ -99,6 +101,10 @@ export function GerenciaDashboard() {
           detalle={d.porCobrar ? `${d.porCobrar} nota(s) de pedido · ${d.cxcVencidas} vencida(s)` : "Sin cobranzas pendientes"}
         />
       </section>
+
+      {/* Resumen de cada módulo (Williams 2026-11-16): los mismos gráficos y tareas pendientes del INICIO de cada
+          módulo, en solo lectura (las tarjetas no abren pantallas de los módulos) */}
+      <ResumenModulos />
 
       {/* Últimas OTs */}
       <Panel titulo="Últimas OTs" icono={<ClipboardList size={17} />}>
@@ -126,6 +132,37 @@ export function GerenciaDashboard() {
         <ErpAlertList items={alertas} vacio="Sin alertas críticas." max={10} />
       </Panel>
     </MarcoPlanta>
+  );
+}
+
+const MODULOS_RESUMEN: { id: Exclude<ModuloInicio, "soporte">; label: string }[] = [
+  { id: "finanzas", label: "Finanzas" },
+  { id: "logistica", label: "Logística" },
+  { id: "almacen", label: "Almacén" },
+  { id: "produccion", label: "Producción" },
+  { id: "ventas", label: "Ventas" },
+];
+
+function ResumenModulos() {
+  const [modulo, setModulo] = useState<(typeof MODULOS_RESUMEN)[number]["id"]>("finanzas");
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="mr-2 text-[15px] font-semibold uppercase tracking-wide text-white">Resumen por módulo</h2>
+        {MODULOS_RESUMEN.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            onClick={() => setModulo(m.id)}
+            aria-pressed={modulo === m.id}
+            className={`rounded-full px-4 py-1.5 text-[13px] font-semibold transition ${modulo === m.id ? "grad-azul text-white" : "btn-glass text-[#D1D5DB] hover:text-white"}`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+      <PanelResumen key={modulo} modulo={modulo} soloLectura />
+    </section>
   );
 }
 

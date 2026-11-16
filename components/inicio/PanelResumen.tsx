@@ -415,8 +415,14 @@ const HOOK_RESUMEN: Record<ModuloInicio, (activo: boolean) => Resumen> = {
 
 // ─────────────────────────────── Vista ───────────────────────────────
 
-/** Gráficos y tareas pendientes del módulo. Montar con key = módulo (cada módulo usa su propio hook). */
-export function PanelResumen({ modulo }: { modulo: ModuloInicio }) {
+/**
+ * Gráficos y tareas pendientes del módulo. Montar con key = módulo (cada módulo usa su propio hook).
+ * `soloLectura` (Dashboard Gerencia): se ve igual, pero las tarjetas no abren pantallas de los módulos.
+ */
+export function PanelResumen({ modulo, soloLectura = false }: { modulo: ModuloInicio; soloLectura?: boolean }) {
+  const ir = (href: string) => {
+    if (!soloLectura) irA(href);
+  };
   const { graficos, pendientes } = HOOK_RESUMEN[modulo](true);
   const abiertas = pendientes.filter((p) => p.cantidad > 0);
   return (
@@ -435,8 +441,9 @@ export function PanelResumen({ modulo }: { modulo: ModuloInicio }) {
               <button
                 key={p.texto}
                 type="button"
-                onClick={() => irA(p.href)}
-                className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition hover-cian ${
+                onClick={() => ir(p.href)}
+                disabled={soloLectura}
+                className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition ${soloLectura ? "cursor-default" : "hover-cian"} ${
                   p.cantidad === 0 ? "border-white/[0.05] bg-white/[0.02] opacity-60" : p.urgente ? "border-[#ff2a5f]/40 bg-[#ff2a5f]/[0.08]" : "border-white/[0.08] bg-white/[0.04]"
                 }`}
               >
@@ -448,7 +455,7 @@ export function PanelResumen({ modulo }: { modulo: ModuloInicio }) {
                   </span>
                   {p.detalle && p.cantidad > 0 && <span className="block text-[12px] text-[#9CA3AF]">{p.detalle}</span>}
                 </span>
-                <ChevronRight size={16} className="shrink-0 text-[#6b7280]" />
+                {!soloLectura && <ChevronRight size={16} className="shrink-0 text-[#6b7280]" />}
               </button>
             ))}
           </div>
@@ -457,7 +464,7 @@ export function PanelResumen({ modulo }: { modulo: ModuloInicio }) {
 
       <div className="grid gap-4 xl:grid-cols-2">
         {graficos.map((g, i) => (
-          <TarjetaGrafico key={g.titulo} g={g} i={i} />
+          <TarjetaGrafico key={g.titulo} g={g} i={i} ir={soloLectura ? undefined : ir} />
         ))}
       </div>
     </div>
@@ -466,16 +473,18 @@ export function PanelResumen({ modulo }: { modulo: ModuloInicio }) {
 
 const formato = (g: Grafico, v: number) => (g.moneda ? montoCorto(v) : `${v.toLocaleString("es-PE")}${g.unidad ? ` ${g.unidad}` : ""}`);
 
-function TarjetaGrafico({ g, i }: { g: Grafico; i: number }) {
+function TarjetaGrafico({ g, i, ir }: { g: Grafico; i: number; ir?: (href: string) => void }) {
   const max = Math.max(0, ...g.series.flatMap((s) => s.valores));
   const vacio = max === 0 || g.etiquetas.length === 0;
   return (
     <section className="seccion flex flex-col rounded-xl border glass-card glass-blur p-5" style={estiloSeccion(i)}>
       <div className="mb-1 flex items-start justify-between gap-3">
         <h3 className="seccion-titulo text-[13px] font-bold uppercase tracking-wide">{g.titulo}</h3>
-        <button type="button" onClick={() => irA(g.href)} className="shrink-0 rounded-md px-2 py-0.5 text-[12px] font-semibold text-[#9CA3AF] transition hover:bg-white/10 hover:text-white">
-          Ver detalle
-        </button>
+        {ir && (
+          <button type="button" onClick={() => ir(g.href)} className="shrink-0 rounded-md px-2 py-0.5 text-[12px] font-semibold text-[#9CA3AF] transition hover:bg-white/10 hover:text-white">
+            Ver detalle
+          </button>
+        )}
       </div>
       <p className="mb-3 text-[12px] text-[#9CA3AF]">{g.detalle}</p>
       {g.series.length > 1 && (
