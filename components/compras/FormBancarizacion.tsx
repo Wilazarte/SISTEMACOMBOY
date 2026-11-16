@@ -2,7 +2,7 @@
 
 import { SelectorCaja } from "@/components/SelectorCaja";
 import { Field, Input, Select } from "@/components/ui";
-import { CAJA_POR_DEFECTO, esCajaEfectivo } from "@/lib/cajas";
+import { CAJA_POR_DEFECTO, esCajaBanco, esCajaEfectivo } from "@/lib/cajas";
 import { TIPOS_BANCARIZACION_ACTUALES, hoy } from "@/lib/storage";
 import type { Bancarizacion, TipoBancarizacion } from "@/lib/types";
 
@@ -24,9 +24,9 @@ export function FormBancarizacion({
   encabezado?: boolean;
 }) {
   const set = <K extends keyof Bancarizacion>(k: K, v: Bancarizacion[K]) => onChange({ ...value, [k]: v });
-  // Caja Chica / Fondo de Reserva -> EFECTIVO; Caja General (Interbank) -> INTERBANK
+  // Caja Chica / Fondo de Reserva -> EFECTIVO; Caja General (transferencias Interbank) -> INTERBANK; Préstamo, Crédito, Otros: el tipo lo elige el usuario
   const cambiarCaja = (caja: string) =>
-    onChange({ ...value, caja, ...(esCajaEfectivo(caja) ? { tipo: "EFECTIVO" as const } : value.tipo === "EFECTIVO" ? { tipo: "INTERBANK" as const } : {}) });
+    onChange({ ...value, caja, ...(esCajaEfectivo(caja) ? { tipo: "EFECTIVO" as const } : esCajaBanco(caja) && value.tipo === "EFECTIVO" ? { tipo: "INTERBANK" as const } : {}) });
   const tipos = TIPOS_BANCARIZACION_ACTUALES.includes(value.tipo) ? TIPOS_BANCARIZACION_ACTUALES : [...TIPOS_BANCARIZACION_ACTUALES, value.tipo];
   const cuenta = <SelectorCaja value={value.caja} onChange={cambiarCaja} encabezado={encabezado} className="md:col-span-3" />;
   if (soloCuenta) return <div className="grid gap-4 md:grid-cols-3">{cuenta}</div>;

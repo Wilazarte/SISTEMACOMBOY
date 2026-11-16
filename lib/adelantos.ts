@@ -2,6 +2,7 @@
 // El monto se descontará en la planilla más adelante; por ahora solo se registra.
 
 import { ErpError } from "./storage";
+import { errorCaja } from "./cajas";
 import { createClient } from "./supabase/client";
 
 export type EstadoAdelanto = "PENDIENTE" | "DESCONTADO" | "ANULADO";
@@ -42,6 +43,11 @@ const sinColumna = (e: { code?: string }) => e.code === "PGRST204" || e.code ===
 const extrasLimpios = (x?: ExtrasAdelanto) =>
   Object.fromEntries(Object.entries(x ?? {}).filter(([, v]) => typeof v === "string" && v.trim() !== "").map(([k, v]) => [k, String(v).trim()]));
 
+/** PRÉSTAMO y OTROS piden su dato (quién prestó / detalle) antes de guardar. */
+const validarCajaAdelanto = (extras?: ExtrasAdelanto) => {
+  const err = extras?.caja_nombre !== undefined ? errorCaja(extras.caja_nombre) : null;
+  if (err) throw new ErpError(err);
+};
 const sinNuevas = (x?: ExtrasAdelanto): ExtrasAdelanto => ({ ...x, medio_pago: undefined, caja_nombre: undefined });
 
 const COLUMNAS = "*";
@@ -113,6 +119,7 @@ export async function listarAdelantos(): Promise<Adelanto[]> {
 }
 
 export async function crearAdelanto(datos: DatosAdelanto, extras?: ExtrasAdelanto): Promise<Adelanto> {
+  validarCajaAdelanto(extras);
   const limpio = preparar(datos);
   const insertar = (fila: object) => createClient().from("adelantos").insert(fila).select(COLUMNAS).single();
   let { data, error } = await insertar({ ...limpio, ...extrasLimpios(extras) });
@@ -124,6 +131,7 @@ export async function crearAdelanto(datos: DatosAdelanto, extras?: ExtrasAdelant
 }
 
 export async function editarAdelanto(id: string, datos: DatosAdelanto, extras?: ExtrasAdelanto): Promise<Adelanto> {
+  validarCajaAdelanto(extras);
   const limpio = preparar(datos);
   // Solo si no está descontado (la base también lo bloquea con un trigger)
   const actualizar = (fila: object) => createClient().from("adelantos").update(fila).eq("id", id).not("estado", "ilike", "descontado").select(COLUMNAS);
