@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Fingerprint, Loader2, Lock, Plus, Trash2, Upload } from "lucide-react";
 import {
   CATEGORIAS_GD,
@@ -47,13 +47,40 @@ function useHash(archivo: File | null): { hash: string; calculando: boolean } {
 
 function SelectorArchivo({ archivo, onCambio }: { archivo: File | null; onCambio: (f: File | null) => void }) {
   const { hash, calculando } = useHash(archivo);
+  // Botón propio + input oculto (como Registrar gasto): el input nativo con estilos no abría el
+  // explorador de Windows en la app de escritorio. También se puede arrastrar el archivo a la caja.
+  const ref = useRef<HTMLInputElement>(null);
+  const [encima, setEncima] = useState(false);
   return (
-    <div className="rounded-lg border border-dashed border-[#294D61]/50 bg-[#CCD0CF]/25 p-3">
+    <div
+      className={cx("rounded-lg border border-dashed p-3 transition", encima ? "border-[#800021] bg-[#CCD0CF]/60" : "border-[#294D61]/50 bg-[#CCD0CF]/25")}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setEncima(true);
+      }}
+      onDragLeave={() => setEncima(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setEncima(false);
+        const f = e.dataTransfer.files?.[0];
+        if (f) onCambio(f);
+      }}
+    >
       <input
+        ref={ref}
         type="file"
-        className="block w-full text-[13px] text-[#11212D] file:mr-3 file:rounded-md file:border-0 file:bg-[#11212D] file:px-3 file:py-1.5 file:text-[12px] file:font-semibold file:text-white"
-        onChange={(e) => onCambio(e.target.files?.[0] ?? null)}
+        className="hidden"
+        onChange={(e) => {
+          onCambio(e.target.files?.[0] ?? null);
+          e.target.value = ""; // permite volver a elegir el mismo archivo
+        }}
       />
+      <div className="flex flex-wrap items-center gap-2">
+        <Boton tono="neutro" onClick={() => ref.current?.click()}>
+          <Upload size={15} /> {archivo ? "Cambiar archivo" : "Seleccionar archivo de la PC"}
+        </Boton>
+        <span className="min-w-0 break-words text-[12px] text-[#11212D]/70">{archivo ? archivo.name : "o arrastre el archivo aquí"}</span>
+      </div>
       {archivo && (
         <div className="mt-2 space-y-0.5 text-[11px] text-[#11212D]/75">
           <p>
