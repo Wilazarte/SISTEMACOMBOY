@@ -95,9 +95,9 @@ const esAppEscritorio = () =>
 
 /**
  * Imprime las páginas ya dibujadas (celular / app): un contenedor solo visible al imprimir.
- * Cada página del PDF va en su propia hoja del tamaño de la página (@page) y la imagen se
- * encoge para caber completa: así el pie de página se imprime dentro de su hoja y nunca
- * se pasa a una hoja aparte (antes, en papel Carta o por redondeo en A4, el pie caía en otra hoja).
+ * Cada página del PDF va en su propia hoja y la imagen se encoge para caber completa en el
+ * papel elegido (A4, A5, Carta, Oficio o ticket de 80 mm): el pie de página se imprime dentro
+ * de su hoja y nunca se pasa a una hoja aparte.
  */
 function imprimirImagenes(paginas: Pagina[]): void {
   const id = "erp-impresion-pdf";
@@ -105,11 +105,16 @@ function imprimirImagenes(paginas: Pagina[]): void {
   const caja = document.createElement("div");
   caja.id = id;
   const p0 = paginas[0] ?? { w: 210, h: 297 };
+  // Ticket (80 mm, impresora POS): la hoja mide lo mismo que el ticket.
+  // Documento normal: sin tamaño fijo, así se elige A4, A5, Carta, Oficio… en el diálogo
+  // de impresión y cada página se encoge para caber entera (con su pie) en esa hoja.
+  const esTicket = p0.w <= 100;
+  const hoja = esTicket ? `${p0.w.toFixed(1)}mm ${p0.h.toFixed(1)}mm` : p0.w > p0.h ? "landscape" : "portrait";
   caja.innerHTML =
     "<style>" +
     `@media screen{#${id}{display:none}}` +
     "@media print{" +
-    `@page{size:${p0.w.toFixed(1)}mm ${p0.h.toFixed(1)}mm;margin:0}` +
+    `@page{size:${hoja};margin:0}` +
     "html,body{margin:0!important;padding:0!important;height:auto!important;min-height:0!important;overflow:visible!important;background:#fff!important}" +
     `body>*:not(#${id}){display:none!important}` +
     `#${id}{display:block!important;margin:0;padding:0}` +
