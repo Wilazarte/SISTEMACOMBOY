@@ -34,6 +34,7 @@ import { getDerivaciones, getReqsSuc, getSucursal, marcarAceptadoVentas, type Pr
 import { asientoAjusteVenta, asientoDe, asientoNotaPedido, esAsientoContable, revertirAsiento, revertirAsientoId } from "./contable";
 import type {
   AsientoContable,
+  ClasificacionCliente,
   Cliente,
   CobroVenta,
   ComprobanteExterno,
@@ -58,6 +59,37 @@ import type {
 } from "./types";
 
 export const getClientes = () => leer<Cliente[]>(KEYS.CLIENTES, []);
+
+// ---------------------------------------------------------------------
+// Clasificación de clientes (lista editable, compartida por Arequipa y Secocha)
+// ---------------------------------------------------------------------
+
+/** Clasificaciones iniciales: valen mientras nadie haya guardado la lista propia. */
+export const CLASIFICACIONES_DEFECTO = ["A1", "VIP", "DISTRIBUIDOR", "NORMAL", "NUEVO"];
+
+/** Nombres de clasificación en orden. Recibe la lista guardada (useStore) o la lee de la caché. */
+export function clasificacionesCliente(guardadas: ClasificacionCliente[] = leer<ClasificacionCliente[]>(KEYS.CLASIF_CLIENTES, [])): string[] {
+  if (guardadas.length === 0) return [...CLASIFICACIONES_DEFECTO];
+  return [...guardadas].sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre)).map((c) => c.nombre);
+}
+
+/** Guarda la lista completa de clasificaciones (en el orden recibido). Una en uso por clientes no se puede quitar. */
+export function guardarClasificaciones(nombres: string[]): void {
+  const limpias: string[] = [];
+  for (const n of nombres) {
+    const nombre = n.trim().replace(/\s+/g, " ").toUpperCase();
+    if (nombre && !limpias.includes(nombre)) limpias.push(nombre);
+  }
+  if (limpias.length === 0) throw new ErpError("Deje al menos una clasificación.");
+  if (limpias.some((n) => n.length > 30)) throw new ErpError("Cada clasificación admite hasta 30 caracteres.");
+  const enUso = Array.from(new Set(getClientes().map((c) => c.clasificacion).filter((c): c is string => !!c && !limpias.includes(c))));
+  if (enUso.length) throw new ErpError(`Hay clientes con la clasificación ${enUso.join(", ")}: cámbielos antes de quitarla.`);
+  const previas = leer<ClasificacionCliente[]>(KEYS.CLASIF_CLIENTES, []);
+  escribir(
+    KEYS.CLASIF_CLIENTES,
+    limpias.map((nombre, i) => ({ id: previas.find((p) => p.nombre === nombre)?.id ?? uid(), nombre, orden: i + 1 })),
+  );
+}
 export const getCondicionesPago = () => leer<CondicionPago[]>(KEYS.COND_PAGO, []);
 export const getNotasPedido = () => leer<NotaPedido[]>(KEYS.NOTAS_PEDIDO, []);
 export const getComprobantes = () => leer<ComprobanteVenta[]>(KEYS.COMPROBANTES, []);
@@ -139,6 +171,8 @@ export const clienteVacio = (): Cliente => ({
   lineaCredito: 0,
   estado: "ACTIVO",
   created_at: "",
+  laborMinera: "",
+  clasificacion: "NUEVO",
 });
 
 export function guardarCliente(data: Cliente): Cliente {
@@ -159,6 +193,8 @@ export function guardarCliente(data: Cliente): Cliente {
     direccionFiscal: data.direccionFiscal.trim(),
     direccionesEntrega: data.direccionesEntrega.map((d) => d.trim()).filter(Boolean),
     email: data.email.trim(),
+    laborMinera: (data.laborMinera ?? "").trim().toUpperCase(),
+    clasificacion: (data.clasificacion ?? "").trim().toUpperCase(),
     lineaCredito: r2(Number(data.lineaCredito) || 0),
     created_at: data.created_at || new Date().toISOString(),
   };
@@ -202,6 +238,8 @@ export function importarClientes(filas: Record<string, unknown>[]): { creados: n
       telefono: v(f, "Telefono", "Teléfono") || previo?.telefono || "",
       email: v(f, "Email", "Correo") || previo?.email || "",
       contacto: v(f, "Contacto") || previo?.contacto || "",
+      laborMinera: v(f, "Labor Minera", "Labor minera", "Labor").toUpperCase() || previo?.laborMinera || "",
+      clasificacion: v(f, "Clasificacion", "Clasificación").toUpperCase() || previo?.clasificacion || "NUEVO",
       lineaCredito: Number(v(f, "Linea Credito", "Línea Crédito", "Linea de Credito")) || previo?.lineaCredito || 0,
       created_at: previo?.created_at ?? new Date().toISOString(),
     };

@@ -79,6 +79,9 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "antecedentes", label: "Antecedentes (REQ procesados)", grupo: "Compras nacionales", destino: `${C}?tab=antecedentes` },
     { slug: "proveedores", label: "Proveedores Nacionales", grupo: "Compras nacionales", destino: "/logistica/proveedores" },
 
+    { slug: "base-proveedores", label: "Base de proveedores", grupo: "Proveedores y clientes", destino: "/logistica/base-proveedores" },
+    { slug: "base-clientes", label: "Base de clientes", grupo: "Proveedores y clientes", destino: "/logistica/base-clientes" },
+
     { slug: "agencias", label: "Agencias (Marvisur · Grael · Shalom)", grupo: "Transporte", destino: "/logistica/agencias" },
     { slug: "cotizar-flete", label: "Cotizar Flete", grupo: "Transporte", destino: "/logistica/cotizar-flete" },
     { slug: "guia-sunat", label: "Guía SUNAT", grupo: "Transporte", destino: "/logistica/guia-sunat" },
