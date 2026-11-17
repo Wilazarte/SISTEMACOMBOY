@@ -16,6 +16,8 @@ Nada secreto (token, certificado, clave SOL) llega al navegador ni al repositori
 1. Crear la cuenta en **nubefact.com** con el RUC 20613238566. Para probar, pedir la **cuenta DEMO** (envía a SUNAT beta, sin costo).
 2. En el panel de Nubefact: registrar las **series** que usa el ERP: `F001` (facturas), `B001` (boletas), `FC01` / `BC01`
    (notas de crédito) y `FD01` / `BD01` (notas de débito). Si Nubefact pide otra serie, avisar para cambiarla en el ERP.
+   La **sede Secocha** usa sus propias series: `F002`, `B002`, `FC02` / `BC02` y `FD02` / `BD02` (mismo RUC y token);
+   registrarlas también y correr `supabase/migrations/20261202_secocha_sunat.sql`.
 3. En el panel: **API - Integración** → copiar la **RUTA** (URL) y el **TOKEN**.
 4. Correr `supabase/migrations/20261125_sunat_cpe.sql` en Supabase → SQL Editor.
 5. Desplegar la función: `supabase functions deploy sunat-cpe`.
