@@ -907,6 +907,71 @@ export function pdfReporteDeuda(d: {
   );
 }
 
+/** Una fila del reporte de stock (ya agrupada / filtrada como en pantalla). */
+export interface FilaStockReporte {
+  nombre: string;
+  categoria: string;
+  sede: string;
+  unidad: string;
+  cantidad: number;
+  costoUnit: number;
+  valor: number;
+  actualizado: string;
+}
+
+/**
+ * Reporte de stock de almacén en A4 vertical (Williams, 2026-11-17): Almacén › Stock y Kardex › Exportar.
+ * Sigue los filtros de la pantalla (almacén, categoría, búsqueda, sin valorizar). Pie en cada hoja.
+ */
+export function pdfReporteStock(d: { filas: FilaStockReporte[]; filtros: string; almacen: string }): void {
+  const hoyIso = new Date().toISOString().slice(0, 10);
+  const m = (n: number) => soles(n).replace(/^S\/\s*/, "");
+  const cant = (n: number) => n.toLocaleString("es-PE", { maximumFractionDigits: 2 });
+  const valorizado = d.filas.reduce((a, f) => a + f.valor, 0);
+  const sinValor = d.filas.filter((f) => !(f.costoUnit > 0)).length;
+  const sinStock = d.filas.filter((f) => f.cantidad <= 0).length;
+  const variasSedes = new Set(d.filas.map((f) => f.sede)).size > 1;
+  const head = ["N°", "Producto", "Categoría", ...(variasSedes ? ["Almacén"] : []), "Und.", "Cantidad", "Últ. costo S/", "Valorizado S/"];
+  const body = d.filas.map((f, i) => [
+    String(i + 1),
+    f.nombre,
+    f.categoria,
+    ...(variasSedes ? [f.sede] : []),
+    f.unidad,
+    cant(f.cantidad),
+    f.costoUnit > 0 ? m(f.costoUnit) : "-",
+    f.costoUnit > 0 ? m(f.valor) : "-",
+  ]);
+  const n = head.length;
+  guardar(
+    construir({
+      titulo: "REPORTE DE STOCK DE ALMACÉN",
+      numero: fechaPE(hoyIso),
+      estado: "REPORTE",
+      datos: [
+        ["Almacén", d.almacen],
+        ["Emitido", new Date().toLocaleString("es-PE")],
+        ["Productos", String(d.filas.length)],
+        ["Valorizado", soles(valorizado)],
+        ["Sin valorizar / sin stock", `${sinValor} / ${sinStock}`],
+        ["Filtros", d.filtros || "Ninguno"],
+      ],
+      columnas: 2,
+      head,
+      body,
+      alinearDerecha: [0, n - 3, n - 2, n - 1],
+      totales: [
+        ["Productos", String(d.filas.length)],
+        ["Sin valorizar", String(sinValor)],
+        ["VALORIZADO TOTAL", soles(valorizado)],
+      ],
+      notas: ["Último costo: sin IGV en factura / OC, con IGV en boleta. Valorizado = cantidad × último costo."],
+      firmas: ["Almacén", "Logística / Gerencia"],
+    }),
+    `STOCK-${d.almacen.replace(/\s+/g, "-")}-${hoyIso}`
+  );
+}
+
 /** Declaración jurada de gasto (gasto sin comprobante) con su N° correlativo DJ-0001. */
 export function docDeclaracionJurada(f: Factura): jsPDF {
   const n = numeroDJ(f);
