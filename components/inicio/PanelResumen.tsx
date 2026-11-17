@@ -52,10 +52,11 @@ interface Resumen {
   pendientes: Pendiente[];
 }
 
-const AZUL = "0 102 255";
-const ROJO = "227 6 19";
-const CIAN = "0 242 254";
-const NARANJA = "255 106 0";
+// Paleta COMBOY (2026-11-17): acero, vino, acero claro y azul noche
+const AZUL = "41 77 97";
+const ROJO = "128 0 33";
+const CIAN = "127 156 171";
+const NARANJA = "128 0 33";
 
 /** Stock escaso: 5 unidades o menos (igual que los KPIs). */
 const STOCK_CRITICO = 5;
