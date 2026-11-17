@@ -61,6 +61,7 @@ import {
   Wallet,
   Warehouse,
   Wrench,
+  FileLock2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -68,6 +69,7 @@ import {
 const ICONO_ACCION: Record<string, LucideIcon> = {
   // Expediente 26W
   expedientes: FolderKanban,
+  "gestion-documentaria": FileLock2,
   "crear-op": FilePlus2,
   "orden-produccion": FilePlus2,
   "cotizacion-oc": FileCheck2,
