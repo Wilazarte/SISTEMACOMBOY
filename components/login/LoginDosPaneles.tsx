@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   BarChart3,
+  ChevronDown,
   ChevronRight,
   Eye,
   EyeOff,
@@ -80,6 +81,8 @@ export default function LoginDosPaneles({ inicial = "", siguiente = null }: { in
   const [enviando, setEnviando] = useState(false);
   const [puedeRecordar, setPuedeRecordar] = useState(false);
   const [recordar, setRecordar] = useState(false);
+  // Celular: tras elegir, la lista se pliega hacia arriba en un botón (Williams 2026-11-17)
+  const [plegado, setPlegado] = useState(!!inicial);
   const formRef = useRef<HTMLFormElement>(null);
   const usuarioRef = useRef<HTMLInputElement>(null);
 
@@ -129,7 +132,8 @@ export default function LoginDosPaneles({ inicial = "", siguiente = null }: { in
     } catch {
       /* almacenamiento bloqueado */
     }
-    // En celular el formulario queda debajo de la lista: llevarlo a la vista
+    // En celular la lista se pliega y el formulario queda a la vista
+    setPlegado(true);
     if (window.matchMedia("(max-width: 767px)").matches) {
       requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
     } else {
@@ -229,7 +233,7 @@ export default function LoginDosPaneles({ inicial = "", siguiente = null }: { in
       <main className="flex min-h-screen items-center justify-center px-4 py-4 md:py-6">
         <div className="grid w-full max-w-[1040px] overflow-hidden rounded-[28px] border border-white/15 shadow-[0_30px_80px_rgba(0,0,0,0.6)] md:grid-cols-[1fr_1.08fr]">
           {/* ===== Panel izquierdo: módulos ===== */}
-          <section className="relative overflow-hidden bg-[#f6f8fc] px-5 pb-20 pt-6 text-[#0f1b33] sm:px-8 md:px-10 md:pb-20 md:pt-7">
+          <section className="relative overflow-hidden bg-[#f6f8fc] px-5 pb-12 pt-6 text-[#0f1b33] sm:px-8 md:px-10 md:pb-20 md:pt-7">
             <OndasClaras />
             <div className="relative">
               {/* Logo de Williams (2026-11-17) sin fondo negro, centrado arriba: solo en este panel */}
@@ -239,7 +243,28 @@ export default function LoginDosPaneles({ inicial = "", siguiente = null }: { in
               <h1 className="mt-3 text-center text-[26px] font-extrabold leading-tight tracking-tight md:text-[30px]">Iniciar sesión</h1>
               <p className="mt-1 text-center text-sm text-[#4b5b78]">Seleccione su módulo</p>
 
-              <ul className="mt-4 space-y-1.5" role="listbox" aria-label="Módulos">
+              {/* Celular con módulo elegido: la lista plegada en un botón */}
+              {plegado && opcion && (
+                <button
+                  type="button"
+                  onClick={() => setPlegado(false)}
+                  aria-expanded={false}
+                  className={`mt-4 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-white md:hidden ${
+                    esSecocha ? "bg-gradient-to-r from-[#0066ff] to-[#00c8fe]" : "bg-[#0f1b33]"
+                  } shadow-[0_6px_18px_rgba(15,27,51,0.3)]`}
+                >
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/15">
+                    <opcion.icon size={16} strokeWidth={2.2} />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{opcion.titulo}</span>
+                  <span className="shrink-0 text-xs font-semibold text-white/75">Cambiar</span>
+                  <ChevronDown size={16} className="shrink-0" />
+                </button>
+              )}
+
+              {/* En celular la lista se desplaza dentro de su propio cuadro */}
+              <div className={`${plegado && opcion ? "hidden md:block" : ""} -mx-1 mt-4 max-h-[52vh] overflow-y-auto overscroll-contain px-1 py-1 md:mx-0 md:mt-3 md:max-h-none md:overflow-visible md:px-0`}>
+              <ul className="space-y-1.5" role="listbox" aria-label="Módulos">
                 {MODULOS.map((o) => (
                   <ItemModulo key={o.id} o={o} sel={activo === o.id} onClick={() => elegir(o.id)} />
                 ))}
@@ -251,6 +276,7 @@ export default function LoginDosPaneles({ inicial = "", siguiente = null }: { in
               <ul role="listbox" aria-label="Sucursal">
                 <ItemModulo o={SECOCHA} sel={esSecocha} onClick={() => elegir("sucursal")} sucursal />
               </ul>
+              </div>
             </div>
           </section>
 
@@ -394,7 +420,7 @@ function ItemModulo({ o, sel, onClick, sucursal }: { o: Opcion; sel: boolean; on
 /** Ondas al pie del panel claro (adaptación de la referencia, en azul eléctrico y cian). */
 function OndasClaras() {
   return (
-    <svg aria-hidden viewBox="0 0 400 140" preserveAspectRatio="none" className="pointer-events-none absolute inset-x-0 bottom-0 h-24 w-full md:h-28">
+    <svg aria-hidden viewBox="0 0 400 140" preserveAspectRatio="none" className="pointer-events-none absolute inset-x-0 bottom-0 h-12 w-full md:h-28">
       <path d="M0,70 C90,20 170,120 260,70 C320,38 360,50 400,30 L400,140 L0,140 Z" fill="#00c8fe" opacity="0.18" />
       <path d="M0,95 C80,60 180,140 280,92 C330,70 370,78 400,62 L400,140 L0,140 Z" fill="#0066ff" opacity="0.22" />
       <path d="M0,120 C100,92 190,140 300,112 C350,100 380,104 400,96 L400,140 L0,140 Z" fill="#0f1b33" opacity="0.9" />
