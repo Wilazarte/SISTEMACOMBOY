@@ -7,7 +7,7 @@
 // =====================================================================
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, BellRing, FileSearch, FileStack, Filter, Lock, Plus, RefreshCw, Search, ShieldAlert } from "lucide-react";
+import { AlertTriangle, BellRing, FileSearch, FileStack, Filter, Lock, Plus, RefreshCw, Route, Search, ShieldAlert } from "lucide-react";
 import { toast } from "@/components/ui";
 import { nombreDe, useSesion } from "@/lib/auth";
 import {
@@ -25,11 +25,12 @@ import {
   type PendienteGD,
 } from "@/lib/gestionDocumental";
 import { SubirDocumento } from "./Formularios";
+import { HistoriaProcesos } from "./HistoriaProcesos";
 import { PanelDocumento } from "./PanelDocumento";
 import { QuienDescargo, Reportes } from "./PanelGerencia";
 import { Boton, ChipEstado, FondoOndas, Tarjeta, Vacio, claseInput, cx } from "./piezas";
 
-type Vista = "documentos" | "descargas" | "reportes";
+type Vista = "documentos" | "historia" | "descargas" | "reportes";
 
 export function GestionDocumental() {
   const { sesion } = useSesion();
@@ -44,6 +45,9 @@ export function GestionDocumental() {
   const [pendientes, setPendientes] = useState<PendienteGD[]>([]);
   const [abierto, setAbierto] = useState<string | null>(null); // id
   const [subir, setSubir] = useState(false);
+  /** Código del proceso al que se adjunta el documento (desde la Historia de procesos). */
+  const [subirRef, setSubirRef] = useState<string | undefined>(undefined);
+  const [proceso, setProceso] = useState<string | undefined>(undefined);
   const [q, setQ] = useState("");
   const [verFiltros, setVerFiltros] = useState(false);
   const [f, setF] = useState({ modulo: "", estado: "", categoria: "", desde: "", hasta: "", archivados: false });
@@ -66,14 +70,34 @@ export function GestionDocumental() {
     if (!sesion) return;
     void cargar().then((l) => {
       // Enlace de la campana: /documentos?doc=POL-0008
-      const cod = new URLSearchParams(window.location.search).get("doc");
+      const qs = new URLSearchParams(window.location.search);
+      const cod = qs.get("doc");
       const d = cod && l.find((x) => x.codigo_unico === cod.toUpperCase());
       if (d) setAbierto(d.id);
+      // Historia de un proceso: /documentos?proceso=REQ-ALM-001
+      const pr = qs.get("proceso");
+      if (pr) {
+        setProceso(pr.toUpperCase());
+        setVista("historia");
+      }
     });
     // Barra estática de pendientes: se refresca cada minuto
     const t = setInterval(() => void misPendientes().then(setPendientes), 60_000);
     return () => clearInterval(t);
   }, [sesion, cargar]);
+
+  // "ver historia" desde la ficha de un documento (Código en otro módulo)
+  useEffect(() => {
+    const ir = (e: Event) => {
+      const c = String((e as CustomEvent<string>).detail ?? "").trim().toUpperCase();
+      if (!c) return;
+      setAbierto(null);
+      setProceso(c);
+      setVista("historia");
+    };
+    window.addEventListener("gd:proceso", ir);
+    return () => window.removeEventListener("gd:proceso", ir);
+  }, []);
 
   const filtrados = useMemo(() => {
     const t = q.trim().toUpperCase();
@@ -117,7 +141,14 @@ export function GestionDocumental() {
           <p className="text-[12px] text-white/65">Sistema auditado: nada se borra, nada cambia sin huella. Cada acción queda registrada con usuario, fecha, hora e IP.</p>
         </div>
         {puedeSubir && (
-          <Boton tono="critico" onClick={() => setSubir(true)} className="shadow-md">
+          <Boton
+            tono="critico"
+            onClick={() => {
+              setSubirRef(undefined);
+              setSubir(true);
+            }}
+            className="shadow-md"
+          >
             <Plus size={16} /> Subir documento
           </Boton>
         )}
@@ -143,32 +174,47 @@ export function GestionDocumental() {
         </div>
       )}
 
-      {/* Vistas: Gerencia / SOPORTE ven además el panel de auditoría y los reportes */}
-      {gerencia && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {(
-            [
-              ["documentos", "Documentos", FileStack],
-              ["descargas", "¿Quién descargó qué?", FileSearch],
-              ["reportes", "Reportes", AlertTriangle],
-            ] as const
-          ).map(([id, label, Icono]) => (
-            <button
-              key={id}
-              onClick={() => setVista(id)}
-              className={cx(
-                "inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-semibold transition",
-                vista === id ? "!bg-[#294D61] !text-white" : "bg-white/80 text-[#11212D] hover:bg-white"
-              )}
-            >
-              <Icono size={15} /> {label}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Vistas: todos ven Documentos e Historia de procesos; Gerencia / SOPORTE además auditoría y reportes */}
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {(
+          [
+            ["documentos", "Documentos", FileStack],
+            ["historia", "Historia de procesos", Route],
+            ...(gerencia
+              ? ([
+                  ["descargas", "¿Quién descargó qué?", FileSearch],
+                  ["reportes", "Reportes", AlertTriangle],
+                ] as const)
+              : []),
+          ] as const
+        ).map(([id, label, Icono]) => (
+          <button
+            key={id}
+            onClick={() => setVista(id)}
+            className={cx(
+              "inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-semibold transition",
+              vista === id ? "!bg-[#294D61] !text-white" : "bg-white/80 text-[#11212D] hover:bg-white"
+            )}
+          >
+            <Icono size={15} /> {label}
+          </button>
+        ))}
+      </div>
 
       <div className="mt-3">
-        {vista === "descargas" && gerencia ? (
+        {vista === "historia" ? (
+          <HistoriaProcesos
+            docsGD={docs ?? []}
+            usuario={usuario}
+            codigoInicial={proceso}
+            puedeSubir={puedeSubir}
+            onAbrirDocumento={setAbierto}
+            onAdjuntar={(codigo) => {
+              setSubirRef(codigo);
+              setSubir(true);
+            }}
+          />
+        ) : vista === "descargas" && gerencia ? (
           <QuienDescargo usuario={usuario} />
         ) : vista === "reportes" && gerencia ? (
           <Reportes usuario={usuario} />
@@ -319,6 +365,7 @@ export function GestionDocumental() {
       <SubirDocumento
         abierta={subir}
         rol={rol}
+        referencia={subirRef}
         onCerrar={() => setSubir(false)}
         onListo={async (codigo) => {
           setSubir(false);

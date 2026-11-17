@@ -70,7 +70,20 @@ function SelectorArchivo({ archivo, onCambio }: { archivo: File | null; onCambio
 }
 
 // ------------------------------------------------------------------ FLUJO 1 · Subir documento
-export function SubirDocumento({ abierta, onCerrar, onListo, rol }: { abierta: boolean; onCerrar: () => void; onListo: (codigo: string) => void; rol: string }) {
+export function SubirDocumento({
+  abierta,
+  onCerrar,
+  onListo,
+  rol,
+  referencia,
+}: {
+  abierta: boolean;
+  onCerrar: () => void;
+  onListo: (codigo: string) => void;
+  rol: string;
+  /** Historia de procesos: el documento se adjunta al proceso con este código (REQ-ALM-001, NP-0001…). */
+  referencia?: string;
+}) {
   const r = rolGD(rol);
   const modulos = modulosParaSubir(r);
   const inicial = (): DatosSubida => ({
@@ -80,7 +93,7 @@ export function SubirDocumento({ abierta, onCerrar, onListo, rol }: { abierta: b
     categoria: "Politica",
     fecha_vencimiento: null,
     es_confidencial: false,
-    referencia_externa: "",
+    referencia_externa: referencia ?? "",
     // Por defecto nadie ve nada: solo el aprobador (Gerencia) recibe permiso explícito de Aprobación
     permisos: ROLES_GD.map((x) => ({ rol: x, permiso: (x === "Gerencia" ? "Aprobacion" : "Sin Acceso") as PermisoGD })),
     aprobadores: ["Gerencia"],

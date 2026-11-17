@@ -367,9 +367,14 @@ function Detalle({ doc, usuario, versionPrevia }: { doc: DocumentoGD; usuario: s
         </Dato>
         {doc.referencia_externa && (
           <Dato label="Código en otro módulo">
-            <span className="inline-flex items-center gap-1 font-semibold text-[#294D61]">
-              <Link2 size={13} /> {doc.referencia_externa}
-            </span>
+            <button
+              type="button"
+              title="Ver la historia clínica del proceso"
+              onClick={() => window.dispatchEvent(new CustomEvent("gd:proceso", { detail: doc.referencia_externa }))}
+              className="inline-flex items-center gap-1 text-left font-semibold text-[#294D61] underline-offset-2 hover:underline"
+            >
+              <Link2 size={13} /> {doc.referencia_externa} · ver historia
+            </button>
           </Dato>
         )}
         {doc.motivo_archivo && <Dato label="Motivo de archivo">{doc.motivo_archivo}</Dato>}
