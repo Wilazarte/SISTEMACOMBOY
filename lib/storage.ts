@@ -1164,7 +1164,11 @@ export function editarRequerimiento(
     items,
     editadoPor: usuarioActual(),
     editadoEn: new Date().toISOString(),
-    historial: [...req.historial, evento(rol, "Editado antes de la revisión", `${items.length} producto(s) · Sede ${cambios.sede}`)],
+    // Quién editó con nombre: Tesorería (Lizbeth) también puede editar los REQ de Almacén con permiso individual
+    historial: [
+      ...req.historial,
+      evento(rol, rol === "TESORERIA" ? "Editado por Tesorería antes de la revisión" : "Editado antes de la revisión", `${items.length} producto(s) · Sede ${cambios.sede} · por ${nombreActual()}`),
+    ],
   };
   escribir(KEYS.REQS_PENDIENTES, lista.map((r) => (r.id === id ? editado : r)));
 }
@@ -2372,6 +2376,11 @@ export const getValesProduccion = () => leer<ValeProduccion[]>(KEYS.VALES_PRODUC
 export type RefKardex = { tipo: TipoKardex; documento: string; chasis?: string; motivo?: string };
 
 const usuarioActual = () => getSesion()?.usuario ?? "sistema";
+/** Nombre real del usuario (para el historial): nombre completo, si no el nombre, si no el usuario. */
+const nombreActual = () => {
+  const s = getSesion();
+  return s?.nombreCompleto || s?.nombre || s?.usuario || "sistema";
+};
 
 function anotarKardex(movs: Omit<MovimientoKardex, "id" | "fecha" | "usuario">[]): void {
   if (!movs.length) return;
