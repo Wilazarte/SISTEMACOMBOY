@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "./supabase/client";
 import type { Rol } from "./types";
 import { DOMINIO, puedeVer, soloSecocha, tieneSecocha, veDashboard, RUTA_GERENCIA, RUTA_SUCURSAL, RUTA_SUCURSAL_ANTIGUA, type RolAuth, type Sesion } from "./permisos";
-import { homeAsignado, isAdmin } from "./permisosPlanta";
+import { esAdminSede, homeAsignado, isAdmin } from "./permisosPlanta";
 
 export * from "./permisos";
 
@@ -177,7 +177,9 @@ export function inicioDe(sesion: Sesion): string {
 }
 
 /** Rol de negocio; un rol desconocido (ej. uno antiguo de la tabla) queda sin permisos de escritura. */
-export const rolNegocio = (sesion: Sesion | null): Rol => (sesion ? ROL_NEGOCIO[sesion.rol as RolAuth] ?? "CONTADOR" : "CONTADOR");
+export const rolNegocio = (sesion: Sesion | null): Rol =>
+  // Administrador de Secocha: los mismos permisos de negocio que SOPORTE, limitados a Secocha por la base
+  sesion && esAdminSede(sesion) ? "GERENCIA" : sesion ? ROL_NEGOCIO[sesion.rol as RolAuth] ?? "CONTADOR" : "CONTADOR";
 
 // =====================================================================
 // Módulos del login: el usuario elige su módulo ANTES de ingresar.
@@ -255,7 +257,7 @@ const NOMBRES: Partial<Record<RolAuth, string>> = {
   tesoreria: "LIZBETH CAHUANA APFATA",
   almacen: "JOSE MANUEL ORTIZ ARAPA",
 };
-export const nombreDe = (s: Sesion): string => (esSoporte(s) ? ETIQUETA_SOPORTE : s.nombreCompleto?.trim() || NOMBRES[s.rol] || s.nombre);
+export const nombreDe = (s: Sesion): string => (esSoporte(s) && !esAdminSede(s) ? ETIQUETA_SOPORTE : s.nombreCompleto?.trim() || NOMBRES[s.rol] || s.nombre);
 
 /** El rol creador se muestra como SOPORTE (Dueño): solo cambia lo que se ve, el rol en la base sigue siendo "creador". */
 export const esSoporte = (s: Sesion | null): boolean => isAdmin(s);

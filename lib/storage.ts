@@ -2567,6 +2567,8 @@ const DJ_AUTO = "DJ-AUTO";
 
 /** Siguiente N° de declaración jurada de gasto: correlativo atómico en Supabase (tabla correlativos, next_correlativo). */
 async function siguienteDJ(): Promise<string> {
+  // Secocha: DJ-SEC-001 (numeración propia de la sede)
+  if (vistaSede?.modo === "sucursal") return `DJ-SEC-${String(await siguienteSede("DJ", vistaSede.propia)).padStart(3, "0")}`;
   const { data, error } = await createClient().rpc("next_correlativo", { t: "DJ" });
   if (error) {
     if (error.code === "42501") throw new ErpError("Su usuario no puede emitir declaraciones juradas.");
@@ -2925,6 +2927,11 @@ export async function registrarGastoCompleto(
  * Se usa cuando el proveedor no entregó cotización (supabase/migrations/20261118_cotizacion_proveedor_gasto.sql).
  */
 async function reservarCotizacionProveedor(): Promise<string> {
+  if (vistaSede?.modo === "sucursal") {
+    const anio = Number(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric" }).format(new Date()));
+    const n = await siguienteSede(`COTPROV_${anio}` as Serie, vistaSede.propia);
+    return `COT-PROV-SEC-${String(n).padStart(4, "0")}-${anio}`;
+  }
   const { data, error } = await createClient().rpc("siguiente_numero_cot_prov");
   if (error) {
     if (error.code === "42501") throw new ErpError(error.message);
@@ -3475,6 +3482,11 @@ export const getOrdenesServicio = () => leer<OrdenServicio[]>(KEYS.ORDENES_SERVI
 
 /** Reserva el siguiente N° de OS del año en Supabase (atómico): OS-001-2026. */
 async function reservarNumeroOS(): Promise<string> {
+  if (vistaSede?.modo === "sucursal") {
+    const anio = Number(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric" }).format(new Date()));
+    const n = await siguienteSede(`OS_${anio}` as Serie, vistaSede.propia);
+    return `OS-SEC-${String(n).padStart(3, "0")}-${anio}`;
+  }
   const { data, error } = await createClient().rpc("siguiente_numero_os");
   if (error) {
     if (error.code === "42501") throw new ErpError(error.message);

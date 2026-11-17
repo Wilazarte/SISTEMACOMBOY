@@ -67,10 +67,33 @@ export async function cargarSedes(vista?: "sucursal" | "central"): Promise<void>
   // Usuario de sede: la suya. ERP central (Taller, Tesorería): Secocha, la única sucursal
   const actualId = asignada?.sedeId ?? sedeSucursal(sedes)?.id ?? "";
   estado = { listo: true, error: "", sedes, asignada, actualId };
-  if (vista === "sucursal" && actualId) fijarVistaSede({ modo: "sucursal", propia: actualId });
+  // ERP: un usuario de Secocha (o SOPORTE que eligió Secocha) trabaja el ERP completo en modo Secocha
+  const erpEnSucursal = vista === "central" && !!actualId && (!!asignada || (sedeElegida() === "sucursal" && !!sedeSucursal(sedes)));
+  if ((vista === "sucursal" || erpEnSucursal) && actualId) fijarVistaSede({ modo: "sucursal", propia: actualId });
   else if (vista === "central" && !asignada && sedeCentral(sedes))
     fijarVistaSede({ modo: "central", ajenas: sedes.filter((x) => x.id !== sedeCentral(sedes)!.id).map((x) => x.id) });
   avisar();
+}
+
+/**
+ * SOPORTE (ERP central) elige con qué sede trabaja el ERP: Arequipa ("central") o Secocha ("sucursal").
+ * Se recuerda en este navegador. Los usuarios de Secocha siempre trabajan en Secocha.
+ */
+const CLAVE_SEDE_ERP = "erp_sede_trabajo";
+export function sedeElegida(): "central" | "sucursal" {
+  try {
+    return window.localStorage.getItem(CLAVE_SEDE_ERP) === "sucursal" ? "sucursal" : "central";
+  } catch {
+    return "central";
+  }
+}
+export async function elegirSedeErp(v: "central" | "sucursal"): Promise<void> {
+  try {
+    window.localStorage.setItem(CLAVE_SEDE_ERP, v);
+  } catch {
+    /* almacenamiento bloqueado */
+  }
+  await cargarSedes("central");
 }
 
 /** Arequipa (Planta Principal): tipo PLANTA_PRINCIPAL o es_central. */
