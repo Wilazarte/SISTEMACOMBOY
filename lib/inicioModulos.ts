@@ -177,6 +177,13 @@ export const ACCIONES_SOPORTE: AccionInicio[] = [
 
 export const accionesDe = (modulo: ModuloInicio): AccionInicio[] => (modulo === "soporte" ? ACCIONES_SOPORTE : ACCIONES_INICIO[modulo]);
 
+/** Funciones de fabricación que la sucursal (Secocha) no tiene. */
+const SOLO_PLANTA = new Set(["ingresar-equipo", "equipos-produccion", "crear-op", "orden-produccion"]);
+
+/** Pantallas de fabricación (Producción, OP, expedientes 26W): fuera de Secocha. */
+export const esRutaProduccion = (path: string): boolean =>
+  ["/produccion", "/dashboard/produccion", "/logistica/crear-op", "/erp/lotes", "/erp/expediente"].some((r) => path === r || path.startsWith(`${r}/`));
+
 /** Las acciones que el usuario puede abrir: permiso del perfil y acceso a la pantalla de destino. */
 export function accionesPermitidas(sesion: Sesion | null, modulo: ModuloInicio): AccionInicio[] {
   if (!sesion) return [];
@@ -184,7 +191,11 @@ export function accionesPermitidas(sesion: Sesion | null, modulo: ModuloInicio):
   return accionesDe(modulo).filter((a) => {
     if (a.externo) return true;
     // Ya dentro de Secocha: sin enlace a la Secocha antigua
-    if (modulo === "soporte" && a.slug === "secocha" && enSucursal()) return false;
+    if (enSucursal()) {
+      if (modulo === "soporte" && a.slug === "secocha") return false;
+      // Secocha solo vende, no fabrica (Williams 2026-11-17): sin Producción ni el flujo de OP / Expediente 26W
+      if (modulo === "produccion" || a.grupo === EXP || a.fase || SOLO_PLANTA.has(a.slug)) return false;
+    }
     if (a.requiere && !permisos[a.requiere]) return false;
     return puedeVer(sesion, (a.permiso ?? a.destino).split("?")[0]);
   });
