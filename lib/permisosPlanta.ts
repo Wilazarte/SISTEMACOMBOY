@@ -13,6 +13,18 @@ export type PerfilPlanta = "soporte" | "logistica" | "almacen" | "finanzas" | "p
  */
 export const isAdmin = (sesion: Sesion | null): boolean => {
   const rol = sesion?.rol as string | undefined;
+  return rol === "creador" || rol === "soporte" || esAdminSede(sesion);
+};
+
+/**
+ * Administrador de Secocha (Williams 2026-11-17): Secocha no tiene perfiles separados; su administrador
+ * (rol "sucursal" con módulos ["*"]) ve TODO el ERP, en modo Secocha (solo datos de Secocha, RLS sede_isolation).
+ * No es SOPORTE: no entra a /soporte ni administra usuarios.
+ */
+export const esAdminSede = (sesion: Sesion | null): boolean => sesion?.rol === "sucursal" && (sesion.modulos ?? []).includes("*");
+/** SOPORTE real (dueño del sistema). */
+export const esSoporteReal = (sesion: Sesion | null): boolean => {
+  const rol = sesion?.rol as string | undefined;
   return rol === "creador" || rol === "soporte";
 };
 

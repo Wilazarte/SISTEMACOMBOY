@@ -3,7 +3,7 @@
 // (lib/auth.ts) y el servidor (middleware.ts) con las mismas reglas.
 // =====================================================================
 
-import { HOME_PERFIL, RUTA_NO_AUTORIZADO, homePlantaDe, isAdmin, perfilPlanta, permisosPlanta } from "./permisosPlanta";
+import { HOME_PERFIL, RUTA_NO_AUTORIZADO, esSoporteReal, homePlantaDe, isAdmin, perfilPlanta, permisosPlanta } from "./permisosPlanta";
 
 /** Roles con permisos definidos en el ERP. Cualquier otro rol de la tabla perfiles se trata como solo lectura. */
 export type RolAuth = "creador" | "tesoreria" | "almacen" | "planilla" | "gerencia" | "sucursal" | "ventas";
@@ -47,7 +47,7 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
   if (!sesion) return false;
   if (ruta === "/dashboard") return true; // solo redirige al primer módulo permitido
   // Pestañas de los botones del INICIO SOPORTE (/soporte/{accion}): solo SOPORTE
-  if (ruta === "/soporte" || ruta.startsWith("/soporte/")) return isAdmin(sesion);
+  if (ruta === "/soporte" || ruta.startsWith("/soporte/")) return esSoporteReal(sesion);
   // Módulo Creador: por rol, no por módulos (gerencia tiene "*" pero no debe entrar)
   if (ruta === RUTA_CREADOR || ruta.startsWith(`${RUTA_CREADOR}/`)) return puedeEditarAsistencia(sesion);
   // Producción: también Almacén (registra las órdenes de producción y el QC)

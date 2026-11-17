@@ -9,7 +9,6 @@ import { CajaChica } from "@/components/sucursal/Caja";
 import { ClientesTab, StockLocalTab } from "@/components/sucursal/Inventario";
 import { ReportesSucursal } from "@/components/sucursal/Reportes";
 import { SucursalShell } from "@/components/sucursal/Shell";
-import { SubmodulosSecocha } from "@/components/sucursal/Submodulos";
 import { getSesion } from "@/lib/auth";
 import { deSede, useSedes } from "@/lib/sedes";
 import { KEYS, tablaDisponible, useStore } from "@/lib/storage";
@@ -38,10 +37,9 @@ const CLAVE_TAB = "sucursal-tab-activa";
 export default function SucursalApp() {
   return (
     <SucursalShell>
-      {/* Operación diaria (jefe de sede, Taller y Tesorería de Arequipa); los usuarios de un submódulo van al suyo */}
-      <SubmodulosSecocha actual="operacion">
-        <SucursalPage />
-      </SubmodulosSecocha>
+      {/* Operación diaria del jefe de sede (y Taller / Tesorería de Arequipa). Los perfiles de Secocha
+          (Tesorería, Logística, Almacén, Ventas, Planilla, Gerencia) usan el ERP completo en modo Secocha. */}
+      <SucursalPage />
     </SucursalShell>
   );
 }
