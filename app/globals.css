@@ -538,3 +538,162 @@ body[data-modo-pestana] [data-guardar-pestana] {
   /* Celda vacía (fila en blanco al final de una tabla editable) */
   table.tabla-movil > tbody > tr > td:empty { display: none; }
 }
+
+/* ===================== Estilo LOGIN en todo el ERP (prueba, Williams 2026-11-17) =====================
+   Mismo lenguaje visual que el inicio de sesión de dos paneles (components/login/LoginDosPaneles.tsx):
+   fondo claro #f6f8fc con ondas azul/cian al pie, tarjetas blancas con borde #e1e7f2, texto azul marino #0f1b33,
+   íconos en círculo rojo COMBOY, seleccionado en azul marino, foco cian y botón principal rojo→azul→cian.
+   La barra superior toma el panel oscuro del login (azul noche con ondas). La estructura no cambia: solo colores.
+   Se activa con la clase .tema-login junto a .tema-planta (ErpLayout). */
+.tema-planta.tema-login {
+  color-scheme: light;
+  --canvas: 238 242 248;
+  --surface: 255 255 255;
+  --fg: 15 27 51;
+  --fg-2: 75 91 120;
+  --corp: 0 102 255;
+  --vino-900: 0 82 220;
+  --vino: 196 30 58;
+  --rojo: 196 30 58;
+  --rojo-soft: 253 236 240;
+  --rojo-tenue: 250 200 210;
+  --azul-900: 15 27 51;
+  --azul-700: 43 59 92;
+  --azul-500: 90 103 130;
+  --plomo-50: 246 248 252;
+  --plomo-100: 238 242 249;
+  --plomo-200: 225 231 242;
+  --plomo-500: 90 103 130;
+  --plomo-600: 75 91 120;
+  --slate-100: 241 245 251; --slate-200: 225 231 242; --slate-300: 203 213 230; --slate-400: 122 135 158;
+  --slate-600: 75 91 120; --slate-700: 43 59 92; --slate-900: 15 27 51;
+  --red-50: 254 242 242; --red-100: 254 226 226; --red-200: 254 202 202; --red-300: 252 165 165; --red-400: 248 113 113;
+  --red-500: 239 68 68; --red-600: 220 38 38; --red-700: 185 28 28; --red-800: 153 27 27; --red-900: 127 29 29;
+  --emerald-50: 236 253 245; --emerald-100: 209 250 229; --emerald-200: 167 243 208; --emerald-400: 52 211 153;
+  --emerald-500: 16 185 129; --emerald-600: 5 150 105; --emerald-700: 4 120 87; --emerald-800: 6 95 70;
+  --amber-50: 255 251 235; --amber-100: 254 243 199; --amber-200: 253 230 138; --amber-300: 252 211 77; --amber-400: 251 191 36;
+  --amber-500: 245 158 11; --amber-600: 217 119 6; --amber-700: 180 83 9; --amber-800: 146 64 14; --amber-900: 120 53 15;
+  --orange-50: 255 247 237; --orange-300: 253 186 116; --orange-600: 234 88 12; --orange-700: 194 65 12; --orange-800: 154 52 18;
+  --blue-50: 239 246 255; --blue-200: 191 219 254; --blue-600: 37 99 235; --blue-800: 30 64 175;
+  --glass-bg: #ffffff;
+  --glass-borde: #e1e7f2;
+  --grad-azul: linear-gradient(90deg, #c41e3a 0%, #0066ff 55%, #00d4fe 100%);
+  --cian: #00c8fe;
+  color: #0f1b33;
+}
+/* Fondo: el panel claro del login, con ondas azul eléctrico / cian al pie */
+.fondo-login {
+  background-color: #eef2f8;
+  background-image:
+    radial-gradient(circle at 8% 0%, rgba(0, 200, 254, 0.1) 0%, transparent 40%),
+    radial-gradient(circle at 100% 30%, rgba(196, 30, 58, 0.05) 0%, transparent 35%),
+    radial-gradient(rgba(15, 27, 51, 0.05) 1px, transparent 1px),
+    linear-gradient(180deg, #f6f8fc 0%, #eaf0f8 100%);
+  background-size: 100% 100%, 100% 100%, 22px 22px, 100% 100%;
+}
+
+/* Barra superior: panel oscuro del login (azul noche con ondas y trazo rojo fuego) */
+.tema-login .cabecera-roja {
+  background-color: #0d1424;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 64' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='a' x1='0' x2='1'%3E%3Cstop offset='0' stop-color='%230066ff' stop-opacity='.55'/%3E%3Cstop offset='1' stop-color='%2300f2fe' stop-opacity='.12'/%3E%3C/linearGradient%3E%3ClinearGradient id='f' x1='0' x2='1'%3E%3Cstop offset='0' stop-color='%23ff2a5f' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23ff2a5f' stop-opacity='.7'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0 0H1600V30C1350 60 1150 5 900 30S400 52 0 22Z' fill='url(%23a)'/%3E%3Cpath d='M0 48C300 20 650 70 1000 40S1450 30 1600 52' fill='none' stroke='%2300f2fe' stroke-opacity='.3' stroke-width='1.5'/%3E%3Cpath d='M600 64C900 38 1200 70 1600 40' fill='none' stroke='url(%23f)' stroke-width='2'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  border-bottom: 1px solid rgba(0, 242, 254, 0.25);
+  box-shadow: 0 6px 24px rgba(15, 27, 51, 0.25);
+}
+.tema-login .cabecera-roja .texto-modulo { color: #fff; text-shadow: 0 0 18px rgba(0, 242, 254, 0.45); }
+.tema-login .cabecera-roja .logo-placa { background: #f6f8fc; border-color: rgba(255, 255, 255, 0.6); }
+
+/* Tarjetas, secciones y cajas: blancas como las opciones del login */
+.tema-login .bg-surface,
+.tema-login .glass-card,
+.tema-login main .glass-blur,
+.tema-login .btn-glass,
+.tema-login .aviso-glass {
+  background-color: #ffffff;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-color: #e1e7f2;
+  color: #0f1b33;
+}
+.tema-login .bg-surface.shadow-pop { background-color: #ffffff; border-color: #e1e7f2; box-shadow: 0 20px 50px rgba(15, 27, 51, 0.18); }
+.tema-login .glass-card,
+.tema-login .shadow-card { box-shadow: 0 6px 22px rgba(15, 27, 51, 0.07); }
+.tema-login .border-plomo-200 { border-color: #e1e7f2; }
+.tema-login .btn-glass { box-shadow: 0 1px 2px rgba(15, 27, 51, 0.04); }
+.tema-login .btn-glass:hover,
+.tema-login .hover-cian:hover,
+.tema-login .seccion .btn-glass:hover,
+.tema-login .seccion .hover-cian:hover { border-color: #00c8fe; box-shadow: 0 4px 14px rgba(0, 200, 254, 0.2); background-color: #ffffff; }
+
+/* Principal: el botón "Ingresar" del login. Activo / seleccionado: azul marino como la opción elegida. */
+.tema-login .bg-corp,
+.tema-login .grad-azul { background-image: linear-gradient(90deg, #c41e3a 0%, #0066ff 55%, #00d4fe 100%); color: #fff; box-shadow: 0 6px 18px rgba(0, 102, 255, 0.28); }
+.tema-login .grad-fuego { box-shadow: 0 4px 12px rgba(255, 42, 95, 0.22); }
+
+/* Secciones: tarjeta blanca con la franja de color arriba y un arco suave en la esquina */
+.tema-login main .seccion {
+  background-color: #ffffff;
+  border-color: #e1e7f2;
+  background-image:
+    linear-gradient(90deg, rgb(var(--sec)) 0%, rgb(var(--sec) / 0.35) 45%, transparent 90%),
+    radial-gradient(120% 90% at 100% 0%, rgb(var(--sec) / 0.06) 0%, transparent 55%);
+  background-size: 100% 3px, 100% 100%;
+}
+.tema-login main .seccion::after { opacity: 0.45; }
+.tema-login main .seccion-titulo { color: color-mix(in srgb, rgb(var(--sec)) 70%, #0f1b33); }
+.tema-login main .seccion-titulo::before { box-shadow: none; }
+
+/* Textos claros pensados para el fondo negro: pasan a azul marino / gris azulado dentro del contenido */
+.tema-login main :is(.text-white, .text-fg, .text-\[\#e5e7eb\], .text-\[\#fff\], .text-\[\#ffffff\]) { color: #0f1b33; }
+.tema-login main :is(.text-\[\#d4d4d8\], .text-\[\#D1D5DB\], .text-\[\#d1d5db\]) { color: #2b3b5c; }
+.tema-login main :is(.text-\[\#a1a1aa\], .text-\[\#9CA3AF\], .text-\[\#9ca3af\], .text-\[\#71717a\], .text-\[\#6b7280\], .text-\[\#6B7280\], .text-\[\#6b7080\]) { color: #5a6782; }
+.tema-login main :is(.text-\[\#4ade80\], .text-\[\#86efac\]) { color: #059669; }
+.tema-login main :is(.text-\[\#60a5fa\], .text-\[\#93c5fd\], .text-\[\#00f2fe\]) { color: #0066ff; }
+.tema-login main :is(.text-\[\#fcd34d\], .text-\[\#fde68a\], .text-\[\#FFB27A\], .text-\[\#FF9A4D\]) { color: #c2410c; }
+.tema-login main :is(.text-\[\#ff6a7f\], .text-\[\#ff6a5f\], .text-\[\#f87171\], .text-\[\#fca5a5\]) { color: #c41e3a; }
+/* …salvo sobre fondos de color (botones principales, chips, avisos rojos, tooltips oscuros) */
+.tema-login main :is(.bg-corp, .grad-azul, .grad-fuego, [class*="bg-gradient"], .bg-\[\#2a7bff\], .bg-\[\#E30613\], .bg-\[\#c4001c\], .bg-\[\#ff2a5f\], .bg-\[\#FF6D00\], .bg-\[\#22c55e\], .bg-azul-900, .bg-red-600, .bg-emerald-600, .bg-blue-600) :is(.text-white, .text-fg),
+.tema-login main :is(.bg-corp, .grad-azul, .grad-fuego, [class*="bg-gradient"], .bg-\[\#2a7bff\], .bg-\[\#E30613\], .bg-\[\#c4001c\], .bg-\[\#ff2a5f\], .bg-\[\#FF6D00\], .bg-\[\#22c55e\], .bg-azul-900, .bg-red-600, .bg-emerald-600, .bg-blue-600).text-white { color: #fff; }
+
+/* Fondos y bordes translúcidos blancos (hechos para el negro) → tintes azul marino suaves */
+.tema-login main :is(.border-white\/5, .border-white\/10, .border-white\/15, .border-white\/20, [class*="border-white/["]) { border-color: #e1e7f2; }
+.tema-login main :is(.bg-white\/5, .bg-white\/10, [class*="bg-white/["]) { background-color: rgba(15, 27, 51, 0.035); }
+.tema-login main :is(.hover\:bg-white\/10:hover, [class*="hover:bg-white/"]:hover) { background-color: rgba(0, 200, 254, 0.08); color: #0f1b33; }
+.tema-login main :is(.bg-\[\#212a3a\], .bg-\[\#2a3445\], .bg-\[\#222222\], .bg-\[\#1A1A1A\], .bg-\[\#1a1a1a\]) { background-color: #f3f6fb; color: #0f1b33; }
+.tema-login main :is(.border-\[\#333333\], .border-\[\#3a4558\], .border-\[\#444444\], .border-\[\#343846\], .border-\[\#2a2d38\]) { border-color: #e1e7f2; }
+
+/* Barras y cajas oscuras con color fijo (navegación INICIO › …, menús, botones grafito) → claras */
+.tema-login main :is([class*="bg-[#0"], [class*="bg-[#1"], .bg-slate-700, .bg-slate-800, .bg-slate-900, .bg-black) { background-color: #ffffff; color: #0f1b33; }
+.tema-login main :is([class*="bg-[#0"], [class*="bg-[#1"]).backdrop-blur { background-color: rgba(246, 248, 252, 0.92); }
+.tema-login main :is(.hover\:bg-slate-700:hover, [class*="hover:bg-[#2"]:hover) { background-color: #eef7fd; }
+.tema-login main :is(.border-slate-600, .border-slate-700, [class*="border-[#2a7bff]"]) { border-color: #d5dceb; }
+.tema-login main .hover\:border-slate-400:hover { border-color: #00c8fe; }
+
+/* Tablas: cabecera gris azulado como los rótulos del login, filas blancas */
+.tema-login table thead { background-color: #f3f6fb; }
+.tema-login table thead th { color: #5a6782; }
+.tema-login table tbody tr:hover { background-color: rgba(0, 200, 254, 0.05); }
+
+/* Campos: blancos, borde #d5dceb y foco cian (como Usuario / Contraseña, en claro) */
+.tema-login main :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea):not(.bg-transparent),
+.tema-login .shadow-pop :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):not(.bg-transparent) {
+  background-color: #ffffff;
+  border-color: #d5dceb;
+  color: #0f1b33;
+}
+.tema-login :is(input, select, textarea):not(.bg-transparent):focus { border-color: #00c8fe; box-shadow: 0 0 0 3px rgb(0 200 254 / 0.18); }
+.tema-login ::placeholder { color: #9aa6bd; }
+
+/* Pie */
+.tema-login > footer { background: rgba(255, 255, 255, 0.85); border-color: #e1e7f2; color: #5a6782; }
+.tema-login > footer .text-white { color: #0f1b33; }
+
+/* Celular: tarjetas de las tablas en blanco */
+@media (max-width: 639px) {
+  .tema-login table.tabla-movil > tbody > tr,
+  .tema-login table.tabla-movil > tfoot > tr { background-color: #ffffff; border-color: #e1e7f2 !important; box-shadow: 0 2px 8px rgba(15, 27, 51, 0.05); }
+  .tema-login table.tabla-movil > tbody > tr > :is(td, th) + :is(td, th) { border-top-color: #eef2f9 !important; }
+  .tema-login table.tabla-movil :is(td, th)[data-label]:not([data-label=""])::before { color: #5a6782; }
+}

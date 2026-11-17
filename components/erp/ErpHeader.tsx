@@ -39,7 +39,7 @@ export function ErpHeader({
   return (
     <header className="fixed inset-x-0 top-0 z-40 flex h-[64px] items-center justify-between gap-3 cabecera-roja px-4 print:hidden lg:px-6">
       <Link href={inicio} className="z-10 flex shrink-0 items-center gap-3" aria-label="Inicio">
-        <Image src="/comboy-logo.png" alt="COMBOY VID" width={110} height={36} priority className="logo-placa h-9 w-auto object-contain" />
+        <Image src="/logo-login.png" alt="COMBOY VID" width={900} height={334} priority className="logo-placa h-10 w-auto object-contain" />
         <span className="hidden whitespace-nowrap text-[18px] font-extrabold uppercase text-white lg:block" style={{ fontFamily: TIMES }}>
           ERP COMBOY VID
         </span>

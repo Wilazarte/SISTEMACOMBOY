@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { ID_BARRA_PESTANAS } from "@/components/ui";
@@ -76,11 +75,11 @@ export function ErpLayout({
   const iniciales = inicialesDe(nombreUsuario, sesion.iniciales);
   const moduloUsuario = etiqueta?.label ?? (sesion.moduloAsignado?.toUpperCase() || undefined);
   return (
-    <div className={"dark tema-planta relative isolate flex min-h-screen flex-col pb-32 text-fg"} data-modulo={moduleName}>
+    <div className={"dark tema-planta tema-login relative isolate flex min-h-screen flex-col pb-32 text-fg"} data-modulo={moduleName}>
       {/* Tema GLASS (2026-11-04): negro grafito con malla abstracta (luz azul eléctrico arriba, fuego abajo). En los
           módulos el mapa mundial queda apenas visible debajo; los INICIO, solo la malla. */}
-      <div aria-hidden className="fondo-malla pointer-events-none fixed inset-0 z-[-1]">
-        {!sinMapa && <Image src="/blue-globe.jpg" alt="" fill priority quality={80} sizes="100vw" className="object-cover object-center opacity-[0.07] mix-blend-screen grayscale" />}
+      <div aria-hidden className="fondo-login pointer-events-none fixed inset-0 z-[-1]">
+        <OndasFondo />
       </div>
 
       <ErpHeader
@@ -108,6 +107,17 @@ export function ErpLayout({
       <ChatGlobal sesion={sesion} modulo={moduleName} abierto={chatAbierto} setAbierto={setChatAbierto} />
       {overlays}
     </div>
+  );
+}
+
+/** Ondas al pie de la pantalla, las mismas del panel claro del inicio de sesión (azul eléctrico, cian y azul noche). */
+function OndasFondo() {
+  return (
+    <svg viewBox="0 0 400 140" preserveAspectRatio="none" className="absolute inset-x-0 bottom-0 h-24 w-full md:h-40">
+      <path d="M0,70 C90,20 170,120 260,70 C320,38 360,50 400,30 L400,140 L0,140 Z" fill="#00c8fe" opacity="0.14" />
+      <path d="M0,95 C80,60 180,140 280,92 C330,70 370,78 400,62 L400,140 L0,140 Z" fill="#0066ff" opacity="0.14" />
+      <path d="M0,120 C100,92 190,140 300,112 C350,100 380,104 400,96 L400,140 L0,140 Z" fill="#0f1b33" opacity="0.55" />
+    </svg>
   );
 }
 
