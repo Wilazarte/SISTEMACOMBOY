@@ -21,7 +21,7 @@ import { detenerCatalogo, iniciarCatalogo } from "@/lib/productos";
 import { cargarSedes, elegirSedeErp, esUsuarioDeSede, getSedeActual, olvidarSedes, useSedes } from "@/lib/sedes";
 import { RUTA_GERENCIA, RUTA_SUCURSAL, inicioDe, soloSecocha, logout, puedeVer, useSesion, veTesoreria } from "@/lib/auth";
 import { RUTA_NO_AUTORIZADO, esAdminSede, homeAsignado, homePlantaDe, isAdmin } from "@/lib/permisosPlanta";
-import { RUTA_INICIO, TITULO_INICIO, buscarAccion, esModuloInicio, type ModuloInicio } from "@/lib/inicioModulos";
+import { RUTA_INICIO, TITULO_INICIO, buscarAccion, esModuloInicio, esRutaProduccion, type ModuloInicio } from "@/lib/inicioModulos";
 import { registrarNavegador } from "@/lib/navegacion";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
 import { useNotificaciones } from "@/lib/notificaciones";
@@ -277,7 +277,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
   };
 
-  const permitido = path === "/dashboard/compras" ? veTesoreria(sesion) : puedeVer(sesion, path);
+  // Secocha solo vende: sin Producción ni OP / expedientes 26W (Williams 2026-11-17)
+  const permitido = modoSecocha && esRutaProduccion(path) ? false : path === "/dashboard/compras" ? veTesoreria(sesion) : puedeVer(sesion, path);
   const actual = moduloDe(path);
   const modulo = actual && actual.href !== "/dashboard" ? actual.href : undefined;
   const enPlanilla = path.startsWith("/dashboard/planilla") || (path === "/dashboard/compras" && tabActiva?.id === "planilla");

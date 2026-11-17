@@ -91,7 +91,6 @@ function seccionesSecocha(sesion: Sesion): Seccion[] {
     { id: "tesoreria", label: "Tesorería", icono: Landmark, modulo: "finanzas", grupos: finanzas.filter(([g]) => g !== "Planilla") },
     { id: "planilla", label: "Planilla", icono: Users, modulo: "finanzas", grupos: finanzas.filter(([g]) => g === "Planilla") },
     { id: "almacen", label: "Almacén", icono: Boxes, modulo: "almacen", grupos: de("almacen") },
-    { id: "produccion", label: "Producción", icono: Factory, modulo: "produccion", grupos: de("produccion") },
   ];
   const secciones = lista.filter((x) => x.grupos.length > 0);
   if (puedeVer(sesion, "/gerencia")) secciones.push({ id: "dashboard", label: "Dashboard", icono: BarChart3, modulo: "soporte", grupos: [], href: "/gerencia" });
