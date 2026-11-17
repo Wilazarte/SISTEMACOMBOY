@@ -477,10 +477,34 @@ export interface ConcesionContratista {
 // Compras directas y stock de almacén
 // =====================================================================
 
+/** Opción de compra del proveedor para un producto: 1 = primera opción, 2 = segunda, 3 = tercera. */
+export type OpcionProveedor = 1 | 2 | 3;
+
+export interface ProductoProveedor {
+  nombre: string;
+  opcion: OpcionProveedor;
+}
+
+/**
+ * Proveedor (documento tipo 'proveedor' de public.compras). Base ÚNICA para Arequipa y Secocha.
+ * Los proveedores creados desde "Registrar compra" solo tienen RUC y razón social; el resto se completa
+ * en Logística > Base de proveedores.
+ */
 export interface Proveedor {
   id: string;
   razonSocial: string;
   ruc: string;
+  asesorVentas?: string;
+  /** Teléfono / celular de contacto. */
+  contacto?: string;
+  correo?: string;
+  direccion?: string;
+  /** Productos que vende, cada uno con su número de opción. */
+  productos?: ProductoProveedor[];
+  estado?: "ACTIVO" | "INACTIVO";
+  creadoEn?: string;
+  /** Sede que lo registró (solo informativo: la base es compartida). */
+  sedeId?: string;
 }
 
 /** Mismos tipos que el gasto sin stock (lib/comprobantes.ts). */
@@ -635,6 +659,19 @@ export interface Cliente {
   lineaCredito: number; // S/ (0 = sin línea)
   estado: "ACTIVO" | "INACTIVO";
   created_at: string;
+  /** Labor minera / unidad donde opera el cliente. */
+  laborMinera?: string;
+  /** Clasificación comercial (lista editable: A1, VIP, DISTRIBUIDOR, NORMAL, NUEVO…). */
+  clasificacion?: string;
+  /** Sede que lo registró (solo informativo: la base es compartida). */
+  sedeId?: string;
+}
+
+/** Clasificación de clientes (documento tipo 'clasificacion_cliente' de public.ventas). */
+export interface ClasificacionCliente {
+  id: string;
+  nombre: string;
+  orden: number;
 }
 
 /** CONTADO (efectivo, transferencia, Yape...), CREDITO (pide días y calcula el vencimiento), PERSONALIZADO (días y detalle libres). */

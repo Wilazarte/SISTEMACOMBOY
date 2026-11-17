@@ -88,6 +88,7 @@ export const KEYS = {
   STOCK: "almacen_stock",
   ASISTENCIA: "planilla_asistencia",
   CLIENTES: "ventas_clientes",
+  CLASIF_CLIENTES: "ventas_clasif_clientes",
   COND_PAGO: "ventas_condiciones_pago",
   NOTAS_PEDIDO: "ventas_notas_pedido",
   COMPROBANTES: "ventas_comprobantes",
@@ -289,6 +290,7 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.TRABAJADORES]: { tabla: "planilla", tipo: "trabajador", forma: "lista" },
   [KEYS.ASISTENCIA]: { tabla: "planilla", tipo: "asistencia", forma: "lista" },
   [KEYS.CLIENTES]: { tabla: "ventas", tipo: "cliente", forma: "lista" },
+  [KEYS.CLASIF_CLIENTES]: { tabla: "ventas", tipo: "clasificacion_cliente", forma: "lista" },
   [KEYS.COND_PAGO]: { tabla: "condiciones_pago", forma: "condiciones" },
   [KEYS.NOTAS_PEDIDO]: { tabla: "ventas", tipo: "nota_pedido", forma: "lista" },
   [KEYS.COMPROBANTES]: { tabla: "ventas", tipo: "comprobante", forma: "lista" },
@@ -377,9 +379,16 @@ let vistaSede: VistaSede | null = null;
 const COMPARTIDAS_ALMACEN = new Set<string>([KEYS.STOCK, KEYS.KARDEX]);
 const esAlmacenSecocha = (x: unknown): boolean => /secocha/i.test(String((x as { sede?: unknown } | null)?.sede ?? ""));
 
+/**
+ * Base de proveedores y clientes (Williams 2026-11-17): UNA sola para Arequipa y Secocha. No se filtran por sede:
+ * las dos sedes ven y editan los mismos registros (la base lo permite con 20261203_base_proveedores_clientes.sql;
+ * sin ese SQL Secocha sigue viendo solo los suyos). Cada fila conserva la sede que la registró.
+ */
+const COMPARTIDAS_SEDES = new Set<string>([KEYS.PROVEEDORES, KEYS.CLIENTES, KEYS.CLASIF_CLIENTES]);
+
 const filtraSede = (key: StoreKey): boolean => {
   const d = DESTINOS[key];
-  if (!vistaSede || d.forma !== "lista" || !TABLAS_POR_SEDE.has(d.tabla)) return false;
+  if (!vistaSede || d.forma !== "lista" || !TABLAS_POR_SEDE.has(d.tabla) || COMPARTIDAS_SEDES.has(key)) return false;
   return !(vistaSede.modo === "central" && COMPARTIDAS_ALMACEN.has(key));
 };
 const visibleEnSede = (x: unknown): boolean => {

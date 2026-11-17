@@ -63,6 +63,7 @@ export const CLAVES_POR_MODULO: Record<string, StoreKey[]> = {
   ],
   "/dashboard/ventas": [
     "ventas_clientes",
+    "ventas_clasif_clientes",
     "ventas_notas_pedido",
     "ventas_comprobantes",
     "ventas_cobros",
