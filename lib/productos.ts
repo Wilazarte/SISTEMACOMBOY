@@ -129,6 +129,9 @@ export function useCatalogo(): Estado {
 }
 
 /** Producto oficial de un nombre (exacto, normalizado o alias). */
+/** ¿Se cargó el catálogo maestro? (sin él no se puede validar nombres). */
+export const catalogoDisponible = (): boolean => estado.disponible;
+
 export const buscarProducto = (nombre: string): ProductoMaestro | undefined => porNombre.get(normalizarNombre(nombre));
 
 /** Categoría del producto del catálogo con ese nombre (stock, REQ, Secocha…); "" si no tiene. */

@@ -9,7 +9,7 @@ import { getSesion } from "@/lib/auth";
 import { SEDES_STOCK, SEDE_REPUESTOS } from "@/lib/empresa";
 import { AUTORIZA_DEFECTO, ETIQUETA_KARDEX, ETIQUETA_MOTIVO, MOTIVOS_RETIRO, errorChasis, kardexDe, requiereChasis, retiroProduccion, textoChasis, type MotivoRetiro } from "@/lib/inventario";
 import { prepararSaldos, type PlanSaldos } from "@/lib/reglasStock";
-import { KEYS, importarSaldosStock, soles, useStore } from "@/lib/storage";
+import { KEYS, importarSaldosStock, planReemplazoStock, reemplazarStock, soles, useStore } from "@/lib/storage";
 import { normalizarChasis } from "@/lib/utils/chasis";
 import { categoriaDe, useCatalogo } from "@/lib/productos";
 import { EtiquetaCategoria, FiltroCategoria, contarCategorias, pasaCategoria } from "@/components/productos/Categorias";
@@ -158,8 +158,8 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
               <FileSpreadsheet size={16} /> Exportar Excel
             </Button>
             {puedeOperar && (
-              <Button variant="secondary" onClick={() => setImportar(true)} title="Importar saldos desde Excel (Nombre Único | Ubicación | Ctd)">
-                <Upload size={16} /> Importar saldos
+              <Button variant="secondary" onClick={() => setImportar(true)} title="Importar Excel: reemplazar todo el stock o sumar saldos">
+                <Upload size={16} /> Importar / Reemplazar
               </Button>
             )}
           </div>
@@ -258,7 +258,7 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
 
       {kardexDe_ && <KardexModal item={stock.find((x) => x.id === kardexDe_.id) ?? kardexDe_} onClose={() => setKardexDe(null)} />}
       {retiroDe && <RetiroProduccionModal item={stock.find((x) => x.id === retiroDe.id) ?? retiroDe} onClose={() => setRetiroDe(null)} />}
-      {importar && <ImportarSaldosModal onClose={() => setImportar(false)} />}
+      {importar && <ImportarSaldosModal onClose={() => setImportar(false)} onRespaldo={exportarExcel} />}
     </Card>
   );
 }
@@ -419,10 +419,23 @@ function RetiroProduccionModal({ item, onClose }: { item: StockItem; onClose: ()
 }
 
 /** Importar saldos desde Excel (Nombre Único | Ubicación | Ctd): vista previa + log, luego importa. */
-function ImportarSaldosModal({ onClose }: { onClose: () => void }) {
+function ImportarSaldosModal({ onClose, onRespaldo }: { onClose: () => void; onRespaldo: () => Promise<void> }) {
   const [plan, setPlan] = useState<PlanSaldos | null>(null);
   const [archivo, setArchivo] = useState("");
   const [verTodo, setVerTodo] = useState(false);
+  // SUMAR = suma al stock actual (saldo inicial) · REEMPLAZAR = el Excel pasa a ser todo el stock
+  const [modo, setModo] = useState<"SUMAR" | "REEMPLAZAR">("REEMPLAZAR");
+  const [alcance, setAlcance] = useState("");
+  const [confirmar, setConfirmar] = useState("");
+  const [verCambios, setVerCambios] = useState(false);
+  const reemplazo = useMemo(() => {
+    if (!plan || modo !== "REEMPLAZAR") return null;
+    try {
+      return planReemplazoStock(plan.productos, alcance);
+    } catch {
+      return null;
+    }
+  }, [plan, modo, alcance]);
 
   const leer = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -432,8 +445,9 @@ function ImportarSaldosModal({ onClose }: { onClose: () => void }) {
       const XLSX = await import("xlsx");
       const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
       const filas = XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "" });
-      setPlan(prepararSaldos(filas));
+      setPlan(prepararSaldos(filas, undefined, { enteros: false }));
       setArchivo(file.name);
+      setConfirmar("");
     } catch {
       toast("No se pudo leer el Excel.", "error");
     }
@@ -444,6 +458,15 @@ function ImportarSaldosModal({ onClose }: { onClose: () => void }) {
       `Importación de saldos · ${archivo} · ${new Date().toLocaleString("es-PE")}`,
       `Filas: ${plan.resumen.filas} · Productos: ${plan.resumen.productos} · Con stock: ${plan.resumen.conStock} · En 0: ${plan.resumen.enCero} · Avisos: ${plan.resumen.avisos} · Errores: ${plan.resumen.errores}`,
       `Unidades: ${Object.entries(plan.resumen.unidades).map(([u, n]) => `${u} ${n}`).join(" · ")}`,
+      ...(reemplazo
+        ? [
+            "",
+            `REEMPLAZO (${alcance || "todos los almacenes"}): ${reemplazo.aplicar.length} del Excel · ${reemplazo.cambian} cambian · ${reemplazo.nuevos} nuevos · ${reemplazo.aCero.length} quedan en 0 · ${reemplazo.omitidos.length} no están en el catálogo`,
+            ...reemplazo.omitidos.map((n) => `NO ESTÁ EN EL CATÁLOGO (no se importa)\t${n}`),
+            ...reemplazo.aCero.map((z) => `QUEDA EN 0 (no está en el Excel)\t${z.sede}\t${z.nombre}\t${z.cantidad} ${z.unidad} -> 0`),
+            ...reemplazo.aplicar.filter((a) => !a.existente || a.antes !== a.cantidad).map((a) => `${a.existente ? "CAMBIA" : "NUEVO"}\t${a.sede}\t${a.nombre}\t${a.antes} -> ${a.cantidad} ${a.unidad}`),
+          ]
+        : []),
       "",
       ...plan.log.map((l) => `Fila ${l.fila}\t${l.nivel}\t${l.producto}\t${l.mensaje}`),
     ].join("\n");
@@ -451,6 +474,18 @@ function ImportarSaldosModal({ onClose }: { onClose: () => void }) {
   };
   const importar = () => {
     if (!plan) return;
+    if (modo === "REEMPLAZAR") {
+      if (!reemplazo) return;
+      let r = { cambiados: 0, nuevos: 0, enCero: 0 };
+      const ok = ejecutar(() => {
+        r = reemplazarStock(reemplazo, `REEMPLAZO ${archivo}`);
+      }, `Stock reemplazado desde ${archivo}`);
+      if (ok) {
+        toast(`${r.cambiados} actualizado(s) · ${r.nuevos} nuevo(s) · ${r.enCero} en 0 (no estaban en el Excel). Cada cambio quedó en el Kardex como Ajuste.`);
+        onClose();
+      }
+      return;
+    }
     let r = { nuevos: 0, actualizados: 0 };
     const ok = ejecutar(() => {
       r = importarSaldosStock(plan.productos, `IMPORT ${archivo}`);
@@ -461,18 +496,69 @@ function ImportarSaldosModal({ onClose }: { onClose: () => void }) {
     }
   };
   const lineas = plan ? (verTodo ? plan.log : plan.log.filter((l) => l.nivel !== "OK")) : [];
+  const listoReemplazo = !!reemplazo && reemplazo.aplicar.length > 0 && confirmar.trim().toUpperCase() === "REEMPLAZAR";
+  const cambios = reemplazo
+    ? [
+        ...reemplazo.aCero.map((z) => ({ k: `0-${z.id}`, tipo: "Queda en 0", sede: z.sede, nombre: z.nombre, antes: z.cantidad, despues: 0, unidad: z.unidad })),
+        ...reemplazo.aplicar
+          .filter((a) => !a.existente || a.antes !== a.cantidad)
+          .map((a) => ({ k: `a-${a.sede}-${a.nombre}`, tipo: a.existente ? "Cambia" : "Nuevo", sede: a.sede, nombre: a.nombre, antes: a.antes, despues: a.cantidad, unidad: a.unidad })),
+      ]
+    : [];
 
   return (
-    <Modal open onClose={onClose} title="Importar saldos de almacén (Excel)" wide>
+    <Modal open onClose={onClose} title={modo === "REEMPLAZAR" ? "Reemplazar stock de almacén con Excel" : "Importar saldos de almacén (Excel)"} wide>
       <div className="space-y-4 text-sm">
+        <div className="grid gap-2 md:grid-cols-2" data-modo-import>
+          {(
+            [
+              ["REEMPLAZAR", "Reemplazar todo el stock", "El Excel pasa a ser el stock: cada producto queda con la cantidad del archivo y los que no están en el archivo quedan en 0."],
+              ["SUMAR", "Sumar al stock actual", "Saldo inicial: la cantidad del Excel se suma a la que ya hay."],
+            ] as const
+          ).map(([v, t, d]) => (
+            <button
+              key={v}
+              type="button"
+              data-modo={v}
+              onClick={() => {
+                setModo(v);
+                setConfirmar("");
+              }}
+              className={cn("rounded-xl border p-3 text-left transition", modo === v ? "border-azul-900 bg-azul-900/5 ring-2 ring-azul-900" : "border-plomo-200 hover:border-azul-900")}
+            >
+              <span className="block font-semibold text-fg">{t}</span>
+              <span className="block text-xs text-plomo-600">{d}</span>
+            </button>
+          ))}
+        </div>
         <p className="text-plomo-600">
-          Columnas: <b>Nombre Único | Ubicación | Ctd</b>. ALMACEN → <b>{SEDE_REPUESTOS}</b>. Unidad: la del nombre (“| UNIDAD”, “| ROLLO”, “| PAR”); ACEITE → LT; BALDE / LÍQUIDO /
-          SILICONA / AFLOJATODO → UND; resto → PZA. Costo 0 (se valoriza después con los Ingresos por V°B°). Si el producto ya existe en la sede, se suma la cantidad.
+          Columnas: <b>Producto (o Nombre Único) | Almacén (o Ubicación) | Unidad | Cantidad</b> y, opcional, <b>Último costo</b>. Sirve el mismo Excel de <b>Exportar Excel</b>: expórtelo,
+          corrija las cantidades y vuelva a subirlo. Sin columna Almacén → <b>{SEDE_REPUESTOS}</b>. Sin columna Unidad: la del nombre (“| UNIDAD”), ACEITE → LT, resto → PZA.
         </p>
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-corp px-4 py-2.5 text-sm font-semibold text-white hover:bg-vino-900">
-          <FileSpreadsheet size={16} /> {plan ? "Elegir otro archivo" : "Elegir Excel"}
-          <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={leer} />
-        </label>
+        <div className="flex flex-wrap items-center gap-2">
+          {modo === "REEMPLAZAR" && (
+            <Button variant="secondary" onClick={() => void onRespaldo()} title="Guarde una copia del stock actual antes de reemplazarlo">
+              <FileDown size={16} /> 1. Descargar respaldo del stock actual
+            </Button>
+          )}
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-corp px-4 py-2.5 text-sm font-semibold text-white hover:bg-vino-900">
+            <FileSpreadsheet size={16} /> {modo === "REEMPLAZAR" ? "2. " : ""}
+            {plan ? "Elegir otro archivo" : "Elegir Excel"}
+            <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={leer} />
+          </label>
+          {modo === "REEMPLAZAR" && (
+            <label className="flex items-center gap-2 text-xs font-semibold text-plomo-600">
+              Almacén a reemplazar:
+              <Select
+                value={alcance}
+                onChange={(e) => setAlcance(e.target.value)}
+                className="w-auto"
+                aria-label="Almacén a reemplazar"
+                options={[{ value: "", label: "Todos los almacenes" }, ...SEDES_STOCK.map((x) => ({ value: x, label: `Solo ${x}` }))]}
+              />
+            </label>
+          )}
+        </div>
         {plan && (
           <>
             <div className="grid grid-cols-2 gap-2 rounded-xl border border-plomo-200 bg-plomo-50 p-3 md:grid-cols-4" data-resumen-import>
@@ -495,6 +581,58 @@ function ImportarSaldosModal({ onClose }: { onClose: () => void }) {
                   .join(" · ")}
               </span>
             </div>
+            {reemplazo && (
+              <div className="space-y-2 rounded-xl border border-amber-300 bg-amber-50 p-3" data-resumen-reemplazo>
+                <p className="font-semibold text-amber-900">
+                  Al reemplazar {alcance ? `el stock de ${alcance}` : "TODO el stock (todos los almacenes)"}:
+                </p>
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                  <span>
+                    Del Excel: <b>{reemplazo.aplicar.length}</b>
+                  </span>
+                  <span>
+                    Cambian: <b>{reemplazo.cambian}</b> · nuevos: <b>{reemplazo.nuevos}</b>
+                  </span>
+                  <span className={reemplazo.aCero.length ? "font-semibold text-red-700" : ""}>
+                    Quedan en 0 (no están en el Excel): <b>{reemplazo.aCero.length}</b>
+                  </span>
+                  <span className={reemplazo.omitidos.length ? "font-semibold text-red-700" : ""}>
+                    No están en el catálogo: <b>{reemplazo.omitidos.length}</b>
+                  </span>
+                </div>
+                {reemplazo.fueraDeAlcance > 0 && <p className="text-xs text-amber-900">{reemplazo.fueraDeAlcance} fila(s) del Excel son de otro almacén y no se tocan.</p>}
+                {reemplazo.omitidos.length > 0 && (
+                  <p className="text-xs text-red-700">
+                    No se importan (pida a Soporte que los cree en el catálogo o corrija el nombre): {reemplazo.omitidos.slice(0, 8).join(", ")}
+                    {reemplazo.omitidos.length > 8 ? ` y ${reemplazo.omitidos.length - 8} más (ver log)` : ""}.
+                  </p>
+                )}
+                <p className="text-xs text-plomo-600">Nada se borra: los registros y su Kardex se conservan, y cada diferencia queda en el Kardex como Ajuste.</p>
+                {cambios.length > 0 && (
+                  <label className="flex items-center gap-2 text-xs">
+                    <input type="checkbox" checked={verCambios} onChange={(e) => setVerCambios(e.target.checked)} /> Ver los {cambios.length} cambios de cantidad
+                  </label>
+                )}
+                {verCambios && (
+                  <div className="max-h-[220px] overflow-y-auto rounded-lg border border-plomo-200 bg-surface">
+                    <table className="w-full text-xs" data-tabla-cambios>
+                      <tbody>
+                        {cambios.map((c) => (
+                          <tr key={c.k} className={cn("border-b border-plomo-100", c.tipo === "Queda en 0" && "bg-red-50")}>
+                            <td className="px-2 py-1 font-semibold">{c.tipo}</td>
+                            <td className="px-2 py-1">{c.sede}</td>
+                            <td className="px-2 py-1">{c.nombre}</td>
+                            <td className="whitespace-nowrap px-2 py-1 text-right">
+                              {num(c.antes)} → <b>{num(c.despues)}</b> {c.unidad}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex items-center gap-3">
               <label className="flex items-center gap-2 text-xs">
                 <input type="checkbox" checked={verTodo} onChange={(e) => setVerTodo(e.target.checked)} /> Ver log completo ({plan.log.length} líneas)
@@ -503,7 +641,7 @@ function ImportarSaldosModal({ onClose }: { onClose: () => void }) {
                 <FileDown size={14} /> Descargar log
               </Button>
             </div>
-            <div className="max-h-[260px] overflow-y-auto rounded-xl border border-plomo-200">
+            <div className="max-h-[200px] overflow-y-auto rounded-xl border border-plomo-200">
               <table className="w-full text-xs">
                 <tbody>
                   {lineas.map((l, i) => (
@@ -524,13 +662,24 @@ function ImportarSaldosModal({ onClose }: { onClose: () => void }) {
             </div>
           </>
         )}
-        <div className="flex justify-end gap-2 border-t border-plomo-100 pt-4">
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-plomo-100 pt-4">
+          {modo === "REEMPLAZAR" && plan && (
+            <Field label='Escriba REEMPLAZAR para confirmar'>
+              <Input value={confirmar} onChange={(e) => setConfirmar(e.target.value)} placeholder="REEMPLAZAR" className="w-44" data-confirmar-reemplazo />
+            </Field>
+          )}
           <Button variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
-          <Button onClick={importar} disabled={!plan || plan.productos.length === 0}>
-            <Upload size={16} /> Importar {plan ? plan.productos.length : ""} producto(s)
-          </Button>
+          {modo === "REEMPLAZAR" ? (
+            <Button variant="danger" onClick={importar} disabled={!listoReemplazo} data-boton-reemplazar>
+              <Upload size={16} /> Reemplazar stock{reemplazo ? ` (${reemplazo.aplicar.length} productos)` : ""}
+            </Button>
+          ) : (
+            <Button onClick={importar} disabled={!plan || plan.productos.length === 0}>
+              <Upload size={16} /> Importar {plan ? plan.productos.length : ""} producto(s)
+            </Button>
+          )}
         </div>
       </div>
     </Modal>

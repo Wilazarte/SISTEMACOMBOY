@@ -50,7 +50,7 @@ import type {
 } from "./types";
 import { generarCodigo } from "./utils/codigos";
 import { clavesDeModulos } from "./storage.por-modulo";
-import { canonizarItems } from "./productos";
+import { buscarProducto, canonizarItems, catalogoDisponible } from "./productos";
 import { normalizarNombre } from "./productos-modelos";
 import { sedeNormalizada } from "./constantes";
 import { exigirRucSunat } from "./ruc";
@@ -2448,6 +2448,113 @@ export function importarSaldosStock(productos: { nombre: string; unidad: string;
   escribir(KEYS.STOCK, stock);
   anotarKardex(movs);
   return { nuevos, actualizados };
+}
+
+/** Qué haría "Reemplazar todo el stock" con un Excel (vista previa, no escribe nada). */
+export interface PlanReemplazo {
+  /** Productos del Excel que quedan con su cantidad (existentes o nuevos). */
+  aplicar: { nombre: string; unidad: string; sede: string; cantidad: number; costoUnit?: number; existente?: StockItem; antes: number }[];
+  /** Registros de stock que no están en el Excel: quedan en 0. */
+  aCero: StockItem[];
+  /** Productos del Excel que no están en el catálogo maestro: no se importan. */
+  omitidos: string[];
+  /** Filas del Excel de otro almacén (cuando se reemplaza un solo almacén). */
+  fueraDeAlcance: number;
+  nuevos: number;
+  cambian: number;
+}
+
+/**
+ * Plan para reemplazar el stock por el de un Excel (Williams, 2026-11-17). alcance = almacén a reemplazar ("" = todos).
+ * El mismo producto en el mismo almacén se reconoce por nombre (sin importar la unidad, que toma la del Excel).
+ */
+export function planReemplazoStock(productos: { nombre: string; unidad: string; sede: string; cantidad: number; costoUnit?: number }[], alcance = ""): PlanReemplazo {
+  const enAlcance = (sede: string) => !alcance || sedeNormalizada(sede) === sedeNormalizada(alcance);
+  const stock = getStock().filter((s) => enAlcance(s.sede));
+  const usados = new Set<string>();
+  const omitidos: string[] = [];
+  const aplicar: PlanReemplazo["aplicar"] = [];
+  let fueraDeAlcance = 0;
+  // Si el Excel trae el mismo producto dos veces en un almacén (otra unidad), se suman
+  const porClave = new Map<string, PlanReemplazo["aplicar"][number]>();
+  for (const p of productos) {
+    if (!enAlcance(p.sede)) {
+      fueraDeAlcance++;
+      continue;
+    }
+    const oficial = buscarProducto(p.nombre);
+    if (catalogoDisponible() && !oficial) {
+      omitidos.push(p.nombre);
+      continue;
+    }
+    const nombre = oficial?.nombre_normalizado ?? normalizarNombre(p.nombre);
+    const sede = sedeNormalizada(p.sede);
+    const k = `${sede}|${normalizarNombre(nombre)}`;
+    const previo = porClave.get(k);
+    if (previo) {
+      previo.cantidad = r2(previo.cantidad + p.cantidad);
+      continue;
+    }
+    const candidatos = stock.filter((s) => !usados.has(s.id) && sedeNormalizada(s.sede) === sede && normalizarNombre(s.nombre) === normalizarNombre(nombre));
+    const existente = candidatos.find((s) => s.unidad === p.unidad) ?? [...candidatos].sort((a, b) => b.cantidad - a.cantidad)[0];
+    if (existente) usados.add(existente.id);
+    const fila = { nombre, unidad: p.unidad, sede, cantidad: r2(Math.max(0, p.cantidad)), ...(p.costoUnit ? { costoUnit: p.costoUnit } : {}), existente, antes: existente?.cantidad ?? 0 };
+    porClave.set(k, fila);
+    aplicar.push(fila);
+  }
+  const aCero = stock.filter((s) => !usados.has(s.id) && s.cantidad !== 0);
+  return {
+    aplicar,
+    aCero,
+    omitidos,
+    fueraDeAlcance,
+    nuevos: aplicar.filter((a) => !a.existente).length,
+    cambian: aplicar.filter((a) => a.existente && (a.antes !== a.cantidad || a.existente.unidad !== a.unidad)).length,
+  };
+}
+
+/**
+ * Reemplaza el stock por el del Excel: cada producto queda con la cantidad del archivo, los que no están quedan en 0
+ * (el registro y su kardex se conservan) y cada diferencia queda en el kardex como AJUSTE. El costo se toma del Excel si trae uno.
+ */
+export function reemplazarStock(plan: PlanReemplazo, documento: string): { cambiados: number; nuevos: number; enCero: number } {
+  if (!plan.aplicar.length) throw new ErpError("El Excel no tiene productos para este almacén.");
+  const ahora = new Date().toISOString();
+  const stock = getStock();
+  const porId = new Map(stock.map((s) => [s.id, s]));
+  const movs: Omit<MovimientoKardex, "id" | "fecha" | "usuario">[] = [];
+  const motivo = `Reemplazo de stock desde Excel por ${usuarioActual()}`;
+  let cambiados = 0;
+  let nuevos = 0;
+  for (const a of plan.aplicar) {
+    const e = a.existente ? porId.get(a.existente.id) : undefined;
+    if (e) {
+      const antes = e.cantidad;
+      if (antes === a.cantidad && e.unidad === a.unidad && !(a.costoUnit && a.costoUnit !== e.costoUnit)) continue;
+      e.cantidad = a.cantidad;
+      e.unidad = a.unidad;
+      e.sede = a.sede;
+      if (a.costoUnit) e.costoUnit = a.costoUnit;
+      e.actualizado = ahora;
+      cambiados++;
+      if (antes !== a.cantidad) movs.push({ sede: e.sede, stock_id: e.id, producto: e.nombre, unidad: e.unidad, tipo_movimiento: "AJUSTE", documento, motivo, cantidad: r2(a.cantidad - antes), saldo: e.cantidad });
+    } else {
+      const n: StockItem = { id: uid(), sede: a.sede, nombre: a.nombre, unidad: a.unidad, cantidad: a.cantidad, costoUnit: a.costoUnit ?? 0, actualizado: ahora };
+      stock.push(n);
+      nuevos++;
+      movs.push({ sede: n.sede, stock_id: n.id, producto: n.nombre, unidad: n.unidad, tipo_movimiento: "AJUSTE", documento, motivo, cantidad: n.cantidad, saldo: n.cantidad });
+    }
+  }
+  for (const z of plan.aCero) {
+    const e = porId.get(z.id);
+    if (!e || e.cantidad === 0) continue;
+    movs.push({ sede: e.sede, stock_id: e.id, producto: e.nombre, unidad: e.unidad, tipo_movimiento: "AJUSTE", documento, motivo: `${motivo} (no está en el Excel)`, cantidad: -e.cantidad, saldo: 0 });
+    e.cantidad = 0;
+    e.actualizado = ahora;
+  }
+  escribir(KEYS.STOCK, stock);
+  anotarKardex(movs);
+  return { cambiados, nuevos, enCero: plan.aCero.length };
 }
 
 /** Cantidad disponible de un producto en una sede. */
