@@ -232,7 +232,10 @@ export default function LoginDosPaneles({ inicial = "", siguiente = null }: { in
           <section className="relative overflow-hidden bg-[#f6f8fc] px-5 pb-20 pt-6 text-[#0f1b33] sm:px-8 md:px-10 md:pb-20 md:pt-7">
             <OndasClaras />
             <div className="relative">
-              <Image src="/logo.png" alt="COMBOY VID" width={300} height={96} priority className="h-12 w-auto max-w-full object-contain md:h-14" />
+              {/* Logo de Williams (2026-11-17) sin fondo negro, centrado arriba: solo en este panel */}
+              <div className="flex justify-center">
+                <Image src="/logo-login.png" alt="COMBOY VID" width={900} height={334} priority className="h-16 w-auto max-w-full object-contain md:h-[72px]" />
+              </div>
               <h1 className="mt-3 text-[26px] font-extrabold leading-tight tracking-tight md:text-[30px]">Iniciar sesión</h1>
               <p className="mt-1 text-sm text-[#4b5b78]">Seleccione su módulo</p>
 
