@@ -21,6 +21,7 @@ import type { ComprobanteVenta, Cotizacion, Factura, Guia, LineaVenta, NotaPedid
 import type { Traslado, VentaSucursal } from "./sucursal-modelos";
 import { COMPROBANTES } from "./comprobantes";
 import { mostrarPDF, registrarZonaFirma } from "./visorPdf";
+import { cuadroDepreciacion, depreciacion, nombreCategoria, type Activo, type Depreciacion, type EntregaActivo } from "./activos";
 
 type RGB = [number, number, number];
 // Plantilla corporativa COMBOY VID
@@ -1511,4 +1512,121 @@ export function pdfGuiaRemision(t: Traslado): void {
     }),
     t.guiaRemision
   );
+}
+
+// =====================================================================
+// ACTIVOS DE LA EMPRESA (Finanzas › Contabilidad › Activos)
+// =====================================================================
+
+/** Ficha de entrega de un activo a su responsable (firman quien entrega y quien recibe, con huella). */
+export function pdfFichaEntregaActivo(a: Activo, e: EntregaActivo): void {
+  guardar(
+    construir({
+      titulo: "FICHA DE ENTREGA DE ACTIVO",
+      numero: e.numero,
+      estado: e.devuelto ? `DEVUELTO ${fechaPE(e.devuelto)}` : "VIGENTE",
+      datos: [
+        ["Código del activo", a.codigo],
+        ["Activo", a.nombre],
+        ["Categoría", nombreCategoria(a.categoria)],
+        ["Marca / Modelo", [a.marca, a.modelo].filter(Boolean).join(" ") || "-"],
+        ["N° de serie", a.serie || "-"],
+        ["Fecha de entrega", fechaPE(e.fecha)],
+        ["Responsable", e.responsable],
+        ["DNI", e.dni || "-"],
+        ["Cargo", e.cargo || "-"],
+        ["Ubicación", [e.sede, a.area].filter(Boolean).join(" · ")],
+        ["Estado al entregar", e.condicion],
+        ["Entregado por", e.entregadoPor],
+      ],
+      head: ["#", "Bien / accesorio entregado", "Cant.", "Condición"],
+      body: [
+        [1, `${a.nombre}${a.serie ? ` (S/N ${a.serie})` : ""}`, 1, e.condicion],
+        ...e.accesorios
+          .split(/[\n,;]+/)
+          .map((x) => x.trim())
+          .filter(Boolean)
+          .map((x, i) => [i + 2, x, 1, e.condicion]),
+      ],
+      notas: [
+        ...(e.observaciones ? [`Observaciones: ${e.observaciones}`] : []),
+        "COMPROMISO DEL RESPONSABLE: recibo el bien descrito en buen estado y me comprometo a usarlo solo para labores de la empresa, " +
+          "cuidarlo, no prestarlo ni trasladarlo sin autorización, avisar de inmediato cualquier falla, pérdida o robo, y devolverlo con sus " +
+          "accesorios al término de mi labor o cuando la empresa lo solicite. La pérdida o daño por negligencia podrá ser descontado conforme a ley.",
+      ],
+      qr: `${EMPRESA.ruc}|ACTIVO|${a.codigo}|${e.numero}|${e.dni || e.responsable}`,
+      qrTexto: [`Activo ${a.codigo}`, `Ficha ${e.numero}`, `Responsable: ${e.responsable}`],
+      firmas: ["Entregado por (Empresa)", `Recibí conforme: ${e.responsable}`],
+      huellaEn: 1,
+    }),
+    e.numero
+  );
+}
+
+/** Hoja de vida del activo: datos, compra, depreciación (cuadro anual), entregas y mantenimientos. */
+export function pdfHojaVidaActivo(a: Activo): void {
+  const d = depreciacion(a);
+  const cuadro = cuadroDepreciacion(a);
+  construirYMostrarHoja(a, d, cuadro);
+}
+
+function construirYMostrarHoja(a: Activo, d: Depreciacion, cuadro: ReturnType<typeof cuadroDepreciacion>): void {
+  const doc = construir({
+    titulo: "HOJA DE VIDA DEL ACTIVO",
+    numero: a.codigo,
+    estado: a.estado === "BAJA" ? "DE BAJA" : a.estado.replace("_", " "),
+    datos: [
+      ["Activo", a.nombre],
+      ["Categoría", nombreCategoria(a.categoria)],
+      ["Marca / Modelo", [a.marca, a.modelo].filter(Boolean).join(" ") || "-"],
+      ["N° de serie", a.serie || "-"],
+      ["Ubicación", [a.sede, a.area].filter(Boolean).join(" · ")],
+      ["Responsable", a.responsable || "Sin asignar"],
+      ["Fecha de compra", fechaPE(a.fechaCompra)],
+      ["Proveedor", a.proveedor || "-"],
+      ["Comprobante", a.comprobante || "-"],
+      ["Costo (sin IGV)", soles(a.costo)],
+      ["Tasa anual / vida útil", `${a.tasaAnual}% · ${d.vidaUtilMeses ? `${(d.vidaUtilMeses / 12).toLocaleString("es-PE", { maximumFractionDigits: 1 })} años` : "-"}`],
+      ["Valor residual", soles(a.valorResidual)],
+      ["Depreciación mensual", soles(d.mensual)],
+      ["Depreciación acumulada", soles(d.acumulada)],
+      ["Valor en libros", soles(d.valorLibros)],
+    ],
+    head: ["Año", "Meses", "Depreciación del año", "Acumulada", "Valor en libros"],
+    body: cuadro.map((f) => [f.anio, f.meses, soles(f.depreciacion), soles(f.acumulada), soles(f.valorLibros)]),
+    alinearDerecha: [1, 2, 3, 4],
+    extra: (doc, y) => {
+      let yy = y;
+      const seccion = (titulo: string, head: string[], body: (string | number)[][]) => {
+        if (!body.length) return;
+        autoTable(doc, {
+          startY: yy + 4,
+          head: [[titulo, ...head.slice(1)]],
+          body,
+          margin: { left: M, right: M, bottom: ALTO_PIE + 6 },
+          styles: { font: "helvetica", fontSize: 7.5, cellPadding: 1.6, lineColor: BORDE, lineWidth: 0.1 },
+          headStyles: { fillColor: AZUL, textColor: 255, fontStyle: "bold" },
+        });
+        yy = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+      };
+      seccion(
+        "Entregas (fichas)",
+        ["", "Fecha", "Responsable", "Cargo", "Devuelto"],
+        a.entregas.map((e) => [e.numero, fechaPE(e.fecha), e.responsable, e.cargo || "-", e.devuelto ? fechaPE(e.devuelto) : "Vigente"])
+      );
+      seccion(
+        "Mantenimientos",
+        ["", "Tipo", "Detalle", "Proveedor", "Costo"],
+        a.mantenimientos.map((m) => [fechaPE(m.fecha), m.tipo, m.detalle, m.proveedor || "-", soles(m.costo)])
+      );
+      return yy + 2;
+    },
+    notas: [
+      ...(a.proximoMantenimiento ? [`Próximo mantenimiento: ${fechaPE(a.proximoMantenimiento)}`] : []),
+      ...(a.baja ? [`Baja: ${fechaPE(a.baja.fecha)} · ${a.baja.motivo}${a.baja.detalle ? ` · ${a.baja.detalle}` : ""}${a.baja.valorVenta ? ` · Venta ${soles(a.baja.valorVenta)}` : ""}`] : []),
+      "Depreciación por el método lineal desde el mes de inicio de uso. Tasas de referencia: art. 22 del Reglamento de la Ley del Impuesto a la Renta; el contador valida la tasa de cada bien.",
+    ],
+    firmas: ["Contabilidad", "V°B° Gerencia"],
+  });
+  guardar(doc, `HOJA-VIDA-${a.codigo}`);
 }

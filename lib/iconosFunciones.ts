@@ -28,6 +28,7 @@ import {
   FileSpreadsheet,
   FileText,
   FolderKanban,
+  Laptop,
   Gauge,
   HandCoins,
   HardHat,
@@ -119,6 +120,7 @@ const ICONO_ACCION: Record<string, LucideIcon> = {
   balance: Scale,
   eeff: BarChart3,
   "estados-cuenta": Banknote,
+  activos: Laptop,
   "facturas-emitidas": Receipt,
   "cuentas-por-cobrar": CircleDollarSign,
   // Ventas
@@ -142,6 +144,7 @@ const ICONO_ACCION: Record<string, LucideIcon> = {
 
 /** Palabras clave (sin tildes, minúsculas) → ícono, para las pestañas de los módulos. El primero que coincide gana. */
 const POR_TEXTO: [RegExp, LucideIcon][] = [
+  [/activos/, Laptop],
   [/nuevo req|nuevo requerimiento/, ClipboardPlus],
   [/nuevos req/, Inbox],
   [/requerim/, ClipboardList],

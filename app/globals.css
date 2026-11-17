@@ -608,7 +608,7 @@ body[data-modo-pestana] [data-guardar-pestana] {
 /* Tarjetas, secciones y cajas: blancas como las opciones del login */
 .tema-login .bg-surface,
 .tema-login .glass-card,
-.tema-login main .glass-blur,
+.tema-login :is(main, [role="dialog"]) .glass-blur,
 .tema-login .btn-glass,
 .tema-login .aviso-glass {
   background-color: #ffffff;
@@ -633,7 +633,7 @@ body[data-modo-pestana] [data-guardar-pestana] {
 .tema-login .grad-fuego { box-shadow: 0 4px 12px rgba(128, 0, 33, 0.22); }
 
 /* Secciones: tarjeta blanca con la franja de color arriba y un arco suave en la esquina */
-.tema-login main .seccion {
+.tema-login :is(main, [role="dialog"]) .seccion {
   background-color: #ffffff;
   border-color: #CCD0CF;
   background-image:
@@ -641,35 +641,35 @@ body[data-modo-pestana] [data-guardar-pestana] {
     radial-gradient(120% 90% at 100% 0%, rgb(var(--sec) / 0.06) 0%, transparent 55%);
   background-size: 100% 3px, 100% 100%;
 }
-.tema-login main .seccion::after { opacity: 0.45; }
-.tema-login main .seccion-titulo { color: color-mix(in srgb, rgb(var(--sec)) 70%, #11212D); }
-.tema-login main .seccion-titulo::before { box-shadow: none; }
+.tema-login :is(main, [role="dialog"]) .seccion::after { opacity: 0.45; }
+.tema-login :is(main, [role="dialog"]) .seccion-titulo { color: color-mix(in srgb, rgb(var(--sec)) 70%, #11212D); }
+.tema-login :is(main, [role="dialog"]) .seccion-titulo::before { box-shadow: none; }
 
 /* Textos claros pensados para el fondo negro: pasan a azul marino / gris azulado dentro del contenido */
-.tema-login main :is(.text-white, .text-fg, .text-\[\#e5e7eb\], .text-\[\#fff\], .text-\[\#ffffff\]) { color: #11212D; }
-.tema-login main :is(.text-\[\#d4d4d8\], .text-\[\#D1D5DB\], .text-\[\#d1d5db\]) { color: #294D61; }
-.tema-login main :is(.text-\[\#a1a1aa\], .text-\[\#9CA3AF\], .text-\[\#9ca3af\], .text-\[\#71717a\], .text-\[\#6b7280\], .text-\[\#6B7280\], .text-\[\#6b7080\]) { color: #4F6B7B; }
-.tema-login main :is(.text-\[\#4ade80\], .text-\[\#86efac\]) { color: #059669; }
-.tema-login main :is(.text-\[\#60a5fa\], .text-\[\#93c5fd\], .text-\[\#00f2fe\]) { color: #294D61; }
-.tema-login main :is(.text-\[\#fcd34d\], .text-\[\#fde68a\], .text-\[\#FFB27A\], .text-\[\#FF9A4D\]) { color: #c2410c; }
-.tema-login main :is(.text-\[\#ff6a7f\], .text-\[\#ff6a5f\], .text-\[\#f87171\], .text-\[\#fca5a5\]) { color: #800021; }
+.tema-login :is(main, [role="dialog"]) :is(.text-white, .text-fg, .text-\[\#e5e7eb\], .text-\[\#fff\], .text-\[\#ffffff\]) { color: #11212D; }
+.tema-login :is(main, [role="dialog"]) :is(.text-\[\#d4d4d8\], .text-\[\#D1D5DB\], .text-\[\#d1d5db\]) { color: #294D61; }
+.tema-login :is(main, [role="dialog"]) :is(.text-\[\#a1a1aa\], .text-\[\#9CA3AF\], .text-\[\#9ca3af\], .text-\[\#71717a\], .text-\[\#6b7280\], .text-\[\#6B7280\], .text-\[\#6b7080\]) { color: #4F6B7B; }
+.tema-login :is(main, [role="dialog"]) :is(.text-\[\#4ade80\], .text-\[\#86efac\]) { color: #059669; }
+.tema-login :is(main, [role="dialog"]) :is(.text-\[\#60a5fa\], .text-\[\#93c5fd\], .text-\[\#00f2fe\]) { color: #294D61; }
+.tema-login :is(main, [role="dialog"]) :is(.text-\[\#fcd34d\], .text-\[\#fde68a\], .text-\[\#FFB27A\], .text-\[\#FF9A4D\]) { color: #c2410c; }
+.tema-login :is(main, [role="dialog"]) :is(.text-\[\#ff6a7f\], .text-\[\#ff6a5f\], .text-\[\#f87171\], .text-\[\#fca5a5\]) { color: #800021; }
 /* …salvo sobre fondos de color (botones principales, chips, avisos rojos, tooltips oscuros) */
-.tema-login main :is(.bg-corp, .grad-azul, .grad-fuego, [class*="bg-gradient"], .bg-\[\#2a7bff\], .bg-\[\#E30613\], .bg-\[\#c4001c\], .bg-\[\#ff2a5f\], .bg-\[\#FF6D00\], .bg-\[\#22c55e\], .bg-azul-900, .bg-red-600, .bg-emerald-600, .bg-blue-600) :is(.text-white, .text-fg),
-.tema-login main :is(.bg-corp, .grad-azul, .grad-fuego, [class*="bg-gradient"], .bg-\[\#2a7bff\], .bg-\[\#E30613\], .bg-\[\#c4001c\], .bg-\[\#ff2a5f\], .bg-\[\#FF6D00\], .bg-\[\#22c55e\], .bg-azul-900, .bg-red-600, .bg-emerald-600, .bg-blue-600).text-white { color: #fff; }
+.tema-login :is(main, [role="dialog"]) :is(.bg-corp, .grad-azul, .grad-fuego, [class*="bg-gradient"], .bg-\[\#2a7bff\], .bg-\[\#E30613\], .bg-\[\#c4001c\], .bg-\[\#ff2a5f\], .bg-\[\#FF6D00\], .bg-\[\#22c55e\], .bg-azul-900, .bg-red-600, .bg-emerald-600, .bg-blue-600) :is(.text-white, .text-fg),
+.tema-login :is(main, [role="dialog"]) :is(.bg-corp, .grad-azul, .grad-fuego, [class*="bg-gradient"], .bg-\[\#2a7bff\], .bg-\[\#E30613\], .bg-\[\#c4001c\], .bg-\[\#ff2a5f\], .bg-\[\#FF6D00\], .bg-\[\#22c55e\], .bg-azul-900, .bg-red-600, .bg-emerald-600, .bg-blue-600).text-white { color: #fff; }
 
 /* Fondos y bordes translúcidos blancos (hechos para el negro) → tintes azul marino suaves */
-.tema-login main :is(.border-white\/5, .border-white\/10, .border-white\/15, .border-white\/20, [class*="border-white/["]) { border-color: #CCD0CF; }
-.tema-login main :is(.bg-white\/5, .bg-white\/10, [class*="bg-white/["]) { background-color: rgba(17, 33, 45, 0.035); }
-.tema-login main :is(.hover\:bg-white\/10:hover, [class*="hover:bg-white/"]:hover) { background-color: rgba(41, 77, 97, 0.08); color: #11212D; }
-.tema-login main :is(.bg-\[\#212a3a\], .bg-\[\#2a3445\], .bg-\[\#222222\], .bg-\[\#1A1A1A\], .bg-\[\#1a1a1a\]) { background-color: #E3E8EA; color: #11212D; }
-.tema-login main :is(.border-\[\#333333\], .border-\[\#3a4558\], .border-\[\#444444\], .border-\[\#343846\], .border-\[\#2a2d38\]) { border-color: #CCD0CF; }
+.tema-login :is(main, [role="dialog"]) :is(.border-white\/5, .border-white\/10, .border-white\/15, .border-white\/20, [class*="border-white/["]) { border-color: #CCD0CF; }
+.tema-login :is(main, [role="dialog"]) :is(.bg-white\/5, .bg-white\/10, [class*="bg-white/["]) { background-color: rgba(17, 33, 45, 0.035); }
+.tema-login :is(main, [role="dialog"]) :is(.hover\:bg-white\/10:hover, [class*="hover:bg-white/"]:hover) { background-color: rgba(41, 77, 97, 0.08); color: #11212D; }
+.tema-login :is(main, [role="dialog"]) :is(.bg-\[\#212a3a\], .bg-\[\#2a3445\], .bg-\[\#222222\], .bg-\[\#1A1A1A\], .bg-\[\#1a1a1a\]) { background-color: #E3E8EA; color: #11212D; }
+.tema-login :is(main, [role="dialog"]) :is(.border-\[\#333333\], .border-\[\#3a4558\], .border-\[\#444444\], .border-\[\#343846\], .border-\[\#2a2d38\]) { border-color: #CCD0CF; }
 
 /* Barras y cajas oscuras con color fijo (navegación INICIO › …, menús, botones grafito) → claras */
-.tema-login main :is([class*="bg-[#0"], [class*="bg-[#1"], .bg-slate-700, .bg-slate-800, .bg-slate-900, .bg-black) { background-color: #ffffff; color: #11212D; }
-.tema-login main :is([class*="bg-[#0"], [class*="bg-[#1"]).backdrop-blur { background-color: rgba(241, 243, 242, 0.92); }
-.tema-login main :is(.hover\:bg-slate-700:hover, [class*="hover:bg-[#2"]:hover) { background-color: #E3E8EA; }
-.tema-login main :is(.border-slate-600, .border-slate-700, [class*="border-[#2a7bff]"]) { border-color: #B4BBBA; }
-.tema-login main .hover\:border-slate-400:hover { border-color: #294D61; }
+.tema-login :is(main, [role="dialog"]) :is([class*="bg-[#0"], [class*="bg-[#1"], .bg-slate-700, .bg-slate-800, .bg-slate-900, .bg-black) { background-color: #ffffff; color: #11212D; }
+.tema-login :is(main, [role="dialog"]) :is([class*="bg-[#0"], [class*="bg-[#1"]).backdrop-blur { background-color: rgba(241, 243, 242, 0.92); }
+.tema-login :is(main, [role="dialog"]) :is(.hover\:bg-slate-700:hover, [class*="hover:bg-[#2"]:hover) { background-color: #E3E8EA; }
+.tema-login :is(main, [role="dialog"]) :is(.border-slate-600, .border-slate-700, [class*="border-[#2a7bff]"]) { border-color: #B4BBBA; }
+.tema-login :is(main, [role="dialog"]) .hover\:border-slate-400:hover { border-color: #294D61; }
 
 /* Tablas: cabecera gris azulado como los rótulos del login, filas blancas */
 .tema-login table thead { background-color: #E3E8EA; }
@@ -677,7 +677,7 @@ body[data-modo-pestana] [data-guardar-pestana] {
 .tema-login table tbody tr:hover { background-color: rgba(41, 77, 97, 0.05); }
 
 /* Campos: blancos, borde #B4BBBA y foco cian (como Usuario / Contraseña, en claro) */
-.tema-login main :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea):not(.bg-transparent),
+.tema-login :is(main, [role="dialog"]) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea):not(.bg-transparent),
 .tema-login .shadow-pop :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):not(.bg-transparent) {
   background-color: #ffffff;
   border-color: #B4BBBA;
@@ -804,7 +804,7 @@ body[data-modo-pestana] [data-guardar-pestana] {
 /* Tarjetas: blancas con borde gris de la paleta y sombra azul noche */
 .tema-login .glass-card,
 .tema-login .shadow-card { box-shadow: 0 6px 22px rgba(17, 33, 45, 0.1); }
-.tema-login main .seccion-titulo { color: color-mix(in srgb, rgb(var(--sec)) 78%, #11212D); }
+.tema-login :is(main, [role="dialog"]) .seccion-titulo { color: color-mix(in srgb, rgb(var(--sec)) 78%, #11212D); }
 
 /* Tablas: cabecera en acero suave con filo acero, filas blancas, hover gris */
 .tema-login table thead { background-color: #DCE3E6; box-shadow: inset 0 -2px 0 #294D61; }
@@ -814,7 +814,7 @@ body[data-modo-pestana] [data-guardar-pestana] {
 /* Colores fijos escritos en las pantallas (azules eléctricos, naranjas y rojos del tema anterior) → paleta */
 .tema-login :is(.text-\[\#2a7bff\], .text-\[\#60a5fa\], .text-\[\#93c5fd\], .text-\[\#00f2fe\], .text-\[\#0066ff\], .hover\:text-\[\#93c5fd\]:hover) { color: #294D61; }
 .tema-login :is(.text-\[\#FF6D00\], .text-\[\#FFB27A\], .text-\[\#FF9A4D\], .text-\[\#c4001c\], .text-\[\#E30613\], .text-\[\#ff2a5f\], .text-\[\#b91c1c\], .hover\:text-\[\#FF9A4D\]:hover, .hover\:text-\[\#c4001c\]:hover) { color: #800021; }
-.tema-login main :is(.text-\[\#fcd34d\], .text-\[\#fde68a\], .text-\[\#ff6a7f\], .text-\[\#ff6a5f\], .text-\[\#f87171\], .text-\[\#fca5a5\]) { color: #800021; }
+.tema-login :is(main, [role="dialog"]) :is(.text-\[\#fcd34d\], .text-\[\#fde68a\], .text-\[\#ff6a7f\], .text-\[\#ff6a5f\], .text-\[\#f87171\], .text-\[\#fca5a5\]) { color: #800021; }
 .tema-login :is(.bg-\[\#2a7bff\], .bg-\[\#0066ff\], .bg-\[\#3b82f6\], .bg-\[\#1e3a8a\], .hover\:bg-\[\#2a7bff\]:hover) { background-color: #294D61; color: #fff; }
 .tema-login :is(.bg-\[\#FF6D00\], .bg-\[\#E30613\], .bg-\[\#ff2a5f\], .bg-\[\#ff1a1a\], .bg-\[\#c4001c\], .bg-\[\#d50000\], .bg-\[\#e0001b\], .bg-\[\#9b0016\]) { background-color: #800021; color: #fff; }
 .tema-login :is(.hover\:bg-\[\#E65C00\]:hover, .hover\:bg-\[\#c4001c\]:hover, .hover\:bg-\[\#B91C1C\]:hover) { background-color: #650019; color: #fff; }
@@ -824,11 +824,11 @@ body[data-modo-pestana] [data-guardar-pestana] {
 .tema-login :is(.ring-\[\#FF6D00\], .ring-\[\#ff2a5f\]) { --tw-ring-color: #800021; }
 .tema-login .accent-\[\#2a7bff\] { accent-color: #294D61; }
 .tema-login :is(input[type="checkbox"], input[type="radio"], input[type="range"], progress) { accent-color: #294D61; }
-.tema-login main :is(.from-\[\#0066ff\]) { --tw-gradient-from: #294D61 var(--tw-gradient-from-position); }
-.tema-login main :is(.via-\[\#0066ff\]) { --tw-gradient-via: #294D61; }
+.tema-login :is(main, [role="dialog"]) :is(.from-\[\#0066ff\]) { --tw-gradient-from: #294D61 var(--tw-gradient-from-position); }
+.tema-login :is(main, [role="dialog"]) :is(.via-\[\#0066ff\]) { --tw-gradient-via: #294D61; }
 /* texto blanco que sí va sobre color */
-.tema-login main :is(.bg-\[\#2a7bff\], .bg-\[\#0066ff\], .bg-\[\#3b82f6\], .bg-\[\#1e3a8a\], .bg-\[\#FF6D00\], .bg-\[\#E30613\], .bg-\[\#ff2a5f\], .bg-\[\#ff1a1a\], .bg-\[\#c4001c\], .bg-\[\#d50000\]) :is(.text-white, .text-fg),
-.tema-login main :is(.bg-\[\#2a7bff\], .bg-\[\#0066ff\], .bg-\[\#3b82f6\], .bg-\[\#1e3a8a\], .bg-\[\#FF6D00\], .bg-\[\#E30613\], .bg-\[\#ff2a5f\], .bg-\[\#ff1a1a\], .bg-\[\#c4001c\], .bg-\[\#d50000\]).text-white { color: #fff; }
+.tema-login :is(main, [role="dialog"]) :is(.bg-\[\#2a7bff\], .bg-\[\#0066ff\], .bg-\[\#3b82f6\], .bg-\[\#1e3a8a\], .bg-\[\#FF6D00\], .bg-\[\#E30613\], .bg-\[\#ff2a5f\], .bg-\[\#ff1a1a\], .bg-\[\#c4001c\], .bg-\[\#d50000\]) :is(.text-white, .text-fg),
+.tema-login :is(main, [role="dialog"]) :is(.bg-\[\#2a7bff\], .bg-\[\#0066ff\], .bg-\[\#3b82f6\], .bg-\[\#1e3a8a\], .bg-\[\#FF6D00\], .bg-\[\#E30613\], .bg-\[\#ff2a5f\], .bg-\[\#ff1a1a\], .bg-\[\#c4001c\], .bg-\[\#d50000\]).text-white { color: #fff; }
 
 /* Enlaces y selección de texto */
 .tema-login ::selection { background: rgba(41, 77, 97, 0.28); }

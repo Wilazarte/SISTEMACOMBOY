@@ -112,6 +112,7 @@ export const sedeSucursal = (sedes: Sede[]): Sede | undefined =>
 
 /** Usuario asignado a una sede (usuarios_sedes): jefe de Secocha o usuario de un submódulo de Secocha. */
 export const esUsuarioDeSede = (): boolean => !!estado.asignada;
+export const getSedes = (): Sede[] => estado.sedes;
 export const sedeActualId = (): string => estado.actualId;
 export const getSedeActual = (): Sede | undefined => estado.sedes.find((s) => s.id === estado.actualId);
 
