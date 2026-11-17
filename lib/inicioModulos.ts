@@ -102,6 +102,7 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "equipos-produccion", label: "Equipos de producción (terminados)", grupo: "Ingresos y stock", destino: `${A}?tab=equipos` },
     { slug: "stock", label: "Stock y Kardex", grupo: "Ingresos y stock", destino: `${A}?tab=stock` },
     { slug: "catalogo-productos", label: "Catálogo de Productos", grupo: "Ingresos y stock", destino: `${V}?tab=productos` },
+    { slug: "categorias-productos", label: "Categorías de productos", grupo: "Ingresos y stock", destino: `${V}?tab=productos&sub=categorias` },
 
     { slug: "ordenes-despacho", label: "Órdenes de despacho (Guía de Remisión)", grupo: "Despacho", destino: `${A}?tab=despacho` },
     { slug: "transferencias", label: "Transferencias Planta ↔ Sucursal", grupo: "Despacho", destino: "/logistica/transferencias" },
@@ -150,6 +151,7 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "clientes", label: "Clientes", grupo: "Clientes y productos", destino: `${V}?tab=clientes` },
     { slug: "catalogo-productos", label: "Catálogo de Productos", grupo: "Clientes y productos", destino: `${V}?tab=productos` },
     { slug: "solicitudes-productos", label: "Solicitudes de productos", grupo: "Clientes y productos", destino: `${V}?tab=productos&sub=solicitudes` },
+    { slug: "categorias-productos", label: "Categorías de productos", grupo: "Clientes y productos", destino: `${V}?tab=productos&sub=categorias` },
   ],
   // PRODUCCION (permisos limitados, Williams 2026-10-30): no emite OP (solo Logística), no ve Finanzas ni Gerencia;
   // en Almacén solo entrega PT. Solo Panel, sus OPs, Control de calidad y Entregar PT (Fase 8), más su flujo 26W.

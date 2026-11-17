@@ -66,8 +66,9 @@ export function CatalogoProductos() {
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Contador label="Total en catálogo" valor={productos.length} icon={<Package size={18} />} onClick={() => setTab("catalogo")} />
+        <Contador label="Sin categoría" valor={sinCategoria} icon={<Tags size={18} />} alerta={sinCategoria > 0} onClick={() => setTab("categorias")} />
         <Contador label="Solicitudes pendientes" valor={pendientes.length} icon={<Inbox size={18} />} alerta={pendientes.length > 0} onClick={() => setTab("solicitudes")} />
         <Contador label="Posibles duplicados" valor={duplicados.length} icon={<Combine size={18} />} alerta={duplicados.length > 0} onClick={() => setTab("duplicados")} />
       </div>
