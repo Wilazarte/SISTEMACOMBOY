@@ -23,7 +23,8 @@ import {
 } from "@/lib/ventas";
 import type { CobroVenta, ComprobanteExterno, ComprobanteVenta, NotaPedido, TipoComprobanteExterno } from "@/lib/types";
 import { CUENTAS_COBRO, medioCobro } from "./comun";
-import { pdfNotaPedidoActualizada } from "@/lib/pdf";
+import { pdfNotaPedidoActualizada, pdfReporteDeuda } from "@/lib/pdf";
+import { guardarExcel } from "@/lib/guardarArchivo";
 
 const filtrosVacios = {
   buscar: "",
@@ -115,7 +116,32 @@ export function CuentasPorCobrar() {
         XLSX.utils.json_to_sheet(grupos.map((g) => ({ [AGRUPAR[reporte]]: g.grupo, Documentos: g.documentos, Total: g.total, Pagado: g.pagado, Saldo: g.saldo, Vencido: g.vencido }))),
         `Deuda por ${AGRUPAR[reporte].toLowerCase()}`.slice(0, 31)
       );
-    XLSX.writeFile(libro, `Cuentas-por-cobrar-${hoy()}.xlsx`);
+    await guardarExcel(libro, `Cuentas-por-cobrar-${hoy()}.xlsx`);
+  };
+
+  // Reporte de deudas en PDF A4 (vista previa: Imprimir / Descargar con "Guardar como" / WhatsApp / Firmar)
+  const exportarPDF = () => {
+    const ESTADOS: Record<string, string> = { PENDIENTE: "Pendiente", VENCIDO: "Vencido", PAGADO: "Pagado" };
+    const filtros = [
+      f.buscar.trim() && `Buscar: "${f.buscar.trim()}"`,
+      f.cliente && `Cliente: ${f.cliente}`,
+      f.vendedor && `Vendedor: ${f.vendedor}`,
+      f.equipo && `Equipo: ${f.equipo}`,
+      f.desde && `${f.porVencimiento ? "Vence" : "Emitido"} desde ${fechaPE(f.desde)}`,
+      f.hasta && `${f.porVencimiento ? "Vence" : "Emitido"} hasta ${fechaPE(f.hasta)}`,
+      f.estado && `Estado: ${ESTADOS[f.estado] ?? f.estado}`,
+      f.origen && `Documento: ${f.origen === "NP" ? "Notas de pedido" : "Comprobantes del sistema"}`,
+      f.externo && `Comprobante externo: ${f.externo === "SI" ? "Referido" : "Sin referir"}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    pdfReporteDeuda({
+      filas: cxc,
+      agrupado: reporte ? { por: AGRUPAR[reporte], grupos: grupos.map((g) => ({ ...g, etiqueta: reporte === "mes" ? mesLabel(g.grupo) : g.grupo })) } : undefined,
+      filtros,
+      totalSaldo,
+      vencido,
+    });
   };
 
   // Nota de pedido actualizada: adelantos con fecha y N° de operación, total pagado y saldo
@@ -163,7 +189,10 @@ export function CuentasPorCobrar() {
               <Button size="sm" variant={reporte ? "warning" : "secondary"} onClick={() => setReporte(reporte ? null : "cliente")}>
                 {reporte ? <X size={14} /> : <BarChart3 size={14} />} {reporte ? "Cerrar reporte" : "Reporte de deuda"}
               </Button>
-              <Button size="sm" variant="secondary" onClick={exportarExcel} disabled={cxc.length === 0}>
+              <Button size="sm" variant="secondary" onClick={exportarPDF} disabled={cxc.length === 0} title="Reporte de deudas en PDF A4">
+                <FileText size={14} /> PDF
+              </Button>
+              <Button size="sm" variant="secondary" onClick={exportarExcel} disabled={cxc.length === 0} title="Excel: elige la carpeta donde guardarlo">
                 <FileSpreadsheet size={14} /> Excel
               </Button>
             </div>

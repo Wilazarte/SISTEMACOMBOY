@@ -9,6 +9,7 @@
 // =====================================================================
 
 import { createClient } from "./supabase/client";
+import { guardarArchivo } from "./guardarArchivo";
 
 export const MODULOS_GD = ["Almacen", "Tesoreria", "Produccion", "Ventas", "Gerencia", "Logistica"] as const;
 export type ModuloGD = (typeof MODULOS_GD)[number];
@@ -428,14 +429,8 @@ export const verArchivo = async (docId: string, version?: string) => leerArchivo
 /** FLUJO 4 · Descargar (registra DESCARGAR; límite 5 por hora; confidencial = 2 confirmaciones + marca de agua). */
 export async function descargarArchivo(docId: string, version: string | undefined, confirmaciones: number): Promise<ArchivoGD> {
   const a = await leerArchivo(await edge(JSON.stringify({ accion: "descargar", document_id: docId, version, confirmaciones }), true));
-  const url = URL.createObjectURL(new Blob([a.bytes], { type: a.tipo }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = a.nombre;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  // "Guardar como" para elegir la carpeta (si el navegador ya no lo permite, descarga normal)
+  await guardarArchivo(a.nombre, new Blob([a.bytes], { type: a.tipo }), { tipo: a.tipo, aviso: false });
   return a;
 }
 

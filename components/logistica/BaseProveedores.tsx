@@ -10,6 +10,7 @@ import { useSesion } from "@/lib/auth";
 import { KEYS, rucValido, useStore } from "@/lib/storage";
 import { OPCIONES_PROVEEDOR, eliminarProveedor, guardarProveedor, proveedorVacio, proveedoresDeProducto, puedeGestionarProveedores } from "@/lib/proveedores";
 import type { OpcionProveedor, Proveedor } from "@/lib/types";
+import { guardarExcel } from "@/lib/guardarArchivo";
 
 const COLOR_OPCION: Record<OpcionProveedor, string> = {
   1: "border-emerald-300 bg-emerald-50 text-emerald-800",
@@ -60,7 +61,7 @@ export function BaseProveedores() {
     });
     const libro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas), "Proveedores");
-    XLSX.writeFile(libro, "base-proveedores.xlsx");
+    await guardarExcel(libro, "base-proveedores.xlsx");
   };
 
   const completos = proveedores.filter((p) => (p.productos ?? []).length > 0).length;
