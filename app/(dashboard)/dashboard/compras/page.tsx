@@ -2,6 +2,8 @@
 
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { ProductoInput } from "@/components/productos/ProductoInput";
+import { EtiquetasCategorias, FiltroCategoria, categoriasDeItems, contarCategoriasDocs, docPasaCategoria } from "@/components/productos/Categorias";
+import { useCatalogo } from "@/lib/productos";
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   AlertTriangle,
@@ -1058,7 +1060,10 @@ function RegistrarCompra({
 // =====================================================================
 function Antecedentes({ reqs, ordenes, rol, onCotizar, onIr }: { reqs: Requerimiento[]; ordenes: OrdenCompra[]; rol: Rol; onCotizar: (id: string) => void; onIr: (tab: string) => void }) {
   // Búsqueda y estado: en el panel "Buscar / Filtrar" de la lista (oculto por defecto)
-  const lista = reqs;
+  const [cat, setCat] = useState("");
+  useCatalogo(); // vuelve a pintar cuando llega el catálogo (categorías de los ítems)
+  const catsReq = new Map(reqs.map((r) => [r.id, categoriasDeItems(r.items)]));
+  const lista = reqs.filter((r) => docPasaCategoria(catsReq.get(r.id) ?? [], cat));
   return (
     <div>
       <QuickActions tab="requerimiento" onIr={onIr} puedeCrear={puede(rol, "req.crear")} />
@@ -1069,6 +1074,8 @@ function Antecedentes({ reqs, ordenes, rol, onCotizar, onIr }: { reqs: Requerimi
       />
       <ListaDocs
           tipo="requerimientos"
+          extraActivos={cat ? 1 : 0}
+          filtrosExtra={<FiltroCategoria value={cat} onChange={setCat} conteo={contarCategoriasDocs(Array.from(catsReq.values()))} />}
           filas={lista.map((r): FilaDoc => {
           const oc = ordenes.find((o) => o.reqId === r.id);
           return {
@@ -1080,6 +1087,7 @@ function Antecedentes({ reqs, ordenes, rol, onCotizar, onIr }: { reqs: Requerimi
               <span className="font-semibold text-fg">{r.numero}</span>
                 {oc && <span className="ml-1.5 text-xs text-plomo-500">→ {oc.numero}</span>}
                 <span className="ml-2 inline-block align-middle"><Badge estado={r.estado} /></span>
+                <EtiquetasCategorias categorias={catsReq.get(r.id) ?? []} />
             </>
           ),
           total: `${(r.items || []).length} ítem(s)`,
@@ -1100,7 +1108,7 @@ function Antecedentes({ reqs, ordenes, rol, onCotizar, onIr }: { reqs: Requerimi
                 </div>
             </>
           ),
-          buscar: `${r.numero} ${r.sede} ${r.motivo} ${oc?.numero ?? ""}`,
+          buscar: `${r.numero} ${r.sede} ${r.motivo} ${oc?.numero ?? ""} ${(catsReq.get(r.id) ?? []).join(" ")}`,
           tipoDoc: "REQ",
           estado: r.estado,
           };
@@ -1359,6 +1367,10 @@ function Ordenes({
 }) {
   const [bancarizar, setBancarizar] = useState<OrdenCompra | null>(null);
   const [editar, setEditar] = useState<OrdenCompra | null>(null);
+  // Filtro por categoría de los productos de la OC (las OS son servicios: salen solo sin filtro)
+  const [catOC, setCatOC] = useState("");
+  useCatalogo();
+  const catsOC = new Map(ordenes.map((o) => [o.id, categoriasDeItems(o.items)]));
   const facturasOC = useStore<Factura[]>(KEYS.FACTURAS, []);
   const [banc, setBanc] = useState<Bancarizacion>(bancarizacionVacia);
   const [cotiId, setCotiId] = useState(preCoti ?? "");
@@ -1587,7 +1599,9 @@ function Ordenes({
         />
         <ListaDocs
           tipo="ordenes"
-          filas={[...ordenes.map((o): FilaDoc => {
+          extraActivos={catOC ? 1 : 0}
+          filtrosExtra={<FiltroCategoria value={catOC} onChange={setCatOC} conteo={contarCategoriasDocs(Array.from(catsOC.values()))} />}
+          filas={[...ordenes.filter((o) => docPasaCategoria(catsOC.get(o.id) ?? [], catOC)).map((o): FilaDoc => {
           return {
           id: o.id,
           fecha: o.fecha,
@@ -1597,6 +1611,7 @@ function Ordenes({
               <span className="font-semibold text-fg">{o.numero}</span>
                 <span className="ml-1.5 text-xs text-plomo-500">{o.cotizacionNumero}</span>
                 <span className="ml-2 inline-block align-middle"><Badge estado={o.estado} /></span>
+                <EtiquetasCategorias categorias={catsOC.get(o.id) ?? []} />
             </>
           ),
           total: (
@@ -1644,11 +1659,11 @@ function Ordenes({
                 </div>
             </>
           ),
-          buscar: `${o.numero} ${o.cotizacionNumero} ${o.reqNumero} ${o.ruc} ${o.formaPago}`,
+          buscar: `${o.numero} ${o.cotizacionNumero} ${o.reqNumero} ${o.ruc} ${o.formaPago} ${(catsOC.get(o.id) ?? []).join(" ")}`,
           tipoDoc: "OC",
           estado: o.estado,
           };
-        }), ...filasOrdenesServicio(servicio.ordenes, rol)].sort((a, b) => b.fecha.localeCompare(a.fecha))}
+        }), ...(catOC ? [] : filasOrdenesServicio(servicio.ordenes, rol))].sort((a, b) => b.fecha.localeCompare(a.fecha))}
         />
       </Card>
       )}

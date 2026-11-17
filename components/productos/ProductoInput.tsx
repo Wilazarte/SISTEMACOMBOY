@@ -6,7 +6,8 @@ import { Button, Field, Input, Modal, Select, Textarea, cn, ejecutarAsync } from
 import { UNIDADES } from "@/lib/empresa";
 import { RUTA_SUCURSAL, getSesion, puedeVer } from "@/lib/auth";
 import { KEYS, r2, useStore } from "@/lib/storage";
-import { buscarProducto, normalizarNombre, solicitarProducto, sugerencias, useCatalogo, type ProductoMaestro } from "@/lib/productos";
+import { buscarProducto, normalizarNombre, solicitarProducto, sugerencias, sugerirCategoriaVigente, useCatalogo, type ProductoMaestro } from "@/lib/productos";
+import { SelectCategoria } from "@/components/productos/Categorias";
 import type { StockItem } from "@/lib/types";
 import type { StockLocal } from "@/lib/sucursal-modelos";
 
@@ -37,7 +38,7 @@ export function DatalistCatalogo() {
         .filter((p) => p.activo)
         .map((p) => {
           const st = [veAlmacen && `Stock almacenes: ${totales.alm.get(p.nombre_normalizado) ?? 0}`, veSuc && `Sucursal: ${totales.suc.get(p.nombre_normalizado) ?? 0}`].filter(Boolean).join(" · ");
-          return <option key={p.id} value={p.nombre_normalizado}>{`${p.sku}${p.marca ? ` - ${p.marca}` : ""} - ${p.unidad}${st ? ` (${st})` : ""}`}</option>;
+          return <option key={p.id} value={p.nombre_normalizado}>{`${p.sku}${p.categoria ? ` - ${p.categoria}` : ""}${p.marca ? ` - ${p.marca}` : ""} - ${p.unidad}${st ? ` (${st})` : ""}`}</option>;
         })}
     </datalist>
   );
@@ -101,7 +102,7 @@ export function ProductoInput({
         className={cn(invalido && "border-red-500 focus:border-red-500")}
         autoComplete="off"
       />
-      {p && <p className="mt-0.5 text-[11px] text-plomo-500">{`${p.sku} · ${p.unidad}${p.marca ? ` · ${p.marca}` : ""}`}</p>}
+      {p && <p className="mt-0.5 text-[11px] text-plomo-500">{`${p.sku} · ${p.unidad}${p.marca ? ` · ${p.marca}` : ""}${p.categoria ? ` · ${p.categoria}` : ""}`}</p>}
       {invalido && (
         <div className="mt-0.5 space-y-0.5 text-[11px]">
           <p className="text-rojo">No está en el catálogo maestro.</p>
@@ -122,7 +123,7 @@ export function ProductoInput({
 
 /** Pedido de producto nuevo: va a aprobación del administrador (no se crea directo). */
 export function SolicitarProducto({ nombre, modulo, onClose }: { nombre: string; modulo?: string; onClose: () => void }) {
-  const [f, setF] = useState({ nombre, unidad: "UND", marca: "", categoria: "", motivo: "" });
+  const [f, setF] = useState({ nombre, unidad: "UND", marca: "", categoria: sugerirCategoriaVigente(nombre) ?? "", motivo: "" });
   const [enviando, setEnviando] = useState(false);
   const enviar = async () => {
     setEnviando(true);
@@ -143,7 +144,7 @@ export function SolicitarProducto({ nombre, modulo, onClose }: { nombre: string;
           <Input value={f.marca} onChange={(e) => setF({ ...f, marca: e.target.value })} />
         </Field>
         <Field label="Categoría" className="sm:col-span-2">
-          <Input value={f.categoria} onChange={(e) => setF({ ...f, categoria: e.target.value })} placeholder="Repuesto, insumo, servicio…" />
+          <SelectCategoria value={f.categoria} onChange={(v) => setF({ ...f, categoria: v })} />
         </Field>
         <Field label="Para qué se necesita" className="sm:col-span-2">
           <Textarea value={f.motivo} onChange={(e) => setF({ ...f, motivo: e.target.value })} />
