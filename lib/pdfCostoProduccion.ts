@@ -13,7 +13,7 @@ import autoTable from "jspdf-autotable";
 import QRCode from "qrcode";
 import { EMPRESA } from "./empresa";
 import { mostrarPDF } from "./visorPdf";
-import { NOMBRE_ETAPA, NOMBRE_SECCION, NOMBRE_SUBTIPO, NOMBRE_TIPO_VERSION, S, datosPDF, nombreEstado, pct, type CostosHoja, type HojaCosto, type LineaCosto, type Seccion } from "./costoProduccion";
+import { NOMBRE_ETAPA, NOMBRE_SECCION, NOMBRE_SUBTIPO, NOMBRE_TIPO_VERSION, S, datosPDF, nombreEstado, pct, referenciaHoja, type CostosHoja, type HojaCosto, type LineaCosto, type Seccion } from "./costoProduccion";
 
 type RGB = [number, number, number];
 const NOCHE: RGB = [17, 33, 45]; // #11212D
@@ -80,7 +80,7 @@ export async function fichaCostoPDF(hoja: HojaCosto, costos: CostosHoja, items: 
     doc.setFont("times", "normal");
     doc.setFontSize(8.5);
     doc.text(`${EMPRESA.razonSocial} · RUC ${EMPRESA.ruc}`, W - M, 16.5, { align: "right" });
-    doc.text(`${hoja.codigo} · OP ${hoja.orden_produccion_id} · Versión v${d.version} (${NOMBRE_TIPO_VERSION[d.tipo]})`, W - M, 21.5, { align: "right" });
+    doc.text(`${hoja.codigo} · ${hoja.origen === "MODELO" ? referenciaHoja(hoja) : `OP ${hoja.orden_produccion_id}`} · Versión v${d.version} (${NOMBRE_TIPO_VERSION[d.tipo]})`, W - M, 21.5, { align: "right" });
   };
 
   const pie = (n: number, total: number) => {
@@ -119,7 +119,7 @@ export async function fichaCostoPDF(hoja: HojaCosto, costos: CostosHoja, items: 
     styles: { font: "times", fontSize: 8.5, cellPadding: 1.1, textColor: NOCHE },
     columnStyles: { 0: { fontStyle: "bold", cellWidth: 34 }, 2: { fontStyle: "bold", cellWidth: 30 } },
     body: [
-      ["Código de orden", hoja.orden_produccion_id, "Hoja de costo", hoja.codigo],
+      [hoja.origen === "MODELO" ? "Modelo de equipo" : "Código de orden", hoja.origen === "MODELO" ? referenciaHoja(hoja).replace(/^Modelo /, "") : hoja.orden_produccion_id, "Hoja de costo", hoja.codigo],
       ["Equipo a fabricar", `${hoja.tipo_equipo}${hoja.modelo ? ` · ${hoja.modelo}` : ""}`, "Cantidad", String(hoja.cantidad)],
       ["Cliente / Proyecto", hoja.cliente_proyecto ?? "—", "Responsable", hoja.responsable ?? "—"],
       ["Fecha inicio", dia(hoja.fecha_inicio), "Fin estimada", dia(hoja.fecha_fin_estimada)],

@@ -9,6 +9,7 @@ import { perfilPlanta } from "@/lib/permisosPlanta";
 import {
   EDITABLE,
   EQUIPOS_A_FABRICAR,
+  NOMBRE_MODELO,
   NOMBRE_SECCION,
   NOMBRE_SUBTIPO,
   S,
@@ -40,6 +41,7 @@ import {
   type TrabajadorCosto,
 } from "@/lib/costoProduccion";
 import { fichaCostoPDF } from "@/lib/pdfCostoProduccion";
+import { UNIDADES } from "@/lib/empresa";
 import { ACERO, Alerta, Area, Boton, Celda, Entrada, EstadoChip, Etiqueta, Lista, Tabla, Tarjeta, VINO, pinta } from "./piezas";
 import { HistorialCostos } from "./HistorialCostos";
 
@@ -193,6 +195,8 @@ export function HojaCosto({ hoja, datos, onVolver }: { hoja: Hoja; datos: Estado
   const pasoActual = PASOS.findIndex((p) => p.estado.includes(hoja.estado));
 
   const filas = (s: Seccion) => lineas.filter((l) => l.seccion === s);
+  // Hoja por MODELO (Williams 2026-11-17): costo general de UNA unidad del modelo, calculado desde cero
+  const porModelo = hoja.origen === "MODELO";
 
   return (
     <div className="space-y-4">
@@ -207,8 +211,8 @@ export function HojaCosto({ hoja, datos, onVolver }: { hoja: Hoja; datos: Estado
               {hoja.codigo} · versión v{costos?.version_actual ?? "—"}
             </p>
             <h2 className="break-words text-[18px] font-bold text-[#11212D]">
-              {hoja.orden_produccion_id} · {hoja.tipo_equipo}
-              {hoja.modelo ? ` ${hoja.modelo}` : ""}
+              {porModelo ? `Ficha de costo por modelo · ${NOMBRE_MODELO[hoja.orden_produccion_id] ?? hoja.orden_produccion_id}` : `${hoja.orden_produccion_id} · ${hoja.tipo_equipo}`}
+              {!porModelo && hoja.modelo ? ` ${hoja.modelo}` : ""}
             </h2>
           </div>
         </div>
@@ -244,11 +248,11 @@ export function HojaCosto({ hoja, datos, onVolver }: { hoja: Hoja; datos: Estado
           {/* Datos generales */}
           <Tarjeta titulo="Datos generales">
             <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Etiqueta texto="Código Orden (auto)">
-                <Entrada value={hoja.orden_produccion_id} disabled />
+              <Etiqueta texto={porModelo ? "Modelo de equipo" : "Código Orden (auto)"}>
+                <Entrada value={porModelo ? NOMBRE_MODELO[hoja.orden_produccion_id] ?? hoja.orden_produccion_id : hoja.orden_produccion_id} disabled />
               </Etiqueta>
               <Etiqueta texto="Equipo a fabricar">
-                <Lista value={cab.tipo_equipo} disabled={!editable} onChange={(e) => cambiarCab("tipo_equipo", e.target.value)}>
+                <Lista value={cab.tipo_equipo} disabled={!editable || porModelo} onChange={(e) => cambiarCab("tipo_equipo", e.target.value)}>
                   {Array.from(new Set([cab.tipo_equipo, ...EQUIPOS_A_FABRICAR])).map((x) => (
                     <option key={x} value={x}>
                       {x}
@@ -315,7 +319,7 @@ export function HojaCosto({ hoja, datos, onVolver }: { hoja: Hoja; datos: Estado
           )}
 
           {/* A) MATERIALES */}
-          <SeccionMateriales lineas={filas("MATERIAL")} editable={editable} total={t.materiales} onCambio={cambiarLinea} onAgregar={agregar} onQuitar={quitarNueva} onAnular={(l) => setDialogo({ accion: "ANULAR_LINEA", lineaId: l, titulo: "Anular línea de costo", motivoMin: 10 })} avisos={avisos} />
+          <SeccionMateriales desdeCero={porModelo} lineas={filas("MATERIAL")} editable={editable} total={t.materiales} onCambio={cambiarLinea} onAgregar={agregar} onQuitar={quitarNueva} onAnular={(l) => setDialogo({ accion: "ANULAR_LINEA", lineaId: l, titulo: "Anular línea de costo", motivoMin: 10 })} avisos={avisos} />
 
           {/* B) MANO DE OBRA */}
           <Tarjeta titulo={NOMBRE_SECCION.MANO_OBRA} accion={<span className="text-[13px] font-bold">{S(t.mano_obra)}</span>}>
@@ -703,6 +707,7 @@ function BotonQuitar({ l, onQuitar, onAnular }: { l: LineaBorrador; onQuitar: (k
 }
 
 function SeccionMateriales({
+  desdeCero,
   lineas,
   editable,
   total,
@@ -712,6 +717,7 @@ function SeccionMateriales({
   onAnular,
   avisos,
 }: {
+  desdeCero: boolean;
   lineas: LineaBorrador[];
   editable: boolean;
   total: number;
@@ -721,6 +727,9 @@ function SeccionMateriales({
   onAnular: (id: string) => void;
   avisos: ReturnType<typeof calcularAlertas>;
 }) {
+  // Hoja por modelo: los materiales escritos a mano van en una lista ancha (material, unidad, cantidad, costo)
+  const libres = desdeCero ? lineas.filter((l) => l.origen_costo === "MANUAL") : [];
+  const enTabla = desdeCero ? lineas.filter((l) => l.origen_costo !== "MANUAL") : lineas;
   const [q, setQ] = useState("");
   const [res, setRes] = useState<StockCatalogo[]>([]);
   const t = useRef<ReturnType<typeof setTimeout>>();
@@ -732,11 +741,36 @@ function SeccionMateriales({
 
   return (
     <Tarjeta titulo={NOMBRE_SECCION.MATERIAL} accion={<span className="text-[13px] font-bold">{S(total)}</span>}>
+      {desdeCero && lineas.length === 0 && (
+        <p className="px-4 pt-3 text-[12.5px] text-[#294D61]">Ficha vacía: toque «Agregar material» y escriba el material, la unidad, la cantidad por equipo y el costo unitario.</p>
+      )}
+      {desdeCero && libres.length > 0 && (
+        <div className="divide-y divide-[#CCD0CF]">
+          <p className="bg-[#CCD0CF]/60 px-3 py-2 text-[10.5px] font-bold uppercase tracking-wide text-[#11212D]">Material · unidad · cantidad por equipo · costo unitario S/ · subtotal</p>
+          {libres.map((l, idx) => (
+            <div key={l.key} className="grid grid-cols-3 items-center gap-2 px-3 py-2.5 sm:grid-cols-[96px_96px_120px_minmax(0,1fr)_32px]">
+              <Entrada className="col-span-3 font-semibold sm:col-span-5" title={l.descripcion} placeholder={`${idx + 1}. Ej. Plancha LAC 3/16`} value={l.descripcion} disabled={!editable} onChange={(e) => onCambio(l.key, { descripcion: e.target.value.toUpperCase() })} />
+              <Lista className="px-1" aria-label="Unidad" value={l.unidad ?? "UND"} disabled={!editable} onChange={(e) => onCambio(l.key, { unidad: e.target.value })}>
+                {Array.from(new Set([l.unidad ?? "UND", ...UNIDADES])).map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </Lista>
+              <Entrada type="number" min={0} step="0.01" aria-label="Cantidad" className="px-2" value={l.cantidad} disabled={!editable} onChange={(e) => onCambio(l.key, { cantidad: n(e.target.value) })} />
+              <Entrada type="number" min={0} step="0.01" aria-label="Costo unitario" className="px-2" value={l.costo_unitario} disabled={!editable} onChange={(e) => onCambio(l.key, { costo_unitario: n(e.target.value) })} />
+              <span className="col-span-2 whitespace-nowrap text-[13px] font-bold sm:col-span-1 sm:text-right">{S(subtotalLinea(l))}</span>
+              <span className="text-right">{editable && <BotonQuitar l={l} onQuitar={onQuitar} onAnular={onAnular} />}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {enTabla.length > 0 && (
       <Tabla head={["Código", "Descripción", "Cantidad", "Costo unitario (Almacén)", "Subtotal", ""]}>
-        {lineas.map((l) => {
+        {enTabla.map((l) => {
           const cambiado = l.origen_costo === "ALMACEN" && l.costo_origen !== null && l.costo_origen !== undefined && Math.abs(l.costo_unitario - l.costo_origen) > 0.00005;
           const sinAlmacen = l.origen_costo === "MANUAL";
-          const pideMotivo = editable && (cambiado || sinAlmacen) && (l.motivo_manual ?? "").trim().length < 10;
+          const pideMotivo = editable && !desdeCero && (cambiado || sinAlmacen) && (l.motivo_manual ?? "").trim().length < 10;
           const alza = avisos.some((a) => a.tipo === "ALZA_MATERIAL" && a.lineaKey === l.key);
           return (
             <tr key={l.key} className={cn(alza && "bg-[#800021]/[0.05]")}>
@@ -770,18 +804,26 @@ function SeccionMateriales({
           );
         })}
       </Tabla>
+      )}
       {editable && (
         <div className="space-y-2 border-t border-[#CCD0CF] p-3">
+          {desdeCero && (
+            <Boton onClick={() => onAgregar({ seccion: "MATERIAL", descripcion: "", unidad: "UND", cantidad: 1, costo_unitario: 0, origen_costo: "MANUAL" })}>
+              <Plus size={15} /> Agregar material
+            </Boton>
+          )}
           <div className="flex flex-wrap items-end gap-2">
-            <Etiqueta texto="Agregar material de Almacén (código o nombre)" className="min-w-[220px] flex-1">
+            <Etiqueta texto={desdeCero ? "O tomar un material de Almacén (opcional)" : "Agregar material de Almacén (código o nombre)"} className="min-w-[220px] flex-1">
               <div className="relative">
                 <Search size={14} className="absolute left-2.5 top-2.5 text-[#294D61]" />
                 <Entrada className="pl-8" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ej. plancha, MP-0012…" />
               </div>
             </Etiqueta>
-            <Boton variante="borde" onClick={() => onAgregar({ seccion: "MATERIAL", descripcion: "Material fuera de almacén", cantidad: 1, costo_unitario: 0, origen_costo: "MANUAL", motivo_manual: "" })}>
-              <Plus size={14} /> Fuera de Almacén
-            </Boton>
+            {!desdeCero && (
+              <Boton variante="borde" onClick={() => onAgregar({ seccion: "MATERIAL", descripcion: "Material fuera de almacén", cantidad: 1, costo_unitario: 0, origen_costo: "MANUAL", motivo_manual: "" })}>
+                <Plus size={14} /> Fuera de Almacén
+              </Boton>
+            )}
           </div>
           {res.length > 0 && (
             <ul className="max-h-56 overflow-y-auto rounded-lg border border-[#CCD0CF] bg-white">
