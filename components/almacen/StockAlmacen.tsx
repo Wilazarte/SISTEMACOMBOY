@@ -11,6 +11,8 @@ import { AUTORIZA_DEFECTO, ETIQUETA_KARDEX, ETIQUETA_MOTIVO, MOTIVOS_RETIRO, err
 import { prepararSaldos, type PlanSaldos } from "@/lib/reglasStock";
 import { KEYS, importarSaldosStock, soles, useStore } from "@/lib/storage";
 import { normalizarChasis } from "@/lib/utils/chasis";
+import { categoriaDe, useCatalogo } from "@/lib/productos";
+import { EtiquetaCategoria, FiltroCategoria, contarCategorias, pasaCategoria } from "@/components/productos/Categorias";
 import type { EquipoTerminado } from "@/lib/equipos";
 import type { OrdenProduccion } from "@/lib/produccion";
 import type { MovimientoKardex, StockItem } from "@/lib/types";
@@ -25,6 +27,9 @@ const FILTROS_SEDE = ["", ...SEDES_STOCK];
  */
 export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: StockItem[]; puedeOperar: boolean; onIrDespacho: () => void }) {
   const [sede, setSede] = useState("");
+  // Categoría del producto en el catálogo maestro ("" = todas)
+  const [cat, setCat] = useState("");
+  const { productos: catalogo } = useCatalogo();
   const [soloSinValor, setSoloSinValor] = useState(false);
   const [kardexDe_, setKardexDe] = useState<StockItem | null>(null);
   const [retiroDe, setRetiroDe] = useState<StockItem | null>(null);
@@ -34,7 +39,7 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
   const mismaSede = (a: string, b: string) => (agrupar ? sedeNormalizada(a) === sedeNormalizada(b) : a === b);
 
   const lista = stock
-    .filter((s) => (!sede || mismaSede(s.sede, sede)) && (!soloSinValor || !(s.costoUnit > 0)))
+    .filter((s) => (!sede || mismaSede(s.sede, sede)) && (!soloSinValor || !(s.costoUnit > 0)) && pasaCategoria(categoriaDe(s.nombre), cat))
     .sort((a, b) => a.sede.localeCompare(b.sede) || a.nombre.localeCompare(b.nombre));
   const filas = useMemo(() => {
     if (!agrupar) return lista.map((s) => ({ s, partes: [s], valor: s.cantidad * s.costoUnit, base: s }));
@@ -53,7 +58,10 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
       })
       .sort((a, b) => a.s.sede.localeCompare(b.s.sede) || a.s.nombre.localeCompare(b.s.nombre));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stock, sede, soloSinValor, agrupar]);
+  }, [stock, sede, soloSinValor, agrupar, cat, catalogo]);
+  const conteoCat = useMemo(() => contarCategorias(stock.filter((s) => !sede || mismaSede(s.sede, sede)).map((s) => categoriaDe(s.nombre))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [stock, sede, agrupar, catalogo]);
   const valorizado = filas.reduce((a, f) => a + f.valor, 0);
   const sinValor = filas.filter((f) => !(f.s.costoUnit > 0)).length;
   const duplicados = filas.filter((f) => f.partes.length > 1).length;
@@ -77,7 +85,7 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
       {/* Búsqueda, sede y "sin valorizar": en el panel "Buscar / Filtrar" (oculto por defecto) */}
       <ListaDocs
         tipo="inventario"
-        extraActivos={(sede ? 1 : 0) + (soloSinValor ? 1 : 0)}
+        extraActivos={(sede ? 1 : 0) + (soloSinValor ? 1 : 0) + (cat ? 1 : 0)}
         filtrosExtra={
               <div className="flex w-full flex-wrap items-center gap-2">
                 <span className="text-xs font-semibold uppercase tracking-wide text-plomo-500">Sede:</span>
@@ -95,6 +103,7 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
                     {s || "Todas"} <span className="opacity-70">{s ? stock.filter((x) => mismaSede(x.sede, s)).length : stock.length}</span>
                   </button>
                 ))}
+                <FiltroCategoria value={cat} onChange={setCat} conteo={conteoCat} />
                 <label className="ml-auto flex cursor-pointer items-center gap-2 text-xs font-semibold text-plomo-600" title="Suma el mismo producto guardado con nombres viejos de almacén (Almacen Aqp, Adm Aqp, Planta Arequipa -> Taller Principal Aqp)">
                   <input type="checkbox" checked={agrupar} onChange={(e) => setAgrupar(e.target.checked)} className="h-4 w-4 accent-azul-900" /> Agrupar duplicados
                 </label>
@@ -112,6 +121,7 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
               <>
                 <span className="font-medium text-fg">{s.sede}</span>
                 <span className="ml-1.5 text-xs text-plomo-500">{s.unidad}</span>
+                <EtiquetaCategoria nombre={categoriaDe(s.nombre)} className="ml-1.5" />
                 {partes.length > 1 && (
                   <span className="tip ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800" data-tip={partes.map((p) => `${p.sede}: ${num(p.cantidad)}`).join(" + ")}>
                     {partes.length} registros
@@ -129,7 +139,7 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
                 {num(s.cantidad)}
               </span>
             ),
-            buscar: `${s.sede} ${s.unidad} ${partes.map((p) => p.sede).join(" ")}`,
+            buscar: `${s.sede} ${s.unidad} ${categoriaDe(s.nombre)} ${partes.map((p) => p.sede).join(" ")}`,
             tipoDoc: s.unidad,
             estado: s.costoUnit > 0 ? "VALORIZADO" : "SIN_VALORIZAR",
             acciones: (
