@@ -1,6 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { createElement, type ReactNode } from "react";
+import { iconoPorTexto } from "@/lib/iconosFunciones";
 
 // Local (components/ui importa este archivo: evita la importación circular)
 const cn = (...c: (string | false | null | undefined)[]): string => c.filter(Boolean).join(" ");
@@ -66,7 +67,8 @@ export function IslandMenu({
                 on ? "grad-azul text-white" : "text-[#a1a1aa] hover:bg-[#212a3a] hover:text-white"
               )}
             >
-              {t.icon}
+              {/* Toda pestaña lleva ícono: el suyo o uno según su nombre (lib/iconosFunciones) */}
+              {t.icon ?? createElement(iconoPorTexto(t.label), { size: 16 })}
               {t.label}
               {t.count !== undefined && t.count > 0 && (
                 <span className={cn("rounded-full px-1.5 text-[11px] font-semibold", on ? "bg-white/20 text-white" : "bg-[#212a3a] text-[#e5e7eb]")}>{t.count}</span>

@@ -1,0 +1,202 @@
+// Un ícono para cada función del ERP (pedido de Williams 2026-11-17): los botones de la barra de accesos
+// (lib/inicioModulos.ts, por slug) y las pestañas de cada módulo (por el texto de la pestaña).
+// Íconos de línea de lucide-react, los mismos de la barra de accesos.
+
+import {
+  Activity,
+  ArrowLeftRight,
+  BadgeCheck,
+  Banknote,
+  BarChart3,
+  BookOpen,
+  BookText,
+  Boxes,
+  Building2,
+  Calculator,
+  CalendarDays,
+  CircleDollarSign,
+  ClipboardCheck,
+  ClipboardList,
+  ClipboardPlus,
+  Contact,
+  Cog,
+  Factory,
+  FileBarChart,
+  FileCheck2,
+  FilePlus2,
+  FileSignature,
+  FileSpreadsheet,
+  FileText,
+  FolderKanban,
+  Gauge,
+  HandCoins,
+  HardHat,
+  History,
+  Inbox,
+  KeyRound,
+  Landmark,
+  LayoutDashboard,
+  LayoutGrid,
+  ListChecks,
+  MapPin,
+  PackageCheck,
+  PackageOpen,
+  PackagePlus,
+  PackageSearch,
+  Receipt,
+  ReceiptText,
+  Route,
+  Scale,
+  ScrollText,
+  Send,
+  Settings,
+  ShieldCheck,
+  ShoppingCart,
+  Store,
+  Tags,
+  Truck,
+  UserCheck,
+  Users,
+  Wallet,
+  Warehouse,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
+
+/** Ícono de cada acción del INICIO / barra de accesos, por slug (lib/inicioModulos.ts). */
+const ICONO_ACCION: Record<string, LucideIcon> = {
+  // Expediente 26W
+  expedientes: FolderKanban,
+  "crear-op": FilePlus2,
+  "orden-produccion": FilePlus2,
+  "cotizacion-oc": FileCheck2,
+  transporte: Truck,
+  "validar-stock": ClipboardCheck,
+  "acta-entrega-completa": FileSignature,
+  "pago-bancarizacion": Landmark,
+  "aceptar-op": BadgeCheck,
+  "reportar-avance": Gauge,
+  "cierre-pt": ShieldCheck,
+  // Compras nacionales / Tesorería
+  cotizaciones: FileText,
+  "ordenes-oc-os": ShoppingCart,
+  "facturas-compra": ReceiptText,
+  facturas: ReceiptText,
+  antecedentes: History,
+  proveedores: Building2,
+  "nuevos-req": Inbox,
+  "registrar-gasto": Wallet,
+  declaraciones: ScrollText,
+  // Transporte
+  agencias: MapPin,
+  "cotizar-flete": Calculator,
+  "guia-sunat": FileBarChart,
+  "guia-remision": Send,
+  transferencias: ArrowLeftRight,
+  // Seguimiento
+  infraestructura: Warehouse,
+  historial: History,
+  detalle: LayoutDashboard,
+  panel: LayoutDashboard,
+  // Almacén
+  "nuevo-requerimiento": ClipboardPlus,
+  requerimientos: ClipboardList,
+  recepcion: PackageOpen,
+  "ingresar-equipo": PackagePlus,
+  "equipos-produccion": Cog,
+  stock: Boxes,
+  "catalogo-productos": Tags,
+  "ordenes-despacho": PackageCheck,
+  // Planilla
+  planilla: CalendarDays,
+  trabajadores: Users,
+  contratistas: HardHat,
+  "historial-planilla": FileSpreadsheet,
+  adelantos: HandCoins,
+  // Contabilidad
+  "libro-diario": BookOpen,
+  "libro-mayor": BookText,
+  balance: Scale,
+  eeff: BarChart3,
+  "estados-cuenta": Banknote,
+  "facturas-emitidas": Receipt,
+  "cuentas-por-cobrar": CircleDollarSign,
+  // Ventas
+  "notas-pedido": FileText,
+  "requerimientos-secocha": Store,
+  despachos: Route,
+  comprobantes: Receipt,
+  "configuracion-ventas": Settings,
+  clientes: Contact,
+  "solicitudes-productos": PackageSearch,
+  // Producción
+  ordenes: ListChecks,
+  calidad: ShieldCheck,
+  "entregar-pt": PackageCheck,
+  // Soporte
+  gerencia: BarChart3,
+  secocha: Store,
+  resumen: LayoutDashboard,
+  creador: KeyRound,
+};
+
+/** Palabras clave (sin tildes, minúsculas) → ícono, para las pestañas de los módulos. El primero que coincide gana. */
+const POR_TEXTO: [RegExp, LucideIcon][] = [
+  [/nuevo req|nuevo requerimiento/, ClipboardPlus],
+  [/nuevos req/, Inbox],
+  [/requerim/, ClipboardList],
+  [/registrar|gasto|caja/, Wallet],
+  [/cotiz/, FileText],
+  [/orden(es)? de despacho|despacho/, PackageCheck],
+  [/orden|oc \/ os/, ShoppingCart],
+  [/factura|comprobante|boleta/, ReceiptText],
+  [/declarac/, ScrollText],
+  [/anteced|historial/, History],
+  [/planilla|periodo|asistencia/, CalendarDays],
+  [/trabajador|personal/, Users],
+  [/contratista/, HardHat],
+  [/adelanto|prestamo/, HandCoins],
+  [/ingreso|recepc/, PackageOpen],
+  [/equipo/, Cog],
+  [/kardex|stock|inventario/, Boxes],
+  [/catalogo|producto/, Tags],
+  [/solicitud/, PackageSearch],
+  [/nota(s)? de pedido|pedido/, FileText],
+  [/cobrar|cobranza|cxc/, CircleDollarSign],
+  [/pagar|cxp|pago/, Banknote],
+  [/cliente/, Contact],
+  [/proveedor/, Building2],
+  [/secocha|sucursal|sede/, Store],
+  [/config|condicion|ajuste/, Settings],
+  [/diario/, BookOpen],
+  [/mayor/, BookText],
+  [/balance/, Scale],
+  [/eeff|estados financieros|reporte|resumen|grafico/, BarChart3],
+  [/estado(s)? de cuenta|banco/, Landmark],
+  [/transfer|traslado/, ArrowLeftRight],
+  [/guia|transporte|flete|agencia/, Truck],
+  [/calidad|qc/, ShieldCheck],
+  [/produccion|fabric|op\b/, Factory],
+  [/mantenim|taller|servicio/, Wrench],
+  [/usuario|perfil|acceso/, UserCheck],
+  [/venta/, Receipt],
+  [/almacen/, Warehouse],
+  [/seguimiento|avance/, Activity],
+  [/expediente|lote/, FolderKanban],
+  [/panel|dashboard|inicio/, LayoutDashboard],
+];
+
+const normalizar = (t: string) =>
+  t
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+
+/** Ícono de una función por su texto (pestañas, botones sin slug). Nunca queda sin ícono. */
+export function iconoPorTexto(texto: string): LucideIcon {
+  const t = normalizar(texto);
+  return POR_TEXTO.find(([re]) => re.test(t))?.[1] ?? LayoutGrid;
+}
+
+/** Ícono de una acción de la barra de accesos: por slug y, si es nueva y aún no está en la lista, por su nombre. */
+export const iconoAccion = (slug: string, label = ""): LucideIcon => ICONO_ACCION[slug] ?? iconoPorTexto(label || slug);

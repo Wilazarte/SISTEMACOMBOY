@@ -81,6 +81,9 @@ export function ErpLayout({
       <div aria-hidden className="fondo-login pointer-events-none fixed inset-0 z-[-1]">
         <OndasFondo />
       </div>
+      {/* Marca de agua del logo COMBOY VID (Williams 2026-11-17): en todas las pantallas del ERP y Secocha; el inicio
+          de sesión no usa este layout, así que no la lleva. */}
+      <div aria-hidden className="marca-agua print:hidden" />
 
       <ErpHeader
         modulo={moduleName}
@@ -110,13 +113,13 @@ export function ErpLayout({
   );
 }
 
-/** Ondas al pie de la pantalla, las mismas del panel claro del inicio de sesión (azul eléctrico, cian y azul noche). */
+/** Ondas al pie de la pantalla con la paleta COMBOY (azul acero, vino y azul noche). */
 function OndasFondo() {
   return (
     <svg viewBox="0 0 400 140" preserveAspectRatio="none" className="absolute inset-x-0 bottom-0 h-24 w-full md:h-40">
-      <path d="M0,70 C90,20 170,120 260,70 C320,38 360,50 400,30 L400,140 L0,140 Z" fill="#00c8fe" opacity="0.14" />
-      <path d="M0,95 C80,60 180,140 280,92 C330,70 370,78 400,62 L400,140 L0,140 Z" fill="#0066ff" opacity="0.14" />
-      <path d="M0,120 C100,92 190,140 300,112 C350,100 380,104 400,96 L400,140 L0,140 Z" fill="#0f1b33" opacity="0.55" />
+      <path d="M0,70 C90,20 170,120 260,70 C320,38 360,50 400,30 L400,140 L0,140 Z" fill="#294D61" opacity="0.16" />
+      <path d="M0,95 C80,60 180,140 280,92 C330,70 370,78 400,62 L400,140 L0,140 Z" fill="#800021" opacity="0.12" />
+      <path d="M0,120 C100,92 190,140 300,112 C350,100 380,104 400,96 L400,140 L0,140 Z" fill="#11212D" opacity="0.6" />
     </svg>
   );
 }

@@ -31,6 +31,7 @@ import { puedeVer, type Sesion } from "@/lib/auth";
 import { enSucursal } from "@/lib/storage";
 import { irA } from "@/lib/navegacion";
 import { useNotifFlujo } from "@/lib/notificacionesFlujo";
+import { iconoAccion } from "@/lib/iconosFunciones";
 
 // Barra de accesos rápidos (pedido de Williams 2026-11-16, estilo de su imagen de referencia): píldora vertical azul
 // marino fija a la DERECHA (la izquierda es del chat rojo), íconos de línea blancos, el activo en un círculo claro con
@@ -185,7 +186,7 @@ export function BarraAccesos({
 
       <nav
         aria-label={`Accesos rápidos ${TITULO_INICIO[modulo]}`}
-        className={`barra-accesos fixed z-40 w-[76px] flex-col items-center rounded-full py-5 shadow-[0_20px_50px_-12px_rgba(10,16,48,0.75)] ${
+        className={`barra-accesos fixed z-40 w-[76px] flex-col items-center rounded-full py-5 shadow-[0_20px_50px_-12px_rgba(17,33,45,0.7)] ${
           movilAbierta ? "bottom-[152px] right-[6px] flex max-h-[calc(100vh-220px)] overflow-y-auto" : "hidden"
         } lg:right-3 lg:top-[84px] lg:bottom-6 lg:flex lg:max-h-none lg:overflow-visible`}
       >
@@ -216,7 +217,7 @@ export function BarraAccesos({
       {panel && (
         <div
           role="menu"
-          className="barra-accesos fixed z-40 w-[min(340px,calc(100vw-110px))] rounded-2xl p-3 text-white shadow-[0_20px_50px_-12px_rgba(10,16,48,0.75)] max-lg:bottom-[152px] max-lg:right-[92px] lg:right-[100px] lg:top-1/2 lg:-translate-y-1/2"
+          className="barra-accesos fixed z-40 w-[min(340px,calc(100vw-110px))] rounded-2xl p-3 text-white shadow-[0_20px_50px_-12px_rgba(17,33,45,0.7)] max-lg:bottom-[152px] max-lg:right-[92px] lg:right-[100px] lg:top-1/2 lg:-translate-y-1/2"
         >
           <p className={`mb-2 px-2 font-bold uppercase tracking-wider ${secocha ? "text-[13px] text-white" : "text-[11px] text-white/60"}`}>{panel.label}</p>
           <div className="flex max-h-[65vh] flex-col gap-1 overflow-y-auto">
@@ -224,19 +225,32 @@ export function BarraAccesos({
               <div key={g} className="flex flex-col gap-1">
                 {/* Secocha: cada grupo del módulo como subtítulo */}
                 {secocha && <p className="mt-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-white/55 first:mt-0">{corto(g)}</p>}
-                {acc.map((a) => (
-                  <button
-                    key={a.slug}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => ir(urlBoton(panel.modulo, a, panel.modulo === modulo ? docElegido() : undefined))}
-                    className={`rounded-xl px-3 py-2 text-left text-[13px] leading-snug transition ${
-                      a.slug === accionActiva && panel.modulo === modulo ? "bg-white font-semibold text-[#1e2a5a]" : "text-white/90 hover:bg-white/10 hover:text-white"
-                    }`}
-                  >
-                    {a.label}
-                  </button>
-                ))}
+                {acc.map((a) => {
+                  const activa = a.slug === accionActiva && panel.modulo === modulo;
+                  const I = iconoAccion(a.slug, a.label);
+                  return (
+                    <button
+                      key={a.slug}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => ir(urlBoton(panel.modulo, a, panel.modulo === modulo ? docElegido() : undefined))}
+                      className={`group/acc flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[13px] leading-snug transition ${
+                        activa ? "bg-[#CCD0CF] font-semibold text-[#11212D]" : "text-white/90 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      {/* Un ícono por función (lib/iconosFunciones.ts) */}
+                      <span
+                        aria-hidden
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ${
+                          activa ? "bg-[#800021] text-white" : "bg-white/10 text-[#CCD0CF] group-hover/acc:bg-[#800021] group-hover/acc:text-white"
+                        }`}
+                      >
+                        <I size={17} strokeWidth={1.7} />
+                      </span>
+                      <span className="min-w-0 flex-1">{a.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             ))}
           </div>
@@ -258,7 +272,7 @@ function Icono({ icono: I, label, activo, onClick, burbuja = 0 }: { icono: Lucid
         aria-current={activo ? "page" : undefined}
         className={`relative flex items-center justify-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
           activo
-            ? "h-14 w-14 bg-gradient-to-b from-white to-[#dfe6ff] text-[#1e2a5a] shadow-[0_6px_18px_-4px_rgba(150,175,255,0.8)]"
+            ? "h-14 w-14 bg-[#CCD0CF] text-[#11212D] shadow-[0_6px_18px_-4px_rgba(204,208,207,0.7)]"
             : "h-12 w-12 text-white/80 hover:bg-white/10 hover:text-white"
         }`}
       >
@@ -266,7 +280,7 @@ function Icono({ icono: I, label, activo, onClick, burbuja = 0 }: { icono: Lucid
         {burbuja > 0 && <Burbuja n={burbuja} />}
       </button>
       {/* Tooltip (solo PC) */}
-      <span className="pointer-events-none absolute right-[calc(100%+18px)] hidden whitespace-nowrap rounded-md bg-[#141a33] px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-lg transition group-hover:opacity-100 lg:block">
+      <span className="pointer-events-none absolute right-[calc(100%+18px)] hidden whitespace-nowrap rounded-md bg-[#11212D] px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-lg transition group-hover:opacity-100 lg:block">
         {label}
       </span>
     </div>
@@ -275,7 +289,7 @@ function Icono({ icono: I, label, activo, onClick, burbuja = 0 }: { icono: Lucid
 
 function Burbuja({ n }: { n: number }) {
   return (
-    <span className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-[#ff3b4e] px-1 text-center text-[10px] font-bold leading-[18px] text-white ring-2 ring-[#1e2a5a]">
+    <span className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-[#800021] px-1 text-center text-[10px] font-bold leading-[18px] text-white ring-2 ring-[#CCD0CF]">
       {n > 99 ? "99+" : n}
     </span>
   );
