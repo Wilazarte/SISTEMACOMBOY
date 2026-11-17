@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "./supabase/client";
-import { ErpError, KEYS, escribir, esperarGuardado, hoy, nuevoEvento, puede, r2, uid } from "./storage";
+import { ErpError, KEYS, escribir, esperarGuardado, hoy, nuevoEvento, puede, r2, serieSede, uid } from "./storage";
 import { anularComprobante, getComprobantes, totalesVenta } from "./ventas";
 import type { ComprobanteVenta, EstadoSunat, LineaVenta, Rol } from "./types";
 
@@ -311,7 +311,7 @@ export async function crearNota(d: DatosNota, vendedor: string, rol: Rol): Promi
     items = [{ id: uid(), productoNombre: "", descripcion: `${sustento} (${orig.numero})`, unidad: "UND", ancho: 0, alto: 0, m2: 0, cantidad: 1, precio: monto, total: monto }];
   }
   const t = totalesVenta(items, conIgv, descuento, preciosConIgv);
-  const serie = SERIE_NOTA[d.tipo][orig.tipo];
+  const serie = serieSede(SERIE_NOTA[d.tipo][orig.tipo]); // Secocha: FC02, BC02, FD02, BD02
   const numero = await correlativoNota(serie);
   const ahora = new Date().toISOString();
   const nota: ComprobanteVenta = {
