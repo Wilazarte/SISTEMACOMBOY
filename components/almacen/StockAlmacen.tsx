@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { productoNormalizado, sedeNormalizada } from "@/lib/constantes";
-import { FileDown, FileSpreadsheet, History, PackageMinus, Truck, Upload } from "lucide-react";
+import { FileDown, FileSpreadsheet, FileText, History, PackageMinus, Truck, Upload } from "lucide-react";
 import { Button, Card, CardHeader, Field, Input, Modal, Select, cn, ejecutar, toast } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { SEDES_STOCK, SEDE_REPUESTOS } from "@/lib/empresa";
@@ -16,7 +16,8 @@ import { EtiquetaCategoria, FiltroCategoria, contarCategorias, pasaCategoria } f
 import type { EquipoTerminado } from "@/lib/equipos";
 import type { OrdenProduccion } from "@/lib/produccion";
 import type { MovimientoKardex, StockItem } from "@/lib/types";
-import { guardarArchivo } from "@/lib/guardarArchivo";
+import { guardarArchivo, guardarExcel } from "@/lib/guardarArchivo";
+import { pdfReporteStock, type FilaStockReporte } from "@/lib/pdf";
 
 const fechaHora = (iso: string) => (iso ? new Date(iso).toLocaleString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-");
 const num = (n: number) => n.toLocaleString("es-PE", { maximumFractionDigits: 2 });
@@ -66,6 +67,82 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
   const valorizado = filas.reduce((a, f) => a + f.valor, 0);
   const sinValor = filas.filter((f) => !(f.s.costoUnit > 0)).length;
   const duplicados = filas.filter((f) => f.partes.length > 1).length;
+  // Lo que queda tras el buscador del panel "Buscar / Filtrar" (null = aún sin filtrar = todas)
+  const [visibles, setVisibles] = useState<{ ids: Set<string>; buscar: string } | null>(null);
+
+  // ---- Exportar stock (Excel / PDF A4) con los mismos filtros de la pantalla ----
+  const filasExportar = (): FilaStockReporte[] =>
+    filas
+      .filter((f) => !visibles || visibles.ids.has(f.s.id))
+      .map(({ s, valor }) => ({
+        nombre: s.nombre,
+        categoria: categoriaDe(s.nombre) || "Sin categoría",
+        sede: s.sede,
+        unidad: s.unidad,
+        cantidad: s.cantidad,
+        costoUnit: s.costoUnit > 0 ? s.costoUnit : 0,
+        valor: s.costoUnit > 0 ? valor : 0,
+        actualizado: s.actualizado,
+      }));
+  const textoFiltros = () =>
+    [
+      cat && `Categoría: ${cat}`,
+      visibles?.buscar && `Buscar: "${visibles.buscar}"`,
+      soloSinValor && "Solo sin valorizar",
+      !agrupar && "Sin agrupar duplicados",
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  const nombreAlmacen = sede || "Todos los almacenes";
+  const hoyIso = () => new Date().toISOString().slice(0, 10);
+
+  const exportarExcel = async () => {
+    const datos = filasExportar();
+    if (!datos.length) return toast("No hay productos para exportar con estos filtros", "error");
+    const XLSX = await import("xlsx");
+    const libro = XLSX.utils.book_new();
+    const hoja = XLSX.utils.json_to_sheet(
+      datos.map((f, i) => ({
+        "N°": i + 1,
+        Producto: f.nombre,
+        Categoría: f.categoria,
+        Almacén: f.sede,
+        Unidad: f.unidad,
+        Cantidad: f.cantidad,
+        "Último costo S/": f.costoUnit || "",
+        "Valorizado S/": f.costoUnit ? Math.round(f.valor * 100) / 100 : "",
+        "Última actualización": f.actualizado ? fechaHora(f.actualizado) : "",
+      }))
+    );
+    hoja["!cols"] = [{ wch: 5 }, { wch: 48 }, { wch: 20 }, { wch: 22 }, { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 18 }];
+    XLSX.utils.book_append_sheet(libro, hoja, "Stock");
+    // Resumen por almacén y categoría
+    const resumen = new Map<string, { productos: number; cantidad: number; valor: number }>();
+    for (const f of datos) {
+      const k = `${f.sede}|${f.categoria}`;
+      const r = resumen.get(k) ?? { productos: 0, cantidad: 0, valor: 0 };
+      resumen.set(k, { productos: r.productos + 1, cantidad: r.cantidad + f.cantidad, valor: r.valor + f.valor });
+    }
+    XLSX.utils.book_append_sheet(
+      libro,
+      XLSX.utils.json_to_sheet([
+        ...Array.from(resumen.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([k, r]) => ({ Almacén: k.split("|")[0], Categoría: k.split("|")[1], Productos: r.productos, "Valorizado S/": Math.round(r.valor * 100) / 100 })),
+        { Almacén: "TOTAL", Categoría: "", Productos: datos.length, "Valorizado S/": Math.round(datos.reduce((a, f) => a + f.valor, 0) * 100) / 100 },
+        {},
+        { Almacén: `Emitido: ${new Date().toLocaleString("es-PE")}`, Categoría: textoFiltros() ? `Filtros: ${textoFiltros()}` : "" },
+      ]),
+      "Resumen"
+    );
+    await guardarExcel(libro, `Stock-${nombreAlmacen.replace(/\s+/g, "-")}-${hoyIso()}.xlsx`);
+  };
+
+  const exportarPDF = () => {
+    const datos = filasExportar();
+    if (!datos.length) return toast("No hay productos para exportar con estos filtros", "error");
+    pdfReporteStock({ filas: datos, filtros: textoFiltros(), almacen: nombreAlmacen });
+  };
 
   return (
     <Card>
@@ -74,6 +151,12 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
         subtitle={`${filas.length} producto(s)${agrupar && duplicados ? ` (${duplicados} agrupados)` : ""} · Valorizado ${soles(valorizado)}${sinValor ? ` · ${sinValor} sin valorizar` : ""} (último costo: sin IGV en factura/OC, con IGV en boleta)`}
         action={
           <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button variant="secondary" onClick={exportarPDF} disabled={filas.length === 0} title={`Exportar stock en PDF A4 (${nombreAlmacen}, con los filtros actuales)`} data-exportar-stock="pdf">
+              <FileText size={16} /> Exportar PDF
+            </Button>
+            <Button variant="secondary" onClick={exportarExcel} disabled={filas.length === 0} title={`Exportar stock a Excel (${nombreAlmacen}, con los filtros actuales)`} data-exportar-stock="excel">
+              <FileSpreadsheet size={16} /> Exportar Excel
+            </Button>
             {puedeOperar && (
               <Button variant="secondary" onClick={() => setImportar(true)} title="Importar saldos desde Excel (Nombre Único | Ubicación | Ctd)">
                 <Upload size={16} /> Importar saldos
@@ -87,6 +170,7 @@ export function StockAlmacen({ stock, puedeOperar, onIrDespacho }: { stock: Stoc
       <ListaDocs
         tipo="inventario"
         extraActivos={(sede ? 1 : 0) + (soloSinValor ? 1 : 0) + (cat ? 1 : 0)}
+        onFiltradas={(ids, buscar) => setVisibles({ ids: new Set(ids), buscar })}
         filtrosExtra={
               <div className="flex w-full flex-wrap items-center gap-2">
                 <span className="text-xs font-semibold uppercase tracking-wide text-plomo-500">Sede:</span>
