@@ -89,17 +89,35 @@ async function renderizar(bytes: Uint8Array): Promise<Pagina[]> {
 }
 
 const esMovil = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-const esAppEscritorio = () => typeof window !== "undefined" && ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
+/** App de escritorio (Tauri o Electron): su visor interno no imprime PDF en iframe, se imprimen las imágenes. */
+const esAppEscritorio = () =>
+  typeof window !== "undefined" && ("__TAURI_INTERNALS__" in window || "__TAURI__" in window || "comboyEscritorio" in window);
 
-/** Imprime las páginas ya dibujadas (celular / app): un contenedor solo visible al imprimir. */
+/**
+ * Imprime las páginas ya dibujadas (celular / app): un contenedor solo visible al imprimir.
+ * Cada página del PDF va en su propia hoja del tamaño de la página (@page) y la imagen se
+ * encoge para caber completa: así el pie de página se imprime dentro de su hoja y nunca
+ * se pasa a una hoja aparte (antes, en papel Carta o por redondeo en A4, el pie caía en otra hoja).
+ */
 function imprimirImagenes(paginas: Pagina[]): void {
   const id = "erp-impresion-pdf";
   document.getElementById(id)?.remove();
   const caja = document.createElement("div");
   caja.id = id;
+  const p0 = paginas[0] ?? { w: 210, h: 297 };
   caja.innerHTML =
-    `<style>@media screen{#${id}{display:none}}@media print{@page{margin:0}body>*:not(#${id}){display:none!important}#${id} img{display:block;width:100%;page-break-after:always;break-after:page}#${id} img:last-child{page-break-after:auto;break-after:auto}}</style>` +
-    paginas.map((p) => `<img src="${p.url}" alt="">`).join("");
+    "<style>" +
+    `@media screen{#${id}{display:none}}` +
+    "@media print{" +
+    `@page{size:${p0.w.toFixed(1)}mm ${p0.h.toFixed(1)}mm;margin:0}` +
+    "html,body{margin:0!important;padding:0!important;height:auto!important;min-height:0!important;overflow:visible!important;background:#fff!important}" +
+    `body>*:not(#${id}){display:none!important}` +
+    `#${id}{display:block!important;margin:0;padding:0}` +
+    `#${id} .hoja{width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;break-inside:avoid;page-break-inside:avoid;break-after:page;page-break-after:always}` +
+    `#${id} .hoja:last-child{break-after:auto;page-break-after:auto}` +
+    `#${id} img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}` +
+    "}</style>" +
+    paginas.map((p) => `<div class="hoja"><img src="${p.url}" alt=""></div>`).join("");
   document.body.appendChild(caja);
   const fin = () => {
     caja.remove();
