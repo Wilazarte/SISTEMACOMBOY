@@ -8,13 +8,14 @@ import { useSesion } from "@/lib/auth";
 import { perfilPlanta } from "@/lib/permisosPlanta";
 import {
   ESTADOS_HOJA,
-  EQUIPOS_A_FABRICAR,
   S,
   crearHoja,
   dashboard,
   desviacion,
   guardarConfig,
-  opsDisponibles,
+  modelosDisponibles,
+  NOMBRE_MODELO,
+  referenciaHoja,
   pct,
   useCostoProduccion,
   type ConfigCosto,
@@ -22,7 +23,7 @@ import {
   type EstadoHoja,
   type OpDisponible,
 } from "@/lib/costoProduccion";
-import { Alerta, Area, Boton, Celda, Encabezado, Entrada, EstadoChip, Etiqueta, FondoCostos, Lista, NOCHE, Tabla, Tarjeta, pinta } from "./piezas";
+import { Alerta, Area, Boton, Celda, Encabezado, Entrada, EstadoChip, Etiqueta, FondoCostos, NOCHE, Tabla, Tarjeta, pinta } from "./piezas";
 import { HojaCosto } from "./HojaCosto";
 
 type Vista = "ordenes" | "dashboard" | "parametros";
@@ -59,10 +60,11 @@ export function CostoProduccion({ modo }: { modo: ModoCostos }) {
   }, [modo]);
   useEffect(() => {
     if (!datos.listo || datos.faltaTabla) return;
-    void opsDisponibles().then(setOps).catch(() => setOps([]));
+    void modelosDisponibles().then(setOps).catch(() => setOps([]));
   }, [datos.listo, datos.faltaTabla, datos.hojas.length]);
 
-  const sinHoja = useMemo(() => ops.filter((o) => !datos.hojas.some((h) => h.estado !== "ANULADO" && h.orden_produccion_id === o.codigo && (h.equipo_id ?? "") === (o.equipo_id ?? ""))), [ops, datos.hojas]);
+  // Modelos sin hoja abierta (una hoja cerrada permite abrir otra para recalcular)
+  const sinHoja = useMemo(() => ops.filter((o) => !datos.hojas.some((h) => h.origen === "MODELO" && h.estado !== "ANULADO" && h.estado !== "CERRADO" && h.orden_produccion_id === o.codigo)), [ops, datos.hojas]);
 
   const lista = useMemo(() => {
     const t = q.trim().toUpperCase();
@@ -172,30 +174,29 @@ export function CostoProduccion({ modo }: { modo: ModoCostos }) {
 
           {creaHojas && sinHoja.length > 0 && (
             <Alerta icono={<AlertTriangle size={15} />}>
-              <b>{sinHoja.length} OP sin hoja de costo:</b>{" "}
-              {sinHoja.slice(0, 6).map((o, i) => (
-                <button key={`${o.codigo}-${o.equipo_id}`} className="mr-1 underline" onClick={() => setNueva(o)}>
-                  {o.codigo}
-                  {o.origen === "LOTE" ? ` (${o.modelo})` : ""}
-                  {i < Math.min(sinHoja.length, 6) - 1 ? "," : ""}
+              <b>{sinHoja.length === 1 ? "1 modelo sin hoja de costo:" : `${sinHoja.length} modelos sin hoja de costo:`}</b>{" "}
+              {sinHoja.map((o, i) => (
+                <button key={o.codigo} className="mr-1 underline" onClick={() => setNueva(o)}>
+                  {NOMBRE_MODELO[o.codigo] ?? o.codigo}
+                  {i < sinHoja.length - 1 ? "," : ""}
                 </button>
-              ))}
-              {sinHoja.length > 6 ? "…" : ""} Toque una para abrir su formulario de costo.
+              ))}{" "}
+              Toque uno para abrir su ficha de costo.
             </Alerta>
           )}
 
           <Tarjeta titulo={`Órdenes con hoja de costo (${lista.length})`}>
             {lista.length === 0 ? (
-              <p className="py-10 text-center text-[13px] text-[#11212D]/70">{datos.hojas.length ? "Ninguna hoja con esos filtros." : "Aún no hay hojas de costo. Abra una desde una OP."}</p>
+              <p className="py-10 text-center text-[13px] text-[#11212D]/70">{datos.hojas.length ? "Ninguna hoja con esos filtros." : "Aún no hay hojas de costo. Abra una por modelo de equipo."}</p>
             ) : (
-              <Tabla head={["OP", "Equipo", "Cantidad", "Costo estimado", "Costo real", "Desviación", "Margen", "Estado"]}>
+              <Tabla head={["Modelo / OP", "Equipo", "Cantidad", "Costo estimado", "Costo real", "Desviación", "Margen", "Estado"]}>
                 {lista.map((h) => {
                   const c = datos.costos.get(h.id);
                   const dv = desviacion(c);
                   return (
                     <tr key={h.id} className="cursor-pointer hover:bg-[#CCD0CF]/35" onClick={() => setAbierta(h.id)}>
                       <Celda>
-                        <p className="font-bold">{h.orden_produccion_id}</p>
+                        <p className="font-bold">{h.origen === "MODELO" ? NOMBRE_MODELO[h.orden_produccion_id] ?? h.orden_produccion_id : h.orden_produccion_id}</p>
                         <p className="text-[11px] text-[#294D61]">{h.codigo}</p>
                       </Celda>
                       <Celda>
@@ -232,24 +233,19 @@ export function CostoProduccion({ modo }: { modo: ModoCostos }) {
   );
 }
 
+/** Hoja de costo por MODELO de equipo (Williams 2026-11-17): se calcula desde cero, una por modelo. */
 function NuevaHoja({ inicial, ops, config, onCerrar, onCreada }: { inicial: OpDisponible | null; ops: OpDisponible[]; config: ConfigCosto; onCerrar: () => void; onCreada: (id: string) => void }) {
-  const clave = (o: OpDisponible) => `${o.codigo}|${o.equipo_id ?? ""}`;
-  const [sel, setSel] = useState(inicial ? clave(inicial) : "");
-  const op = ops.find((o) => clave(o) === sel) ?? inicial;
-  const [f, setF] = useState({ tipo_equipo: "", modelo: "", cantidad: 1, cliente_proyecto: "", responsable: "", fecha_inicio: new Date().toISOString().slice(0, 10), fecha_fin_estimada: "", precio_venta: 0, margen_deseado: config.margen_deseado });
+  const [sel, setSel] = useState(inicial?.codigo ?? "");
+  const modelo = ops.find((o) => o.codigo === sel) ?? (inicial?.codigo === sel ? inicial : null);
+  const [f, setF] = useState({ responsable: "", fecha_inicio: new Date().toISOString().slice(0, 10), precio_venta: 0, margen_deseado: config.margen_deseado });
   const [ocupado, setOcupado] = useState(false);
-  useEffect(() => {
-    if (!op) return;
-    const tipo = EQUIPOS_A_FABRICAR.find((e) => op.tipo_equipo?.toUpperCase().startsWith(e.split(" ")[0])) ?? op.tipo_equipo;
-    setF((x) => ({ ...x, tipo_equipo: tipo, modelo: op.modelo ?? "", cantidad: Number(op.cantidad) || 1, cliente_proyecto: op.cliente ?? x.cliente_proyecto }));
-  }, [op]);
 
   const crear = async () => {
-    if (!op) return toast("Elija la OP.", "error");
+    if (!modelo) return toast("Elija el modelo de equipo.", "error");
     setOcupado(true);
     try {
-      const r = await crearHoja({ orden_produccion_id: op.codigo, equipo_id: op.equipo_id, ...f });
-      toast(`${r.codigo} creada${r.materiales_bom ? ` con ${r.materiales_bom} materiales de la lista (BOM)` : ""}`);
+      const r = await crearHoja({ origen: "MODELO", orden_produccion_id: modelo.codigo, tipo_equipo: modelo.tipo_equipo, cantidad: 1, ...f });
+      toast(`${r.codigo} creada: agregue los materiales, cantidades y costos.`);
       onCreada(r.id);
     } catch (e) {
       toast((e as Error).message, "error");
@@ -259,60 +255,46 @@ function NuevaHoja({ inicial, ops, config, onCerrar, onCreada }: { inicial: OpDi
   };
 
   return (
-    <Modal open onClose={onCerrar} title="Nueva hoja de costo de producción" wide>
+    <Modal open onClose={onCerrar} title="Nueva ficha de costo por modelo" wide>
       <div className="space-y-3">
-        <Etiqueta texto="Orden de producción (existente)" ayuda="La hoja se enlaza por código a la OP o al equipo del lote 26W: no se crea otra OP.">
-          <Lista value={sel} onChange={(e) => setSel(e.target.value)}>
-            <option value="">Seleccione…</option>
-            {[...(inicial && !ops.some((o) => clave(o) === clave(inicial)) ? [inicial] : []), ...ops].map((o) => (
-              <option key={clave(o)} value={clave(o)}>
-                {o.codigo} · {o.tipo_equipo} {o.modelo ?? ""} {o.origen === "LOTE" ? `× ${o.cantidad}` : ""} · {o.detalle ?? ""}
-              </option>
+        <Etiqueta texto="Modelo de equipo" ayuda="Una ficha general por modelo: el costo de UNA unidad, que vale para todas sus OP.">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {ops.map((o) => (
+              <button
+                key={o.codigo}
+                type="button"
+                onClick={() => setSel(o.codigo)}
+                className="rounded-lg border-2 px-3 py-2 text-left"
+                style={sel === o.codigo ? { borderColor: "#294D61", backgroundColor: "rgba(41,77,97,0.08)", color: NOCHE } : { borderColor: "#CCD0CF", backgroundColor: "#ffffff", color: NOCHE }}
+              >
+                <span className="block text-[13.5px] font-bold">{NOMBRE_MODELO[o.codigo] ?? o.codigo}</span>
+                <span className="block text-[11.5px] text-[#294D61]">{o.detalle}</span>
+              </button>
             ))}
-          </Lista>
+            {ops.length === 0 && <p className="text-[12.5px] text-[#800021]">Los 4 modelos ya tienen una ficha abierta: ábrala desde la lista.</p>}
+          </div>
         </Etiqueta>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Etiqueta texto="Código Orden (auto)">
-            <Entrada value={op?.codigo ?? ""} disabled />
-          </Etiqueta>
-          <Etiqueta texto="Equipo a fabricar">
-            <Lista value={f.tipo_equipo} onChange={(e) => setF({ ...f, tipo_equipo: e.target.value })}>
-              {Array.from(new Set([f.tipo_equipo, ...EQUIPOS_A_FABRICAR].filter(Boolean))).map((x) => (
-                <option key={x} value={x}>
-                  {x}
-                </option>
-              ))}
-            </Lista>
-          </Etiqueta>
-          <Etiqueta texto="Cantidad">
-            <Entrada type="number" min={1} value={f.cantidad} onChange={(e) => setF({ ...f, cantidad: Number(e.target.value) })} />
-          </Etiqueta>
-          <Etiqueta texto="Cliente / Proyecto">
-            <Entrada value={f.cliente_proyecto} onChange={(e) => setF({ ...f, cliente_proyecto: e.target.value })} />
-          </Etiqueta>
+        <div className="grid gap-3 sm:grid-cols-2">
           <Etiqueta texto="Responsable de Producción">
             <Entrada value={f.responsable} onChange={(e) => setF({ ...f, responsable: e.target.value })} />
           </Etiqueta>
-          <Etiqueta texto="Precio de venta unitario">
-            <Entrada type="number" min={0} step="0.01" value={f.precio_venta || ""} onChange={(e) => setF({ ...f, precio_venta: Number(e.target.value) })} />
-          </Etiqueta>
-          <Etiqueta texto="Fecha inicio">
+          <Etiqueta texto="Fecha">
             <Entrada type="date" value={f.fecha_inicio} onChange={(e) => setF({ ...f, fecha_inicio: e.target.value })} />
           </Etiqueta>
-          <Etiqueta texto="Fecha fin estimada">
-            <Entrada type="date" value={f.fecha_fin_estimada} onChange={(e) => setF({ ...f, fecha_fin_estimada: e.target.value })} />
+          <Etiqueta texto="Precio de venta unitario (opcional)">
+            <Entrada type="number" min={0} step="0.01" value={f.precio_venta || ""} onChange={(e) => setF({ ...f, precio_venta: Number(e.target.value) })} />
           </Etiqueta>
           <Etiqueta texto="Margen deseado %">
             <Entrada type="number" min={0} max={95} value={Math.round(f.margen_deseado * 100)} onChange={(e) => setF({ ...f, margen_deseado: Number(e.target.value) / 100 })} />
           </Etiqueta>
         </div>
-        <p className="text-[11.5px] text-[#294D61]">Si el modelo tiene lista de materiales (BOM), sus materiales entran solos con el último costo de Almacén.</p>
+        <p className="text-[11.5px] text-[#294D61]">La ficha empieza vacía: usted agrega cada material con su cantidad y costo. Todo queda en la bitácora de auditoría.</p>
         <div className="flex justify-end gap-2">
           <Boton variante="borde" onClick={onCerrar}>
             Cancelar
           </Boton>
-          <Boton onClick={() => void crear()} disabled={!op || ocupado}>
-            {ocupado ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Crear hoja de costo
+          <Boton onClick={() => void crear()} disabled={!modelo || ocupado}>
+            {ocupado ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Crear ficha de costo
           </Boton>
         </div>
       </div>
@@ -384,7 +366,7 @@ function DashboardCostos({ datos, onAbrir }: { datos: EstadoCostos; onAbrir: (id
           <Tabla head={["OP", "Equipo", "Estimado", "Real", "Sobrecosto", "Margen", "Estado"]}>
             {d.sobrecosto.map((x) => (
               <tr key={x.hoja.id} className="cursor-pointer hover:bg-[#CCD0CF]/35" onClick={() => onAbrir(x.hoja.id)}>
-                <Celda className="font-bold">{x.hoja.orden_produccion_id}</Celda>
+                <Celda className="font-bold">{referenciaHoja(x.hoja)}</Celda>
                 <Celda>{x.hoja.tipo_equipo}</Celda>
                 <Celda className="whitespace-nowrap">{S(x.estimado)}</Celda>
                 <Celda className="whitespace-nowrap">{S(x.real)}</Celda>

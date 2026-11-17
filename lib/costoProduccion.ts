@@ -53,8 +53,8 @@ export const CONFIG_DEFECTO: ConfigCosto = {
 export interface HojaCosto {
   id: string;
   codigo: string; // CP-2026-0001
-  origen: "OP" | "LOTE";
-  orden_produccion_id: string; // OP-2026-0087 / 26W-003
+  origen: "OP" | "LOTE" | "MODELO";
+  orden_produccion_id: string; // OP-2026-0087 / 26W-003 / modelo (REMOLCADOR ECO-MINE 3000) si origen = MODELO
   equipo_id: string | null;
   requerimiento_ids: string[];
   tipo_equipo: string;
@@ -225,7 +225,8 @@ export interface PrecioMaterial {
 
 /** OP existente a la que se le puede abrir hoja de costo (pc_ops_disponibles). */
 export interface OpDisponible {
-  origen: "OP" | "LOTE";
+  origen: "OP" | "LOTE" | "MODELO";
+  ops?: string[]; // MODELO: OP existentes de ese modelo
   codigo: string;
   equipo_id: string | null;
   tipo_equipo: string;
@@ -563,7 +564,7 @@ const sinKey = (l: LineaBorrador) => {
   return resto;
 };
 
-export const crearHoja = (d: { orden_produccion_id: string; equipo_id?: string | null; tipo_equipo: string; modelo?: string | null; cantidad: number; cliente_proyecto?: string; responsable?: string; fecha_inicio?: string; fecha_fin_estimada?: string; margen_deseado?: number; precio_venta?: number }) =>
+export const crearHoja = (d: { origen?: "MODELO"; orden_produccion_id: string; equipo_id?: string | null; tipo_equipo: string; modelo?: string | null; cantidad: number; cliente_proyecto?: string; responsable?: string; fecha_inicio?: string; fecha_fin_estimada?: string; margen_deseado?: number; precio_venta?: number }) =>
   rpc<{ id: string; codigo: string; materiales_bom: number }>("pc_crear_orden", { p: d }).then(async (r) => {
     await recargarCostos();
     return r;
@@ -606,6 +607,19 @@ export const guardarConfig = (c: Partial<ConfigCosto>, motivo: string) => rpc<Co
 export const verificar = (ordenId: string) => rpc<Verificacion>("pc_verificar", { p_orden: ordenId });
 export const datosPDF = (ordenId: string) => rpc<DatosPDF>("pc_registrar_pdf", { p_orden: ordenId });
 export const opsDisponibles = () => rpc<OpDisponible[]>("pc_ops_disponibles");
+/** Costo por MODELO (Williams 2026-11-17): ECO-MINE 3000, ECO-MINE PRO 3500, Coche minero y Eléctrico, con sus OP. */
+export const modelosDisponibles = () => rpc<OpDisponible[]>("pc_modelos_disponibles");
+
+/** Nombre corto del modelo para pantallas y PDF. */
+export const NOMBRE_MODELO: Record<string, string> = {
+  "REMOLCADOR ECO-MINE 3000": "ECO-MINE 3000",
+  "REMOLCADOR ECO-MINE 3500 PRO": "ECO-MINE PRO 3500",
+  "COCHE MINERO": "COCHE MINERO",
+  "REMOLCADOR ELECTRIC 4000": "ELÉCTRICO 4000",
+};
+/** Lo que identifica la hoja: el modelo (hoja por modelo) o la OP. */
+export const referenciaHoja = (h: Pick<HojaCosto, "origen" | "orden_produccion_id">) =>
+  h.origen === "MODELO" ? `Modelo ${NOMBRE_MODELO[h.orden_produccion_id] ?? h.orden_produccion_id}` : h.orden_produccion_id;
 export const catalogoStock = (q = "") => rpc<StockCatalogo[]>("pc_catalogo_stock", { p_q: q });
 export const catalogoTrabajadores = () => rpc<TrabajadorCosto[]>("pc_catalogo_trabajadores");
 export const catalogoMaquinas = () => rpc<MaquinaCosto[]>("pc_catalogo_maquinas");
