@@ -12,6 +12,7 @@ import { InicioModulo } from "@/components/inicio/InicioModulo";
 import { isAdmin } from "@/lib/permisosPlanta";
 import { KEYS, fechaPE, hoy, r2, soles, useStore } from "@/lib/storage";
 import type { ComprobanteVenta, NotaPedido, OrdenCompra, StockItem } from "@/lib/types";
+import { esVentaEmitida } from "@/lib/ventas";
 
 /** Stock crítico: 5 unidades o menos (el ERP aún no maneja stock mínimo por producto). */
 const STOCK_CRITICO = 5;
@@ -56,7 +57,7 @@ function DashboardHome() {
   const veAlmacen = puedeVer(sesion, "/dashboard/almacen");
   const mes = mesActual();
 
-  const emitidos = comprobantes.filter((c) => c.estado === "EMITIDO");
+  const emitidos = comprobantes.filter((c) => esVentaEmitida(c));
   const ventasMes = emitidos.filter((c) => c.fecha.startsWith(mes));
   const totalVentasMes = r2(ventasMes.reduce((a, c) => a + c.total, 0));
   const ocMes = ordenes.filter((o) => o.fecha.startsWith(mes));

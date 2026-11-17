@@ -756,6 +756,8 @@ export interface ComprobanteExterno {
 }
 
 export type TipoComprobanteVenta = "FACTURA" | "BOLETA" | "NOTA_CREDITO" | "NOTA_DEBITO";
+/** NO_ENVIADO (aún no se manda) · ENVIADO (en el PSE, esperando a SUNAT) · ACEPTADO / OBSERVADO (válido) · RECHAZADO · EXCEPCION (no recibido, reenviar) · ANULADO (baja aceptada). */
+export type EstadoSunat = "NO_ENVIADO" | "ENVIADO" | "ACEPTADO" | "OBSERVADO" | "RECHAZADO" | "EXCEPCION" | "ANULADO";
 export type FormaPagoVenta = "CONTADO" | "CREDITO" | "CREDITO_CUOTAS";
 
 export interface Cuota {
@@ -795,7 +797,14 @@ export interface ComprobanteVenta {
   cuotas: Cuota[];
   saldo: number; // por cobrar
   estado: "BORRADOR" | "EMITIDO" | "ANULADO";
-  estadoSunat: "NO_ENVIADO";
+  /** Estado en SUNAT (la fuente de verdad es la tabla sunat_cpe; aquí queda una copia para PDF y filtros). */
+  estadoSunat: EstadoSunat;
+  /** Datos de la respuesta de SUNAT: hash de la firma (representación impresa / QR) y CDR. */
+  sunat?: { hash: string; codigo: string; descripcion: string; entorno: "beta" | "produccion"; fecha: string };
+  /** Notas de crédito / débito: comprobante que modifican y motivo (catálogos SUNAT 09 / 10). */
+  ref?: { id: string; tipo: "FACTURA" | "BOLETA"; numero: string; fecha: string };
+  motivoCodigo?: string;
+  motivoDescripcion?: string;
   lugarEntrega: string;
   odId?: string;
   odNumero?: string;

@@ -1106,13 +1106,39 @@ export function pdfNotaPedidoActualizada(d: {
   );
 }
 
+const CODIGO_CPE: Record<ComprobanteVenta["tipo"], string> = { FACTURA: "01", BOLETA: "03", NOTA_CREDITO: "07", NOTA_DEBITO: "08" };
+const TITULO_CPE: Record<ComprobanteVenta["tipo"], string> = {
+  FACTURA: "FACTURA ELECTRÓNICA",
+  BOLETA: "BOLETA DE VENTA ELECTRÓNICA",
+  NOTA_CREDITO: "NOTA DE CRÉDITO ELECTRÓNICA",
+  NOTA_DEBITO: "NOTA DE DÉBITO ELECTRÓNICA",
+};
+
+/** QR de la representación impresa (formato SUNAT): RUC|TIPO|SERIE|NÚMERO|IGV|TOTAL|FECHA|TIPO DOC|N° DOC|HASH| */
 function qrSunat(c: ComprobanteVenta): string {
   const [doc, num] = c.clienteDoc.split(" ");
-  return [EMPRESA.ruc, c.tipo === "FACTURA" ? "01" : "03", c.serie, c.numero.split("-")[1] ?? "", c.igv.toFixed(2), c.total.toFixed(2), c.fecha, tipoDocSunat(doc), num, ""].join("|");
+  return [EMPRESA.ruc, CODIGO_CPE[c.tipo], c.serie, c.numero.split("-")[1] ?? "", c.igv.toFixed(2), c.total.toFixed(2), c.fecha, tipoDocSunat(doc), num, c.sunat?.hash ?? "", ""].join("|");
+}
+
+/** Leyenda SUNAT de la representación impresa (estado y valor resumen / hash). */
+function leyendaSunat(c: ComprobanteVenta): string[] {
+  const titulo = TITULO_CPE[c.tipo].toLowerCase();
+  const estado =
+    c.estadoSunat === "ACEPTADO" || c.estadoSunat === "OBSERVADO"
+      ? `Aceptado por SUNAT${c.sunat?.entorno === "beta" ? " (BETA - PRUEBAS, sin valor legal)" : ""}`
+      : c.estadoSunat === "ANULADO"
+        ? "Anulado ante SUNAT (comunicación de baja)"
+        : c.estadoSunat === "RECHAZADO"
+          ? "RECHAZADO por SUNAT: sin validez"
+          : "Pendiente de envío a SUNAT";
+  return [
+    `Representación impresa de la ${titulo}. Consulte su validez en www.sunat.gob.pe. ${estado}.`,
+    ...(c.sunat?.hash ? [`Valor resumen (hash): ${c.sunat.hash}`] : []),
+  ];
 }
 
 export function pdfComprobanteVenta(c: ComprobanteVenta): void {
-  const titulo = c.tipo === "FACTURA" ? "FACTURA ELECTRÓNICA" : "BOLETA DE VENTA ELECTRÓNICA";
+  const titulo = TITULO_CPE[c.tipo];
   abrir(
     construir({
       titulo,
@@ -1124,8 +1150,15 @@ export function pdfComprobanteVenta(c: ComprobanteVenta): void {
         ["Dirección", c.clienteDireccion || "-"],
         ["Fecha emisión", fechaPE(c.fecha)],
         ["Forma de pago", c.formaPago === "CONTADO" ? "Contado" : `${c.condPagoNombre} · vence ${fechaPE(c.fechaVenc)}`],
-        ["Nota de pedido", c.npNumero ?? "-"],
-        ["Orden despacho", c.odNumero ?? "-"],
+        ...(c.ref
+          ? ([
+              ["Documento que modifica", `${c.ref.numero} (${fechaPE(c.ref.fecha)})`],
+              ["Motivo", `${c.motivoCodigo ?? ""} · ${c.motivoDescripcion ?? ""}`],
+            ] as [string, string][])
+          : ([
+              ["Nota de pedido", c.npNumero ?? "-"],
+              ["Orden despacho", c.odNumero ?? "-"],
+            ] as [string, string][])),
         ["Moneda", "Soles (PEN)"],
       ],
       head: ["#", "Descripción", "Medidas", "Cant.", "m²", c.preciosConIgv ? (c.conIgv ? "P. unit. inc. IGV" : "P. unit.") : "V. unit.", c.preciosConIgv ? "Importe" : "Valor venta"],
@@ -1141,7 +1174,7 @@ export function pdfComprobanteVenta(c: ComprobanteVenta): void {
         ...(c.cuotas.length
           ? [`Cuotas: ${c.cuotas.map((q) => `N°${q.n} ${fechaPE(q.fecha)} ${soles(q.monto)}`).join(" · ")}${c.inicial > 0 ? ` · Inicial ${soles(c.inicial)}` : ""}`]
           : []),
-        "Representación impresa del comprobante. Estado SUNAT: NO ENVIADO (el ERP aún no está conectado a un OSE/PSE de facturación electrónica).",
+        ...leyendaSunat(c),
       ],
       qr: qrSunat(c),
       qrTexto: [`${titulo} ${c.numero}`, `Total ${soles(c.total)} · IGV ${soles(c.igv)}`, ...lineasCuentas()],
@@ -1153,7 +1186,7 @@ export function pdfComprobanteVenta(c: ComprobanteVenta): void {
 
 /** Ticket 80 mm con IGV discriminado. */
 export function pdfTicketVenta(c: ComprobanteVenta): void {
-  const alto = 178 + c.items.length * 10;
+  const alto = 190 + c.items.length * 10;
   const doc = new jsPDF({ unit: "mm", format: [80, alto] });
   const cx = 40;
   let y = 8;
@@ -1186,7 +1219,7 @@ export function pdfTicketVenta(c: ComprobanteVenta): void {
   linea(EMPRESA.telefono);
   y += 1;
   sep();
-  linea(c.tipo === "FACTURA" ? "FACTURA ELECTRÓNICA" : "BOLETA DE VENTA ELECTRÓNICA", 8.5, true);
+  linea(TITULO_CPE[c.tipo], 8.5, true);
   linea(c.numero || "BORRADOR", 10, true);
   sep();
   linea(`Fecha: ${fechaPE(c.fecha)}`, 7.5, false, "left");
@@ -1206,7 +1239,7 @@ export function pdfTicketVenta(c: ComprobanteVenta): void {
   sep();
   dibujarQR(doc, qrSunat(c), cx - 14, y, 28);
   y += 31;
-  linea("Representación impresa. Estado SUNAT: NO ENVIADO.", 6.5);
+  leyendaSunat(c).forEach((t) => linea(t, 6.5));
   linea("¡Gracias por su compra!", 8, true);
   // Footer negro ÁREA INFORMÁTICA (al pie del ticket)
   y = Math.max(y + 2, alto - 22);
