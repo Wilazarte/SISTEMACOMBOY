@@ -205,17 +205,13 @@ export default function ComprasPage() {
     // Requerimientos por revisar: sección de la barra derecha de notificaciones (layout)
     <div className="w-full space-y-6">
       {/* Planilla (botón propio del dock) muestra solo su título, isla y contenido */}
-      {!enPlanilla && (
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="font-serif tracking-tight text-2xl font-bold leading-tight text-fg lg:text-[28px]">Tesorería / Compras</h1>
-          </div>
-          {!puede(rol, "req.revisar") && (
-            <span className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-plomo-600">Modo lectura para su rol</span>
-          )}
+      {/* El nombre del módulo ya está en la barra superior (Williams 2026-11-16): el título queda solo para lectores de pantalla */}
+      {!enPlanilla && <h1 className="sr-only">Tesorería / Compras</h1>}
+      {!enPlanilla && !puede(rol, "req.revisar") && (
+        <div className="flex justify-end">
+          <span className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-plomo-600">Modo lectura para su rol</span>
         </div>
       )}
-
 
       {/* Isla de Tesorería sin Planilla: Planilla abre desde su botón del dock y dibuja su propia isla */}
       <Tabs<Tab>

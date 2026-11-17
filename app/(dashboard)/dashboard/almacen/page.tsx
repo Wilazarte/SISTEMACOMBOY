@@ -64,7 +64,8 @@ export default function AlmacenPage() {
   return (
     <div className="w-full space-y-6">
       <div>
-        <h1 className="font-serif tracking-tight text-2xl font-semibold leading-tight text-fg lg:text-[28px]">Almacén</h1>
+        {/* El nombre del módulo ya está en la barra superior (Williams 2026-11-16): solo para lectores de pantalla */}
+          <h1 className="sr-only">Almacén</h1>
         <p className="mt-1 text-[13px] text-plomo-600">Emisión de requerimientos, ingresos de mercadería y stock</p>
       </div>
 
