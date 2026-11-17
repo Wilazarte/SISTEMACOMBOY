@@ -237,9 +237,9 @@ function Login() {
         )}
       </section>
 
-      {/* Dock de módulos (scroll horizontal en mobile) */}
+      {/* Dock de módulos: en celular, grilla de 2 columnas sin desplazamiento horizontal (Williams 2026-11-17) */}
       <nav className="mt-10 w-full px-4 pb-10">
-        <div className="mx-auto flex w-full max-w-[1100px] justify-between gap-3 overflow-x-auto rounded-3xl border border-white/15 bg-black/55 px-6 py-4 backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="mx-auto grid w-full max-w-[1100px] grid-cols-2 justify-between gap-3 rounded-3xl border border-white/15 bg-black/55 px-3 py-4 sm:flex sm:overflow-x-auto sm:px-6 backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {DOCK.map(({ id, slug, titulo, iniciales, persona, badge }) => {
             const sel = activo === id;
             return (
@@ -249,7 +249,7 @@ function Login() {
                 data-modulo={id}
                 aria-pressed={sel}
                 onClick={() => elegir(id, slug)}
-                className={`flex min-h-[118px] min-w-[128px] flex-1 flex-col items-center justify-center gap-1 rounded-2xl border bg-[#141414]/90 px-2 py-3 text-center text-white transition-all duration-200 hover:scale-105 hover:border-[#D50000] hover:shadow-[0_0_20px_rgba(213,0,0,0.75)] ${
+                className={`flex min-h-[118px] min-w-0 flex-1 flex-col sm:min-w-[128px] items-center justify-center gap-1 rounded-2xl border bg-[#141414]/90 px-2 py-3 text-center text-white transition-all duration-200 hover:scale-105 hover:border-[#D50000] hover:shadow-[0_0_20px_rgba(213,0,0,0.75)] ${
                   sel ? "scale-105 border-[#D50000] shadow-[0_0_22px_rgba(213,0,0,0.9)]" : "border-white/15"
                 }`}
               >
@@ -266,7 +266,7 @@ function Login() {
               type="button"
               data-modulo="sucursal-secocha"
               onClick={() => router.push(SUCURSAL_SECOCHA.href)}
-              className="flex h-20 min-w-[132px] flex-1 flex-col items-center justify-center gap-1.5 rounded-full border border-blue-500 bg-blue-500/15 text-center text-[14px] font-bold leading-tight text-blue-100 shadow-[0_0_15px] shadow-blue-500/50 transition-all duration-200 hover:bg-blue-500/25 hover:shadow-blue-500/80"
+              className="col-span-2 flex h-20 min-w-0 flex-1 flex-col sm:min-w-[132px] items-center justify-center gap-1.5 rounded-full border border-blue-500 bg-blue-500/15 text-center text-[14px] font-bold leading-tight text-blue-100 shadow-[0_0_15px] shadow-blue-500/50 transition-all duration-200 hover:bg-blue-500/25 hover:shadow-blue-500/80"
             >
               <Store size={24} strokeWidth={2} />
               {SUCURSAL_SECOCHA.titulo}

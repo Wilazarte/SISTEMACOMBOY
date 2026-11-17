@@ -38,7 +38,7 @@ export function IslandMenu({
   className?: string;
 }) {
   return (
-    <div className={cn("mx-4 mt-3 flex gap-1 overflow-x-auto rounded-full border border-white/[0.08] glass-blur px-2 py-1.5", className)}>
+    <div className={cn("mx-4 mt-3 flex flex-wrap gap-1 rounded-2xl border sm:flex-nowrap sm:overflow-x-auto sm:rounded-full border-white/[0.08] glass-blur px-2 py-1.5", className)}>
       {acciones.map((a) => (
         <button
           key={a.label}
@@ -51,7 +51,7 @@ export function IslandMenu({
         </button>
       ))}
       {acciones.length > 0 && items.length > 0 && <span aria-hidden className="mx-1 my-1.5 w-px shrink-0 bg-[#2a3445]" />}
-      <div role="tablist" className="flex gap-1">
+      <div role="tablist" className="flex flex-wrap gap-1 sm:flex-nowrap">
         {items.map((t) => {
           const on = activo === t.id;
           return (
