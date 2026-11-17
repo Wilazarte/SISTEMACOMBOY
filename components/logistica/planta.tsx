@@ -5,7 +5,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { AlertTriangle, Bell, CircleDollarSign, Clock, Cog, Lock, Package, Plus, Receipt, Timer, Truck, Users, Video } from "lucide-react";
 import { consumosDeChasis } from "@/lib/inventario";
 import type { OrdenProduccion } from "@/lib/produccion";
-import { KEYS, r2, soles, useStore } from "@/lib/storage";
+import { KEYS, enSucursal, r2, soles, useStore } from "@/lib/storage";
 import type { StockItem, ValeProduccion } from "@/lib/types";
 import { cn } from "@/components/ui";
 import { puedeVer, type Sesion } from "@/lib/auth";
@@ -95,6 +95,8 @@ export function BarraModulos({ sesion, actual }: { sesion: Sesion | null; actual
  * El actual va marcado y abre su módulo de trabajo; los demás abren su home en la misma ventana. Sin permiso: candado.
  */
 export function AccesosModulos({ sesion, actual }: { sesion: Sesion | null; /** Módulo resaltado (sin él, ninguno: INICIO SOPORTE). */ actual?: ModuloPlanta }) {
+  // Secocha (Williams 2026-11-17): sin fila de módulos arriba; los módulos están en la barra derecha (BarraAccesos)
+  if (enSucursal()) return null;
   return (
     <nav aria-label="Ir a otro módulo" className="flex flex-wrap items-center justify-end gap-1.5">
       <span className="mr-1 text-[11px] uppercase tracking-wide text-[#6B7280]">Módulos</span>

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   Bell,
+  BarChart3,
   BookOpen,
   Boxes,
   ClipboardList,
@@ -25,8 +26,9 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import type { Sesion } from "@/lib/auth";
 import { GRUPO_EXPEDIENTE, RUTA_INICIO, TITULO_INICIO, accionesPermitidas, urlBoton, type AccionInicio, type ModuloInicio } from "@/lib/inicioModulos";
+import { puedeVer, type Sesion } from "@/lib/auth";
+import { enSucursal } from "@/lib/storage";
 import { irA } from "@/lib/navegacion";
 import { useNotifFlujo } from "@/lib/notificacionesFlujo";
 
@@ -58,6 +60,44 @@ const ICONO_GRUPO: Record<string, LucideIcon> = {
 /** Nombre corto del grupo para el tooltip. */
 const corto = (g: string) => (g === GRUPO_EXPEDIENTE ? "Expediente 26W" : g);
 
+/** Una entrada de la barra: un grupo del INICIO (ERP) o, en Secocha, un módulo con sus grupos como subtítulos. */
+interface Seccion {
+  id: string;
+  label: string;
+  icono: LucideIcon;
+  /** Módulo con el que se arma la URL de cada acción. */
+  modulo: ModuloInicio;
+  grupos: [string, AccionInicio[]][];
+  /** Sin panel: abre esta pantalla directo (Dashboard). */
+  href?: string;
+}
+
+const agrupar = (acciones: AccionInicio[]): [string, AccionInicio[]][] => {
+  const m = new Map<string, AccionInicio[]>();
+  acciones.forEach((a) => m.set(a.grupo, [...(m.get(a.grupo) ?? []), a]));
+  return [...m.entries()];
+};
+
+/**
+ * Secocha (Williams 2026-11-17): la barra derecha es el menú. Un ícono por módulo (Ventas, Logística, Tesorería,
+ * Planilla, Almacén, Producción, Dashboard); al tocarlo se abren sus funciones con los grupos como subtítulos.
+ */
+function seccionesSecocha(sesion: Sesion): Seccion[] {
+  const de = (m: ModuloInicio) => agrupar(accionesPermitidas(sesion, m));
+  const finanzas = de("finanzas");
+  const lista: Seccion[] = [
+    { id: "ventas", label: "Ventas", icono: Receipt, modulo: "ventas", grupos: de("ventas") },
+    { id: "logistica", label: "Logística", icono: Truck, modulo: "logistica", grupos: de("logistica") },
+    { id: "tesoreria", label: "Tesorería", icono: Landmark, modulo: "finanzas", grupos: finanzas.filter(([g]) => g !== "Planilla") },
+    { id: "planilla", label: "Planilla", icono: Users, modulo: "finanzas", grupos: finanzas.filter(([g]) => g === "Planilla") },
+    { id: "almacen", label: "Almacén", icono: Boxes, modulo: "almacen", grupos: de("almacen") },
+    { id: "produccion", label: "Producción", icono: Factory, modulo: "produccion", grupos: de("produccion") },
+  ];
+  const secciones = lista.filter((x) => x.grupos.length > 0);
+  if (puedeVer(sesion, "/gerencia")) secciones.push({ id: "dashboard", label: "Dashboard", icono: BarChart3, modulo: "soporte", grupos: [], href: "/gerencia" });
+  return secciones;
+}
+
 export function BarraAccesos({
   sesion,
   modulo,
@@ -79,13 +119,19 @@ export function BarraAccesos({
 }) {
   const flujo = useNotifFlujo(true);
   const avisos = calculados + flujo.items.filter((n) => !n.leida && (modulo === "soporte" || n.modulo === modulo.toUpperCase())).length;
-  const acciones = useMemo(() => accionesPermitidas(sesion, modulo), [sesion, modulo]);
-  const grupos = useMemo(() => {
-    const m = new Map<string, AccionInicio[]>();
-    acciones.forEach((a) => m.set(a.grupo, [...(m.get(a.grupo) ?? []), a]));
-    return [...m.entries()];
-  }, [acciones]);
-  const grupoActivo = accionActiva ? acciones.find((a) => a.slug === accionActiva)?.grupo : undefined;
+  const secocha = enSucursal();
+  const secciones = useMemo<Seccion[]>(
+    () =>
+      secocha
+        ? seccionesSecocha(sesion)
+        : agrupar(accionesPermitidas(sesion, modulo)).map(([g, acc]) => ({ id: g, label: corto(g), icono: ICONO_GRUPO[g] ?? LayoutGrid, modulo, grupos: [[g, acc]] })),
+    [sesion, modulo, secocha]
+  );
+  // Sección marcada: la que tiene la acción abierta; en Secocha, si no hay acción, la del módulo actual
+  const conAccion = accionActiva
+    ? secciones.find((x) => x.modulo === modulo && x.grupos.some(([, acc]) => acc.some((a) => a.slug === accionActiva)))?.id
+    : undefined;
+  const seccionActiva = conAccion ?? (secocha ? secciones.find((x) => x.modulo === modulo)?.id : undefined);
   const [abierto, setAbierto] = useState<string | null>(null);
   // Celular: la barra se pliega en un botón redondo abajo a la derecha
   const [movilAbierta, setMovilAbierta] = useState(false);
@@ -108,7 +154,7 @@ export function BarraAccesos({
     };
   }, [abierto, movilAbierta]);
 
-  if (grupos.length === 0) return null;
+  if (secciones.length === 0) return null;
 
   const ir = (href: string) => {
     setAbierto(null);
@@ -123,7 +169,7 @@ export function BarraAccesos({
       return undefined;
     }
   };
-  const lista = abierto ? grupos.find(([g]) => g === abierto)?.[1] ?? [] : [];
+  const panel = abierto ? secciones.find((x) => x.id === abierto) : undefined;
 
   return (
     <div ref={raiz} className="print:hidden">
@@ -148,13 +194,13 @@ export function BarraAccesos({
         <span className="my-3 h-px w-9 bg-white/20" />
 
         <div className="flex flex-col items-center gap-3 lg:flex-1 lg:justify-center">
-          {grupos.map(([g]) => (
+          {secciones.map((x) => (
             <Icono
-              key={g}
-              icono={ICONO_GRUPO[g] ?? LayoutGrid}
-              label={corto(g)}
-              activo={abierto ? abierto === g : grupoActivo === g}
-              onClick={() => setAbierto((v) => (v === g ? null : g))}
+              key={x.id}
+              icono={x.icono}
+              label={x.label}
+              activo={abierto ? abierto === x.id : seccionActiva === x.id}
+              onClick={() => (x.href ? ir(x.href) : setAbierto((v) => (v === x.id ? null : x.id)))}
             />
           ))}
         </div>
@@ -168,25 +214,31 @@ export function BarraAccesos({
       </nav>
 
       {/* Panel del grupo: a la izquierda de la barra, mismo azul */}
-      {abierto && (
+      {panel && (
         <div
           role="menu"
           className="barra-accesos fixed z-40 w-[min(340px,calc(100vw-110px))] rounded-2xl p-3 text-white shadow-[0_20px_50px_-12px_rgba(10,16,48,0.75)] max-lg:bottom-[152px] max-lg:right-[92px] lg:right-[100px] lg:top-1/2 lg:-translate-y-1/2"
         >
-          <p className="mb-2 px-2 text-[11px] font-bold uppercase tracking-wider text-white/60">{corto(abierto)}</p>
-          <div className="flex max-h-[60vh] flex-col gap-1 overflow-y-auto">
-            {lista.map((a) => (
-              <button
-                key={a.slug}
-                type="button"
-                role="menuitem"
-                onClick={() => ir(urlBoton(modulo, a, docElegido()))}
-                className={`rounded-xl px-3 py-2 text-left text-[13px] leading-snug transition ${
-                  a.slug === accionActiva ? "bg-white font-semibold text-[#1e2a5a]" : "text-white/90 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                {a.label}
-              </button>
+          <p className={`mb-2 px-2 font-bold uppercase tracking-wider ${secocha ? "text-[13px] text-white" : "text-[11px] text-white/60"}`}>{panel.label}</p>
+          <div className="flex max-h-[65vh] flex-col gap-1 overflow-y-auto">
+            {panel.grupos.map(([g, acc]) => (
+              <div key={g} className="flex flex-col gap-1">
+                {/* Secocha: cada grupo del módulo como subtítulo */}
+                {secocha && <p className="mt-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-white/55 first:mt-0">{corto(g)}</p>}
+                {acc.map((a) => (
+                  <button
+                    key={a.slug}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => ir(urlBoton(panel.modulo, a, panel.modulo === modulo ? docElegido() : undefined))}
+                    className={`rounded-xl px-3 py-2 text-left text-[13px] leading-snug transition ${
+                      a.slug === accionActiva && panel.modulo === modulo ? "bg-white font-semibold text-[#1e2a5a]" : "text-white/90 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    {a.label}
+                  </button>
+                ))}
+              </div>
             ))}
           </div>
         </div>
