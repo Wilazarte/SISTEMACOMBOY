@@ -131,6 +131,7 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "balance", label: "Balance", grupo: "Contabilidad", destino: `${K}?tab=balance`, requiere: "canViewFacturas" },
     { slug: "eeff", label: "Estados Financieros (EEFF)", grupo: "Contabilidad", destino: `${K}?tab=eeff`, requiere: "canViewFacturas" },
     { slug: "estados-cuenta", label: "Estados de cuenta", grupo: "Contabilidad", destino: `${K}?tab=estados`, requiere: "canViewFacturas" },
+    { slug: "activos", label: "Activos de la empresa (entrega, mantenimiento, depreciación)", grupo: "Contabilidad", destino: `${K}?tab=activos` },
     { slug: "facturas-emitidas", label: "Facturas emitidas (Registro de Ventas)", grupo: "Contabilidad", destino: `${V}?tab=comprobantes`, requiere: "canViewFacturas" },
     { slug: "cuentas-por-cobrar", label: "Cuentas por cobrar", grupo: "Contabilidad", destino: `${V}?tab=cobrar` },
 

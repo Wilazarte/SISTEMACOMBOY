@@ -110,6 +110,7 @@ export const KEYS = {
   CONTABLE_PLAN: "contable_plan_cuentas",
   CONTABLE_CIERRES: "contable_cierres",
   MOV_CAJA: "contable_mov_caja", // movimientos manuales de caja (Estados de cuenta)
+  ACTIVOS: "contable_activos", // registro de activos de la empresa (lib/activos.ts)
   // Sucursal Beta (tabla sucursal, ver supabase/migrations/20261022_sucursal_beta.sql y lib/sucursal.ts)
   SUC_SUCURSALES: "sucursal_sucursales",
   SUC_VENTAS: "sucursal_ventas",
@@ -309,6 +310,7 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.CONTABLE_PLAN]: { tabla: "contable", tipo: "PLAN_CUENTAS", forma: "lista" },
   [KEYS.CONTABLE_CIERRES]: { tabla: "contable", tipo: "CIERRE_MENSUAL", forma: "lista" },
   [KEYS.MOV_CAJA]: { tabla: "contable", tipo: "MOVIMIENTO_CAJA", forma: "lista" },
+  [KEYS.ACTIVOS]: { tabla: "contable", tipo: "ACTIVO_FIJO", forma: "lista" },
   [KEYS.OBSERVACIONES]: { tabla: "observaciones", forma: "observaciones" },
   [KEYS.SUC_SUCURSALES]: { tabla: "sucursal", tipo: "sucursal", forma: "lista" },
   [KEYS.SUC_VENTAS]: { tabla: "sucursal", tipo: "venta", forma: "lista" },
@@ -374,7 +376,8 @@ let vistaSede: VistaSede | null = null;
  * Stock y kardex: el almacén es físico. Arequipa sigue viendo sus DOS almacenes (Taller Principal y Sucursal Secocha)
  * como siempre; Secocha ve solo el suyo. Las filas del almacén Sucursal Secocha son de la sede Secocha (sede_id).
  */
-const COMPARTIDAS_ALMACEN = new Set<string>([KEYS.STOCK, KEYS.KARDEX]);
+// Activos de la empresa: igual que el almacén, Arequipa ve los de las dos sedes y Secocha solo los suyos (campo sede).
+const COMPARTIDAS_ALMACEN = new Set<string>([KEYS.STOCK, KEYS.KARDEX, KEYS.ACTIVOS]);
 const esAlmacenSecocha = (x: unknown): boolean => /secocha/i.test(String((x as { sede?: unknown } | null)?.sede ?? ""));
 
 const filtraSede = (key: StoreKey): boolean => {

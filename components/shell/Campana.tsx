@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bell, BellOff, Boxes, ClipboardList, Factory, FolderOpen, PackageCheck, PackagePlus, Receipt, Store, Truck, Wallet, type LucideIcon } from "lucide-react";
+import { Bell, BellOff, Boxes, ClipboardList, Factory, FolderOpen, Laptop, PackageCheck, PackagePlus, Receipt, Store, Truck, Wallet, type LucideIcon } from "lucide-react";
 import { cn } from "@/components/ui";
 import { useSesion } from "@/lib/auth";
 import type { Notificacion, TipoNotif } from "@/lib/notificaciones";
@@ -10,7 +10,7 @@ import { perfilPlanta } from "@/lib/permisosPlanta";
 import { guardarPrefs } from "@/lib/preferencias";
 import { useIr } from "./ir";
 
-const ICONO: Record<TipoNotif, LucideIcon> = { despacho: Truck, requerimiento: ClipboardList, factura: Receipt, qc: PackageCheck, stock: Boxes, sucursal: Store, producto: PackagePlus, expediente: FolderOpen };
+const ICONO: Record<TipoNotif, LucideIcon> = { despacho: Truck, requerimiento: ClipboardList, factura: Receipt, qc: PackageCheck, stock: Boxes, sucursal: Store, producto: PackagePlus, expediente: FolderOpen, activo: Laptop };
 const ICONO_MODULO: Record<string, LucideIcon> = { LOGISTICA: Truck, PRODUCCION: Factory, ALMACEN: Boxes, FINANZAS: Wallet };
 
 type Pestana = "TODOS" | (typeof MODULOS_NOTIF)[number];
