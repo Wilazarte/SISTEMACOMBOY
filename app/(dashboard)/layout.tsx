@@ -331,15 +331,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             </button>
           ) : (
             modoSecocha && (
-              // Administrador de Secocha: el chip lleva a la Operación diaria de la sede (ventas de mostrador, caja chica, traslados)
-              <Link
-                href={RUTA_SUCURSAL}
-                className="tip flex h-9 items-center gap-1.5 rounded-lg border border-amber-400/60 bg-amber-500/15 px-2.5 text-[12px] font-semibold text-amber-200 transition hover:bg-amber-500/25"
-                data-tip="Operación diaria de Secocha"
-              >
+              <span className="flex h-9 items-center gap-1.5 rounded-lg border border-amber-400/60 bg-amber-500/15 px-2.5 text-[12px] font-semibold text-amber-200">
                 <MapPin size={14} />
                 <span className="hidden sm:inline">Sede Secocha</span>
-              </Link>
+              </span>
             )
           )}
           <button

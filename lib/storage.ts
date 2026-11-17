@@ -366,13 +366,21 @@ const avisarError = (msg: string) => window.dispatchEvent(new CustomEvent("erp:t
 // Al guardar, las filas ocultas se conservan (no se borran del servidor).
 // ---------------------------------------------------------------------
 
-export type VistaSede = { modo: "central"; ajenas: string[] } | { modo: "sucursal"; propia: string };
+export type VistaSede = { modo: "central"; ajenas: string[]; /** Sede de Secocha (dueña del almacén Sucursal Secocha). */ secocha?: string } | { modo: "sucursal"; propia: string };
 const TABLAS_POR_SEDE = new Set<string>(["compras", "almacen", "planilla", "ventas", "contable"]);
 let vistaSede: VistaSede | null = null;
 
+/**
+ * Stock y kardex: el almacén es físico. Arequipa sigue viendo sus DOS almacenes (Taller Principal y Sucursal Secocha)
+ * como siempre; Secocha ve solo el suyo. Las filas del almacén Sucursal Secocha son de la sede Secocha (sede_id).
+ */
+const COMPARTIDAS_ALMACEN = new Set<string>([KEYS.STOCK, KEYS.KARDEX]);
+const esAlmacenSecocha = (x: unknown): boolean => /secocha/i.test(String((x as { sede?: unknown } | null)?.sede ?? ""));
+
 const filtraSede = (key: StoreKey): boolean => {
   const d = DESTINOS[key];
-  return !!vistaSede && d.forma === "lista" && TABLAS_POR_SEDE.has(d.tabla);
+  if (!vistaSede || d.forma !== "lista" || !TABLAS_POR_SEDE.has(d.tabla)) return false;
+  return !(vistaSede.modo === "central" && COMPARTIDAS_ALMACEN.has(key));
 };
 const visibleEnSede = (x: unknown): boolean => {
   const sede = (x as { sedeId?: string } | null)?.sedeId;
@@ -386,6 +394,7 @@ export function fijarVistaSede(v: VistaSede | null): void {
   vistaSede = v;
   if (typeof window === "undefined") return;
   (Object.keys(DESTINOS) as StoreKey[]).filter((k) => cache.has(k) && DESTINOS[k].forma === "lista" && TABLAS_POR_SEDE.has(DESTINOS[k].tabla)).forEach(avisar);
+  window.dispatchEvent(new Event("erp:vista-sede"));
 }
 export const getVistaSede = (): VistaSede | null => vistaSede;
 /** Las pantallas trabajan para una sucursal (Secocha): numeración y series propias. */
@@ -779,10 +788,18 @@ export function escribir<T>(key: StoreKey, value: T): void {
   if (filtraSede(key) && Array.isArray(value)) {
     // Lo nuevo de la sucursal lleva su sede; las filas de otras sedes (ocultas en pantalla) se conservan
     const propia = vistaSede!.modo === "sucursal" ? vistaSede!.propia : "";
-    const visibles = (value as { sedeId?: string }[]).map((x) => (propia && x && !x.sedeId ? { ...x, sedeId: propia } : x));
+    const visibles = (value as { sedeId?: string }[])
+      .map((x) => (propia && x && !x.sedeId ? { ...x, sedeId: propia } : x))
+      // Secocha solo tiene su almacén: el stock y el kardex que mueve son del almacén Sucursal Secocha
+      .map((x) => (propia && x && COMPARTIDAS_ALMACEN.has(key) && !esAlmacenSecocha(x) ? { ...x, sede: "Sucursal Secocha" } : x));
     const ids = new Set(visibles.map((x) => String((x as { id?: unknown }).id)));
     const ocultas = ((cache.get(key) ?? []) as { id: string }[]).filter((x) => !visibleEnSede(x) && !ids.has(String(x.id)));
     value = [...visibles, ...ocultas] as T;
+  }
+  if (vistaSede?.modo === "central" && vistaSede.secocha && COMPARTIDAS_ALMACEN.has(key) && Array.isArray(value)) {
+    // Arequipa mueve stock al almacén Sucursal Secocha (traslado): esa fila es de la sede Secocha
+    const sec = vistaSede.secocha;
+    value = (value as { sedeId?: string }[]).map((x) => (x && !x.sedeId && esAlmacenSecocha(x) ? { ...x, sedeId: sec } : x)) as T;
   }
   const filas = aFilas(key, value);
   const antes = servidor.get(key) ?? new Map<string, string>();

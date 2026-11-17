@@ -5,6 +5,7 @@
 
 import { puedeVer, type Sesion } from "./auth";
 import { permisosPlanta, type PermisosPlanta } from "./permisosPlanta";
+import { enSucursal } from "./storage";
 import { FASES, NOMBRE_PERFIL, RESPONSABLE, TITULO_FASE, type Fase } from "./expedientes";
 
 export type ModuloInicio = "logistica" | "almacen" | "finanzas" | "produccion" | "ventas" | "soporte";
@@ -182,6 +183,8 @@ export function accionesPermitidas(sesion: Sesion | null, modulo: ModuloInicio):
   const permisos = permisosPlanta(sesion);
   return accionesDe(modulo).filter((a) => {
     if (a.externo) return true;
+    // Ya dentro de Secocha: sin enlace a la Secocha antigua
+    if (modulo === "soporte" && a.slug === "secocha" && enSucursal()) return false;
     if (a.requiere && !permisos[a.requiere]) return false;
     return puedeVer(sesion, (a.permiso ?? a.destino).split("?")[0]);
   });
