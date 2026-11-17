@@ -149,12 +149,13 @@ begin
   get diagnostics n = row_count;
   raise notice 'Productos del stock local pasados al almacén Sucursal Secocha: %', n;
 
-  -- 5b. Clientes de la sucursal -> clientes de Ventas (Secocha)
+  -- 5b. Clientes de la sucursal -> clientes de Ventas (Secocha). ventas.id es uuid en producción:
+  --     id fijo derivado del cliente antiguo (sirve también si la columna es texto)
   if to_regclass('public.ventas') is not null then
     insert into public.ventas (tipo, id, data, sede_id)
-    select 'cliente', 'suc-' || c.id,
+    select 'cliente', md5('suc-cliente-' || c.id)::uuid,
            jsonb_build_object(
-             'id', 'suc-' || c.id,
+             'id', md5('suc-cliente-' || c.id)::uuid::text,
              'tipoDoc', case when length(regexp_replace(coalesce(c.data->>'doc', ''), '\D', '', 'g')) = 11 then 'RUC'
                              when length(regexp_replace(coalesce(c.data->>'doc', ''), '\D', '', 'g')) = 8 then 'DNI' else 'CE' end,
              'numDoc', btrim(coalesce(c.data->>'doc', '')), 'razonSocial', btrim(c.data->>'nombre'),
