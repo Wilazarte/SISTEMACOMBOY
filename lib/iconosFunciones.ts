@@ -137,6 +137,8 @@ const ICONO_ACCION: Record<string, LucideIcon> = {
   ordenes: ListChecks,
   calidad: ShieldCheck,
   "entregar-pt": PackageCheck,
+  "costo-produccion": Calculator,
+  "validar-costos-produccion": Calculator,
   // Soporte
   gerencia: BarChart3,
   secocha: Store,

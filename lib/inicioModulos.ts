@@ -126,6 +126,7 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "facturas", label: "Facturas · Pagar proveedor (CxP)", grupo: "Tesorería", destino: `${C}?tab=facturas` },
     { slug: "declaraciones", label: "Declaraciones juradas", grupo: "Tesorería", destino: `${C}?tab=declaraciones` },
     { slug: "antecedentes", label: "Antecedentes (REQ procesados)", grupo: "Tesorería", destino: `${C}?tab=antecedentes` },
+    { slug: "validar-costos-produccion", label: "Validar costos de producción", grupo: "Tesorería", destino: "/finanzas/costos-produccion" },
 
     { slug: "planilla", label: "Planilla periodo", grupo: "Planilla", destino: `${C}?tab=planilla&sub=planilla` },
     { slug: "trabajadores", label: "Trabajadores", grupo: "Planilla", destino: `${C}?tab=planilla&sub=trabajadores` },
@@ -175,6 +176,8 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "ordenes", label: "Mis OPs asignadas", grupo: "Producción", destino: P },
     { slug: "calidad", label: "Control de calidad (QC con firma)", grupo: "Producción", destino: `${P}?estado=EN_FABRICACION` },
     { slug: "entregar-pt", label: "Entregar PT a Almacén (chasis y serie de motor)", grupo: "Producción", destino: LOTES, fase: 8 },
+    // Costo de Producción (Williams 2026-11-17): hoja de costo auditada por equipo (tablas production_*)
+    { slug: "costo-produccion", label: "Costo de Producción (hoja auditada por equipo)", grupo: "Producción", destino: "/produccion/costos" },
 
     { slug: "gestion-documentaria", label: "Gestión Documentaria", grupo: "Documentos", destino: "/documentos" },
   ],
@@ -193,7 +196,7 @@ export const ACCIONES_SOPORTE: AccionInicio[] = [
 export const accionesDe = (modulo: ModuloInicio): AccionInicio[] => (modulo === "soporte" ? ACCIONES_SOPORTE : ACCIONES_INICIO[modulo]);
 
 /** Funciones de fabricación que la sucursal (Secocha) no tiene. */
-const SOLO_PLANTA = new Set(["ingresar-equipo", "equipos-produccion", "crear-op", "orden-produccion"]);
+const SOLO_PLANTA = new Set(["ingresar-equipo", "equipos-produccion", "crear-op", "orden-produccion", "validar-costos-produccion"]);
 
 /** Pantallas de fabricación (Producción, OP, expedientes 26W): fuera de Secocha. */
 export const esRutaProduccion = (path: string): boolean =>

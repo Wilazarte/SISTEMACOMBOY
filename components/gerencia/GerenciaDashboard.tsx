@@ -81,6 +81,10 @@ export function GerenciaDashboard() {
         subtitulo="Visor general · solo lectura · Arequipa · Perú"
         accion={
           <div className="flex flex-wrap items-center gap-3">
+            {/* Costo de Producción (2026-11-17): Gerencia aprueba el costo final de cada equipo */}
+            <Link href="/gerencia/costos-produccion" className="rounded-lg bg-[#294D61] px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-[#294D61]/90">
+              Costos de producción por aprobar
+            </Link>
             {/* Gestión Documentaria: Gerencia aprueba, ve archivados y audita quién descargó qué */}
             <Link href="/documentos" className="inline-flex items-center gap-1.5 rounded-lg bg-[#800021] px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-[#800021]/90">
               <FileLock2 size={15} /> Gestión Documentaria
