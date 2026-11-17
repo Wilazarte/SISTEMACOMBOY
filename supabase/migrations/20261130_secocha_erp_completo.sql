@@ -69,8 +69,9 @@ begin
   if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'cajas' and column_name = 'sede_id') then
     raise exception 'La tabla cajas no tiene sede_id: corra primero 20261023_sedes_multisede.sql';
   end if;
+  -- Secocha: código SEC o, si no, la sede que no es central (sin usar sedes.tipo, que puede no existir)
   select id into sec from public.sedes
-   where upper(coalesce(tipo, '')) = 'SUCURSAL' or upper(codigo) = 'SEC'
+   where upper(codigo) = 'SEC' or not es_central
    order by (upper(codigo) = 'SEC') desc limit 1;
   if sec is null then
     raise notice 'No existe la sede Secocha: se omiten sus cajas';
