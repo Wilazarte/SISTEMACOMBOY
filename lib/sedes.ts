@@ -71,7 +71,7 @@ export async function cargarSedes(vista?: "sucursal" | "central"): Promise<void>
   const erpEnSucursal = vista === "central" && !!actualId && (!!asignada || (sedeElegida() === "sucursal" && !!sedeSucursal(sedes)));
   if ((vista === "sucursal" || erpEnSucursal) && actualId) fijarVistaSede({ modo: "sucursal", propia: actualId });
   else if (vista === "central" && !asignada && sedeCentral(sedes))
-    fijarVistaSede({ modo: "central", ajenas: sedes.filter((x) => x.id !== sedeCentral(sedes)!.id).map((x) => x.id) });
+    fijarVistaSede({ modo: "central", ajenas: sedes.filter((x) => x.id !== sedeCentral(sedes)!.id).map((x) => x.id), secocha: sedeSucursal(sedes)?.id });
   avisar();
 }
 

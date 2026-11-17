@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowRightLeft, BarChart3, Boxes, ClipboardList, PackageCheck, ShoppingCart, Truck, Users, Wallet } from "lucide-react";
 import { Tabs } from "@/components/ui";
 import { DerivarTaller, EntregarProducto, RegistrarVenta } from "@/components/sucursal/Ventas";
@@ -9,7 +10,7 @@ import { CajaChica } from "@/components/sucursal/Caja";
 import { ClientesTab, StockLocalTab } from "@/components/sucursal/Inventario";
 import { ReportesSucursal } from "@/components/sucursal/Reportes";
 import { SucursalShell } from "@/components/sucursal/Shell";
-import { getSesion } from "@/lib/auth";
+import { getSesion, inicioDe, soloSecocha } from "@/lib/auth";
 import { deSede, useSedes } from "@/lib/sedes";
 import { KEYS, tablaDisponible, useStore } from "@/lib/storage";
 import {
@@ -37,10 +38,33 @@ const CLAVE_TAB = "sucursal-tab-activa";
 export default function SucursalApp() {
   return (
     <SucursalShell>
-      {/* Operación diaria del jefe de sede (y Taller / Tesorería de Arequipa). Los perfiles de Secocha
-          (Tesorería, Logística, Almacén, Ventas, Planilla, Gerencia) usan el ERP completo en modo Secocha. */}
-      <SucursalPage />
+      <OperacionRetirada />
     </SucursalShell>
+  );
+}
+
+/**
+ * La Operación diaria antigua se retiró (Williams 2026-11-17): Secocha trabaja en el ERP completo en modo Secocha
+ * (su stock local y sus clientes pasaron al ERP con 20261201_secocha_fase2.sql). Quien tiene ERP va a su INICIO;
+ * un usuario solo de /secocha ve el aviso. La pantalla antigua queda abajo como historial de solo consulta.
+ */
+function OperacionRetirada() {
+  const router = useRouter();
+  const sesion = getSesion();
+  const conErp = !!sesion && !soloSecocha(sesion);
+  useEffect(() => {
+    if (conErp && sesion) router.replace(inicioDe(sesion));
+  }, [conErp, sesion, router]);
+  if (conErp) return null;
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200">
+        <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+        La Operación diaria de Secocha se retiró: Secocha trabaja ahora en el ERP completo (Ventas, Tesorería, Almacén, Planilla).
+        Pida al administrador que habilite su usuario en el ERP de Secocha. Abajo queda el historial anterior, solo para consulta.
+      </div>
+      <SucursalPage />
+    </div>
   );
 }
 

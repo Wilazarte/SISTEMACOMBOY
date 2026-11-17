@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "./supabase/client";
+import { getVistaSede } from "./storage";
 
 export const MODULOS_NOTIF = ["LOGISTICA", "PRODUCCION", "ALMACEN", "FINANZAS"] as const;
 export type ModuloNotif = (typeof MODULOS_NOTIF)[number];
@@ -27,6 +28,8 @@ export interface NotifFlujo {
   leida: boolean;
   /** REQ_ALMACEN: { req_id, numero, evento } (SQL 20261117). */
   datos?: Record<string, unknown> | null;
+  /** Sede del aviso (SQL 20261201_secocha_fase2.sql); sin la columna, undefined. */
+  sede_id?: string | null;
 }
 
 interface Estado {
@@ -42,15 +45,20 @@ let iniciado = false;
 
 const avisar = () => oyentes.forEach((f) => f(estado));
 
+const COLUMNAS = "id,created_at,modulo,tipo,titulo,mensaje,asignado_a,codigo_expediente,fase,href,leida,datos";
+let conSede = true;
+
 async function recargar(): Promise<void> {
-  const { data, error } = await createClient()
-    .from("notificaciones")
-    .select("id,created_at,modulo,tipo,titulo,mensaje,asignado_a,codigo_expediente,fase,href,leida,datos")
-    .not("tipo", "is", null)
-    .order("created_at", { ascending: false })
-    .limit(LIMITE);
+  const consulta = (cols: string) =>
+    createClient().from("notificaciones").select(cols).not("tipo", "is", null).order("created_at", { ascending: false }).limit(LIMITE);
+  let { data, error } = await consulta(conSede ? `${COLUMNAS},sede_id` : COLUMNAS);
+  // Sin la columna sede_id (falta 20261201_secocha_fase2.sql): se lee como antes
+  if (error && conSede && (error.code === "42703" || /sede_id/i.test(error.message))) {
+    conSede = false;
+    ({ data, error } = await consulta(COLUMNAS));
+  }
   // REQ de Almacén: abren Tesorería > NUEVOS REQ (el SQL 20261117 guarda solo /dashboard/compras)
-  const items = ((data ?? []) as NotifFlujo[]).map((n) => (n.tipo === "REQ_ALMACEN" ? { ...n, href: "/dashboard/compras?tab=nuevos" } : n));
+  const items = ((data ?? []) as unknown as NotifFlujo[]).map((n) => (n.tipo === "REQ_ALMACEN" ? { ...n, href: "/dashboard/compras?tab=nuevos" } : n));
   estado = error ? { items: [], disponible: false } : { items, disponible: true };
   avisar();
 }
@@ -69,19 +77,31 @@ function iniciar(): void {
     .subscribe();
 }
 
+/** Avisos de la sede en pantalla: Arequipa no ve los de Secocha y Secocha solo los suyos (la base ya lo filtra). */
+function deLaSede(e: Estado): Estado {
+  const v = getVistaSede();
+  if (!v) return e;
+  const items = e.items.filter((n) => (v.modo === "sucursal" ? !n.sede_id || n.sede_id === v.propia : !n.sede_id || !v.ajenas.includes(n.sede_id)));
+  return items.length === e.items.length ? e : { ...e, items };
+}
+
 /** Avisos del flujo que RLS deja ver a este usuario, en vivo. `activo = false`: no descarga nada. */
 export function useNotifFlujo(activo: boolean): Estado {
   const [e, setE] = useState<Estado>(estado);
+  const [, setVista] = useState(0);
   useEffect(() => {
     if (!activo) return;
     iniciar();
     setE(estado);
     oyentes.add(setE);
+    const onVista = () => setVista((n) => n + 1);
+    window.addEventListener("erp:vista-sede", onVista);
     return () => {
       oyentes.delete(setE);
+      window.removeEventListener("erp:vista-sede", onVista);
     };
   }, [activo]);
-  return e;
+  return deLaSede(e);
 }
 
 /** Ids de los REQ de Almacén que ya tienen aviso en la tabla (SQL 20261117): la campana no los repite. */
