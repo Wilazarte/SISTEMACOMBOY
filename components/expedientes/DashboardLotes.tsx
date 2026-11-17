@@ -105,11 +105,11 @@ export function DashboardLotes() {
 
       {s.listo && !s.faltaTabla && filas.length === 0 && <p className="rounded-lg border border-dashed border-[#333333] p-6 text-center text-[13px] text-[#a1a1aa]">Sin expedientes registrados. El primero nace con la OP de lote mixto que crea Logística.</p>}
 
-      <div className="flex gap-3 overflow-x-auto pb-2">
+      <div className="flex flex-col gap-3 pb-2 sm:flex-row sm:overflow-x-auto">
         {[...FASES, ...(verCerrados ? (["CERRADO"] as const) : [])].map((n) => {
           const items = columna(n);
           return (
-            <div key={n} className="w-64 shrink-0 rounded-xl border border-[#333333] bg-[#111] p-2">
+            <div key={n} className="w-full shrink-0 rounded-xl sm:w-64 border border-[#333333] bg-[#111] p-2">
               <h3 className="mb-2 px-1 text-[12px] font-bold uppercase text-[#FF9A4D]">
                 {n === "CERRADO" ? "Cerrados" : `${n}. ${TITULO_FASE[n]}`}
                 <span className="block text-[11px] font-normal normal-case text-[#a1a1aa]">{n === "CERRADO" ? "Expediente completo" : NOMBRE_PERFIL[RESPONSABLE[n]]} · {items.length}</span>

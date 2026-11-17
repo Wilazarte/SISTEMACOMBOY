@@ -111,7 +111,7 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
 
       {/* Izquierda (3/12): avisos del módulo en una columna FIJA al hacer scroll (sticky bajo la barra superior, la lista
           con scroll propio); derecha (9/12) gráficos y tareas pendientes */}
-      <div className="grid gap-4 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <div className="lg:col-span-3 lg:sticky lg:top-20 lg:self-start">
           <NotificacionesEnVivo sesion={sesion} modulo={modulo} />
         </div>
