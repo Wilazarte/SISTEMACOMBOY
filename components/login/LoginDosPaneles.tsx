@@ -236,8 +236,8 @@ export default function LoginDosPaneles({ inicial = "", siguiente = null }: { in
               <div className="flex justify-center">
                 <Image src="/logo-login.png" alt="COMBOY VID" width={900} height={334} priority className="h-16 w-auto max-w-full object-contain md:h-[72px]" />
               </div>
-              <h1 className="mt-3 text-[26px] font-extrabold leading-tight tracking-tight md:text-[30px]">Iniciar sesión</h1>
-              <p className="mt-1 text-sm text-[#4b5b78]">Seleccione su módulo</p>
+              <h1 className="mt-3 text-center text-[26px] font-extrabold leading-tight tracking-tight md:text-[30px]">Iniciar sesión</h1>
+              <p className="mt-1 text-center text-sm text-[#4b5b78]">Seleccione su módulo</p>
 
               <ul className="mt-4 space-y-1.5" role="listbox" aria-label="Módulos">
                 {MODULOS.map((o) => (
@@ -258,14 +258,14 @@ export default function LoginDosPaneles({ inicial = "", siguiente = null }: { in
           <section className="relative overflow-hidden bg-[#0d1424] px-5 py-8 sm:px-8 md:px-12 md:py-12">
             <OndasOscuras />
             <form ref={formRef} onSubmit={entrar} noValidate className="relative mx-auto flex h-full w-full max-w-[400px] scroll-mt-4 flex-col justify-center">
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#00f2fe]">ERP COMBOY VID</p>
-              <h2 className="mt-1 text-2xl font-bold text-white">{opcion ? opcion.titulo : "Bienvenido"}</h2>
-              <p className="mt-1 text-sm text-white/55">{opcion ? "Ingrese con su usuario de este módulo." : "Elija su módulo en la lista para continuar."}</p>
+              <p className="text-center text-[11px] font-bold uppercase tracking-[0.18em] text-[#00f2fe]">ERP COMBOY VID</p>
+              <h2 className="mt-1 text-center text-2xl font-bold text-white">{opcion ? opcion.titulo : "Bienvenido"}</h2>
+              <p className="mt-1 text-center text-sm text-white/55">{opcion ? "Ingrese con su usuario de este módulo." : "Elija su módulo en la lista para continuar."}</p>
 
               <div className="mt-7 space-y-4">
                 {/* 1. Encargado del módulo (solo lectura) */}
                 <label className="block">
-                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/55">Encargado del módulo</span>
+                  <span className="mb-1.5 block text-center text-xs font-semibold uppercase tracking-wide text-white/55">Encargado del módulo</span>
                   <span className="relative block">
                     <UserRound size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#00f2fe]" />
                     <input
@@ -278,12 +278,12 @@ export default function LoginDosPaneles({ inicial = "", siguiente = null }: { in
                       aria-label="Encargado del módulo"
                     />
                   </span>
-                  {encargado && <span className="mt-1 block truncate text-xs text-white/45">{encargado.cargo}</span>}
+                  {encargado && <span className="mt-1 block truncate text-center text-xs text-white/45">{encargado.cargo}</span>}
                 </label>
 
                 {/* 2. Usuario */}
                 <label className="block">
-                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/55">Usuario</span>
+                  <span className="mb-1.5 block text-center text-xs font-semibold uppercase tracking-wide text-white/55">Usuario</span>
                   <span className="relative block">
                     <User size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#00f2fe]" />
                     <input
@@ -302,7 +302,7 @@ export default function LoginDosPaneles({ inicial = "", siguiente = null }: { in
 
                 {/* 3. Contraseña */}
                 <label className="block">
-                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-white/55">Contraseña</span>
+                  <span className="mb-1.5 block text-center text-xs font-semibold uppercase tracking-wide text-white/55">Contraseña</span>
                   <span className="relative block">
                     <Lock size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[#00f2fe]" />
                     <input
