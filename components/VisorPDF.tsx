@@ -9,6 +9,7 @@ import { Download, Loader2, MessageCircle, MousePointerClick, PenLine, Printer, 
 import { Button, toast } from "@/components/ui";
 import { FirmaPad } from "@/components/FirmaPad";
 import { getSesion } from "@/lib/auth";
+import { guardarArchivo } from "@/lib/guardarArchivo";
 import { EV_PDF, descargarBytes, marcarHostVisor, type PdfVista, type ZonaFirma } from "@/lib/visorPdf";
 
 /** Firma estampada: centro de la línea (mm) como las de lib/pdf.ts › firmas(). */
@@ -227,22 +228,11 @@ export function VisorPDF() {
     }
   };
 
-  // Descargar: ventana "Guardar como" para elegir la carpeta (Chrome / Edge / app Windows).
+  // Descargar: ventana "Guardar como" para elegir la carpeta (lib/guardarArchivo: Chrome / Edge / app Windows).
   // Donde no existe (celular, Firefox, Safari) se descarga a la carpeta de Descargas.
   const descargar = async () => {
     if (!bytes) return;
-    const picker = (window as unknown as { showSaveFilePicker?: (o: unknown) => Promise<FileSystemFileHandle> }).showSaveFilePicker;
-    if (typeof picker !== "function" || esMovil()) return descargarBytes(bytes, vista.nombre);
-    try {
-      const h = await picker.call(window, { suggestedName: archivo, types: [{ description: "Documento PDF", accept: { "application/pdf": [".pdf"] } }] });
-      const w = await h.createWritable();
-      await w.write(bytes as unknown as BufferSource);
-      await w.close();
-      toast(`${h.name} guardado`);
-    } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") return; // canceló la ventana
-      descargarBytes(bytes, vista.nombre);
-    }
+    await guardarArchivo(archivo, bytes, { tipo: "application/pdf" });
   };
 
   const whatsapp = async () => {

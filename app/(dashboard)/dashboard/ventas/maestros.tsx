@@ -10,6 +10,7 @@ import { puedeGestionarClientes } from "@/lib/proveedores";
 import { MEDIOS_PAGO, TIPOS_CONDICION, clasificacionesCliente, guardarClasificaciones, clienteVacio, eliminarCliente, eliminarCondicion, guardarCliente, guardarCondicion, importarClientes, saldoCliente } from "@/lib/ventas";
 import type { ClasificacionCliente, Cliente, CondicionPago } from "@/lib/types";
 import { FormCliente, useVentas } from "./comun";
+import { guardarExcel } from "@/lib/guardarArchivo";
 
 // =====================================================================
 // CONFIGURACIÓN · CONDICIONES DE PAGO (tabla public.condiciones_pago)
@@ -182,7 +183,7 @@ export function Clientes({ logistica = false }: { logistica?: boolean }) {
     );
     const libro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(libro, hoja, "Clientes");
-    XLSX.writeFile(libro, "base-clientes.xlsx");
+    await guardarExcel(libro, "base-clientes.xlsx");
   };
 
   const importar = async (e: React.ChangeEvent<HTMLInputElement>) => {

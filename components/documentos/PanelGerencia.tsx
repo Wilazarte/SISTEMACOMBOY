@@ -25,6 +25,7 @@ import {
 } from "@/lib/gestionDocumental";
 import { Boton, Campo, Tarjeta, Vacio, claseInput, cx } from "./piezas";
 import { TablaAuditoria } from "./PanelDocumento";
+import { guardarExcel } from "@/lib/guardarArchivo";
 
 type Fila = Record<string, string | number>;
 
@@ -57,7 +58,7 @@ async function exportarExcel(titulo: string, archivo: string, filas: Fila[], usu
     ]),
     "Firma de auditoría"
   );
-  XLSX.writeFile(libro, `${archivo}.xlsx`);
+  await guardarExcel(libro, `${archivo}.xlsx`);
   // AUDITORÍA: EXPORTAR_REPORTE
   await registrarExportacion(`${titulo} · Excel · ${filas.length} registro(s)`, { formato: "XLSX", hash_sha256: f.hash, registros: filas.length, filtros, cadena_ok: f.cadena.ok });
 }

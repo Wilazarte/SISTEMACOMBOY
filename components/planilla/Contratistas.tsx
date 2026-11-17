@@ -24,6 +24,7 @@ import {
 import { SEDES } from "@/lib/empresa";
 import { pdfContratoConcesion } from "@/lib/pdf";
 import { BotonPDF } from "@/components/planilla/ContratistasMaestro";
+import { elegirCarpeta } from "@/lib/guardarArchivo";
 import { descargarRecibo } from "@/components/planilla/generateReciboPDF";
 import QuickActions, { QA_IDS } from "@/components/tesoreria/QuickActions";
 import { BotonFiltros } from "@/components/ui/BotonFiltros";
@@ -62,8 +63,12 @@ export function Contratistas({ soloLectura }: { soloLectura: boolean }) {
   const descargarRecibos = async () => {
     const sel = visibles.filter((c) => c.estado !== "ANULADO");
     if (!sel.length) return toast("No hay concesiones en la lista", "error");
-    if (sel.length > 1 && !confirm(`¿Descargar ${sel.length} recibos PDF (uno por concesión)?`)) return;
-    for (const c of sel) await descargarRecibo(c, "CONCESION", sel.length > 1);
+    if (sel.length === 1) return descargarRecibo(sel[0], "CONCESION");
+    // Varios: se elige UNA carpeta de la PC y todos los recibos se guardan ahí
+    const destino = await elegirCarpeta();
+    if (!destino) return;
+    for (const c of sel) await descargarRecibo(c, "CONCESION", destino);
+    toast(`${sel.length} recibos guardados${destino.carpeta ? ` en la carpeta ${destino.carpeta}` : " en Descargas"}`);
   };
   const activos = lista.filter((c) => c.estado === "ACTIVO");
   const sel = lista.find((c) => c.id === detalle) ?? null;

@@ -7,6 +7,7 @@
 // =====================================================================
 
 import type { jsPDF } from "jspdf";
+import { descargaDirecta } from "./guardarArchivo";
 
 /** Línea de firma de un PDF (mm, desde la esquina superior izquierda). x = centro de la línea. */
 export interface ZonaFirma {
@@ -45,14 +46,7 @@ const limpiarNombre = (n: string) => n.replace(/\.pdf$/i, "").replace(/[\\/:*?"<
 
 /** Descarga directa (descargas masivas o páginas sin visor). */
 export function descargarBytes(bytes: ArrayBuffer | Uint8Array, nombre: string): void {
-  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${limpiarNombre(nombre)}.pdf`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  descargaDirecta(bytes, `${limpiarNombre(nombre)}.pdf`, "application/pdf");
 }
 
 /** Muestra un PDF ya generado (jsPDF) en la ventana de vista previa. */

@@ -12,7 +12,7 @@ import { CUENTAS_ORIGEN_PAGO, numeroDJ, codigoContratista, codigoGasto, cotizaci
 import { codigoDesdeNumero, estadoDocumento } from "./utils/codigos";
 import { SEDE_PLANTA_PRINCIPAL, bloqueDocumento, sedeOrigenReq, type DocUnificado, type TipoDocumento } from "./plantillasDocumentos";
 import { equipoDeLinea, sedeEquipo } from "./equipos";
-import { ESTADOS_OD, LUGARES_ENTREGA, estadoOD, origenOD, type EstadoAlmacen } from "./ventas";
+import { ESTADOS_OD, LUGARES_ENTREGA, estadoOD, origenOD, type EstadoAlmacen, type FilaCxC, type GrupoDeuda } from "./ventas";
 import { toast } from "@/components/ui";
 import type { Adelanto } from "./adelantos";
 import type { HistorialDetalle, HistorialPlanilla } from "./historial";
@@ -815,6 +815,95 @@ export function pdfEstadoCuenta(d: {
       horizontal: true,
     }),
     nombre
+  );
+}
+
+/**
+ * Reporte de deudas (Cuentas por cobrar) en A4 vertical (Williams, 2026-11-17): resumen agrupado
+ * (si el reporte está abierto), detalle por documento con días vencidos y totales. Sigue los filtros de la pantalla.
+ */
+export function pdfReporteDeuda(d: {
+  filas: FilaCxC[];
+  /** Resumen por cliente / vendedor / mes / equipo (opcional). */
+  agrupado?: { por: string; grupos: (GrupoDeuda & { etiqueta: string })[] };
+  filtros: string;
+  totalSaldo: number;
+  vencido: number;
+}): void {
+  const total = d.filas.reduce((a, f) => a + f.total, 0);
+  const pagado = d.filas.reduce((a, f) => a + f.pagado, 0);
+  // Montos sin "S/" en las tablas (la cabecera dice S/) para que no se partan en dos líneas
+  const m = (n: number) => soles(n).replace(/^S\/\s*/, "");
+  const pct = (n: number) => (d.totalSaldo > 0 ? `${((n / d.totalSaldo) * 100).toFixed(1)} %` : "-");
+  const hoyIso = new Date().toISOString().slice(0, 10);
+  const head = ["Documento", "Cliente", "Emisión", "Vence", "Días venc.", "Total S/", "Pagado S/", "Saldo S/", "Estado"];
+  const body = d.filas.map((f) => [
+    f.externo ? `${f.documento}\n${f.externo.numero}` : f.documento,
+    `${f.cliente}${f.clienteDoc ? `\n${f.clienteDoc}` : ""}`,
+    fechaPE(f.fecha),
+    fechaPE(f.vencimiento),
+    f.diasVencido ? String(f.diasVencido) : "",
+    m(f.total),
+    m(f.pagado),
+    m(f.saldo),
+    f.estado,
+  ]);
+  const anchos = { 0: { cellWidth: 22 }, 1: { cellWidth: 44 }, 2: { cellWidth: 16 }, 3: { cellWidth: 16 }, 4: { cellWidth: 11 }, 8: { cellWidth: 20 } };
+  const totales: [string, string][] = [
+    ["Documentos", String(d.filas.length)],
+    ["Importe total", soles(total)],
+    ["Pagado", soles(pagado)],
+    ["Vencido", soles(d.vencido)],
+    ["SALDO POR COBRAR", soles(d.totalSaldo)],
+  ];
+  const H = 297;
+  const saltar = (doc: jsPDF, y: number, alto: number) => {
+    if (y + alto <= H - ALTO_PIE - 8) return y;
+    doc.addPage();
+    return 20;
+  };
+  const detalle = (doc: jsPDF, y: number): number => {
+    y = tituloSeccion(doc, saltar(doc, y + 2, 20), "DETALLE POR DOCUMENTO");
+    return tabla(doc, y, head, body, [4, 5, 6, 7], anchos);
+  };
+  const resumen = d.agrupado;
+  guardar(
+    construir({
+      titulo: "REPORTE DE DEUDAS · CUENTAS POR COBRAR",
+      numero: fechaPE(hoyIso),
+      estado: "REPORTE",
+      datos: [
+        ["Emitido", new Date().toLocaleString("es-PE")],
+        ["Documentos", String(d.filas.length)],
+        ["Saldo por cobrar", soles(d.totalSaldo)],
+        ["Vencido", soles(d.vencido)],
+        ["Agrupado por", resumen?.por ?? "Sin agrupar"],
+        ["Filtros", d.filtros || "Ninguno (todas las cuentas)"],
+      ],
+      columnas: 2,
+      ...(resumen
+        ? {
+            head: [resumen.por, "Docs.", "Total S/", "Pagado S/", "Saldo S/", "Vencido S/", "% deuda"],
+            body: [
+              ...resumen.grupos.map((g) => [g.etiqueta, String(g.documentos), m(g.total), m(g.pagado), m(g.saldo), m(g.vencido), pct(g.saldo)]),
+              ["TOTAL", String(d.filas.length), m(total), m(pagado), m(d.totalSaldo), m(d.vencido), d.totalSaldo > 0 ? "100 %" : "-"],
+            ],
+            alinearDerecha: [1, 2, 3, 4, 5, 6],
+            extra: (doc: jsPDF, y: number) => bloqueTotales(doc, detalle(doc, y), totales),
+          }
+        : {
+            head,
+            body,
+            alinearDerecha: [4, 5, 6, 7],
+            totales,
+          }),
+      notas: [
+        "Saldo = importe total menos los cobros registrados (adelantos y pagos). Días venc. = días desde la fecha de vencimiento hasta hoy.",
+        ...(resumen?.por.startsWith("Equipo") ? ["Por equipo / producto: el saldo de cada documento se reparte según el importe de cada producto."] : []),
+      ],
+      firmas: ["Finanzas / Tesorería", "Gerencia"],
+    }),
+    `REPORTE-DEUDAS-CXC-${hoyIso}`
   );
 }
 

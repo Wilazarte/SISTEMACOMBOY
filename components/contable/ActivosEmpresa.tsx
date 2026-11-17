@@ -35,6 +35,7 @@ import {
 import { pdfFichaEntregaActivo, pdfHojaVidaActivo } from "@/lib/pdf";
 import { KEYS, enSucursal, fechaPE, hoy, soles, useStore } from "@/lib/storage";
 import type { Trabajador } from "@/lib/types";
+import { guardarExcel } from "@/lib/guardarArchivo";
 
 const SEC = "Sucursal Secocha";
 const sedesFormulario = (): string[] => (enSucursal() ? [SEC] : [...SEDES_ACTIVO]);
@@ -116,7 +117,7 @@ export function ActivosEmpresa() {
     });
     const libro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas), "Activos");
-    XLSX.writeFile(libro, `Registro-activos-${hoy()}.xlsx`);
+    await guardarExcel(libro, `Registro-activos-${hoy()}.xlsx`);
   };
 
   return (
