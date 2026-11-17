@@ -325,6 +325,20 @@ export const verificarCadena = () => rpc<{ ok: boolean; total: number; ultimo_ha
 export const registrarExportacion = (detalle: string, valor: Record<string, unknown>) =>
   rpc("gd_registrar_evento", { p_doc: null, p_accion: "EXPORTAR_REPORTE", p_detalle: detalle, p_valor: valor });
 
+/**
+ * AUDITORÍA: abrir o imprimir la historia clínica de un proceso (SQL 20261207). Si ese SQL aún no se corrió,
+ * la base rechaza la acción: la historia se muestra igual y se avisa en consola.
+ */
+export async function registrarConsultaHistoria(proceso: string, detalle: string, valor: Record<string, unknown> = {}): Promise<boolean> {
+  try {
+    await rpc("gd_registrar_evento", { p_doc: null, p_accion: "CONSULTAR_HISTORIA", p_detalle: detalle, p_valor: { proceso, ...valor } });
+    return true;
+  } catch (e) {
+    console.warn("Historia de procesos: no se pudo registrar en audit_log (¿falta correr 20261207_gd_historia_procesos.sql?)", (e as Error).message);
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------- Edge Function (archivos)
 async function edge(body: BodyInit, json: boolean): Promise<Response> {
   const cli = sb();
@@ -449,6 +463,7 @@ export const ACCION_TEXTO: Record<string, string> = {
   VENCER: "Venció",
   CONSULTAR_AUDITORIA: "Consultó auditoría",
   EXPORTAR_REPORTE: "Exportó reporte",
+  CONSULTAR_HISTORIA: "Consultó historia de proceso",
 };
 /** Acciones críticas (se pintan en burdeos). */
 export const ACCION_CRITICA = new Set(["RECHAZAR", "ELIMINAR_LOGICA", "ACCESO_DENEGADO", "DESCARGA_BLOQUEADA", "ALERTA_INTEGRIDAD", "VENCER"]);
