@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ClipboardList, Factory, Gauge, HandCoins, Layers, Package, ShoppingCart, TrendingUp } from "lucide-react";
 import { ErpAlertList, type ErpAlerta } from "@/components/erp/ErpAlertList";
@@ -78,7 +79,15 @@ export function GerenciaDashboard() {
         icono={<Gauge size={30} />}
         titulo="GERENCIA"
         subtitulo="Visor general · solo lectura · Arequipa · Perú"
-        accion={<span className="text-[13px] text-[#d4d4d8]">Actualizado: Hoy · {sync} hrs</span>}
+        accion={
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Costo de Producción (2026-11-17): Gerencia aprueba el costo final de cada equipo */}
+            <Link href="/gerencia/costos-produccion" className="rounded-lg bg-[#294D61] px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-[#294D61]/90">
+              Costos de producción por aprobar
+            </Link>
+            <span className="text-[13px] text-[#d4d4d8]">Actualizado: Hoy · {sync} hrs</span>
+          </div>
+        }
       />
 
       {/* KPIs de todos los módulos (solo lectura, sin botones de acción) */}
