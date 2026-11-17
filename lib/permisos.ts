@@ -26,7 +26,18 @@ export interface Sesion {
   iniciales?: string;
   /** Módulo asignado (perfiles.modulo_asignado: TODOS, FINANZAS, ALMACEN, LOGISTICA, PRODUCCION, VENTAS). */
   moduloAsignado?: string;
+  /**
+   * Permisos individuales de ESTE usuario (perfiles.permisos), excepciones a la regla "cada rol solo su módulo".
+   * Ej.: "req.editar_almacen" = Tesorería puede editar los REQ de Almacén (Lizbeth, pedido de Williams 2026-11-17).
+   */
+  permisos?: string[];
 }
+
+/** Permiso individual de Tesorería para editar requerimientos de Almacén antes de revisarlos. */
+export const PERMISO_EDITAR_REQ_ALMACEN = "req.editar_almacen";
+
+/** ¿El usuario tiene este permiso individual (perfiles.permisos)? */
+export const tienePermiso = (sesion: Sesion | null, permiso: string): boolean => !!sesion?.permisos?.includes(permiso);
 
 /**
  * Permiso "editar_asistencia_creador": edición manual de DÍAS / TARD. en el Módulo Creador.
