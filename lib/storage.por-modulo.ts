@@ -63,6 +63,7 @@ export const CLAVES_POR_MODULO: Record<string, StoreKey[]> = {
   ],
   "/dashboard/ventas": [
     "ventas_clientes",
+    "ventas_clasif_clientes",
     "ventas_notas_pedido",
     "ventas_comprobantes",
     "ventas_cobros",
@@ -72,7 +73,7 @@ export const CLAVES_POR_MODULO: Record<string, StoreKey[]> = {
     "almacen_equipos_terminados",
   ],
   "/dashboard/planilla": PLANILLA,
-  "/dashboard/contable": ["contable_asientos", "contable_plan_cuentas", "contable_cierres", "ventas_asientos", "contable_mov_caja"],
+  "/dashboard/contable": ["contable_asientos", "contable_plan_cuentas", "contable_cierres", "ventas_asientos", "contable_mov_caja", "contable_activos"],
   "/dashboard/creador": ["CV_TRABAJADORES_V2", "planilla_asistencia", "planilla_huellas_alias"],
   // Secocha (app aparte /secocha, antes /sucursal): la base solo entrega las filas de la sede del usuario
   "/secocha": [

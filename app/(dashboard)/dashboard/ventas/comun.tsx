@@ -6,9 +6,9 @@ import { Button, Field, Input, Select, cn } from "@/components/ui";
 import { EstadoRuc } from "@/components/EstadoRuc";
 import { UNIDADES } from "@/lib/empresa";
 import { KEYS, cargarCondicionesPago, r2, soles, useStore } from "@/lib/storage";
-import { DETALLE_LUGAR, LARGO_DOC, LUGARES_ENTREGA, lugarConDireccion, calcularLinea, lineaVacia, totalesVenta, validarDocumento } from "@/lib/ventas";
+import { clasificacionesCliente, DETALLE_LUGAR, LARGO_DOC, LUGARES_ENTREGA, lugarConDireccion, calcularLinea, lineaVacia, totalesVenta, validarDocumento } from "@/lib/ventas";
 import { normalizarEquipo, sedeEquipo, type EquipoTerminado } from "@/lib/equipos";
-import type { Cliente, CondicionPago, DatosDespacho, LugarEntrega, LineaVenta, StockItem, TipoDocCliente } from "@/lib/types";
+import type { ClasificacionCliente, Cliente, CondicionPago, DatosDespacho, LugarEntrega, LineaVenta, StockItem, TipoDocCliente } from "@/lib/types";
 import { ProductoInput } from "@/components/productos/ProductoInput";
 
 /** Datos de Ventas sincronizados con Supabase (tiempo real). */
@@ -256,6 +256,9 @@ export function FormCliente({
 }) {
   const set = <K extends keyof Cliente>(k: K, v: Cliente[K]) => onChange({ ...form, [k]: v });
   const errDoc = form.numDoc ? validarDocumento(form.tipoDoc, form.numDoc.trim().toUpperCase()) : null;
+  const clasificaciones = clasificacionesCliente(useStore<ClasificacionCliente[]>(KEYS.CLASIF_CLIENTES, []));
+  // Un cliente con una clasificación que ya no está en la lista la conserva hasta que se cambie
+  const opcionesClasif = form.clasificacion && !clasificaciones.includes(form.clasificacion) ? [...clasificaciones, form.clasificacion] : clasificaciones;
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <Field label="Tipo doc. *">
@@ -284,8 +287,14 @@ export function FormCliente({
       <Field label="Dirección fiscal" className="sm:col-span-2">
         <Input value={form.direccionFiscal} onChange={(e) => set("direccionFiscal", e.target.value)} />
       </Field>
-      <Field label="Teléfono">
-        <Input value={form.telefono} onChange={(e) => set("telefono", e.target.value)} />
+      <Field label="Labor minera" hint="Mina, unidad o labor donde opera el cliente">
+        <Input value={form.laborMinera ?? ""} onChange={(e) => set("laborMinera", e.target.value)} />
+      </Field>
+      <Field label="Clasificación">
+        <Select value={form.clasificacion ?? ""} onChange={(e) => set("clasificacion", e.target.value)} placeholder="(sin clasificar)" options={opcionesClasif.map((c) => ({ value: c, label: c }))} />
+      </Field>
+      <Field label="Número de contacto">
+        <Input value={form.telefono} onChange={(e) => set("telefono", e.target.value)} inputMode="tel" />
       </Field>
       <Field label="Email">
         <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />

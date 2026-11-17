@@ -9,6 +9,7 @@ import { Download, Loader2, MessageCircle, MousePointerClick, PenLine, Printer, 
 import { Button, toast } from "@/components/ui";
 import { FirmaPad } from "@/components/FirmaPad";
 import { getSesion } from "@/lib/auth";
+import { guardarArchivo } from "@/lib/guardarArchivo";
 import { EV_PDF, descargarBytes, marcarHostVisor, type PdfVista, type ZonaFirma } from "@/lib/visorPdf";
 
 /** Firma estampada: centro de la línea (mm) como las de lib/pdf.ts › firmas(). */
@@ -89,17 +90,40 @@ async function renderizar(bytes: Uint8Array): Promise<Pagina[]> {
 }
 
 const esMovil = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-const esAppEscritorio = () => typeof window !== "undefined" && ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
+/** App de escritorio (Tauri o Electron): su visor interno no imprime PDF en iframe, se imprimen las imágenes. */
+const esAppEscritorio = () =>
+  typeof window !== "undefined" && ("__TAURI_INTERNALS__" in window || "__TAURI__" in window || "comboyEscritorio" in window);
 
-/** Imprime las páginas ya dibujadas (celular / app): un contenedor solo visible al imprimir. */
+/**
+ * Imprime las páginas ya dibujadas (celular / app): un contenedor solo visible al imprimir.
+ * Cada página del PDF va en su propia hoja y la imagen se encoge para caber completa en el
+ * papel elegido (A4, A5, Carta, Oficio o ticket de 80 mm): el pie de página se imprime dentro
+ * de su hoja y nunca se pasa a una hoja aparte.
+ */
 function imprimirImagenes(paginas: Pagina[]): void {
   const id = "erp-impresion-pdf";
   document.getElementById(id)?.remove();
   const caja = document.createElement("div");
   caja.id = id;
+  const p0 = paginas[0] ?? { w: 210, h: 297 };
+  // Ticket (80 mm, impresora POS): la hoja mide lo mismo que el ticket.
+  // Documento normal: sin tamaño fijo, así se elige A4, A5, Carta, Oficio… en el diálogo
+  // de impresión y cada página se encoge para caber entera (con su pie) en esa hoja.
+  const esTicket = p0.w <= 100;
+  const hoja = esTicket ? `${p0.w.toFixed(1)}mm ${p0.h.toFixed(1)}mm` : p0.w > p0.h ? "landscape" : "portrait";
   caja.innerHTML =
-    `<style>@media screen{#${id}{display:none}}@media print{@page{margin:0}body>*:not(#${id}){display:none!important}#${id} img{display:block;width:100%;page-break-after:always;break-after:page}#${id} img:last-child{page-break-after:auto;break-after:auto}}</style>` +
-    paginas.map((p) => `<img src="${p.url}" alt="">`).join("");
+    "<style>" +
+    `@media screen{#${id}{display:none}}` +
+    "@media print{" +
+    `@page{size:${hoja};margin:0}` +
+    "html,body{margin:0!important;padding:0!important;height:auto!important;min-height:0!important;overflow:visible!important;background:#fff!important}" +
+    `body>*:not(#${id}){display:none!important}` +
+    `#${id}{display:block!important;margin:0;padding:0}` +
+    `#${id} .hoja{width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;break-inside:avoid;page-break-inside:avoid;break-after:page;page-break-after:always}` +
+    `#${id} .hoja:last-child{break-after:auto;page-break-after:auto}` +
+    `#${id} img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}` +
+    "}</style>" +
+    paginas.map((p) => `<div class="hoja"><img src="${p.url}" alt=""></div>`).join("");
   document.body.appendChild(caja);
   const fin = () => {
     caja.remove();
@@ -204,22 +228,11 @@ export function VisorPDF() {
     }
   };
 
-  // Descargar: ventana "Guardar como" para elegir la carpeta (Chrome / Edge / app Windows).
+  // Descargar: ventana "Guardar como" para elegir la carpeta (lib/guardarArchivo: Chrome / Edge / app Windows).
   // Donde no existe (celular, Firefox, Safari) se descarga a la carpeta de Descargas.
   const descargar = async () => {
     if (!bytes) return;
-    const picker = (window as unknown as { showSaveFilePicker?: (o: unknown) => Promise<FileSystemFileHandle> }).showSaveFilePicker;
-    if (typeof picker !== "function" || esMovil()) return descargarBytes(bytes, vista.nombre);
-    try {
-      const h = await picker.call(window, { suggestedName: archivo, types: [{ description: "Documento PDF", accept: { "application/pdf": [".pdf"] } }] });
-      const w = await h.createWritable();
-      await w.write(bytes as unknown as BufferSource);
-      await w.close();
-      toast(`${h.name} guardado`);
-    } catch (e) {
-      if (e instanceof DOMException && e.name === "AbortError") return; // canceló la ventana
-      descargarBytes(bytes, vista.nombre);
-    }
+    await guardarArchivo(archivo, bytes, { tipo: "application/pdf" });
   };
 
   const whatsapp = async () => {

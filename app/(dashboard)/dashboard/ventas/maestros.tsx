@@ -2,12 +2,15 @@
 
 import { FiltrosPlegables } from "@/components/ui/BotonFiltros";
 import { useState } from "react";
-import { Pencil, Plus, Trash2, Upload } from "lucide-react";
+import { Download, Pencil, Plus, Tags, Trash2, Upload } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, cn, ejecutar, toast } from "@/components/ui";
-import { puede, soles, useRol } from "@/lib/storage";
-import { MEDIOS_PAGO, TIPOS_CONDICION, clienteVacio, eliminarCliente, eliminarCondicion, guardarCliente, guardarCondicion, importarClientes, saldoCliente } from "@/lib/ventas";
-import type { Cliente, CondicionPago } from "@/lib/types";
+import { KEYS, puede, soles, useRol, useStore } from "@/lib/storage";
+import { getSesion } from "@/lib/auth";
+import { puedeGestionarClientes } from "@/lib/proveedores";
+import { MEDIOS_PAGO, TIPOS_CONDICION, clasificacionesCliente, guardarClasificaciones, clienteVacio, eliminarCliente, eliminarCondicion, guardarCliente, guardarCondicion, importarClientes, saldoCliente } from "@/lib/ventas";
+import type { ClasificacionCliente, Cliente, CondicionPago } from "@/lib/types";
 import { FormCliente, useVentas } from "./comun";
+import { guardarExcel } from "@/lib/guardarArchivo";
 
 // =====================================================================
 // CONFIGURACIÓN · CONDICIONES DE PAGO (tabla public.condiciones_pago)
@@ -143,13 +146,45 @@ export function CondicionesPago() {
 // =====================================================================
 // CLIENTES
 // =====================================================================
-export function Clientes() {
+/**
+ * Base de clientes: la misma para Ventas y para Logística (`logistica`), y para Arequipa y Secocha.
+ * En Logística no se muestran condición de pago, línea de crédito ni saldo (son de Ventas / cobranza).
+ */
+export function Clientes({ logistica = false }: { logistica?: boolean }) {
   const [rol] = useRol();
   const { clientes, condiciones } = useVentas();
+  const clasificaciones = clasificacionesCliente(useStore<ClasificacionCliente[]>(KEYS.CLASIF_CLIENTES, []));
   const [form, setForm] = useState<Cliente | null>(null);
   const [q, setQ] = useState("");
-  const habilitado = puede(rol, "venta.gestionar");
-  const lista = clientes.filter((c) => !q || `${c.numDoc} ${c.razonSocial} ${c.contacto}`.toLowerCase().includes(q.toLowerCase()));
+  const [clasif, setClasif] = useState("");
+  const [editarClasif, setEditarClasif] = useState<string | null>(null);
+  const habilitado = logistica ? puedeGestionarClientes(getSesion()) : puede(rol, "venta.gestionar");
+  const lista = clientes.filter(
+    (c) =>
+      (!q || `${c.numDoc} ${c.razonSocial} ${c.contacto} ${c.laborMinera ?? ""} ${c.telefono}`.toLowerCase().includes(q.toLowerCase())) &&
+      (!clasif || (clasif === "-" ? !c.clasificacion : c.clasificacion === clasif)),
+  );
+
+  const exportar = async () => {
+    const XLSX = await import("xlsx");
+    const hoja = XLSX.utils.json_to_sheet(
+      lista.map((c) => ({
+        "Tipo Doc": c.tipoDoc,
+        Numero: c.numDoc,
+        "Razon Social": c.razonSocial,
+        "Labor Minera": c.laborMinera ?? "",
+        Clasificacion: c.clasificacion ?? "",
+        Telefono: c.telefono,
+        Contacto: c.contacto,
+        Email: c.email,
+        Direccion: c.direccionFiscal,
+        Estado: c.estado,
+      })),
+    );
+    const libro = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(libro, hoja, "Clientes");
+    await guardarExcel(libro, "base-clientes.xlsx");
+  };
 
   const importar = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -170,15 +205,29 @@ export function Clientes() {
   return (
     <Card>
       <CardHeader
-        title="Clientes"
-        subtitle="Columnas para importar: Tipo Doc, Numero, Razon Social, Direccion, Telefono, Email, Contacto, Linea Credito."
+        title={logistica ? "Base de clientes" : "Clientes"}
+        subtitle="Base única para Arequipa y Secocha. Columnas para importar: Tipo Doc, Numero, Razon Social, Labor Minera, Clasificacion, Direccion, Telefono, Email, Contacto, Linea Credito."
         action={
           <div className="flex flex-wrap gap-2">
             <FiltrosPlegables activos={q ? 1 : 0}>
               <Input placeholder="Buscar…" value={q} onChange={(e) => setQ(e.target.value)} className="w-48" aria-label="Buscar" autoFocus />
+              <Select
+                value={clasif}
+                onChange={(e) => setClasif(e.target.value)}
+                aria-label="Clasificación"
+                className="w-44"
+                placeholder="Toda clasificación"
+                options={[...clasificaciones.map((c) => ({ value: c, label: c })), { value: "-", label: "Sin clasificar" }]}
+              />
             </FiltrosPlegables>
+            <Button variant="secondary" onClick={() => void exportar()} disabled={lista.length === 0}>
+              <Download size={16} /> Excel
+            </Button>
             {habilitado && (
               <>
+                <Button variant="secondary" onClick={() => setEditarClasif(clasificaciones.join("\n"))}>
+                  <Tags size={16} /> Clasificaciones
+                </Button>
                 <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-plomo-200 bg-surface px-4 py-2 text-sm font-medium text-slate-700 hover:bg-plomo-50">
                   <Upload size={16} /> Importar Excel
                   <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={importar} />
@@ -191,9 +240,12 @@ export function Clientes() {
           </div>
         }
       />
-      <Table head={["Documento", "Razón social / Nombres", "Contacto", "Cond. pago", "Línea crédito", "Saldo", "Estado", ""]} empty={lista.length === 0}>
+      <Table
+        head={["Documento", "Razón social / Nombres", "Labor minera", "Clasificación", "Contacto", ...(logistica ? [] : ["Cond. pago", "Línea crédito", "Saldo"]), "Estado", ""]}
+        empty={lista.length === 0}
+      >
         {lista.map((c) => {
-          const saldo = saldoCliente(c.id);
+          const saldo = logistica ? 0 : saldoCliente(c.id);
           return (
             <tr key={c.id} className={cn("hover:bg-plomo-50", c.estado === "INACTIVO" && "opacity-50")}>
               <Td>
@@ -203,13 +255,19 @@ export function Clientes() {
                 <p className="font-semibold text-fg">{c.razonSocial}</p>
                 <p className="max-w-xs truncate text-xs text-plomo-500">{c.direccionFiscal || "-"}</p>
               </Td>
+              <Td>{c.laborMinera || "-"}</Td>
+              <Td>{c.clasificacion ? <span className="inline-block whitespace-nowrap rounded-full border border-plomo-200 bg-plomo-50 px-2 py-0.5 text-xs font-semibold text-fg">{c.clasificacion}</span> : "-"}</Td>
               <Td>
-                {c.contacto || "-"}
-                <p className="text-xs text-plomo-500">{[c.telefono, c.email].filter(Boolean).join(" · ")}</p>
+                {c.telefono || c.contacto || "-"}
+                <p className="text-xs text-plomo-500">{[c.telefono ? c.contacto : "", c.email].filter(Boolean).join(" · ")}</p>
               </Td>
-              <Td>{condiciones.find((x) => x.id === c.condPagoId)?.nombre ?? "-"}</Td>
-              <Td className="text-right">{c.lineaCredito > 0 ? soles(c.lineaCredito) : "Sin límite"}</Td>
-              <Td className={cn("text-right", saldo > 0 && "font-semibold text-red-600")}>{soles(saldo)}</Td>
+              {!logistica && (
+                <>
+                  <Td>{condiciones.find((x) => x.id === c.condPagoId)?.nombre ?? "-"}</Td>
+                  <Td className="text-right">{c.lineaCredito > 0 ? soles(c.lineaCredito) : "Sin límite"}</Td>
+                  <Td className={cn("text-right", saldo > 0 && "font-semibold text-red-600")}>{soles(saldo)}</Td>
+                </>
+              )}
               <Td>
                 <Badge estado={c.estado} />
               </Td>
@@ -245,6 +303,35 @@ export function Clientes() {
               </Button>
               <Button type="submit" variant="warning">
                 Guardar cliente
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+      <Modal open={editarClasif !== null} onClose={() => setEditarClasif(null)} title="Clasificaciones de clientes">
+        {editarClasif !== null && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (ejecutar(() => guardarClasificaciones(editarClasif.split("\n")), "Clasificaciones guardadas")) setEditarClasif(null);
+            }}
+            className="space-y-4"
+          >
+            <Field label="Una clasificación por línea, en el orden en que deben aparecer" hint="Se usan en Arequipa y en Secocha. No se puede quitar una que todavía tengan clientes.">
+              <textarea
+                value={editarClasif}
+                onChange={(e) => setEditarClasif(e.target.value.toUpperCase())}
+                rows={8}
+                className="w-full rounded-lg border border-plomo-200 px-3 py-2 text-sm outline-none focus:border-azul-900 focus:ring-2 focus:ring-plomo-200"
+                autoFocus
+              />
+            </Field>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={() => setEditarClasif(null)}>
+                Cancelar
+              </Button>
+              <Button type="submit" variant="warning">
+                Guardar lista
               </Button>
             </div>
           </form>

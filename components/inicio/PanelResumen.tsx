@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { AlertTriangle, BarChart3, CheckCircle2, ChevronRight } from "lucide-react";
 import type { EquipoTerminado } from "@/lib/equipos";
+import { mantenimientosPendientes, normalizarActivo, type Activo } from "@/lib/activos";
 import { useExpedientes } from "@/lib/expedientes";
 import type { ModuloInicio } from "@/lib/inicioModulos";
 import { useLogistica } from "@/lib/logistica";
@@ -52,10 +53,11 @@ interface Resumen {
   pendientes: Pendiente[];
 }
 
-const AZUL = "0 102 255";
-const ROJO = "227 6 19";
-const CIAN = "0 242 254";
-const NARANJA = "255 106 0";
+// Paleta COMBOY (2026-11-17): acero, vino, acero claro y azul noche
+const AZUL = "41 77 97";
+const ROJO = "128 0 33";
+const CIAN = "127 156 171";
+const NARANJA = "128 0 33";
 
 /** Stock escaso: 5 unidades o menos (igual que los KPIs). */
 const STOCK_CRITICO = 5;
@@ -100,9 +102,11 @@ function useResumenFinanzas(activo: boolean): Resumen {
   const facturas = useStore<Factura[]>(KEYS.FACTURAS, [], activo);
   const notas = useStore<NotaPedido[]>(KEYS.NOTAS_PEDIDO, [], activo);
   const comprobantes = useStore<ComprobanteVenta[]>(KEYS.COMPROBANTES, [], activo);
+  const activos = useStore<Activo[]>(KEYS.ACTIVOS, [], activo);
   return useMemo(() => {
     const { claves, etiquetas } = ultimosMeses();
     const hoyStr = hoy();
+    const mant = mantenimientosPendientes(activos.map(normalizarActivo));
     const emitidos = comprobantes.filter((c) => c.estado === "EMITIDO");
     const gastos = facturas.filter((f) => f.esGastoTesoreria);
     const compras = facturas.filter((f) => !f.esGastoTesoreria);
@@ -159,9 +163,11 @@ function useResumenFinanzas(activo: boolean): Resumen {
         { texto: "Facturas por pagar vencidas", cantidad: vencidasPagar.length, href: "/dashboard/compras?tab=facturas", urgente: true },
         { texto: "Notas de pedido por cobrar", cantidad: porCobrar.length, detalle: montoCorto(r2(porCobrar.reduce((a, n) => a + saldoNP(n), 0))), href: "/dashboard/ventas?tab=cobrar" },
         { texto: "Cobranzas vencidas", cantidad: vencidasCobrar.length, href: "/dashboard/ventas?tab=cobrar", urgente: true },
+        { texto: "Activos con mantenimiento vencido", cantidad: mant.filter((m) => m.estado === "VENCIDO").length, href: "/dashboard/contable?tab=activos", urgente: true },
+        { texto: "Activos con mantenimiento próximo", cantidad: mant.filter((m) => m.estado === "PROXIMO").length, href: "/dashboard/contable?tab=activos" },
       ],
     };
-  }, [facturas, notas, comprobantes]);
+  }, [facturas, notas, comprobantes, activos]);
 }
 
 function useResumenLogistica(activo: boolean): Resumen {

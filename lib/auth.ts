@@ -65,6 +65,7 @@ async function cargarSesion(): Promise<Sesion | null> {
     nombreCompleto: data.nombre_completo ?? undefined,
     iniciales: data.avatar_iniciales ?? undefined,
     moduloAsignado: data.modulo_asignado ?? undefined,
+    permisos: Array.isArray(data.permisos) ? data.permisos : [],
   };
 }
 

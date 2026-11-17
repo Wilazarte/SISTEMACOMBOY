@@ -79,6 +79,9 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "antecedentes", label: "Antecedentes (REQ procesados)", grupo: "Compras nacionales", destino: `${C}?tab=antecedentes` },
     { slug: "proveedores", label: "Proveedores Nacionales", grupo: "Compras nacionales", destino: "/logistica/proveedores" },
 
+    { slug: "base-proveedores", label: "Base de proveedores", grupo: "Proveedores y clientes", destino: "/logistica/base-proveedores" },
+    { slug: "base-clientes", label: "Base de clientes", grupo: "Proveedores y clientes", destino: "/logistica/base-clientes" },
+
     { slug: "agencias", label: "Agencias (Marvisur · Grael · Shalom)", grupo: "Transporte", destino: "/logistica/agencias" },
     { slug: "cotizar-flete", label: "Cotizar Flete", grupo: "Transporte", destino: "/logistica/cotizar-flete" },
     { slug: "guia-sunat", label: "Guía SUNAT", grupo: "Transporte", destino: "/logistica/guia-sunat" },
@@ -88,6 +91,8 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "infraestructura", label: "Infraestructura Planta", grupo: "Seguimiento", destino: "/logistica/infraestructura" },
     { slug: "historial", label: "Historial General", grupo: "Seguimiento", destino: "/logistica/historial" },
     { slug: "detalle", label: "Panel Logística (detalle)", grupo: "Seguimiento", destino: "/logistica/detalle" },
+
+    { slug: "gestion-documentaria", label: "Gestión Documentaria", grupo: "Documentos", destino: "/documentos" },
   ],
   almacen: [
     { slug: "expedientes", label: "Expedientes 26W · Tablero de lotes", grupo: EXP, destino: LOTES },
@@ -108,6 +113,8 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "transferencias", label: "Transferencias Planta ↔ Sucursal", grupo: "Despacho", destino: "/logistica/transferencias" },
 
     { slug: "panel", label: "Panel Almacén (ubicaciones, movimientos, PT)", grupo: "Seguimiento", destino: "/almacen/panel" },
+
+    { slug: "gestion-documentaria", label: "Gestión Documentaria", grupo: "Documentos", destino: "/documentos" },
   ],
   finanzas: [
     { slug: "expedientes", label: "Expedientes 26W · Tablero de lotes", grupo: EXP, destino: LOTES },
@@ -120,6 +127,7 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "facturas", label: "Facturas · Pagar proveedor (CxP)", grupo: "Tesorería", destino: `${C}?tab=facturas` },
     { slug: "declaraciones", label: "Declaraciones juradas", grupo: "Tesorería", destino: `${C}?tab=declaraciones` },
     { slug: "antecedentes", label: "Antecedentes (REQ procesados)", grupo: "Tesorería", destino: `${C}?tab=antecedentes` },
+    { slug: "validar-costos-produccion", label: "Validar costos de producción", grupo: "Tesorería", destino: "/finanzas/costos-produccion" },
 
     { slug: "planilla", label: "Planilla periodo", grupo: "Planilla", destino: `${C}?tab=planilla&sub=planilla` },
     { slug: "trabajadores", label: "Trabajadores", grupo: "Planilla", destino: `${C}?tab=planilla&sub=trabajadores` },
@@ -132,10 +140,13 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "balance", label: "Balance", grupo: "Contabilidad", destino: `${K}?tab=balance`, requiere: "canViewFacturas" },
     { slug: "eeff", label: "Estados Financieros (EEFF)", grupo: "Contabilidad", destino: `${K}?tab=eeff`, requiere: "canViewFacturas" },
     { slug: "estados-cuenta", label: "Estados de cuenta", grupo: "Contabilidad", destino: `${K}?tab=estados`, requiere: "canViewFacturas" },
+    { slug: "activos", label: "Activos de la empresa (entrega, mantenimiento, depreciación)", grupo: "Contabilidad", destino: `${K}?tab=activos` },
     { slug: "facturas-emitidas", label: "Facturas emitidas (Registro de Ventas)", grupo: "Contabilidad", destino: `${V}?tab=comprobantes`, requiere: "canViewFacturas" },
     { slug: "cuentas-por-cobrar", label: "Cuentas por cobrar", grupo: "Contabilidad", destino: `${V}?tab=cobrar` },
 
     { slug: "panel", label: "Panel Finanzas (CxC, CxP, IGV, cajas, costeo)", grupo: "Seguimiento", destino: "/finanzas/panel" },
+
+    { slug: "gestion-documentaria", label: "Gestión Documentaria", grupo: "Documentos", destino: "/documentos" },
   ],
   // VENTAS (módulo propio, Williams 2026-11-16; antes era el grupo "Ventas" de Logística): pedidos, facturación,
   // cobranza, clientes y catálogo. No participa del flujo 26W de fabricación.
@@ -152,6 +163,8 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "catalogo-productos", label: "Catálogo de Productos", grupo: "Clientes y productos", destino: `${V}?tab=productos` },
     { slug: "solicitudes-productos", label: "Solicitudes de productos", grupo: "Clientes y productos", destino: `${V}?tab=productos&sub=solicitudes` },
     { slug: "categorias-productos", label: "Categorías de productos", grupo: "Clientes y productos", destino: `${V}?tab=productos&sub=categorias` },
+
+    { slug: "gestion-documentaria", label: "Gestión Documentaria", grupo: "Documentos", destino: "/documentos" },
   ],
   // PRODUCCION (permisos limitados, Williams 2026-10-30): no emite OP (solo Logística), no ve Finanzas ni Gerencia;
   // en Almacén solo entrega PT. Solo Panel, sus OPs, Control de calidad y Entregar PT (Fase 8), más su flujo 26W.
@@ -165,6 +178,10 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "ordenes", label: "Mis OPs asignadas", grupo: "Producción", destino: P },
     { slug: "calidad", label: "Control de calidad (QC con firma)", grupo: "Producción", destino: `${P}?estado=EN_FABRICACION` },
     { slug: "entregar-pt", label: "Entregar PT a Almacén (chasis y serie de motor)", grupo: "Producción", destino: LOTES, fase: 8 },
+    // Costo de Producción (Williams 2026-11-17): hoja de costo auditada por equipo (tablas production_*)
+    { slug: "costo-produccion", label: "Costo de Producción (hoja auditada por equipo)", grupo: "Producción", destino: "/produccion/costos" },
+
+    { slug: "gestion-documentaria", label: "Gestión Documentaria", grupo: "Documentos", destino: "/documentos" },
   ],
 };
 
@@ -175,12 +192,13 @@ export const ACCIONES_SOPORTE: AccionInicio[] = [
   { slug: "expedientes", label: "Expedientes 26W · Tablero de lotes", grupo: EXP, destino: LOTES },
   { slug: "resumen", label: "Dashboard general (resumen)", grupo: "Soporte", destino: "/dashboard?vista=resumen" },
   { slug: "creador", label: "Creador (usuarios, asistencia)", grupo: "Soporte", destino: "/dashboard/creador" },
+  { slug: "gestion-documentaria", label: "Gestión Documentaria", grupo: "Documentos", destino: "/documentos" },
 ];
 
 export const accionesDe = (modulo: ModuloInicio): AccionInicio[] => (modulo === "soporte" ? ACCIONES_SOPORTE : ACCIONES_INICIO[modulo]);
 
 /** Funciones de fabricación que la sucursal (Secocha) no tiene. */
-const SOLO_PLANTA = new Set(["ingresar-equipo", "equipos-produccion", "crear-op", "orden-produccion"]);
+const SOLO_PLANTA = new Set(["ingresar-equipo", "equipos-produccion", "crear-op", "orden-produccion", "validar-costos-produccion"]);
 
 /** Pantallas de fabricación (Producción, OP, expedientes 26W): fuera de Secocha. */
 export const esRutaProduccion = (path: string): boolean =>

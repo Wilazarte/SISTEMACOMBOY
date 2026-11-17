@@ -12,6 +12,7 @@ import { createClient } from "./supabase/client";
 import { ErpError, KEYS, escribir, esperarGuardado, hoy, nuevoEvento, puede, r2, serieSede, uid } from "./storage";
 import { anularComprobante, getComprobantes, totalesVenta } from "./ventas";
 import type { ComprobanteVenta, EstadoSunat, LineaVenta, Rol } from "./types";
+import { guardarArchivo } from "./guardarArchivo";
 
 export type EstadoCpe = "PENDIENTE" | "ENVIADO" | "ACEPTADO" | "OBSERVADO" | "RECHAZADO" | "EXCEPCION" | "ANULADO";
 
@@ -219,14 +220,8 @@ export async function estadoBajaSunat(c: ComprobanteVenta, rol: Rol): Promise<Fi
 // ---------------------------------------------------------------------
 
 function bajar(nombre: string, datos: BlobPart, tipo: string) {
-  const url = URL.createObjectURL(new Blob([datos], { type: tipo }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = nombre;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  // "Guardar como" para elegir la carpeta (lib/guardarArchivo)
+  return guardarArchivo(nombre, new Blob([datos], { type: tipo }), { tipo });
 }
 
 const deBase64 = (b64: string) => Uint8Array.from(atob(b64), (ch) => ch.charCodeAt(0));
@@ -244,9 +239,9 @@ export async function descargarSunat(id: string, que: "xml" | "cdr" | "baja_cdr"
     return;
   }
   if (!fila || !contenido) throw new ErpError(que === "xml" ? "Aún no hay XML firmado." : "SUNAT aún no devolvió la constancia (CDR).");
-  if (que === "xml") bajar(`${fila.nombre_archivo}.xml`, contenido, "application/xml");
-  else if (que === "cdr") bajar(`R-${fila.nombre_archivo}.zip`, deBase64(contenido), "application/zip");
-  else bajar(`R-${fila.nombre_archivo?.split("-")[0]}-${fila.baja_id}.zip`, deBase64(contenido), "application/zip");
+  if (que === "xml") await bajar(`${fila.nombre_archivo}.xml`, contenido, "application/xml");
+  else if (que === "cdr") await bajar(`R-${fila.nombre_archivo}.zip`, deBase64(contenido), "application/zip");
+  else await bajar(`R-${fila.nombre_archivo?.split("-")[0]}-${fila.baja_id}.zip`, deBase64(contenido), "application/zip");
 }
 
 // ---------------------------------------------------------------------

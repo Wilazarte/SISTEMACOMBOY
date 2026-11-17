@@ -26,7 +26,18 @@ export interface Sesion {
   iniciales?: string;
   /** Módulo asignado (perfiles.modulo_asignado: TODOS, FINANZAS, ALMACEN, LOGISTICA, PRODUCCION, VENTAS). */
   moduloAsignado?: string;
+  /**
+   * Permisos individuales de ESTE usuario (perfiles.permisos), excepciones a la regla "cada rol solo su módulo".
+   * Ej.: "req.editar_almacen" = Tesorería puede editar los REQ de Almacén (Lizbeth, pedido de Williams 2026-11-17).
+   */
+  permisos?: string[];
 }
+
+/** Permiso individual de Tesorería para editar requerimientos de Almacén antes de revisarlos. */
+export const PERMISO_EDITAR_REQ_ALMACEN = "req.editar_almacen";
+
+/** ¿El usuario tiene este permiso individual (perfiles.permisos)? */
+export const tienePermiso = (sesion: Sesion | null, permiso: string): boolean => !!sesion?.permisos?.includes(permiso);
 
 /**
  * Permiso "editar_asistencia_creador": edición manual de DÍAS / TARD. en el Módulo Creador.
@@ -53,6 +64,9 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
   // Producción: también Almacén (registra las órdenes de producción y el QC)
   if (ruta === RUTA_PRODUCCION || ruta.startsWith(`${RUTA_PRODUCCION}/`)) if (sesion.rol === "almacen") return true;
   if (ruta === RUTA_NO_AUTORIZADO) return true;
+  // Gestión Documentaria (/documentos): entra todo perfil, también GERENCIA; cada uno ve solo sus documentos o los que
+  // tienen permiso explícito para su rol (lo decide la base: SQL 20261204_gestion_documentaria.sql, gd_nivel)
+  if (ruta === RUTA_DOCUMENTOS || ruta.startsWith(`${RUTA_DOCUMENTOS}/`)) return true;
   // GERENCIA es visor (pedido de Williams, 2026-10-29): solo su Dashboard Gerencia, ningún módulo;
   // las reuniones y el chat grupal están dentro de /gerencia
   if (sesion.rol === "gerencia") return ruta === RUTA_GERENCIA || ruta.startsWith(`${RUTA_GERENCIA}/`);
@@ -85,6 +99,8 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
 }
 
 export const RUTA_PRODUCCION = "/dashboard/produccion";
+/** Gestión Documentaria auditada (módulo independiente). */
+export const RUTA_DOCUMENTOS = "/documentos";
 /** Flujo v3.0: tablero de expedientes 26W y expediente por código. */
 export const RUTA_ERP = "/erp";
 /** Dashboard Gerencia (War Room): GERENCIA y SOPORTE. */

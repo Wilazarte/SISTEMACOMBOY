@@ -11,6 +11,7 @@ import { CUENTAS_CAJA, movimientosCaja, resumenCuenta, type CuentaCaja } from "@
 import { pdfEstadoCuenta } from "@/lib/pdf";
 import { KEYS, eliminarMovimientoCaja, fechaPE, hoy, registrarMovimientoCaja, soles, useStore } from "@/lib/storage";
 import type { Compra, Factura, MovimientoCajaManual } from "@/lib/types";
+import { guardarExcel } from "@/lib/guardarArchivo";
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"];
 
@@ -59,7 +60,7 @@ export function EstadosCuenta({ anio, mes, onVerDiario }: { anio: number; mes: n
     const filas = lista.map((m) => ({ Fecha: fechaPE(m.fecha), Cuenta: m.cuenta, Concepto: m.concepto, "Doc. referencia": m.documento, Proveedor: m.proveedor, Debe: m.debe || "", Haber: m.haber || "", Saldo: m.saldo ?? 0 }));
     const libro = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas), "Estado de cuenta");
-    XLSX.writeFile(libro, `Estado-cuenta-${(cuenta || "todas-las-cuentas").replace(/\s+/g, "-")}-${periodo.replace(/\s+/g, "-")}.xlsx`);
+    await guardarExcel(libro, `Estado-cuenta-${(cuenta || "todas-las-cuentas").replace(/\s+/g, "-")}-${periodo.replace(/\s+/g, "-")}.xlsx`);
   };
 
   return (

@@ -4,7 +4,8 @@ import type { jsPDF } from "jspdf";
 import { EMPRESA } from "@/lib/empresa";
 import { TIPOS_SERVICIO } from "@/lib/contratistas";
 import { cargarLogo, construir } from "@/lib/pdf";
-import { descargarBytes, mostrarPDF } from "@/lib/visorPdf";
+import { mostrarPDF } from "@/lib/visorPdf";
+import type { Destino } from "@/lib/guardarArchivo";
 import { SERVICIOS_CONTRATISTA, fechaPE, hoy, soles } from "@/lib/storage";
 import type { ConcesionContratista, Trabajador } from "@/lib/types";
 
@@ -84,14 +85,14 @@ export function generatePDF(data: Trabajador | ConcesionContratista, tipo: TipoR
 const nombreArchivo = (nombre: string) =>
   `Recibo-${nombre.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().replace(/[^A-Za-z0-9]+/g, "_")}-${hoy()}.pdf`;
 
-/** Botón PDF de la tabla: vista previa del recibo. directo = descarga sin vista previa (varios recibos a la vez). */
-export async function descargarRecibo(data: Trabajador, tipo: "CONTRATISTA", directo?: boolean): Promise<void>;
-export async function descargarRecibo(data: ConcesionContratista, tipo: "CONCESION", directo?: boolean): Promise<void>;
-export async function descargarRecibo(data: Trabajador | ConcesionContratista, tipo: TipoRecibo, directo = false): Promise<void> {
+/** Botón PDF de la tabla: vista previa del recibo. destino = carpeta elegida (varios recibos a la vez, sin vista previa). */
+export async function descargarRecibo(data: Trabajador, tipo: "CONTRATISTA", destino?: Destino | null): Promise<void>;
+export async function descargarRecibo(data: ConcesionContratista, tipo: "CONCESION", destino?: Destino | null): Promise<void>;
+export async function descargarRecibo(data: Trabajador | ConcesionContratista, tipo: TipoRecibo, destino: Destino | null = null): Promise<void> {
   await cargarLogo();
   const doc = tipo === "CONTRATISTA" ? generatePDF(data as Trabajador, tipo) : generatePDF(data as ConcesionContratista, tipo);
   const nombre = tipo === "CONTRATISTA" ? (data as Trabajador).nombre : (data as ConcesionContratista).razonSocial;
   const archivo = nombreArchivo(nombre).replace(/\.pdf$/, "");
-  if (directo) descargarBytes(doc.output("arraybuffer"), archivo);
+  if (destino) await destino.guardar(`${archivo}.pdf`, doc.output("arraybuffer"), "application/pdf");
   else mostrarPDF(doc, archivo);
 }

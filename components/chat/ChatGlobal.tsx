@@ -6,6 +6,7 @@ import type { Sesion } from "@/lib/auth";
 import { estiloSeccion } from "@/lib/seccionColor";
 import { MAX_ADJUNTO, esAudio, esImagen, esVideo, tamanoLegible, useChatGlobal, type MensajeChat } from "@/lib/chat";
 import { usePresencia } from "@/lib/presencia";
+import { guardarArchivo } from "@/lib/guardarArchivo";
 
 /** Evento para abrir la barra del chat desde cualquier pantalla: window.dispatchEvent(new Event(EV_ABRIR_CHAT)). */
 export const EV_ABRIR_CHAT = "erp:abrir-chat";
@@ -399,7 +400,8 @@ function Adjunto({ m, url, onCarga }: { m: MensajeChat; url?: string; onCarga: (
   if (esVideo(m)) return <video src={url} controls preload="metadata" onLoadedMetadata={onCarga} className="my-1 max-h-60 w-full rounded-lg" />;
   if (esAudio(m)) return <audio src={url} controls preload="metadata" className="my-1 w-56 max-w-full" />;
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer" download={m.adjunto_nombre ?? undefined} className="my-1 flex items-center gap-2 rounded-lg bg-[#f3f4f6] px-2.5 py-2 hover:bg-[#e5e7eb]">
+    <div className="my-1 flex items-center gap-2 rounded-lg bg-[#f3f4f6] px-2.5 py-2 hover:bg-[#e5e7eb]">
+      <a href={url} target="_blank" rel="noopener noreferrer" className="flex min-w-0 flex-1 items-center gap-2" title="Abrir">
       <FileText size={22} className="shrink-0 text-[#c4001c]" />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[12px] font-semibold text-[#111827]">{m.adjunto_nombre}</span>
@@ -407,7 +409,17 @@ function Adjunto({ m, url, onCarga }: { m: MensajeChat; url?: string; onCarga: (
           {(m.adjunto_nombre?.split(".").pop() ?? "").slice(0, 5)} · {tamanoLegible(m.adjunto_bytes)}
         </span>
       </span>
-      <Download size={15} className="shrink-0 text-[#4b5563]" />
-    </a>
+      </a>
+      {/* Guardar como: elegir la carpeta de la PC */}
+      <button
+        type="button"
+        title="Guardar en la PC"
+        aria-label={`Guardar ${m.adjunto_nombre ?? "archivo"}`}
+        onClick={() => void guardarArchivo(m.adjunto_nombre || "archivo", async () => (await fetch(url)).blob()).catch(() => window.open(url, "_blank", "noopener"))}
+        className="shrink-0 rounded-md p-1 text-[#4b5563] hover:bg-black/[0.08] hover:text-[#111827]"
+      >
+        <Download size={15} />
+      </button>
+    </div>
   );
 }

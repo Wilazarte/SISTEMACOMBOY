@@ -16,6 +16,7 @@ import { EtiquetaCategoria, FiltroCategoria, contarCategorias, pasaCategoria } f
 import type { EquipoTerminado } from "@/lib/equipos";
 import type { OrdenProduccion } from "@/lib/produccion";
 import type { MovimientoKardex, StockItem } from "@/lib/types";
+import { guardarArchivo } from "@/lib/guardarArchivo";
 
 const fechaHora = (iso: string) => (iso ? new Date(iso).toLocaleString("es-PE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-");
 const num = (n: number) => n.toLocaleString("es-PE", { maximumFractionDigits: 2 });
@@ -362,10 +363,7 @@ function ImportarSaldosModal({ onClose }: { onClose: () => void }) {
       "",
       ...plan.log.map((l) => `Fila ${l.fila}\t${l.nivel}\t${l.producto}\t${l.mensaje}`),
     ].join("\n");
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([txt], { type: "text/plain;charset=utf-8" }));
-    a.download = `log_import_stock_${archivo.replace(/\.[^.]+$/, "")}.txt`;
-    a.click();
+    void guardarArchivo(`log_import_stock_${archivo.replace(/\.[^.]+$/, "")}.txt`, new Blob([txt], { type: "text/plain;charset=utf-8" }));
   };
   const importar = () => {
     if (!plan) return;

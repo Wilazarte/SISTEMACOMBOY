@@ -3,9 +3,10 @@ import type { CSSProperties } from "react";
 /**
  * Colores de sección del tema GLASS (Williams, 2026-11-04): cada sección de un módulo lleva su propio color de la
  * marca para distinguirse rápido. Canales "r g b" que lee la clase .seccion de app/globals.css (variable --sec).
- * Orden: azul eléctrico, rojo COMBOY, cian, naranja fuego, rosa fuego, gris titanio.
+ * Paleta COMBOY (2026-11-17): azul acero #294D61, vino #800021, azul noche #11212D y sus tonos medios
+ * (acero claro, vino claro, gris oscuro).
  */
-export const COLORES_SECCION = ["0 102 255", "227 6 19", "0 242 254", "255 106 0", "255 42 95", "138 153 173"] as const;
+export const COLORES_SECCION = ["41 77 97", "128 0 33", "17 33 45", "84 113 129", "160 51 77", "127 143 150"] as const;
 
 /** Color por posición (secciones vecinas nunca repiten color). */
 export const colorPorIndice = (i: number): string => COLORES_SECCION[((i % COLORES_SECCION.length) + COLORES_SECCION.length) % COLORES_SECCION.length];

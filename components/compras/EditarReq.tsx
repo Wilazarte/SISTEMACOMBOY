@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Pencil, Plus, Send, Trash2 } from "lucide-react";
 import { Button, Field, Input, Modal, Select, Textarea, ejecutar } from "@/components/ui";
 import type { Sesion } from "@/lib/auth";
+import { PERMISO_EDITAR_REQ_ALMACEN, tienePermiso } from "@/lib/permisos";
+import { getSesion } from "@/lib/auth";
 import { SEDES, UNIDADES } from "@/lib/empresa";
 import { editarRequerimiento, reenviarRequerimiento, uid } from "@/lib/storage";
 import type { ItemReq, Requerimiento, Rol } from "@/lib/types";
@@ -15,11 +17,15 @@ export const itemVacio = (): ItemReq => ({ id: uid(), nombre: "", cantidad: 1, u
  * Quién puede editar un REQ: solo PENDIENTE (antes de la revisión) u OBSERVADO (corregir y reenviar),
  * y solo quien lo emitió o el creador. Gerencia es de solo lectura (y RLS no le deja escribir en compras).
  * Los REQ antiguos no guardan quién los emitió: los edita el rol Almacén, que es quien los emite.
+ * Excepción individual (Williams 2026-11-17): quien tenga el permiso "req.editar_almacen" en su perfil
+ * (Lizbeth, Tesorería) edita los REQ de Almacén PENDIENTES desde NUEVOS REQ. Queda registrado quién editó.
+ * Los OBSERVADOS los sigue corrigiendo Almacén (al reenviar vuelven a Tesorería).
  */
 export function permisoEditarReq(req: Requerimiento, sesion: Sesion | null): { ok: boolean; motivo: string } {
   if (req.estado !== "PENDIENTE" && req.estado !== "OBSERVADO") return { ok: false, motivo: "Documento ya procesado" };
   if (!sesion || sesion.soloLectura) return { ok: false, motivo: "Su usuario es de solo lectura" };
   if (sesion.rol === "creador") return { ok: true, motivo: "" };
+  if (req.estado === "PENDIENTE" && req.origen !== "SUCURSAL" && tienePermiso(sesion, PERMISO_EDITAR_REQ_ALMACEN)) return { ok: true, motivo: "" };
   const esAutor = req.creadoPor ? req.creadoPor === sesion.usuario : sesion.rol === "almacen";
   return esAutor ? { ok: true, motivo: "" } : { ok: false, motivo: "Solo quien lo emitió puede editarlo" };
 }
@@ -107,6 +113,9 @@ export function EditarReq({ req, rol, onClose }: { req: Requerimiento; rol: Rol;
   const [motivo, setMotivo] = useState(req.motivo);
   const [items, setItems] = useState<ItemReq[]>(req.items.length ? req.items : [itemVacio()]);
   const observado = req.estado === "OBSERVADO";
+  // Edita alguien que no emitió el REQ (Tesorería con permiso): se le avisa que queda registrado
+  const sesion = getSesion();
+  const ajeno = !!sesion && sesion.rol !== "almacen" && (!req.creadoPor || req.creadoPor !== sesion.usuario);
 
   const guardar = () => {
     const ok = observado
@@ -120,6 +129,11 @@ export function EditarReq({ req, rol, onClose }: { req: Requerimiento; rol: Rol;
       {observado && (
         <div className="mb-4 rounded-lg bg-orange-50 px-3 py-2 text-sm text-orange-800">
           <b>Observación de Tesorería:</b> {req.observacion}
+        </div>
+      )}
+      {ajeno && !observado && (
+        <div className="mb-4 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-900">
+          Está editando un requerimiento de Almacén. Quedará registrado que <b>{sesion?.nombreCompleto ?? sesion?.nombre}</b> lo editó, con fecha, hora y lo que cambió, y Almacén recibirá un aviso.
         </div>
       )}
       <div className="mb-4 grid gap-3 md:grid-cols-3">

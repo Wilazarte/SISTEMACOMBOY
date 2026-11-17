@@ -113,6 +113,9 @@ const TONOS: Record<Tono, { cls: string; punto: string }> = {
 
 const TONO_ESTADO: Record<string, Tono> = {
   PENDIENTE: "rojo",
+  MALOGRADO: "rojo",
+  EN_MANTENIMIENTO: "ambar",
+  OPERATIVO: "verde",
   OBSERVADO: "rojo",
   OBSERVADA: "rojo",
   POR_PAGAR: "rojo",
@@ -215,6 +218,8 @@ const ETIQUETA: Record<string, string> = {
   PENDIENTE_COSTEO: "PENDIENTE COSTEO",
   POR_COBRAR: "POR COBRAR",
   BAJO_MINIMO: "BAJO MÍNIMO",
+  EN_MANTENIMIENTO: "EN MANTENIMIENTO",
+  BAJA: "DE BAJA",
 };
 
 export function Badge({ estado }: { estado: string }) {

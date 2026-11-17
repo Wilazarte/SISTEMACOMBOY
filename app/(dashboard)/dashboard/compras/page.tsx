@@ -382,6 +382,11 @@ function NuevosReq({
                 <p className="text-xs text-plomo-600">
                   {fechaPE(r.fecha)} · {r.sede}
                 </p>
+                {r.editadoPor && r.editadoEn && (
+                  <p className="text-[11px] text-amber-500" title="Queda en el historial del REQ y en la auditoría de ediciones">
+                    Editado por {r.editadoPor} · {new Date(r.editadoEn).toLocaleString("es-PE", { dateStyle: "short", timeStyle: "short" })}
+                  </p>
+                )}
                 </div>
               </div>
               <span className="rounded-full bg-[#fbbf24] px-2 py-0.5 text-[11px] font-bold text-black">PENDIENTE</span>

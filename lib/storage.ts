@@ -88,6 +88,7 @@ export const KEYS = {
   STOCK: "almacen_stock",
   ASISTENCIA: "planilla_asistencia",
   CLIENTES: "ventas_clientes",
+  CLASIF_CLIENTES: "ventas_clasif_clientes",
   COND_PAGO: "ventas_condiciones_pago",
   NOTAS_PEDIDO: "ventas_notas_pedido",
   COMPROBANTES: "ventas_comprobantes",
@@ -110,6 +111,7 @@ export const KEYS = {
   CONTABLE_PLAN: "contable_plan_cuentas",
   CONTABLE_CIERRES: "contable_cierres",
   MOV_CAJA: "contable_mov_caja", // movimientos manuales de caja (Estados de cuenta)
+  ACTIVOS: "contable_activos", // registro de activos de la empresa (lib/activos.ts)
   // Sucursal Beta (tabla sucursal, ver supabase/migrations/20261022_sucursal_beta.sql y lib/sucursal.ts)
   SUC_SUCURSALES: "sucursal_sucursales",
   SUC_VENTAS: "sucursal_ventas",
@@ -289,6 +291,7 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.TRABAJADORES]: { tabla: "planilla", tipo: "trabajador", forma: "lista" },
   [KEYS.ASISTENCIA]: { tabla: "planilla", tipo: "asistencia", forma: "lista" },
   [KEYS.CLIENTES]: { tabla: "ventas", tipo: "cliente", forma: "lista" },
+  [KEYS.CLASIF_CLIENTES]: { tabla: "ventas", tipo: "clasificacion_cliente", forma: "lista" },
   [KEYS.COND_PAGO]: { tabla: "condiciones_pago", forma: "condiciones" },
   [KEYS.NOTAS_PEDIDO]: { tabla: "ventas", tipo: "nota_pedido", forma: "lista" },
   [KEYS.COMPROBANTES]: { tabla: "ventas", tipo: "comprobante", forma: "lista" },
@@ -309,6 +312,7 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.CONTABLE_PLAN]: { tabla: "contable", tipo: "PLAN_CUENTAS", forma: "lista" },
   [KEYS.CONTABLE_CIERRES]: { tabla: "contable", tipo: "CIERRE_MENSUAL", forma: "lista" },
   [KEYS.MOV_CAJA]: { tabla: "contable", tipo: "MOVIMIENTO_CAJA", forma: "lista" },
+  [KEYS.ACTIVOS]: { tabla: "contable", tipo: "ACTIVO_FIJO", forma: "lista" },
   [KEYS.OBSERVACIONES]: { tabla: "observaciones", forma: "observaciones" },
   [KEYS.SUC_SUCURSALES]: { tabla: "sucursal", tipo: "sucursal", forma: "lista" },
   [KEYS.SUC_VENTAS]: { tabla: "sucursal", tipo: "venta", forma: "lista" },
@@ -374,12 +378,20 @@ let vistaSede: VistaSede | null = null;
  * Stock y kardex: el almacén es físico. Arequipa sigue viendo sus DOS almacenes (Taller Principal y Sucursal Secocha)
  * como siempre; Secocha ve solo el suyo. Las filas del almacén Sucursal Secocha son de la sede Secocha (sede_id).
  */
-const COMPARTIDAS_ALMACEN = new Set<string>([KEYS.STOCK, KEYS.KARDEX]);
+// Activos de la empresa: igual que el almacén, Arequipa ve los de las dos sedes y Secocha solo los suyos (campo sede).
+const COMPARTIDAS_ALMACEN = new Set<string>([KEYS.STOCK, KEYS.KARDEX, KEYS.ACTIVOS]);
 const esAlmacenSecocha = (x: unknown): boolean => /secocha/i.test(String((x as { sede?: unknown } | null)?.sede ?? ""));
+
+/**
+ * Base de proveedores y clientes (Williams 2026-11-17): UNA sola para Arequipa y Secocha. No se filtran por sede:
+ * las dos sedes ven y editan los mismos registros (la base lo permite con 20261203_base_proveedores_clientes.sql;
+ * sin ese SQL Secocha sigue viendo solo los suyos). Cada fila conserva la sede que la registró.
+ */
+const COMPARTIDAS_SEDES = new Set<string>([KEYS.PROVEEDORES, KEYS.CLIENTES, KEYS.CLASIF_CLIENTES]);
 
 const filtraSede = (key: StoreKey): boolean => {
   const d = DESTINOS[key];
-  if (!vistaSede || d.forma !== "lista" || !TABLAS_POR_SEDE.has(d.tabla)) return false;
+  if (!vistaSede || d.forma !== "lista" || !TABLAS_POR_SEDE.has(d.tabla) || COMPARTIDAS_SEDES.has(key)) return false;
   return !(vistaSede.modo === "central" && COMPARTIDAS_ALMACEN.has(key));
 };
 const visibleEnSede = (x: unknown): boolean => {
@@ -1152,7 +1164,11 @@ export function editarRequerimiento(
     items,
     editadoPor: usuarioActual(),
     editadoEn: new Date().toISOString(),
-    historial: [...req.historial, evento(rol, "Editado antes de la revisión", `${items.length} producto(s) · Sede ${cambios.sede}`)],
+    // Quién editó con nombre: Tesorería (Lizbeth) también puede editar los REQ de Almacén con permiso individual
+    historial: [
+      ...req.historial,
+      evento(rol, rol === "TESORERIA" ? "Editado por Tesorería antes de la revisión" : "Editado antes de la revisión", `${items.length} producto(s) · Sede ${cambios.sede} · por ${nombreActual()}`),
+    ],
   };
   escribir(KEYS.REQS_PENDIENTES, lista.map((r) => (r.id === id ? editado : r)));
 }
@@ -2360,6 +2376,11 @@ export const getValesProduccion = () => leer<ValeProduccion[]>(KEYS.VALES_PRODUC
 export type RefKardex = { tipo: TipoKardex; documento: string; chasis?: string; motivo?: string };
 
 const usuarioActual = () => getSesion()?.usuario ?? "sistema";
+/** Nombre real del usuario (para el historial): nombre completo, si no el nombre, si no el usuario. */
+const nombreActual = () => {
+  const s = getSesion();
+  return s?.nombreCompleto || s?.nombre || s?.usuario || "sistema";
+};
 
 function anotarKardex(movs: Omit<MovimientoKardex, "id" | "fecha" | "usuario">[]): void {
   if (!movs.length) return;

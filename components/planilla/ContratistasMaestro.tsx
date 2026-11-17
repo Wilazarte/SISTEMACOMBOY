@@ -8,6 +8,7 @@ import { BotonFiltros } from "@/components/ui/BotonFiltros";
 import { EstadoRuc } from "@/components/EstadoRuc";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { SEDES } from "@/lib/empresa";
+import { elegirCarpeta } from "@/lib/guardarArchivo";
 import { descargarRecibo, estadoContratista } from "@/components/planilla/generateReciboPDF";
 import {
   FORMAS_PAGO_CONTRATISTA,
@@ -74,8 +75,12 @@ export function ContratistasMaestro({ trabajadores, soloLectura }: { trabajadore
   const descargarRecibos = async () => {
     const sel = lista.filter((t) => t.activo);
     if (!sel.length) return toast("No hay contratistas activos en la lista", "error");
-    if (sel.length > 1 && !confirm(`¿Descargar ${sel.length} recibos PDF (uno por contratista)?`)) return;
-    for (const t of sel) await descargarRecibo(t, "CONTRATISTA", sel.length > 1);
+    if (sel.length === 1) return descargarRecibo(sel[0], "CONTRATISTA");
+    // Varios: se elige UNA carpeta de la PC y todos los recibos se guardan ahí
+    const destino = await elegirCarpeta();
+    if (!destino) return;
+    for (const t of sel) await descargarRecibo(t, "CONTRATISTA", destino);
+    toast(`${sel.length} recibos guardados${destino.carpeta ? ` en la carpeta ${destino.carpeta}` : " en Descargas"}`);
   };
 
   return (
