@@ -43,6 +43,17 @@ const ETIQUETA: Record<string, string> = {
 
 function ChipSunat({ g }: { g: GuiaRemision }) {
   const e = g.estadoSunat ?? "NO_ENVIADO";
+  if (g.estado === "ANULADA") {
+    const motivo = [...g.historial].reverse().find((h) => h.accion === "Anulada")?.detalle;
+    return (
+      <span
+        title={motivo || "Guía anulada en el ERP"}
+        className="ml-1.5 inline-flex items-center whitespace-nowrap rounded-full bg-plomo-100 px-2 py-0.5 align-middle text-[11px] font-semibold text-plomo-600 ring-1 ring-inset ring-plomo-400/30"
+      >
+        ANULADA
+      </span>
+    );
+  }
   return (
     <span
       title={[g.sunat?.codigo, g.sunat?.descripcion].filter(Boolean).join(" ") || "Aún no se envía a SUNAT"}
