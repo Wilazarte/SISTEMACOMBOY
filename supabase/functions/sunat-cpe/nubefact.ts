@@ -18,6 +18,29 @@ const fechaNf = (iso: string) => {
 };
 const n2 = (n: number) => Number(m2(n));
 
+/**
+ * Cuenta DEMO de Nubefact: solo deja emitir con sus series de prueba (FFF1 facturas y sus notas, BBB1 boletas y sus notas).
+ * Secreto opcional NUBEFACT_SERIES, p. ej. "F001=FFF1,FC01=FFF1,FD01=FFF1,B001=BBB1,BC01=BBB1,BD01=BBB1":
+ * el ERP sigue numerando con sus series y solo lo que viaja a Nubefact usa la serie de la demo. En producción se deja vacío.
+ */
+export function mapaSeries(texto = Deno.env.get("NUBEFACT_SERIES") ?? ""): Record<string, string> {
+  const m: Record<string, string> = {};
+  for (const par of texto.split(",")) {
+    const [de, a] = par.split("=").map((x) => x.trim().toUpperCase());
+    if (de && a) m[de] = a;
+  }
+  return m;
+}
+function aplicarSeries(cuerpo: Record<string, unknown>): Record<string, unknown> {
+  const m = mapaSeries();
+  const c = { ...cuerpo };
+  for (const k of ["serie", "documento_que_se_modifica_serie"]) {
+    const v = c[k];
+    if (typeof v === "string" && m[v]) c[k] = m[v];
+  }
+  return c;
+}
+
 export interface RespuestaPse {
   ok: boolean;
   aceptada: boolean;
@@ -111,7 +134,7 @@ async function llamar(ruta: string, token: string, cuerpo: Record<string, unknow
       const r = await fetch(ruta, {
         method: "POST",
         headers: { Authorization: `Token token="${token}"`, "Content-Type": "application/json" },
-        body: JSON.stringify(cuerpo),
+        body: JSON.stringify(aplicarSeries(cuerpo)),
         signal: AbortSignal.timeout(60_000),
       });
       const texto = await r.text();
