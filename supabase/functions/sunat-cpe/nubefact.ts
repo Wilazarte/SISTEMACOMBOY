@@ -189,6 +189,11 @@ export async function generarNubefact(ruta: string, token: string, d: DocumentoC
   return leer(await llamar(ruta, token, jsonNubefact(d)));
 }
 
+/** Operación libre (guías de remisión: generar_guia / consultar_guia) con la misma conexión, reintentos y series DEMO. */
+export async function operacionNubefact(ruta: string, token: string, cuerpo: Record<string, unknown>): Promise<RespuestaPse> {
+  return leer(await llamar(ruta, token, cuerpo));
+}
+
 export async function consultarNubefact(ruta: string, token: string, codigoTipo: string, serie: string, numero: string): Promise<RespuestaPse> {
   return leer(await llamar(ruta, token, { operacion: "consultar_comprobante", tipo_de_comprobante: TIPO_NUBEFACT[codigoTipo], serie, numero: Number(numero) }));
 }

@@ -8,7 +8,7 @@ import { createPortal } from "react-dom";
 import { Download, Eye, FileCheck2, FileCode2, FileText, Loader2, Printer, Share2, X } from "lucide-react";
 import { Button, toast } from "@/components/ui";
 import { guardarArchivo } from "@/lib/guardarArchivo";
-import type { ComprobanteVenta } from "@/lib/types";
+import type { DatosSunatPse, EstadoSunat } from "@/lib/types";
 
 type Clase = "pdf" | "xml" | "cdr";
 
@@ -285,8 +285,15 @@ function Visor({ a, onClose }: { a: Archivo; onClose: () => void }) {
   return createPortal(ventana, raiz);
 }
 
+/** Lo que necesitan los botones: comprobante de venta o guía de remisión. */
+export interface DocConArchivos {
+  numero: string;
+  estadoSunat?: EstadoSunat;
+  sunat?: DatosSunatPse;
+}
+
 /** Botones PDF · XML · CDR de una fila (XML y CDR solo con SUNAT ACEPTADO). */
-export function ArchivosSunat({ c }: { c: ComprobanteVenta }) {
+export function ArchivosSunat({ c }: { c: DocConArchivos }) {
   const [abierto, setAbierto] = useState<Archivo | null>(null);
   const cerrar = useCallback(() => setAbierto(null), []);
   const s = c.sunat;

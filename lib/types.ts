@@ -797,6 +797,66 @@ export type TipoComprobanteVenta = "FACTURA" | "BOLETA" | "NOTA_CREDITO" | "NOTA
 export type EstadoSunat = "NO_ENVIADO" | "ENVIADO" | "ACEPTADO" | "OBSERVADO" | "RECHAZADO" | "EXCEPCION" | "ANULADO";
 export type FormaPagoVenta = "CONTADO" | "CREDITO" | "CREDITO_CUOTAS";
 
+/** Datos de la respuesta del PSE (Nubefact): número con el que se registró y enlaces del PDF / XML / CDR. */
+export interface DatosSunatPse {
+  hash: string;
+  codigo: string;
+  descripcion: string;
+  entorno: "beta" | "produccion";
+  fecha: string;
+  numero?: string;
+  enlacePdf?: string;
+  enlaceXml?: string;
+  enlaceCdr?: string;
+}
+
+/** Línea de la guía: qué se traslada (sin precios). */
+export interface ItemGuia {
+  id: string;
+  descripcion: string;
+  unidad: string;
+  cantidad: number;
+}
+
+/** Guía de Remisión Remitente electrónica (Ventas, serie T005). */
+export interface GuiaRemision {
+  id: string;
+  serie: string; // T005 (Secocha: T002)
+  numero: string; // T005-0001
+  fecha: string; // emisión AAAA-MM-DD
+  fechaTraslado: string; // inicio del traslado AAAA-MM-DD
+  clienteId: string;
+  cliente: string; // destinatario
+  clienteDoc: string; // "RUC 20123456789" / "DNI 12345678"
+  /** Comprobante de venta relacionado (opcional). */
+  comprobanteId?: string;
+  comprobanteNumero?: string;
+  /** Catálogo 20: 01 venta, 02 compra, 04 traslado entre establecimientos, 13 otros, 14 venta sujeta a confirmación. */
+  motivoTraslado: string;
+  /** Catálogo 18: 01 transporte público (empresa transportista), 02 transporte privado (vehículo propio). */
+  modalidad: "01" | "02";
+  transportistaRuc: string;
+  transportistaNombre: string;
+  placa: string;
+  conductorDni: string;
+  conductorNombres: string;
+  conductorApellidos: string;
+  conductorLicencia: string;
+  partidaUbigeo: string;
+  partidaDireccion: string;
+  llegadaUbigeo: string;
+  llegadaDireccion: string;
+  pesoKg: number;
+  bultos: number;
+  items: ItemGuia[];
+  observaciones: string;
+  estado: "EMITIDA" | "ANULADA";
+  estadoSunat: EstadoSunat;
+  sunat?: DatosSunatPse;
+  vendedor: string;
+  historial: EventoHistorial[];
+}
+
 export interface Cuota {
   n: number;
   fecha: string;

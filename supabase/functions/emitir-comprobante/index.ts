@@ -5,6 +5,7 @@
 //   - comprobante: el mismo objeto de ventas.data (tipo 'comprobante') -> ver ComprobanteErp en ../sunat-cpe/documento.ts
 //   - referencia:  solo para notas de crédito / débito, el comprobante que modifican
 //   - consultar:   true = no emite, solo consulta en Nubefact el estado y los enlaces (XML / CDR) actualizados
+//   { guia: GuiaErp, consultar? }: Guía de Remisión Remitente (generar_guia / consultar_guia), ver ./guia.ts
 //   También se acepta el ComprobanteErp directo en el cuerpo (sin envolver en { comprobante }).
 //
 // Respuestas: 200 -> RespuestaPse de Nubefact (ok, aceptada, codigo, enlacePdf, ...)
@@ -16,8 +17,9 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { armarDocumento, ErrorCpe, type ComprobanteErp } from "../sunat-cpe/documento.ts";
-import { consultarNubefact, generarNubefact } from "../sunat-cpe/nubefact.ts";
+import { consultarNubefact, generarNubefact, operacionNubefact } from "../sunat-cpe/nubefact.ts";
 import { emisor, nubefact } from "../sunat-cpe/config.ts";
+import { jsonConsultaGuia, jsonGuia, serieYNumero, type GuiaErp } from "./guia.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -44,7 +46,7 @@ Deno.serve(async (req) => {
   const { data: perfil } = await admin.from("perfiles").select("rol").eq("id", u.user.id).maybeSingle();
   if (!ROLES.includes(String(perfil?.rol ?? "").toLowerCase())) return json({ error: "Su usuario no puede emitir comprobantes electrónicos." }, 403);
 
-  let body: { comprobante?: ComprobanteErp; referencia?: ComprobanteErp; consultar?: boolean } & Partial<ComprobanteErp>;
+  let body: { comprobante?: ComprobanteErp; referencia?: ComprobanteErp; guia?: GuiaErp; consultar?: boolean } & Partial<ComprobanteErp>;
   try {
     body = await req.json();
   } catch {
@@ -55,6 +57,18 @@ Deno.serve(async (req) => {
 
   try {
     const nf = nubefact(); // valida que existan NUBEFACT_RUTA / NUBEFACT_TOKEN (mensaje claro si faltan)
+
+    // Guía de Remisión Remitente: { guia } emite (generar_guia); { guia, consultar: true } solo consulta (consultar_guia)
+    if (body.guia) {
+      const g = body.guia;
+      const { serie, correlativo } = serieYNumero(g);
+      const numero = `${serie}-${correlativo}`;
+      let r = await operacionNubefact(nf.ruta, nf.token, body.consultar === true ? jsonConsultaGuia(g) : jsonGuia(g));
+      if (body.consultar !== true && !r.ok && /exist|registrad|duplicad/i.test(r.error ?? "")) r = await operacionNubefact(nf.ruta, nf.token, jsonConsultaGuia(g));
+      if (!r.ok) return json({ ...r, error: `Nubefact: ${r.error ?? "error"}` }, 422);
+      return json({ ...r, numero });
+    }
+
     const doc = armarDocumento(comprobante, emisor(), referencia);
     // { consultar: true }: solo consulta el estado en Nubefact (trae el XML / CDR cuando SUNAT ya respondió), no emite
     if (body.consultar === true) {

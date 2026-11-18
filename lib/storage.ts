@@ -92,6 +92,7 @@ export const KEYS = {
   COND_PAGO: "ventas_condiciones_pago",
   NOTAS_PEDIDO: "ventas_notas_pedido",
   COMPROBANTES: "ventas_comprobantes",
+  GUIAS_REMISION: "ventas_guias_remision",
   COBROS: "ventas_cobros",
   ASIENTOS: "ventas_asientos",
   DESPACHOS: "almacen_despachos",
@@ -295,6 +296,7 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.COND_PAGO]: { tabla: "condiciones_pago", forma: "condiciones" },
   [KEYS.NOTAS_PEDIDO]: { tabla: "ventas", tipo: "nota_pedido", forma: "lista" },
   [KEYS.COMPROBANTES]: { tabla: "ventas", tipo: "comprobante", forma: "lista" },
+  [KEYS.GUIAS_REMISION]: { tabla: "ventas", tipo: "guia_remision", forma: "lista" },
   [KEYS.COBROS]: { tabla: "ventas", tipo: "cobro", forma: "lista" },
   [KEYS.ASIENTOS]: { tabla: "ventas", tipo: "asiento", forma: "lista" },
   [KEYS.DESPACHOS]: { tabla: "almacen", tipo: "despacho", forma: "lista" },
@@ -910,7 +912,7 @@ function evento(usuario: Rol, accion: string, detalle?: string): EventoHistorial
 export const nuevoEvento = evento;
 
 /** Series con correlativo atómico en Supabase (siguiente_numero). */
-export type Serie = "REQ" | "OC" | "DJ" | "NP" | "F001" | "B001" | "F005" | "B005" | "OD" | "BOL" | "GST" | "RCT" | "EQ" | "OP" | `BOL_${number}`;
+export type Serie = "REQ" | "OC" | "DJ" | "NP" | "F001" | "B001" | "F005" | "B005" | "T005" | "OD" | "BOL" | "GST" | "RCT" | "EQ" | "OP" | `BOL_${number}`;
 
 /** Actualiza la caché de contadores sin enviarla: el servidor ya tiene el valor. */
 function fijarContador(serie: Serie, n: number): void {

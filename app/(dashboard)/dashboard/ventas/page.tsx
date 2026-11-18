@@ -1,22 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, ClipboardList, Inbox, Contact, FilePlus2, History, Package, Receipt, Search, Settings2, Truck, Wallet } from "lucide-react";
+import { AlertTriangle, ClipboardList, Inbox, Contact, FilePlus2, History, Package, Receipt, ScrollText, Search, Settings2, Truck, Wallet } from "lucide-react";
 import { abrirBuscadorDePagina } from "@/components/layout/IslandMenu";
 import { CatalogoProductos } from "@/components/productos/CatalogoProductos";
 import { Button, Tabs } from "@/components/ui";
 import { KEYS, useStore } from "@/lib/storage";
 import { estadoOD, filasCxC, npsSinDespacho } from "@/lib/ventas";
-import type { ComprobanteVenta, NotaPedido, OrdenDespacho } from "@/lib/types";
+import type { ComprobanteVenta, GuiaRemision, NotaPedido, OrdenDespacho } from "@/lib/types";
 import { OrdenesDespacho } from "../almacen/despacho";
 import { CuentasPorCobrar } from "./cobrar";
 import { useCargaCondiciones } from "./comun";
 import { Comprobantes } from "./comprobantes";
+import { GuiasRemision } from "./guias";
 import { Clientes, CondicionesPago } from "./maestros";
 import { NotasPedido } from "./notas";
 import { RequerimientosSecocha, useSecocha } from "./secocha";
 
-type Tab = "secocha" | "notas" | "comprobantes" | "despachos" | "productos" | "condiciones" | "clientes" | "cobrar";
+type Tab = "secocha" | "notas" | "comprobantes" | "guias" | "despachos" | "productos" | "condiciones" | "clientes" | "cobrar";
 
 /**
  * VENTAS — Nota de Pedido -> Aprobada (cuenta por cobrar) -> Factura/Boleta -> Orden de Despacho (Almacén) -> Cobro.
@@ -33,6 +34,7 @@ export default function VentasPage() {
   const notas = useStore<NotaPedido[]>(KEYS.NOTAS_PEDIDO, []);
   const comprobantes = useStore<ComprobanteVenta[]>(KEYS.COMPROBANTES, []);
   const despachos = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, []);
+  const guias = useStore<GuiaRemision[]>(KEYS.GUIAS_REMISION, []);
   const sinOD = npsSinDespacho(notas, despachos);
   const vencidos = filasCxC(notas, comprobantes).filter((f) => f.estado === "VENCIDO").length;
   const secocha = useSecocha();
@@ -90,6 +92,7 @@ export default function VentasPage() {
           { id: "secocha", label: "Requerimientos de Secocha", icon: <Inbox size={16} />, count: secocha.pendientes },
           { id: "notas", label: "Notas de pedido", icon: <ClipboardList size={16} />, count: notas.filter((n) => n.estado === "APROBADA").length },
           { id: "comprobantes", label: "Comprobantes", icon: <Receipt size={16} />, count: comprobantes.filter((c) => c.estado === "BORRADOR").length },
+          { id: "guias", label: "Guías de Remisión", icon: <ScrollText size={16} />, count: guias.filter((g) => g.estado === "EMITIDA" && g.estadoSunat === "NO_ENVIADO").length },
           {
             id: "despachos",
             label: "Despachos (seguimiento)",
@@ -112,6 +115,7 @@ export default function VentasPage() {
         />
       )}
       {tab === "comprobantes" && <Comprobantes preNp={facturarNp} onListo={() => setFacturarNp(undefined)} nuevoPedido={nuevoPedido} />}
+      {tab === "guias" && <GuiasRemision />}
       {tab === "despachos" && (
         <>
           {sinOD.length > 0 && (

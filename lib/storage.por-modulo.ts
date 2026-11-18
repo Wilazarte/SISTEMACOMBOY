@@ -67,6 +67,7 @@ export const CLAVES_POR_MODULO: Record<string, StoreKey[]> = {
     "ventas_notas_pedido",
     "ventas_comprobantes",
     "ventas_cobros",
+    "ventas_guias_remision",
     "ventas_asientos",
     "almacen_despachos",
     "almacen_stock",
