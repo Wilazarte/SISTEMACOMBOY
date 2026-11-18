@@ -94,7 +94,12 @@ export function GuiasRemision() {
   const [rol] = useRol();
   const guias = useStore<GuiaRemision[]>(KEYS.GUIAS_REMISION, []);
   const comprobantes = useStore<ComprobanteVenta[]>(KEYS.COMPROBANTES, []);
-  const { clientes } = useVentas();
+  const { clientes, stock } = useVentas();
+  /** SKU del producto por su nombre (las líneas de venta no guardan el código). */
+  const skuDe = (nombre: string) => {
+    const n = nombre.trim().toLowerCase();
+    return n ? stock.find((s) => s.nombre.trim().toLowerCase() === n)?.sku ?? "" : "";
+  };
   const [form, setForm] = useState<DatosGuia | null>(null);
   const [guardando, setGuardando] = useState(false);
   const habilitado = puede(rol, "venta.gestionar");
@@ -128,6 +133,7 @@ export function GuiasRemision() {
       llegadaDireccion: form.llegadaDireccion || c.lugarEntrega || "",
       items: c.items.map((l) => ({
         ...lineaGuiaVacia(),
+        codigo: skuDe(l.productoNombre),
         descripcion: [l.productoNombre, l.descripcion].filter((x) => x && x.trim()).join(" - "),
         unidad: l.unidad || "UND",
         cantidad: l.cantidad,

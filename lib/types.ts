@@ -813,6 +813,8 @@ export interface DatosSunatPse {
 /** Línea de la guía: qué se traslada (sin precios). */
 export interface ItemGuia {
   id: string;
+  /** Código del producto (SKU del catálogo). Si va vacío, el envío usa 001, 002… (SUNAT no lo acepta en blanco). */
+  codigo?: string;
   descripcion: string;
   unidad: string;
   cantidad: number;

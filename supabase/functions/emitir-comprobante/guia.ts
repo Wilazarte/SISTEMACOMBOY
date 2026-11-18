@@ -27,7 +27,7 @@ export interface GuiaErp {
   llegadaDireccion: string;
   pesoKg: number;
   bultos: number;
-  items: { descripcion: string; unidad: string; cantidad: number }[];
+  items: { codigo?: string; descripcion: string; unidad: string; cantidad: number }[];
   observaciones?: string;
   estado: string;
 }
@@ -99,9 +99,10 @@ export function jsonGuia(g: GuiaErp): Record<string, unknown> {
     punto_de_llegada_direccion: limpiar(g.llegadaDireccion, 150),
     enviar_automaticamente_al_cliente: false,
     formato_de_pdf: "",
-    items: g.items.map((l) => ({
+    items: g.items.map((l, i) => ({
       unidad_de_medida: UNIDAD_SUNAT[(l.unidad || "").toUpperCase()] ?? "NIU",
-      codigo: "",
+      // SUNAT exige el código en cada línea de la GRE: el del producto (SKU) o, si no tiene, 001, 002…
+      codigo: limpiar(l.codigo ?? "", 30) || String(i + 1).padStart(3, "0"),
       descripcion: limpiar(l.descripcion, 250),
       cantidad: Number(l.cantidad),
     })),
