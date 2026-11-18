@@ -80,7 +80,7 @@ const TONO: Record<string, string> = {
   ENVIADO: "bg-sky-50 text-sky-800 ring-sky-600/30",
 };
 const ETIQUETA: Record<string, string> = {
-  ACEPTADO: "SUNAT ✓",
+  ACEPTADO: "SUNAT ACEPTADO",
   OBSERVADO: "SUNAT ✓ obs.",
   RECHAZADO: "SUNAT rechazado",
   EXCEPCION: "SUNAT no recibido",

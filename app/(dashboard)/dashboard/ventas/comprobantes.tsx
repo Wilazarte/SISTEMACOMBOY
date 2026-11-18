@@ -25,7 +25,7 @@ import {
 import type { ComprobanteVenta, FormaPagoVenta, NotaPedido, OrdenDespacho, TipoComprobanteVenta } from "@/lib/types";
 import { CUENTAS_COBRO, DatosDespachoForm, medioCobro, LineasEditor, SelectorCliente, TotalesVenta, useVentas } from "./comun";
 import { enviarSunat, sunatValido, useSunat } from "@/lib/sunat";
-import { AccionesSunat, BarraSunat, EstadoSunatChip, ModalBaja, ModalNota } from "./sunat";
+import { AccionesSunat, EstadoSunatChip, ModalBaja, ModalNota } from "./sunat";
 
 type Filtro = "TODOS" | TipoComprobanteVenta;
 
@@ -257,7 +257,6 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
           )
         }
       />
-      <BarraSunat error={sunat.error} />
       <div className="flex flex-wrap gap-1 border-b border-plomo-100 px-5 py-2">
         {(["TODOS", "FACTURA", "BOLETA", "NOTA_CREDITO", "NOTA_DEBITO"] as Filtro[]).map((f) => (
           <button
@@ -312,7 +311,7 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
           acciones: (
             <>
               <div className="flex flex-wrap gap-1">
-                <Button size="sm" variant="secondary" onClick={() => pdfComprobanteVenta(c)} title="PDF A4">
+                <Button size="sm" variant="secondary" onClick={() => (c.sunat?.enlacePdf ? window.open(c.sunat.enlacePdf, "_blank", "noopener") : pdfComprobanteVenta(c))} title={c.sunat?.enlacePdf ? "PDF A4 de Nubefact" : "PDF A4"}>
                   <FileText size={14} /> A4
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => pdfTicketVenta(c)} title="Ticket 80 mm">

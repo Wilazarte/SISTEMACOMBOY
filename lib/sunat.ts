@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "./supabase/client";
-import { ErpError, KEYS, escribir, esperarGuardado, hoy, nuevoEvento, puede, r2, serieSede, uid } from "./storage";
+import { ErpError, KEYS, escribir, hoy, nuevoEvento, puede, r2, serieSede, uid } from "./storage";
 import { anularComprobante, getComprobantes, totalesVenta } from "./ventas";
 import type { ComprobanteVenta, EstadoSunat, LineaVenta, Rol } from "./types";
 import { guardarArchivo } from "./guardarArchivo";
@@ -157,21 +157,71 @@ function reflejar(id: string, f: Pick<FilaSunat, "estado" | "hash" | "codigo" | 
   return actualizado;
 }
 
-/** Envía (o reenvía si fue rechazado / no recibido) el comprobante a SUNAT y guarda el CDR. */
-export async function enviarSunat(c: ComprobanteVenta, rol: Rol): Promise<FilaSunat> {
+/** Respuesta del Edge Function emitir-comprobante (Nubefact). */
+interface RespuestaEmision {
+  ok: boolean;
+  aceptada: boolean;
+  codigo: string;
+  descripcion: string;
+  observaciones: string[];
+  hash: string;
+  enlacePdf: string;
+  enlaceXml: string;
+  enlaceCdr: string;
+  numero: string;
+  error?: string;
+}
+
+/** Resultado de enviarSunat: lo que leen las pantallas (estado, código y descripción) + el PDF de Nubefact. */
+export type ResultadoEnvio = Pick<FilaSunat, "estado" | "codigo" | "descripcion"> & { numero: string; enlacePdf: string };
+
+/**
+ * Envía el comprobante a SUNAT vía Nubefact (Edge Function emitir-comprobante) con los datos de la fila.
+ * OK: queda ACEPTADO y se guardan el número y el PDF de Nubefact en el comprobante.
+ * Error: se lanza el mensaje real del Edge Function y el comprobante sigue "SUNAT pendiente".
+ */
+export async function enviarSunat(c: ComprobanteVenta, rol: Rol): Promise<ResultadoEnvio> {
   if (!puede(rol, "venta.gestionar")) throw new ErpError("Su usuario no puede enviar comprobantes a SUNAT.");
   if (c.estado !== "EMITIDO") throw new ErpError("Solo se envían comprobantes EMITIDOS.");
-  // El Edge Function lee el comprobante de Supabase: primero se confirma que terminó de guardarse
-  const pendiente = await esperarGuardado();
-  if (pendiente) throw new ErpError(`El comprobante aún no se guardó en Supabase: ${pendiente}`);
-  const f = await invocar<FilaSunat>("enviar", { id: c.id });
-  reflejar(c.id, f);
-  trasAceptar(c, f, rol);
-  return f;
+  const referencia = c.ref ? getComprobantes().find((x) => x.id === c.ref!.id) : undefined;
+  if ((c.tipo === "NOTA_CREDITO" || c.tipo === "NOTA_DEBITO") && !referencia) throw new ErpError(`No se encontró ${c.ref?.numero ?? "el comprobante"} que modifica la nota.`);
+  const { data, error } = await createClient().functions.invoke("emitir-comprobante", { body: { comprobante: c, ...(referencia ? { referencia } : {}) } });
+  if (error) {
+    const ctx = (error as { context?: Response }).context;
+    const cuerpo = ctx && typeof ctx.json === "function" ? ((await ctx.json().catch(() => null)) as { error?: string } | null) : null;
+    console.error("emitir-comprobante", c.numero, cuerpo ?? error);
+    throw new ErpError(cuerpo?.error ?? (cuerpo ? JSON.stringify(cuerpo) : error.message));
+  }
+  const r = data as RespuestaEmision;
+  if (!r?.ok) throw new ErpError(r?.error ?? "Nubefact no devolvió una respuesta válida.");
+  let actualizado: ComprobanteVenta | undefined;
+  const lista = getComprobantes().map((x) => {
+    if (x.id !== c.id) return x;
+    actualizado = {
+      ...x,
+      estadoSunat: "ACEPTADO",
+      sunat: {
+        hash: r.hash ?? "",
+        codigo: r.codigo ?? "",
+        descripcion: r.descripcion ?? "",
+        entorno: "beta",
+        fecha: new Date().toISOString(),
+        numero: r.numero ?? "",
+        enlacePdf: r.enlacePdf ?? "",
+        enlaceXml: r.enlaceXml ?? "",
+        enlaceCdr: r.enlaceCdr ?? "",
+      },
+    };
+    return actualizado;
+  });
+  if (actualizado) escribir(KEYS.COMPROBANTES, lista);
+  trasAceptar(c, "ACEPTADO", rol);
+  return { estado: "ACEPTADO", codigo: r.codigo ?? "", descripcion: r.descripcion ?? "", numero: r.numero ?? "", enlacePdf: r.enlacePdf ?? "" };
 }
 
 /** Nota de crédito que anula la operación: al ser aceptada, el comprobante original se anula en el ERP. */
-function trasAceptar(c: ComprobanteVenta, f: FilaSunat, rol: Rol): void {
+function trasAceptar(c: ComprobanteVenta, estado: EstadoCpe, rol: Rol): void {
+  const f = { estado };
   // Nota de crédito que anula la operación: al ser aceptada, el comprobante original se anula en el ERP
   if (sunatValido(f.estado) && c.tipo === "NOTA_CREDITO" && c.ref && ["01", "02", "06"].includes(c.motivoCodigo ?? "")) {
     const orig = getComprobantes().find((x) => x.id === c.ref!.id);
@@ -189,7 +239,7 @@ function trasAceptar(c: ComprobanteVenta, f: FilaSunat, rol: Rol): void {
 export async function consultarSunat(c: ComprobanteVenta, rol: Rol): Promise<FilaSunat> {
   const f = await invocar<FilaSunat>("consultar", { id: c.id });
   reflejar(c.id, f);
-  trasAceptar(c, f, rol);
+  trasAceptar(c, f.estado, rol);
   return f;
 }
 

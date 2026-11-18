@@ -837,7 +837,18 @@ export interface ComprobanteVenta {
   /** Estado en SUNAT (la fuente de verdad es la tabla sunat_cpe; aquí queda una copia para PDF y filtros). */
   estadoSunat: EstadoSunat;
   /** Datos de la respuesta de SUNAT: hash de la firma (representación impresa / QR) y CDR. */
-  sunat?: { hash: string; codigo: string; descripcion: string; entorno: "beta" | "produccion"; fecha: string };
+  sunat?: {
+    hash: string;
+    codigo: string;
+    descripcion: string;
+    entorno: "beta" | "produccion";
+    fecha: string;
+    /** Emitido vía Nubefact (emitir-comprobante): número con el que se registró y enlaces del PSE. */
+    numero?: string;
+    enlacePdf?: string;
+    enlaceXml?: string;
+    enlaceCdr?: string;
+  };
   /** Notas de crédito / débito: comprobante que modifican y motivo (catálogos SUNAT 09 / 10). */
   ref?: { id: string; tipo: "FACTURA" | "BOLETA"; numero: string; fecha: string };
   motivoCodigo?: string;
