@@ -910,7 +910,7 @@ function evento(usuario: Rol, accion: string, detalle?: string): EventoHistorial
 export const nuevoEvento = evento;
 
 /** Series con correlativo atómico en Supabase (siguiente_numero). */
-export type Serie = "REQ" | "OC" | "DJ" | "NP" | "F001" | "B001" | "OD" | "BOL" | "GST" | "RCT" | "EQ" | "OP" | `BOL_${number}`;
+export type Serie = "REQ" | "OC" | "DJ" | "NP" | "F001" | "B001" | "F005" | "B005" | "OD" | "BOL" | "GST" | "RCT" | "EQ" | "OP" | `BOL_${number}`;
 
 /** Actualiza la caché de contadores sin enviarla: el servidor ya tiene el valor. */
 function fijarContador(serie: Serie, n: number): void {

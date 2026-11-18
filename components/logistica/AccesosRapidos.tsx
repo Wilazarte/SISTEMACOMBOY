@@ -64,7 +64,7 @@ const ACCIONES: Record<ModuloPlanta, Accion[]> = {
     { label: "Mundo Ventas", href: RUTA_MUNDO_VENTAS, permiso: "/dashboard/ventas", requiere: "canAccessMundoVentas", destacado: true, icono: <Store size={30} /> },
     { label: "Cotizar Cliente", href: "/dashboard/ventas?tab=notas", requiere: "canEmitFactura", icono: <HandCoins size={26} /> },
     { label: "Generar Pedido Venta", href: "/dashboard/ventas?tab=notas", requiere: "canEmitFactura", icono: <ClipboardList size={26} /> },
-    { label: "Emitir Factura F001", href: "/dashboard/ventas?tab=comprobantes", requiere: "canEmitFactura", icono: <FileCheck2 size={26} /> },
+    { label: "Emitir Factura F005", href: "/dashboard/ventas?tab=comprobantes", requiere: "canEmitFactura", icono: <FileCheck2 size={26} /> },
     { label: "Cuentas por cobrar", href: "/dashboard/ventas?tab=cobrar", icono: <Banknote size={26} /> },
   ],
   almacen: [
@@ -104,7 +104,7 @@ const GLOBALES: Accion[] = [
   { label: "Mundo Ventas", href: RUTA_MUNDO_VENTAS, permiso: "/dashboard/ventas", destacado: true, icono: <Store size={30} /> },
   { label: "Crear OC", href: "/dashboard/compras?tab=ordenes", icono: <ShoppingCart size={26} /> },
   { label: "Pagar Proveedor", href: "/dashboard/compras?tab=facturas", icono: <Banknote size={26} /> },
-  { label: "Emitir Factura F001", href: "/dashboard/ventas?tab=comprobantes", icono: <FileCheck2 size={26} /> },
+  { label: "Emitir Factura F005", href: "/dashboard/ventas?tab=comprobantes", icono: <FileCheck2 size={26} /> },
   { label: "Emitir Guía Remisión", href: "/dashboard/almacen?tab=despacho", icono: <FileText size={26} /> },
   { label: "Recepción MP", href: "/dashboard/almacen?tab=ingresos", icono: <ArrowDownToLine size={26} /> },
   { label: "Iniciar OT", href: "/dashboard/produccion", icono: <Play size={26} /> },
