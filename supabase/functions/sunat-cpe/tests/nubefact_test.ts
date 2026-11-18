@@ -2,7 +2,7 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { armarDocumento, type ComprobanteErp } from "../documento.ts";
 import { EMISOR_DEFECTO } from "../config.ts";
-import { anularNubefact, generarNubefact, jsonNubefact } from "../nubefact.ts";
+import { anularNubefact, generarNubefact, jsonNubefact, mapaSeries } from "../nubefact.ts";
 
 const fac: ComprobanteErp = {
   id: "c1",
@@ -102,4 +102,10 @@ Deno.test("cliente Nubefact contra servidor simulado", async () => {
     ac.abort();
     await server.finished;
   }
+});
+
+Deno.test("NUBEFACT_SERIES: series de la cuenta demo", () => {
+  const m = mapaSeries("F001=FFF1, fc01=fff1,B001=BBB1,,malo");
+  assertEquals(m, { F001: "FFF1", FC01: "FFF1", B001: "BBB1" });
+  assertEquals(mapaSeries(""), {});
 });

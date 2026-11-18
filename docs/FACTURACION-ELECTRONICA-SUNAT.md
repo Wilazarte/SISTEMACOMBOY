@@ -27,9 +27,14 @@ Nada secreto (token, certificado, clave SOL) llega al navegador ni al repositori
 | `NUBEFACT_RUTA` | la RUTA del panel (https://api.nubefact.com/api/v1/…) |
 | `NUBEFACT_TOKEN` | el TOKEN del panel |
 | `SUNAT_ENTORNO` | `beta` con la cuenta demo · `produccion` con la cuenta real (solo cambia la etiqueta del ERP y del PDF) |
+| `NUBEFACT_SERIES` | **solo cuenta demo**: `F001=FFF1,FC01=FFF1,FD01=FFF1,B001=BBB1,BC01=BBB1,BD01=BBB1` (la demo solo acepta sus series FFF1 y BBB1). En producción se borra. |
+
+Probado contra la cuenta demo (2026-11-18): factura FFF1 y nota de crédito ACEPTADAS por SUNAT; boleta BBB1
+recibida (queda "en proceso" hasta el resumen diario). Con la demo, el correlativo no puede pasar en más de 200 al
+último registrado en Nubefact, y como facturas y notas comparten FFF1 un número puede chocar: es solo para probar.
 
 7. Emitir una factura de prueba: debe salir **SUNAT ✓** y se pueden bajar el XML, el CDR y el PDF del PSE.
-8. Para producción: cambiar RUTA y TOKEN por los de la cuenta real y `SUNAT_ENTORNO=produccion`.
+8. Para producción: cambiar RUTA y TOKEN por los de la cuenta real, `SUNAT_ENTORNO=produccion` y borrar `NUBEFACT_SERIES`.
 
 En modo PSE: si SUNAT tarda, el comprobante queda **SUNAT en proceso** y se actualiza con **Consultar**. La **Baja**
 (anulación ante SUNAT) sirve para facturas y boletas: Nubefact arma la comunicación de baja o el resumen diario.
