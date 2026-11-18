@@ -71,3 +71,38 @@ export async function mostrarPDFUrl(url: string, nombre: string): Promise<void> 
   }
   window.dispatchEvent(new CustomEvent<PdfVista>(EV_PDF, { detail: { nombre: limpiarNombre(nombre), bytes, zonas: [] } }));
 }
+
+/**
+ * Imprime directo un PDF ya generado, en su propio tamaño de hoja (A4, ticket 80 mm o 58 mm), sin abrir la vista previa.
+ * Celular y app de escritorio (Tauri / Electron) no imprimen PDF en un iframe: ahí se abre la vista previa, que sí
+ * imprime (como imágenes) con el botón Imprimir.
+ */
+export function imprimirPDF(doc: jsPDF, nombre: string): void {
+  const movil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const app = "__TAURI_INTERNALS__" in window || "__TAURI__" in window || "comboyEscritorio" in window;
+  if (movil || app || !hayVisor()) {
+    mostrarPDF(doc, nombre);
+    return;
+  }
+  const n = limpiarNombre(nombre);
+  doc.setProperties({ title: n });
+  const url = URL.createObjectURL(new Blob([doc.output("arraybuffer")], { type: "application/pdf" }));
+  const f = document.createElement("iframe");
+  f.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+  f.title = n;
+  f.src = url;
+  f.onload = () => {
+    try {
+      f.contentWindow?.focus();
+      f.contentWindow?.print();
+    } catch {
+      mostrarPDF(doc, nombre);
+    }
+    // se limpia después: el diálogo de impresión puede seguir abierto un rato
+    setTimeout(() => {
+      f.remove();
+      URL.revokeObjectURL(url);
+    }, 120_000);
+  };
+  document.body.appendChild(f);
+}

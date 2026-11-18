@@ -8,6 +8,7 @@ import { Button, Card, CardHeader, Field, Input, Modal, Select, Textarea, cn, to
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { getSesion } from "@/lib/auth";
 import { UNIDADES } from "@/lib/empresa";
+import { imprimirGuiaVenta, pdfGuiaVenta } from "@/lib/pdf";
 import {
   MOTIVOS_TRASLADO,
   SERIE_GUIA,
@@ -22,6 +23,7 @@ import {
 import { KEYS, previewNumero, puede, useRol, useStore } from "@/lib/storage";
 import type { ComprobanteVenta, GuiaRemision } from "@/lib/types";
 import { ArchivosSunat } from "./archivosSunat";
+import { BotonesPdf } from "./botonesPdf";
 import { SelectorCliente, useVentas } from "./comun";
 
 const mensaje = (e: unknown) => (e instanceof Error ? e.message : "Error inesperado");
@@ -216,6 +218,7 @@ export function GuiasRemision() {
             ),
             acciones: (
               <div className="flex flex-wrap gap-1">
+                <BotonesPdf numero={g.numero} ver={(t) => pdfGuiaVenta(g, t)} imprimir={(t) => imprimirGuiaVenta(g, t)} />
                 <ArchivosSunat c={g} />
                 <AccionesGuia g={g} habilitado={habilitado} />
               </div>

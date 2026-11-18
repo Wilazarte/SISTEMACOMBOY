@@ -2,11 +2,11 @@
 
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useEffect, useState } from "react";
-import { Ban, FilePlus2, FileText, Printer, Send, Trash2, Truck } from "lucide-react";
+import { Ban, FilePlus2, Send, Trash2, Truck } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Textarea, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/client";
-import { pdfComprobanteVenta, pdfTicketVenta } from "@/lib/pdf";
+import { imprimirComprobanteVenta, pdfComprobanteVenta } from "@/lib/pdf";
 import { KEYS, fechaPE, hoy, previewNumero, puede, r2, soles, useRol, useStore } from "@/lib/storage";
 import {
   SERIE,
@@ -27,6 +27,7 @@ import { CUENTAS_COBRO, DatosDespachoForm, medioCobro, LineasEditor, SelectorCli
 import { enviarSunat, sunatValido, useSunat } from "@/lib/sunat";
 import { AccionesSunat, EstadoSunatChip, ModalBaja, ModalNota } from "./sunat";
 import { ArchivosSunat } from "./archivosSunat";
+import { BotonesPdf } from "./botonesPdf";
 
 type Filtro = "TODOS" | TipoComprobanteVenta;
 
@@ -312,12 +313,7 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
           acciones: (
             <>
               <div className="flex flex-wrap gap-1">
-                <Button size="sm" variant="secondary" onClick={() => (c.sunat?.enlacePdf ? window.open(c.sunat.enlacePdf, "_blank", "noopener") : pdfComprobanteVenta(c))} title={c.sunat?.enlacePdf ? "PDF A4 de Nubefact" : "PDF A4"}>
-                  <FileText size={14} /> A4
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => pdfTicketVenta(c)} title="Ticket 80 mm">
-                  <Printer size={14} />
-                </Button>
+                <BotonesPdf numero={c.numero || "borrador"} ver={(t) => pdfComprobanteVenta(c, t)} imprimir={(t) => imprimirComprobanteVenta(c, t)} />
                 <ArchivosSunat c={c} />
                 {habilitado && c.estado === "BORRADOR" && (
                   <>

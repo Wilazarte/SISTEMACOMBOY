@@ -17,10 +17,11 @@ import { toast } from "@/components/ui";
 import type { Adelanto } from "./adelantos";
 import type { HistorialDetalle, HistorialPlanilla } from "./historial";
 import type { ConcesionContratista, LugarEntrega } from "./types";
-import type { ComprobanteVenta, Cotizacion, Factura, Guia, LineaVenta, NotaPedido, OrdenCompra, OrdenDespacho, OrdenServicio, Requerimiento } from "./types";
+import type { ComprobanteVenta, Cotizacion, Factura, Guia, GuiaRemision, LineaVenta, NotaPedido, OrdenCompra, OrdenDespacho, OrdenServicio, Requerimiento } from "./types";
 import type { Traslado, VentaSucursal } from "./sucursal-modelos";
 import { COMPROBANTES } from "./comprobantes";
-import { mostrarPDF, registrarZonaFirma } from "./visorPdf";
+import { imprimirPDF, mostrarPDF, registrarZonaFirma } from "./visorPdf";
+import { montoEnLetras } from "./letras";
 import { cuadroDepreciacion, depreciacion, nombreCategoria, type Activo, type Depreciacion, type EntregaActivo } from "./activos";
 
 type RGB = [number, number, number];
@@ -75,10 +76,13 @@ function dibujarLogo(doc: jsPDF, x: number, y: number, w: number, h: number): vo
   }
   doc.setFont("helvetica", "bold");
   doc.setFontSize(26);
+  const ancho = doc.getTextWidth("COMBOY VID");
+  if (ancho > w) doc.setFontSize((26 * w) / ancho); // que entre completo (ticket 58 mm)
   doc.setTextColor(...AZUL);
   doc.text("COMBOY", x, y + h / 2 + 3);
   doc.setTextColor(...ROJO);
   doc.text("VID", x + doc.getTextWidth("COMBOY "), y + h / 2 + 3);
+  doc.setTextColor(0, 0, 0);
 }
 
 export interface Bloque {
@@ -1292,126 +1296,338 @@ function leyendaSunat(c: ComprobanteVenta): string[] {
   ];
 }
 
-export function pdfComprobanteVenta(c: ComprobanteVenta): void {
-  const titulo = TITULO_CPE[c.tipo];
-  abrir(
-    construir({
-      titulo,
-      numero: c.numero || "BORRADOR",
-      estado: c.estado === "EMITIDO" ? (c.saldo > 0 ? "EMITIDO · POR COBRAR" : "EMITIDO · COBRADO") : c.estado,
-      datos: [
-        ["Cliente", c.cliente],
-        ["Documento", c.clienteDoc],
-        ["Dirección", c.clienteDireccion || "-"],
-        ["Fecha emisión", fechaPE(c.fecha)],
-        ["Forma de pago", c.formaPago === "CONTADO" ? "Contado" : `${c.condPagoNombre} · vence ${fechaPE(c.fechaVenc)}`],
-        ...(c.ref
-          ? ([
-              ["Documento que modifica", `${c.ref.numero} (${fechaPE(c.ref.fecha)})`],
-              ["Motivo", `${c.motivoCodigo ?? ""} · ${c.motivoDescripcion ?? ""}`],
-            ] as [string, string][])
-          : ([
-              ["Nota de pedido", c.npNumero ?? "-"],
-              ["Orden despacho", c.odNumero ?? "-"],
-            ] as [string, string][])),
-        ["Moneda", "Soles (PEN)"],
-      ],
-      head: ["#", "Descripción", "Medidas", "Cant.", "m²", c.preciosConIgv ? (c.conIgv ? "P. unit. inc. IGV" : "P. unit.") : "V. unit.", c.preciosConIgv ? "Importe" : "Valor venta"],
-      body: cuerpoVenta(c.items),
-      alinearDerecha: [3, 4, 5, 6],
-      totales: [
-        ...(c.descuento > 0 ? ([["Descuento", `- ${soles(c.descuento)}`]] as [string, string][]) : []),
-        [c.conIgv ? "Op. gravada" : "Op. inafecta", soles(c.base)],
-        ["IGV 18%", soles(c.igv)],
-        ["IMPORTE TOTAL", soles(c.total)],
-      ],
-      notas: [
-        ...(c.cuotas.length
-          ? [`Cuotas: ${c.cuotas.map((q) => `N°${q.n} ${fechaPE(q.fecha)} ${soles(q.monto)}`).join(" · ")}${c.inicial > 0 ? ` · Inicial ${soles(c.inicial)}` : ""}`]
-          : []),
-        ...leyendaSunat(c),
-      ],
-      qr: qrSunat(c),
-      qrTexto: [`${titulo} ${c.numero}`, `Total ${soles(c.total)} · IGV ${soles(c.igv)}`, ...lineasCuentas()],
-      firmas: ["Emisor", "Recibí conforme: Cliente"],
-    }),
-    c.numero || "borrador"
-  );
+// ---------------------------------------------------------------------
+// Representación impresa propia (COMBOY VID): Factura, Boleta, NC, ND y Guía de Remisión T005,
+// en A4, ticket 80 mm y ticket 58 mm. Todo sale de los datos guardados en Supabase (no del PDF del PSE).
+// ---------------------------------------------------------------------
+
+export type TamanoPdf = "A4" | "80" | "58";
+export const TAMANOS_PDF: { id: TamanoPdf; label: string; detalle: string }[] = [
+  { id: "A4", label: "A4", detalle: "Hoja completa" },
+  { id: "80", label: "Ticket 80 mm", detalle: "Ticketera estándar" },
+  { id: "58", label: "Ticket 58 mm", detalle: "Ticketera pequeña / portátil" },
+];
+
+/** Respuesta del CDR guardada con el documento (código y descripción de SUNAT). */
+function lineaCdr(s?: { codigo?: string; descripcion?: string }): string[] {
+  if (!s?.codigo && !s?.descripcion) return [];
+  return [`CDR SUNAT: ${[s.codigo ? `código ${s.codigo}` : "", s.descripcion ?? ""].filter(Boolean).join(" · ")}`];
 }
 
-/** Ticket 80 mm con IGV discriminado. */
-export function pdfTicketVenta(c: ComprobanteVenta): void {
-  const alto = 190 + c.items.length * 10;
-  const doc = new jsPDF({ unit: "mm", format: [80, alto] });
-  const cx = 40;
-  let y = 8;
-  const linea = (t: string, size = 7.5, bold = false, align: "center" | "left" = "center") => {
-    doc.setFont("helvetica", bold ? "bold" : "normal");
-    doc.setFontSize(size);
-    const l = doc.splitTextToSize(t, 72) as string[];
-    doc.text(l, align === "center" ? cx : 4, y, { align });
-    y += l.length * (size * 0.45);
-  };
-  const sep = () => {
-    doc.setDrawColor(150);
-    doc.setLineDashPattern([1, 1], 0);
-    doc.line(4, y, 76, y);
-    doc.setLineDashPattern([], 0);
-    y += 3.5;
-  };
-  const fila = (k: string, v: string, bold = false) => {
-    doc.setFont("helvetica", bold ? "bold" : "normal");
-    doc.setFontSize(bold ? 9 : 7.5);
-    doc.text(k, 4, y);
-    doc.text(v, 76, y, { align: "right" });
-    y += bold ? 5 : 4;
-  };
-  dibujarLogo(doc, 8, 4, 64, 16);
-  y = 24;
-  linea(EMPRESA.nombreComercial, 8, true);
-  linea(`RUC ${EMPRESA.ruc}`, 7.5, true);
-  linea(EMPRESA.direccion);
-  linea(EMPRESA.telefono);
-  y += 1;
-  sep();
-  linea(TITULO_CPE[c.tipo], 8.5, true);
-  linea(c.numero || "BORRADOR", 10, true);
-  sep();
-  linea(`Fecha: ${fechaPE(c.fecha)}`, 7.5, false, "left");
-  linea(`Cliente: ${c.cliente}`, 7.5, false, "left");
-  linea(c.clienteDoc, 7.5, false, "left");
-  linea(`Pago: ${c.formaPago === "CONTADO" ? "Contado" : `${c.condPagoNombre} (vence ${fechaPE(c.fechaVenc)})`}`, 7.5, false, "left");
-  sep();
-  c.items.forEach((l) => {
-    linea(`${l.cantidad} x ${l.descripcion}${l.m2 > 0 ? ` (${l.ancho}x${l.alto} m = ${l.m2.toFixed(2)} m²)` : ""}`, 7.5, false, "left");
-    fila(`   ${soles(l.precio)}${l.m2 > 0 ? "/m²" : ""}`, soles(l.total));
+const letrasTotal = (total: number) => montoEnLetras(total);
+
+function docA4Comprobante(c: ComprobanteVenta): jsPDF {
+  const titulo = TITULO_CPE[c.tipo];
+  return construir({
+    titulo,
+    numero: c.numero || "BORRADOR",
+    estado: c.estado === "EMITIDO" ? (c.ref ? "EMITIDO" : c.saldo > 0 ? "EMITIDO · POR COBRAR" : "EMITIDO · COBRADO") : c.estado,
+    datos: [
+      ["Cliente", c.cliente],
+      ["Documento", c.clienteDoc],
+      ["Dirección", c.clienteDireccion || "-"],
+      ["Fecha emisión", fechaPE(c.fecha)],
+      ["Forma de pago", c.formaPago === "CONTADO" ? "Contado" : `${c.condPagoNombre} · vence ${fechaPE(c.fechaVenc)}`],
+      ...(c.ref
+        ? ([
+            ["Documento que modifica", `${c.ref.numero} (${fechaPE(c.ref.fecha)})`],
+            ["Motivo", `${c.motivoCodigo ?? ""} · ${c.motivoDescripcion ?? ""}`],
+          ] as [string, string][])
+        : ([
+            ["Nota de pedido", c.npNumero ?? "-"],
+            ["Orden despacho", c.odNumero ?? "-"],
+          ] as [string, string][])),
+      ["Moneda", "Soles (PEN)"],
+    ],
+    head: ["#", "Descripción", "Medidas", "Cant.", "m²", c.preciosConIgv ? (c.conIgv ? "P. unit. inc. IGV" : "P. unit.") : "V. unit.", c.preciosConIgv ? "Importe" : "Valor venta"],
+    body: cuerpoVenta(c.items.map((l) => ({ ...l, descripcion: [l.productoNombre, l.descripcion].filter((x) => x && x.trim()).join(" - ") }))),
+    alinearDerecha: [3, 4, 5, 6],
+    totales: [
+      ...(c.descuento > 0 ? ([["Descuento", `- ${soles(c.descuento)}`]] as [string, string][]) : []),
+      [c.conIgv ? "Op. gravada" : "Op. inafecta", soles(c.base)],
+      ["IGV 18%", soles(c.igv)],
+      ["IMPORTE TOTAL", soles(c.total)],
+    ],
+    notas: [
+      letrasTotal(c.total),
+      ...(c.cuotas.length
+        ? [`Cuotas: ${c.cuotas.map((q) => `N°${q.n} ${fechaPE(q.fecha)} ${soles(q.monto)}`).join(" · ")}${c.inicial > 0 ? ` · Inicial ${soles(c.inicial)}` : ""}`]
+        : []),
+      ...leyendaSunat(c),
+      ...lineaCdr(c.sunat),
+    ],
+    qr: qrSunat(c),
+    qrTexto: [`${titulo} ${c.numero}`, `Total ${soles(c.total)} · IGV ${soles(c.igv)}`, ...lineasCuentas()],
+    firmas: ["Emisor", "Recibí conforme: Cliente"],
   });
-  sep();
-  if (c.descuento > 0) fila("Descuento", `- ${soles(c.descuento)}`);
-  fila(c.conIgv ? "Op. gravada" : "Op. inafecta", soles(c.base));
-  fila("IGV 18%", soles(c.igv));
-  fila("TOTAL", soles(c.total), true);
-  sep();
-  dibujarQR(doc, qrSunat(c), cx - 14, y, 28);
-  y += 31;
-  leyendaSunat(c).forEach((t) => linea(t, 6.5));
-  linea("¡Gracias por su compra!", 8, true);
-  // Footer negro ÁREA INFORMÁTICA (al pie del ticket)
-  y = Math.max(y + 2, alto - 22);
-  doc.setFillColor(...ROJO);
-  doc.rect(0, y, 80, 3 * PT, "F");
-  doc.setFillColor(...NEGRO);
-  doc.rect(0, y + 3 * PT, 80, alto - y, "F");
-  doc.setTextColor(255, 255, 255);
-  y += 5;
-  linea("ÁREA INFORMÁTICA - COMBOY VID", 8, true);
-  linea(`${EMPRESA.nombreComercial} • RUC ${EMPRESA.ruc}`, 5.5);
-  linea(`${EMPRESA.email} • Tel: ${EMPRESA.telefono}`, 5.5);
-  doc.setTextColor(226, 232, 240);
-  linea(`Documento generado: ${new Date().toLocaleString("es-PE")}`, 5);
-  doc.setTextColor(160, 160, 160);
-  linea("DOCUMENTO OFICIAL • NO MODIFICABLE • REGISTRO HISTORIAL", 5);
-  abrir(doc, `${c.numero || "borrador"}-ticket`);
+}
+
+/** Contenido de un ticket (80 / 58 mm): se mide primero y la hoja sale del largo justo. */
+interface Ticket {
+  titulo: string;
+  numero: string;
+  cabecera: string[];
+  /** Líneas de detalle: texto y, opcional, importe a la derecha en la línea siguiente. */
+  lineas: { texto: string; derecha?: string; izquierda?: string }[];
+  totales: { k: string; v: string; fuerte?: boolean }[];
+  pie: string[];
+  qr: string;
+  leyenda: string[];
+  despedida?: string;
+}
+
+function docTicket(t: Ticket, ancho: 80 | 58): jsPDF {
+  const chico = ancho === 58;
+  const m = chico ? 3 : 4;
+  const util = ancho - 2 * m;
+  const cx = ancho / 2;
+  const f = (n: number) => (chico ? n - 0.8 : n); // tipografía un poco menor en 58 mm
+  const qrLado = chico ? 24 : 28;
+  const pieAlto = 22;
+
+  const pintar = (doc: jsPDF, alto: number): number => {
+    let y = 8;
+    const linea = (txt: string, size = 7.5, bold = false, align: "center" | "left" = "center") => {
+      doc.setFont("helvetica", bold ? "bold" : "normal");
+      doc.setFontSize(f(size));
+      const l = doc.splitTextToSize(txt, util) as string[];
+      doc.text(l, align === "center" ? cx : m, y, { align });
+      y += l.length * (f(size) * 0.45);
+    };
+    const sep = () => {
+      doc.setDrawColor(150);
+      doc.setLineDashPattern([1, 1], 0);
+      doc.line(m, y, ancho - m, y);
+      doc.setLineDashPattern([], 0);
+      y += 3.5;
+    };
+    const fila = (k: string, v: string, fuerte = false) => {
+      doc.setFont("helvetica", fuerte ? "bold" : "normal");
+      doc.setFontSize(f(fuerte ? 9 : 7.5));
+      doc.text(k, m, y);
+      doc.text(v, ancho - m, y, { align: "right" });
+      y += fuerte ? 5 : 4;
+    };
+    dibujarLogo(doc, chico ? 6 : 8, 4, ancho - (chico ? 12 : 16), chico ? 13 : 16);
+    doc.setTextColor(0, 0, 0);
+    y = chico ? 21 : 24;
+    linea(EMPRESA.razonSocial, 8, true);
+    linea(`RUC ${EMPRESA.ruc}`, 7.5, true);
+    linea(EMPRESA.direccion);
+    linea(EMPRESA.telefono);
+    y += 1;
+    sep();
+    linea(t.titulo, 8.5, true);
+    linea(t.numero, 10, true);
+    sep();
+    t.cabecera.forEach((x) => linea(x, 7.5, false, "left"));
+    sep();
+    t.lineas.forEach((l) => {
+      linea(l.texto, 7.5, false, "left");
+      if (l.derecha) fila(`   ${l.izquierda ?? ""}`, l.derecha);
+    });
+    if (t.totales.length) {
+      sep();
+      t.totales.forEach((x) => fila(x.k, x.v, x.fuerte));
+    }
+    if (t.pie.length) {
+      sep();
+      t.pie.forEach((x) => linea(x, 7, false, "left"));
+    }
+    sep();
+    dibujarQR(doc, t.qr, cx - qrLado / 2, y, qrLado);
+    y += qrLado + 3;
+    t.leyenda.forEach((x) => linea(x, 6.5));
+    if (t.despedida) linea(t.despedida, 8, true);
+    // Pie negro ÁREA INFORMÁTICA (al final del ticket)
+    y = Math.max(y + 2, alto - pieAlto);
+    doc.setFillColor(...ROJO);
+    doc.rect(0, y, ancho, 3 * PT, "F");
+    doc.setFillColor(...NEGRO);
+    doc.rect(0, y + 3 * PT, ancho, Math.max(pieAlto, alto - y), "F");
+    doc.setTextColor(255, 255, 255);
+    y += 5;
+    linea("ÁREA INFORMÁTICA - COMBOY VID", 8, true);
+    linea(`${EMPRESA.nombreComercial} • RUC ${EMPRESA.ruc}`, 5.5);
+    linea(`${EMPRESA.email} • Tel: ${EMPRESA.telefono}`, 5.5);
+    doc.setTextColor(226, 232, 240);
+    linea(`Documento generado: ${new Date().toLocaleString("es-PE")}`, 5);
+    doc.setTextColor(160, 160, 160);
+    linea("DOCUMENTO OFICIAL • NO MODIFICABLE • REGISTRO HISTORIAL", 5);
+    doc.setTextColor(0, 0, 0);
+    return y;
+  };
+
+  // 1) se mide en una hoja larga; 2) se dibuja en una del largo exacto (rollo de ticketera)
+  const medida = new jsPDF({ unit: "mm", format: [ancho, 3000] });
+  const fin = pintar(medida, 0);
+  const alto = Math.ceil(fin + 4);
+  const doc = new jsPDF({ unit: "mm", format: [ancho, alto] });
+  pintar(doc, alto);
+  return doc;
+}
+
+function ticketComprobante(c: ComprobanteVenta): Ticket {
+  return {
+    titulo: TITULO_CPE[c.tipo],
+    numero: c.numero || "BORRADOR",
+    cabecera: [
+      `Fecha: ${fechaPE(c.fecha)}`,
+      `Cliente: ${c.cliente}`,
+      c.clienteDoc,
+      ...(c.clienteDireccion ? [`Dirección: ${c.clienteDireccion}`] : []),
+      ...(c.ref ? [`Modifica: ${c.ref.numero}`, `Motivo: ${c.motivoCodigo ?? ""} ${c.motivoDescripcion ?? ""}`] : []),
+      `Pago: ${c.formaPago === "CONTADO" ? "Contado" : `${c.condPagoNombre} (vence ${fechaPE(c.fechaVenc)})`}`,
+    ],
+    lineas: c.items.map((l) => ({
+      texto: `${l.cantidad} x ${[l.productoNombre, l.descripcion].filter((x) => x && x.trim()).join(" - ")}${l.m2 > 0 ? ` (${l.ancho}x${l.alto} m = ${l.m2.toFixed(2)} m²)` : ""}`,
+      izquierda: `${soles(l.precio)}${l.m2 > 0 ? "/m²" : ""}`,
+      derecha: soles(l.total),
+    })),
+    totales: [
+      ...(c.descuento > 0 ? [{ k: "Descuento", v: `- ${soles(c.descuento)}` }] : []),
+      { k: c.conIgv ? "Op. gravada" : "Op. inafecta", v: soles(c.base) },
+      { k: "IGV 18%", v: soles(c.igv) },
+      { k: "TOTAL", v: soles(c.total), fuerte: true },
+    ],
+    pie: [letrasTotal(c.total)],
+    qr: qrSunat(c),
+    leyenda: [...leyendaSunat(c), ...lineaCdr(c.sunat)],
+    despedida: "¡Gracias por su compra!",
+  };
+}
+
+/** PDF del comprobante en el tamaño pedido (sin mostrarlo). */
+export function docComprobanteVenta(c: ComprobanteVenta, tam: TamanoPdf = "A4"): jsPDF {
+  return tam === "A4" ? docA4Comprobante(c) : docTicket(ticketComprobante(c), tam === "58" ? 58 : 80);
+}
+
+const sufijo = (tam: TamanoPdf) => (tam === "A4" ? "" : `-ticket${tam}`);
+
+export function pdfComprobanteVenta(c: ComprobanteVenta, tam: TamanoPdf = "A4"): void {
+  abrir(docComprobanteVenta(c, tam), `${c.numero || "borrador"}${sufijo(tam)}`);
+}
+
+/** Ticket 80 mm (se mantiene por compatibilidad). */
+export function pdfTicketVenta(c: ComprobanteVenta): void {
+  pdfComprobanteVenta(c, "80");
+}
+
+export function imprimirComprobanteVenta(c: ComprobanteVenta, tam: TamanoPdf): void {
+  imprimirPDF(docComprobanteVenta(c, tam), `${c.numero || "borrador"}${sufijo(tam)}`);
+}
+
+// --------------------------- Guía de Remisión T005 ---------------------------
+
+const MODALIDAD_GUIA: Record<string, string> = { "01": "Transporte público", "02": "Transporte privado" };
+const MOTIVO_GUIA: Record<string, string> = {
+  "01": "Venta",
+  "02": "Compra",
+  "04": "Traslado entre establecimientos de la misma empresa",
+  "13": "Otros",
+  "14": "Venta sujeta a confirmación del comprador",
+};
+
+function qrGuia(g: GuiaRemision): string {
+  const [doc, num] = g.clienteDoc.split(" ");
+  return [EMPRESA.ruc, "09", g.serie, g.numero.split("-")[1] ?? "", g.fecha, tipoDocSunat(doc ?? ""), num ?? "", g.sunat?.hash ?? "", ""].join("|");
+}
+
+function leyendaGuia(g: GuiaRemision): string[] {
+  const estado =
+    g.estado === "ANULADA"
+      ? "ANULADA en el ERP: sin validez"
+      : g.estadoSunat === "ACEPTADO" || g.estadoSunat === "OBSERVADO"
+        ? `Aceptada por SUNAT${g.sunat?.entorno === "beta" ? " (BETA - PRUEBAS, sin valor legal)" : ""}`
+        : g.estadoSunat === "RECHAZADO"
+          ? "RECHAZADA por SUNAT: sin validez"
+          : g.estadoSunat === "ENVIADO"
+            ? "En proceso en SUNAT"
+            : "Pendiente de envío a SUNAT";
+  return [
+    `Representación impresa de la guía de remisión remitente electrónica. Consulte su validez en www.sunat.gob.pe. ${estado}.`,
+    ...(g.sunat?.hash ? [`Valor resumen (hash): ${g.sunat.hash}`] : []),
+  ];
+}
+
+const transporteGuia = (g: GuiaRemision): [string, string][] =>
+  g.modalidad === "01"
+    ? [
+        ["Transportista", `${g.transportistaNombre} · RUC ${g.transportistaRuc}`],
+        ...(g.placa ? ([["Placa", g.placa]] as [string, string][]) : []),
+      ]
+    : [
+        ["Conductor", `${g.conductorNombres} ${g.conductorApellidos} · DNI ${g.conductorDni}`],
+        ["Licencia", g.conductorLicencia],
+        ["Placa", g.placa],
+      ];
+
+function docA4Guia(g: GuiaRemision): jsPDF {
+  return construir({
+    titulo: "GUÍA DE REMISIÓN REMITENTE ELECTRÓNICA",
+    numero: g.numero,
+    estado: g.estado,
+    datos: [
+      ["Destinatario", g.cliente],
+      ["Documento", g.clienteDoc],
+      ["Fecha emisión", fechaPE(g.fecha)],
+      ["Inicio de traslado", fechaPE(g.fechaTraslado)],
+      ["Motivo de traslado", `${g.motivoTraslado} · ${MOTIVO_GUIA[g.motivoTraslado] ?? ""}`],
+      ["Modalidad", MODALIDAD_GUIA[g.modalidad] ?? g.modalidad],
+      ...transporteGuia(g),
+      ["Punto de partida", `${g.partidaDireccion} (ubigeo ${g.partidaUbigeo})`],
+      ["Punto de llegada", `${g.llegadaDireccion} (ubigeo ${g.llegadaUbigeo})`],
+      ["Peso bruto total", `${g.pesoKg} kg`],
+      ["N° de bultos", String(g.bultos)],
+      ["Comprobante relacionado", g.comprobanteNumero ?? "-"],
+    ],
+    columnas: 2,
+    head: ["#", "Código", "Descripción", "Unidad", "Cantidad"],
+    body: g.items.map((l, k) => [k + 1, l.codigo || String(k + 1).padStart(3, "0"), l.descripcion, l.unidad, l.cantidad]),
+    alinearDerecha: [4],
+    notas: [...(g.observaciones ? [`Observaciones: ${g.observaciones}`] : []), ...leyendaGuia(g), ...lineaCdr(g.sunat)],
+    qr: qrGuia(g),
+    qrTexto: [`Guía ${g.numero}`, `${g.pesoKg} kg · ${g.bultos} bulto(s)`, `Destino: ${g.llegadaDireccion}`],
+    firmas: ["Remitente", "Transportista / Conductor", "Recibí conforme: Destinatario"],
+  });
+}
+
+function ticketGuia(g: GuiaRemision): Ticket {
+  return {
+    titulo: "GUÍA DE REMISIÓN REMITENTE ELECTRÓNICA",
+    numero: g.numero,
+    cabecera: [
+      `Emisión: ${fechaPE(g.fecha)} · Traslado: ${fechaPE(g.fechaTraslado)}`,
+      `Destinatario: ${g.cliente}`,
+      g.clienteDoc,
+      `Motivo: ${g.motivoTraslado} ${MOTIVO_GUIA[g.motivoTraslado] ?? ""}`,
+      `${MODALIDAD_GUIA[g.modalidad] ?? g.modalidad}`,
+      ...transporteGuia(g).map(([k, v]) => `${k}: ${v}`),
+      `Partida: ${g.partidaDireccion} (${g.partidaUbigeo})`,
+      `Llegada: ${g.llegadaDireccion} (${g.llegadaUbigeo})`,
+      ...(g.comprobanteNumero ? [`Comprobante: ${g.comprobanteNumero}`] : []),
+    ],
+    lineas: g.items.map((l, k) => ({ texto: `${l.codigo || String(k + 1).padStart(3, "0")} · ${l.descripcion}`, izquierda: l.unidad, derecha: String(l.cantidad) })),
+    totales: [
+      { k: "Peso bruto total", v: `${g.pesoKg} kg` },
+      { k: "N° de bultos", v: String(g.bultos), fuerte: true },
+    ],
+    pie: g.observaciones ? [`Obs.: ${g.observaciones}`] : [],
+    qr: qrGuia(g),
+    leyenda: [...leyendaGuia(g), ...lineaCdr(g.sunat)],
+  };
+}
+
+export function docGuiaVenta(g: GuiaRemision, tam: TamanoPdf = "A4"): jsPDF {
+  return tam === "A4" ? docA4Guia(g) : docTicket(ticketGuia(g), tam === "58" ? 58 : 80);
+}
+
+export function pdfGuiaVenta(g: GuiaRemision, tam: TamanoPdf = "A4"): void {
+  abrir(docGuiaVenta(g, tam), `${g.numero}${sufijo(tam)}`);
+}
+
+export function imprimirGuiaVenta(g: GuiaRemision, tam: TamanoPdf): void {
+  imprimirPDF(docGuiaVenta(g, tam), `${g.numero}${sufijo(tam)}`);
 }
 
 /** Casilla de verificación (marcada con X) + texto. */

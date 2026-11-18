@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Download, Eye, FileCheck2, FileCode2, FileText, Loader2, Printer, Share2, X } from "lucide-react";
+import { Download, Eye, FileCheck2, FileCode2, Loader2, Printer, Share2, X } from "lucide-react";
 import { Button, toast } from "@/components/ui";
 import { guardarArchivo } from "@/lib/guardarArchivo";
 import type { DatosSunatPse, EstadoSunat } from "@/lib/types";
@@ -292,21 +292,19 @@ export interface DocConArchivos {
   sunat?: DatosSunatPse;
 }
 
-/** Botones PDF · XML · CDR de una fila (XML y CDR solo con SUNAT ACEPTADO). */
+/**
+ * Botones XML · CDR de una fila (solo con SUNAT ACEPTADO), del PSE. El PDF ya no es el de Nubefact:
+ * es la plantilla propia de COMBOY VID (BotonesPdf: A4 / 80 mm / 58 mm).
+ */
 export function ArchivosSunat({ c }: { c: DocConArchivos }) {
   const [abierto, setAbierto] = useState<Archivo | null>(null);
   const cerrar = useCallback(() => setAbierto(null), []);
   const s = c.sunat;
-  if (!s?.enlacePdf && !s?.enlaceXml && !s?.enlaceCdr) return null;
-  const aceptado = c.estadoSunat === "ACEPTADO";
+  if (!s || c.estadoSunat !== "ACEPTADO") return null;
+  const aceptado = true;
   const abrir = (clase: Clase, enlace?: string) => enlace && setAbierto({ clase, numero: c.numero, enlace });
   return (
     <>
-      {s.enlacePdf && (
-        <Button size="sm" variant="ghost" title="PDF de Nubefact" onClick={() => abrir("pdf", s.enlacePdf)}>
-          <FileText size={14} /> PDF
-        </Button>
-      )}
       {aceptado && (
         <Button size="sm" variant="ghost" title={s.enlaceXml ? "XML firmado" : "Nubefact aún no devuelve el XML"} disabled={!s.enlaceXml} onClick={() => abrir("xml", s.enlaceXml)}>
           <FileCode2 size={14} /> XML
