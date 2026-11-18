@@ -26,6 +26,7 @@ import type { ComprobanteVenta, FormaPagoVenta, NotaPedido, OrdenDespacho, TipoC
 import { CUENTAS_COBRO, DatosDespachoForm, medioCobro, LineasEditor, SelectorCliente, TotalesVenta, useVentas } from "./comun";
 import { enviarSunat, sunatValido, useSunat } from "@/lib/sunat";
 import { AccionesSunat, EstadoSunatChip, ModalBaja, ModalNota } from "./sunat";
+import { ArchivosSunat } from "./archivosSunat";
 
 type Filtro = "TODOS" | TipoComprobanteVenta;
 
@@ -317,6 +318,7 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
                 <Button size="sm" variant="ghost" onClick={() => pdfTicketVenta(c)} title="Ticket 80 mm">
                   <Printer size={14} />
                 </Button>
+                <ArchivosSunat c={c} />
                 {habilitado && c.estado === "BORRADOR" && (
                   <>
                     <Button size="sm" variant="warning" onClick={() => abrirBorrador(c)}>
