@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Ban, FilePlus2, FileText, Printer, Send, Trash2, Truck } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Textarea, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/client";
 import { pdfComprobanteVenta, pdfTicketVenta } from "@/lib/pdf";
 import { KEYS, fechaPE, hoy, previewNumero, puede, r2, soles, useRol, useStore } from "@/lib/storage";
 import {
@@ -44,6 +45,34 @@ const datosVacios = (): DatosComprobante => ({
   lugarEntrega: "",
   despacho: despachoVacio(),
 });
+
+// TEMPORAL: prueba de NubeFact (boleta demo B001-3). Quitar cuando termine la prueba.
+async function probarBoletaDemo() {
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase.functions.invoke("emitir-comprobante", {
+      body: { comprobante: {
+        id: "prueba-3", tipo: "BOLETA", serie: "B001", numero: "B001-3",
+        fecha: "2026-11-18", cliente: "JUAN PEREZ QUISPE", clienteDoc: "DNI 12345678",
+        items: [{ productoNombre: "Producto de prueba", descripcion: "", unidad: "UND", cantidad: 1, precio: 10 }],
+        conIgv: true, preciosConIgv: true, descuento: 0, base: 8.47, igv: 1.53, total: 10,
+        formaPago: "CONTADO", estado: "EMITIDO",
+      }},
+    });
+    if (error) {
+      let detalle: unknown = error.message;
+      try { detalle = await (error as { context?: Response }).context?.json(); } catch { /* sin cuerpo JSON */ }
+      console.log("PRUEBA NUBEFACT - ERROR", detalle);
+      alert("ERROR:\n" + JSON.stringify(detalle, null, 2));
+      return;
+    }
+    console.log("PRUEBA NUBEFACT - OK", data);
+    alert(`OK\nNúmero: ${data?.numero}\nPDF: ${data?.enlacePdf}`);
+  } catch (e) {
+    console.log("PRUEBA NUBEFACT - EXCEPCIÓN", e);
+    alert("EXCEPCIÓN: " + (e instanceof Error ? e.message : String(e)));
+  }
+}
 
 export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: string; onListo: () => void; /** Sube con "Emitir Nuevo" de la isla: abre el formulario. */ nuevoPedido?: number }) {
   const [rol] = useRol();
@@ -205,6 +234,13 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
             {f === "TODOS" ? "Todos" : tipoLabel[f]}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={probarBoletaDemo}
+          className="ml-auto rounded border border-dashed border-amber-400 px-2 py-1 text-[10px] font-medium text-amber-700 hover:bg-amber-50"
+        >
+          PROBAR BOLETA DEMO B001-3
+        </button>
       </div>
       <ListaDocs
           tipo="ventas"
