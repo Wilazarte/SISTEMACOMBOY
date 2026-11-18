@@ -156,6 +156,7 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "despachos", label: "Despachos (seguimiento)", grupo: "Pedidos", destino: `${V}?tab=despachos` },
 
     { slug: "comprobantes", label: "Emitir Factura / Boleta (Comprobantes)", grupo: "Facturación y cobranza", destino: `${V}?tab=comprobantes`, requiere: "canEmitFactura" },
+    { slug: "guias-remision", label: "Guías de Remisión", grupo: "Facturación y cobranza", destino: `${V}?tab=guias`, requiere: "canEmitFactura" },
     { slug: "cuentas-por-cobrar", label: "Cuentas por cobrar", grupo: "Facturación y cobranza", destino: `${V}?tab=cobrar` },
     { slug: "configuracion-ventas", label: "Configuración (condiciones de pago)", grupo: "Facturación y cobranza", destino: `${V}?tab=condiciones` },
 
