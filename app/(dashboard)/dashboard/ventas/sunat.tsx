@@ -11,6 +11,7 @@ import {
   SERIE_NOTA,
   bajaSunat,
   configSunat,
+  consultarNubefactFila,
   consultarSunat,
   crearNota,
   descargarSunat,
@@ -181,6 +182,27 @@ export function AccionesSunat({
       {habilitado && c.estado === "EMITIDO" && !valido && f?.estado !== "ENVIADO" && (
         <Button size="sm" variant="warning" onClick={enviar} disabled={ocupado} title="Enviar a SUNAT">
           <UploadCloud size={14} /> {ocupado ? "Enviando…" : f ? "Reenviar SUNAT" : "Enviar SUNAT"}
+        </Button>
+      )}
+      {habilitado && c.estado === "EMITIDO" && !!c.sunat?.enlacePdf && (
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={ocupado}
+          title="Consultar en Nubefact y traer el XML / CDR actualizados"
+          onClick={() =>
+            correr(async () => {
+              const x = await consultarNubefactFila(c, rol);
+              const s = x.sunat!;
+              const faltan = [!s.enlaceXml && "XML", !s.enlaceCdr && "CDR"].filter(Boolean).join(" y ");
+              toast(
+                faltan ? `${c.numero}: SUNAT aún no devuelve el ${faltan}. Vuelva a consultar más tarde.` : `${c.numero}: XML y CDR actualizados.`,
+                faltan ? "error" : "ok"
+              );
+            })
+          }
+        >
+          <RefreshCw size={14} /> {ocupado ? "Consultando…" : "Consultar"}
         </Button>
       )}
       {f?.nombre_archivo && (

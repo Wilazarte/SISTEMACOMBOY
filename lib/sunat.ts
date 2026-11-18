@@ -219,6 +219,50 @@ export async function enviarSunat(c: ComprobanteVenta, rol: Rol): Promise<Result
   return { estado: "ACEPTADO", codigo: r.codigo ?? "", descripcion: r.descripcion ?? "", numero: r.numero ?? "", enlacePdf: r.enlacePdf ?? "" };
 }
 
+/**
+ * Consulta en Nubefact un comprobante ya enviado y guarda en la fila los enlaces actualizados
+ * (el XML / CDR llegan cuando SUNAT responde; en boletas, con el resumen diario). No emite nada nuevo:
+ * con { consultar: true } el Edge Function solo consulta (y la versión anterior, al ver que ya existe, también consulta).
+ */
+export async function consultarNubefactFila(c: ComprobanteVenta, rol: Rol): Promise<ComprobanteVenta> {
+  if (!puede(rol, "venta.gestionar")) throw new ErpError("Su usuario no puede consultar comprobantes en SUNAT.");
+  if (!c.sunat?.enlacePdf) throw new ErpError(`${c.numero} aún no se envió a Nubefact: use Enviar SUNAT.`);
+  const referencia = c.ref ? getComprobantes().find((x) => x.id === c.ref!.id) : undefined;
+  const { data, error } = await createClient().functions.invoke("emitir-comprobante", {
+    body: { comprobante: c, ...(referencia ? { referencia } : {}), consultar: true },
+  });
+  if (error) {
+    const ctx = (error as { context?: Response }).context;
+    const cuerpo = ctx && typeof ctx.json === "function" ? ((await ctx.json().catch(() => null)) as { error?: string } | null) : null;
+    console.error("consultar Nubefact", c.numero, cuerpo ?? error);
+    throw new ErpError(cuerpo?.error ?? (cuerpo ? JSON.stringify(cuerpo) : error.message));
+  }
+  const r = data as RespuestaEmision;
+  if (!r?.ok) throw new ErpError(r?.error ?? "Nubefact no devolvió una respuesta válida.");
+  let actualizado: ComprobanteVenta | undefined;
+  const lista = getComprobantes().map((x) => {
+    if (x.id !== c.id || !x.sunat) return x;
+    const s = x.sunat;
+    actualizado = {
+      ...x,
+      sunat: {
+        ...s,
+        hash: r.hash || s.hash,
+        codigo: r.codigo || s.codigo,
+        descripcion: r.descripcion || s.descripcion,
+        fecha: new Date().toISOString(),
+        enlacePdf: r.enlacePdf || s.enlacePdf,
+        enlaceXml: r.enlaceXml || s.enlaceXml,
+        enlaceCdr: r.enlaceCdr || s.enlaceCdr,
+      },
+    };
+    return actualizado;
+  });
+  if (!actualizado) throw new ErpError(`No se encontró ${c.numero}.`);
+  escribir(KEYS.COMPROBANTES, lista);
+  return actualizado;
+}
+
 /** Nota de crédito que anula la operación: al ser aceptada, el comprobante original se anula en el ERP. */
 function trasAceptar(c: ComprobanteVenta, estado: EstadoCpe, rol: Rol): void {
   const f = { estado };
