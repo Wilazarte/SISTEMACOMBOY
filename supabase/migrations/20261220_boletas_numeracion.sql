@@ -6,6 +6,7 @@
 --    perdió el permiso que le dio 20261021_tesoreria_edita_planilla.sql: al descargar la boleta salía
 --    "Su usuario no puede emitir boletas…" y no se numeraba. Se recrea igual que 20261219 + tesoreria/admin.
 -- 2) El contador del año (BOL_2026…) nunca queda por debajo de la última boleta ya emitida (no repite números).
+-- 3) Las boletas que ya salieron repetidas pierden su N° (se conserva la primera) para que reciban uno nuevo.
 --
 -- Pegar en Supabase → SQL Editor → Run. Se puede ejecutar varias veces.
 -- =====================================================================
@@ -61,6 +62,22 @@ update public.compras c
      where coalesce((k.data ->> ('BOL_' || x.anio))::int, 0) < x.mx
   ) m
  where c.tipo = 'contador' and c.id = '00000000-0000-0000-0000-000000000001' and m.ajuste is not null;
+
+-- 3) Boletas que ya salieron con un N° repetido (ej. la de Darwin con el N° de la anterior): se conserva la más
+--    antigua y a las siguientes se les quita el N° (respaldo en planilla_respaldo_boletas_dup). Al volver a
+--    descargar esa boleta en el ERP (F5 antes), recibe un N° nuevo que ya no se repite.
+create table if not exists public.planilla_respaldo_boletas_dup as select * from public.planilla where false;
+with dup as (
+  select b.ctid as fila, row_number() over (partition by b.data ->> 'codigo' order by b.data ->> 'fecha', b.id) as orden
+    from public.planilla b
+   where b.tipo = 'boleta' and coalesce(b.data ->> 'codigo', '') <> ''
+), quitar as (
+  select fila from dup where orden > 1
+), resp as (
+  insert into public.planilla_respaldo_boletas_dup select p.* from public.planilla p where p.ctid in (select fila from quitar)
+  returning 1
+)
+delete from public.planilla p where p.ctid in (select fila from quitar);
 
 notify pgrst, 'reload schema';
 

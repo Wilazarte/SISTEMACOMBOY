@@ -1058,6 +1058,18 @@ export function anioDePeriodo(periodo: string): number {
  * Si aún no se ejecutó supabase/boleta_anual.sql, usa el contador global BOL (como antes) para no bloquear la boleta.
  */
 async function reservarBoletaAnual(periodo: string): Promise<{ codigo: string; correlativo: number; anio: number }> {
+  // Candado contra números repetidos (Williams 2026-11-19: la boleta de Darwin salió con el N° de la anterior).
+  // Si el contador de Supabase quedó atrasado (p. ej. un SQL recreó siguiente_numero sin BOL_AAAA y se usó el
+  // contador global BOL, o al revés), se sigue pidiendo número hasta pasar los códigos ya emitidos.
+  const usados = new Set(getBoletas().map((b) => b.codigo));
+  for (let intentos = 0; intentos < 500; intentos++) {
+    const c = await reservarBoletaAnualUnaVez(periodo);
+    if (!usados.has(c.codigo)) return c;
+  }
+  throw new ErpError("La numeración de boletas está muy atrasada: ejecute supabase/migrations/20261220_boletas_numeracion.sql en Supabase.");
+}
+
+async function reservarBoletaAnualUnaVez(periodo: string): Promise<{ codigo: string; correlativo: number; anio: number }> {
   const anio = anioDePeriodo(periodo);
   let n: number;
   try {
