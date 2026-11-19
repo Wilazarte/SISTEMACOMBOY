@@ -1011,20 +1011,40 @@ export interface BoletaEmitida {
 
 export const getBoletas = () => leer<BoletaEmitida[]>(KEYS.BOLETAS, []);
 
-export async function codigoBoleta(periodo: string, trabajadorId: string, nombre: string, totalPagar: number): Promise<string> {
+export async function codigoBoleta(periodoTexto: string, trabajadorId: string, nombre: string, totalPagar: number): Promise<string> {
+  // Misma clave desde la planilla y desde el historial: el historial guarda "SEMANA 14 - ABRIL 2026 · TODOS" (o
+  // "· OBREROS"); sin quitar ese sufijo, al reimprimir desde el historial se reservaba OTRO número (saltos y dos
+  // códigos para la misma boleta).
+  const periodo = periodoBoleta(periodoTexto);
   // "BOL|<periodo>|<N°>": el id "<periodo>|<N°>" es el mismo de la asistencia del trabajador y, si la tabla planilla
   // conserva una clave primaria solo por id (instalaciones antiguas), chocaba: duplicate key … "planilla_pkey".
   const id = `BOL|${periodo}|${trabajadorId}`;
   const anterior = `${periodo}|${trabajadorId}`; // boletas emitidas antes de este cambio
-  const previa = getBoletas().find((b) => b.id === id || (b.id === anterior && b.periodo === periodo && b.trabajadorId === trabajadorId));
+  // También reconoce las emitidas antes con el sufijo del cierre en el periodo (se reutiliza el código más bajo)
+  const previa =
+    getBoletas().find((b) => b.id === id || (b.id === anterior && b.periodo === periodo && b.trabajadorId === trabajadorId)) ??
+    getBoletas()
+      .filter((b) => b.trabajadorId === trabajadorId && periodoBoleta(b.periodo) === periodo)
+      .sort((a, b) => a.anio - b.anio || a.correlativo - b.correlativo)[0];
   if (previa) {
     if (previa.totalPagar !== totalPagar) escribir(KEYS.BOLETAS, getBoletas().map((b) => (b.id === previa.id ? { ...b, totalPagar, nombre } : b)));
     return previa.codigo;
   }
-  const c = await reservarBoletaAnual(periodo);
-  escribir(KEYS.BOLETAS, [...getBoletas(), { id, ...c, periodo, trabajadorId, nombre, totalPagar, fecha: new Date().toISOString() }]);
-  return c.codigo;
+  // Doble clic en "Boleta" o "todas las boletas": una sola reserva por trabajador y periodo (sin saltos)
+  const pendiente = boletasEnCurso.get(id);
+  if (pendiente) return pendiente;
+  const tarea = (async () => {
+    const c = await reservarBoletaAnual(periodo);
+    escribir(KEYS.BOLETAS, [...getBoletas(), { id, ...c, periodo, trabajadorId, nombre, totalPagar, fecha: new Date().toISOString() }]);
+    return c.codigo;
+  })().finally(() => boletasEnCurso.delete(id));
+  boletasEnCurso.set(id, tarea);
+  return tarea;
 }
+const boletasEnCurso = new Map<string, Promise<string>>();
+
+/** Periodo de la boleta sin el grupo del cierre (" · TODOS", " · OBREROS"…), en mayúsculas y sin espacios dobles. */
+export const periodoBoleta = (p: string): string => normalizarPeriodo(p.split(" · ")[0]);
 
 /** Año de la boleta: el del periodo ("SEMANA 14 - ABRIL 2026" -> 2026); sin año, el actual. */
 export function anioDePeriodo(periodo: string): number {
@@ -1045,7 +1065,7 @@ async function reservarBoletaAnual(periodo: string): Promise<{ codigo: string; c
   } catch (e) {
     if (!/serie inv/i.test((e as Error).message)) throw e;
     const g = await reservarCodigo("BOL");
-    return { codigo: generarCodigo("BOL", g.correlativo, anio), correlativo: g.correlativo, anio };
+    return { codigo: marcarSede(generarCodigo("BOL", g.correlativo, anio)), correlativo: g.correlativo, anio };
   }
   return { codigo: marcarSede(generarCodigo("BOL", n, anio)), correlativo: n, anio };
 }
@@ -1931,15 +1951,19 @@ export const TIPOS_SUELDO: Record<TipoSueldo, { label: string; divisor: number }
   POR_CONTRATO: { label: "Por contrato", divisor: 30 }, // contratistas: no entran a la planilla del periodo
 };
 
-/** Frecuencia de pago de la ficha: los registros sin dato se pagan por semana (como hasta ahora). */
-export const frecuenciaPagoDe = (t: Pick<Trabajador, "frecuenciaPago">): FrecuenciaPago => (t.frecuenciaPago === "MENSUAL" ? "MENSUAL" : "SEMANAL");
+/**
+ * Frecuencia de pago = la del tipo de sueldo (regla Williams 2026-11-19): sueldo MENSUAL se paga en la planilla
+ * del mes; diario, semanal, quincenal y por hora, en la planilla de la semana. Ya no se elige aparte en la ficha,
+ * así no se contradicen (antes un sueldo diario podía quedar con pago mensual).
+ */
+export const frecuenciaPagoDe = (t: Pick<Trabajador, "tipoSueldo">): FrecuenciaPago => (t.tipoSueldo === "MENSUAL" ? "MENSUAL" : "SEMANAL");
 
 /** Planilla MENSUAL (frecuencia de pago mensual): el mes son 27 días (sueldo diario = mensual / 27). */
 export const DIAS_PERIODO_MENSUAL = 27;
 
-/** Divisor del sueldo diario: sueldo mensual con pago mensual = 27 días; el resto, el de su tipo de sueldo (mensual con pago semanal = 26). */
-export const divisorSueldo = (t: Pick<Trabajador, "tipoSueldo" | "frecuenciaPago">): number =>
-  t.tipoSueldo === "MENSUAL" && frecuenciaPagoDe(t) === "MENSUAL" ? DIAS_PERIODO_MENSUAL : (TIPOS_SUELDO[t.tipoSueldo] ?? TIPOS_SUELDO.DIARIO).divisor;
+/** Divisor del sueldo diario: sueldo mensual (pago mensual) = 27 días; el resto, el de su tipo de sueldo. */
+export const divisorSueldo = (t: Pick<Trabajador, "tipoSueldo">): number =>
+  frecuenciaPagoDe(t) === "MENSUAL" ? DIAS_PERIODO_MENSUAL : (TIPOS_SUELDO[t.tipoSueldo] ?? TIPOS_SUELDO.DIARIO).divisor;
 
 export const AFP_OPTIONS: Record<TipoAfp, { label: string; porc: number }> = {
   AFP_INTEGRA: { label: "AFP Integra", porc: 10 },
@@ -1980,6 +2004,7 @@ function normalizarTrabajador(t: Partial<Trabajador>): Trabajador {
     fechaIngreso: typeof t.fechaIngreso === "string" && FECHA_RE.test(t.fechaIngreso) ? t.fechaIngreso : "",
     sueldo: Number.isFinite(sueldo) && sueldo >= 0 ? sueldo : base.sueldo,
     tipoSueldo,
+    frecuenciaPago: tipoSueldo === "MENSUAL" ? "MENSUAL" : "SEMANAL", // siempre igual al tipo de sueldo
     afpTipo,
     afpPorcentaje: Number.isFinite(afpPorcentaje) && afpPorcentaje >= 0 ? afpPorcentaje : AFP_OPTIONS[afpTipo].porc,
     activo: t.activo !== false,
@@ -2026,7 +2051,6 @@ function fichaOpcional(t: Partial<Trabajador>): Partial<Trabajador> {
   if (typeof t.fechaBaja === "string" && FECHA_RE.test(t.fechaBaja)) r.fechaBaja = t.fechaBaja;
   if (t.estadoCivil && ESTADOS_CIVILES.includes(t.estadoCivil)) r.estadoCivil = t.estadoCivil;
   if (t.esContratista === true) r.esContratista = true;
-  if (t.frecuenciaPago === "MENSUAL" || t.frecuenciaPago === "SEMANAL") r.frecuenciaPago = t.frecuenciaPago;
   if (t.bancoNombre && (t.bancoTipoCuenta === "Ahorros" || t.bancoTipoCuenta === "Corriente")) r.bancoTipoCuenta = t.bancoTipoCuenta;
   if (typeof t.ruc === "string" && /^\d{11}$/.test(t.ruc.trim())) r.ruc = t.ruc.trim();
   if (t.tipoServicio && t.tipoServicio in SERVICIOS_CONTRATISTA) r.tipoServicio = t.tipoServicio;
