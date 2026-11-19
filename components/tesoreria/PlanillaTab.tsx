@@ -174,7 +174,10 @@ function calcular(t: Trabajador, liq: LiquidacionPeriodo, asistenciaExterna?: As
     ? { ...resumirAsistencia(fechas), ...(porHora ? { horas: horasReales(fechas) } : {}) }
     : { dias: registro?.dias ?? 0, horas: registro?.horas ?? (porHora ? 0 : (registro?.dias ?? 0) * liq.horasJornada), tardanzas: registro?.tardanzas ?? 0 };
   // S/ por hora (cualquier modo): básico = S/ hora × horas reales del reloj (sin jornada); extra solo manual
-  const r = porHora ? liquidarPorHora(t.sueldo, reloj.horas, liq.ajustes[t.id]) : liquidar(t.sueldo, divisorSueldo(t), reloj, liq, liq.ajustes[t.id]);
+  // Se paga según el TIPO DE SUELDO (Williams 2026-11-19): por hora solo el sueldo "Por hora"; diario / semanal /
+  // quincenal / mensual siempre por DÍAS aunque el periodo esté en modo HORAS (antes: 54 h × S/ 7.75 en vez de 6 días × S/ 62).
+  const cfg = liq.modo === "HORAS" ? { ...liq, modo: "DIAS" as const } : liq;
+  const r = porHora ? liquidarPorHora(t.sueldo, reloj.horas, liq.ajustes[t.id]) : liquidar(t.sueldo, divisorSueldo(t), reloj, cfg, liq.ajustes[t.id]);
   const descuentoAfp = r2(r.bruto * ((t.afpPorcentaje || 0) / 100));
   const neto = r2(r.bruto - descuentoAfp);
   return {

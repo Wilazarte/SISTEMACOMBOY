@@ -64,7 +64,7 @@ export function LiquidacionCelda({ periodo, trabajadorId, liq, r, editable }: { 
   const j = liq.horasJornada;
   return (
     <div className={cn("min-w-[170px] space-y-1.5 rounded-lg p-1", r.manual && "bg-amber-50 ring-1 ring-amber-300")}>
-      {liq.modo !== "HORAS" && !r.porHora && (
+      {r.modo !== "HORAS" && !r.porHora && (
         <div className="flex flex-wrap items-center gap-1">
           <Numero valor={r.dias} entero sufijo="días" disabled={!editable} onGuardar={(dias) => set({ dias })} />
           {editable && (
@@ -79,7 +79,7 @@ export function LiquidacionCelda({ periodo, trabajadorId, liq, r, editable }: { 
           )}
         </div>
       )}
-      {(liq.modo === "HORAS" || r.porHora) && (
+      {(r.modo === "HORAS" || r.porHora) && (
         <div className="flex flex-wrap items-center gap-1">
           <Numero valor={r.horas} sufijo="h" disabled={!editable} onGuardar={(horas) => set({ horas })} />
           {editable && (
@@ -123,7 +123,7 @@ export function LiquidacionCelda({ periodo, trabajadorId, liq, r, editable }: { 
           )}
         </div>
       )}
-      {liq.modo === "DIAS_HORAS" && !r.porHora && (
+      {r.modo === "DIAS_HORAS" && !r.porHora && (
         <div className="flex flex-wrap items-center gap-1">
           <Numero valor={r.horasExtra} sufijo="h extra" disabled={!editable} onGuardar={(horasExtra) => set({ horasExtra })} />
           {editable && (
