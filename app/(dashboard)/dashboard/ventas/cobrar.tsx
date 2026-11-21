@@ -2,10 +2,10 @@
 
 import { BotonFiltros } from "@/components/ui/BotonFiltros";
 import { useState } from "react";
-import { BarChart3, FileCheck2, FileSpreadsheet, FileText, Lock, Pencil, Trash2, Wallet, X } from "lucide-react";
+import { BarChart3, FileCheck2, FileSpreadsheet, Wallet, X } from "lucide-react";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
-import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, Textarea, cn, ejecutar } from "@/components/ui";
-import { esSoporte, getSesion } from "@/lib/auth";
+import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, cn, ejecutar } from "@/components/ui";
+import { getSesion } from "@/lib/auth";
 import { KEYS, fechaPE, hoy, puede, r2, soles, useRol, useStore } from "@/lib/storage";
 import {
   TIPOS_COMPROBANTE_EXTERNO,
@@ -13,18 +13,13 @@ import {
   registrarCobro,
   registrarCobroNP,
   registrarComprobanteExterno,
-  editarCobro,
-  eliminarCobro,
   reporteDeuda,
-  ventaActualizada,
   type AgruparDeuda,
   type EstadoCxC,
   type FilaCxC,
 } from "@/lib/ventas";
 import type { CobroVenta, ComprobanteExterno, ComprobanteVenta, NotaPedido, TipoComprobanteExterno } from "@/lib/types";
 import { CUENTAS_COBRO, medioCobro } from "./comun";
-import { pdfNotaPedidoActualizada, pdfReporteDeuda } from "@/lib/pdf";
-import { guardarExcel } from "@/lib/guardarArchivo";
 
 const filtrosVacios = {
   buscar: "",
@@ -53,11 +48,8 @@ export function CuentasPorCobrar() {
   const { showFiltros, setShowFiltros } = useTogglePanel();
   const [reporte, setReporte] = useState<AgruparDeuda | null>(null);
   const [sel, setSel] = useState<FilaCxC | null>(null);
-  const [corregir, setCorregir] = useState<{ cobro: CobroVenta; eliminar: boolean } | null>(null);
-  // Editar / eliminar cobros: solo SOPORTE y con PIN
-  const soporte = esSoporte(getSesion());
   const [externo, setExterno] = useState<FilaCxC | null>(null);
-  const [datos, setDatos] = useState({ monto: 0, cuenta: CUENTAS_COBRO[0], referencia: "", fecha: hoy(), observacion: "" });
+  const [datos, setDatos] = useState({ monto: 0, cuenta: CUENTAS_COBRO[0], referencia: "", fecha: hoy() });
   const habilitado = puede(rol, "venta.cobrar");
   const puedeReferir = habilitado || puede(rol, "venta.gestionar");
 
@@ -116,45 +108,11 @@ export function CuentasPorCobrar() {
         XLSX.utils.json_to_sheet(grupos.map((g) => ({ [AGRUPAR[reporte]]: g.grupo, Documentos: g.documentos, Total: g.total, Pagado: g.pagado, Saldo: g.saldo, Vencido: g.vencido }))),
         `Deuda por ${AGRUPAR[reporte].toLowerCase()}`.slice(0, 31)
       );
-    await guardarExcel(libro, `Cuentas-por-cobrar-${hoy()}.xlsx`);
-  };
-
-  // Reporte de deudas en PDF A4 (vista previa: Imprimir / Descargar con "Guardar como" / WhatsApp / Firmar)
-  const exportarPDF = () => {
-    const ESTADOS: Record<string, string> = { PENDIENTE: "Pendiente", VENCIDO: "Vencido", PAGADO: "Pagado" };
-    const filtros = [
-      f.buscar.trim() && `Buscar: "${f.buscar.trim()}"`,
-      f.cliente && `Cliente: ${f.cliente}`,
-      f.vendedor && `Vendedor: ${f.vendedor}`,
-      f.equipo && `Equipo: ${f.equipo}`,
-      f.desde && `${f.porVencimiento ? "Vence" : "Emitido"} desde ${fechaPE(f.desde)}`,
-      f.hasta && `${f.porVencimiento ? "Vence" : "Emitido"} hasta ${fechaPE(f.hasta)}`,
-      f.estado && `Estado: ${ESTADOS[f.estado] ?? f.estado}`,
-      f.origen && `Documento: ${f.origen === "NP" ? "Notas de pedido" : "Comprobantes del sistema"}`,
-      f.externo && `Comprobante externo: ${f.externo === "SI" ? "Referido" : "Sin referir"}`,
-    ]
-      .filter(Boolean)
-      .join(" · ");
-    pdfReporteDeuda({
-      filas: cxc,
-      agrupado: reporte ? { por: AGRUPAR[reporte], grupos: grupos.map((g) => ({ ...g, etiqueta: reporte === "mes" ? mesLabel(g.grupo) : g.grupo })) } : undefined,
-      filtros,
-      totalSaldo,
-      vencido,
-    });
-  };
-
-  // Nota de pedido actualizada: adelantos con fecha y N° de operación, total pagado y saldo
-  const verActualizada = (f: FilaCxC) => {
-    const v = ventaActualizada(f, notas, comprobantes, cobros);
-    pdfNotaPedidoActualizada({
-      ...v,
-      pagos: v.pagos.map((c) => ({ fecha: c.fecha, monto: c.monto, cuenta: c.cuenta, referencia: c.referencia, observacion: c.observacion ?? "", documento: c.npId ? c.npNumero ?? "" : c.comprobanteNumero })),
-    });
+    XLSX.writeFile(libro, `Cuentas-por-cobrar-${hoy()}.xlsx`);
   };
 
   const abrir = (f: FilaCxC) => {
-    setDatos({ monto: f.saldo, cuenta: CUENTAS_COBRO[0], referencia: "", fecha: hoy(), observacion: "" });
+    setDatos({ monto: f.saldo, cuenta: CUENTAS_COBRO[0], referencia: "", fecha: hoy() });
     setSel(f);
   };
 
@@ -189,10 +147,7 @@ export function CuentasPorCobrar() {
               <Button size="sm" variant={reporte ? "warning" : "secondary"} onClick={() => setReporte(reporte ? null : "cliente")}>
                 {reporte ? <X size={14} /> : <BarChart3 size={14} />} {reporte ? "Cerrar reporte" : "Reporte de deuda"}
               </Button>
-              <Button size="sm" variant="secondary" onClick={exportarPDF} disabled={cxc.length === 0} title="Reporte de deudas en PDF A4">
-                <FileText size={14} /> PDF
-              </Button>
-              <Button size="sm" variant="secondary" onClick={exportarExcel} disabled={cxc.length === 0} title="Excel: elige la carpeta donde guardarlo">
+              <Button size="sm" variant="secondary" onClick={exportarExcel} disabled={cxc.length === 0}>
                 <FileSpreadsheet size={14} /> Excel
               </Button>
             </div>
@@ -350,11 +305,6 @@ export function CuentasPorCobrar() {
               </Td>
               <Td>
                 <div className="flex gap-1">
-                  <span className="tip" data-tip="Ver nota de pedido actualizada (adelantos y saldo)">
-                    <Button size="sm" variant="secondary" onClick={() => verActualizada(f)} aria-label="Ver nota de pedido actualizada">
-                      <FileText size={14} />
-                    </Button>
-                  </span>
                   {habilitado && f.saldo > 0 && (
                     <span className="tip" data-tip="Registrar cobro">
                       <Button size="sm" variant="warning" onClick={() => abrir(f)} aria-label="Registrar cobro">
@@ -378,7 +328,7 @@ export function CuentasPorCobrar() {
 
       <Card>
         <CardHeader title="Cobros registrados" />
-        <Table compacto head={["Fecha", "Documento", "Comprobante", "Cliente", "Monto", "Caja / Banco", "Referencia", "Observación", "Usuario", ...(soporte ? [""] : [])]} empty={cobros.length === 0}>
+        <Table tarjetas head={["Fecha", "Documento", "Comprobante", "Cliente", "Monto", "Caja / Banco", "Referencia", "Usuario"]} empty={cobros.length === 0}>
           {cobros.slice(0, 100).map((c) => (
             <tr key={c.id}>
               <Td>{fechaPE(c.fecha)}</Td>
@@ -388,31 +338,7 @@ export function CuentasPorCobrar() {
               <Td className="text-right font-semibold text-emerald-700">{soles(c.monto)}</Td>
               <Td>{c.cuenta}</Td>
               <Td>{c.referencia || "-"}</Td>
-              <Td className="text-xs">
-                <span className="block max-w-[12rem] truncate" title={c.observacion}>
-                  {c.observacion || "-"}
-                </span>
-              </Td>
-              <Td>
-                {c.usuario}
-                {c.editadoPor && <p className="text-xs text-amber-600">Editado por {c.editadoPor}</p>}
-              </Td>
-              {soporte && (
-                <Td>
-                  <div className="flex gap-1">
-                    <span className="tip" data-tip="Editar cobro (SOPORTE · PIN)">
-                      <Button size="sm" variant="ghost" onClick={() => setCorregir({ cobro: c, eliminar: false })} aria-label="Editar cobro">
-                        <Pencil size={14} />
-                      </Button>
-                    </span>
-                    <span className="tip" data-tip="Eliminar cobro (SOPORTE · PIN)">
-                      <Button size="sm" variant="ghost" onClick={() => setCorregir({ cobro: c, eliminar: true })} aria-label="Eliminar cobro">
-                        <Trash2 size={14} className="text-red-600" />
-                      </Button>
-                    </span>
-                  </div>
-                </Td>
-              )}
+              <Td>{c.usuario}</Td>
             </tr>
           ))}
         </Table>
@@ -450,14 +376,6 @@ export function CuentasPorCobrar() {
               <Field label="N° operación / referencia">
                 <Input value={datos.referencia} onChange={(e) => setDatos({ ...datos, referencia: e.target.value })} />
               </Field>
-              <Field label="Observación (opcional)" className="sm:col-span-2">
-                <Textarea
-                  rows={2}
-                  value={datos.observacion}
-                  placeholder="Ej: depósito en efectivo del cliente, pago parcial acordado con Gerencia…"
-                  onChange={(e) => setDatos({ ...datos, observacion: e.target.value })}
-                />
-              </Field>
             </div>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="secondary" onClick={() => setSel(null)}>
@@ -470,8 +388,6 @@ export function CuentasPorCobrar() {
           </form>
         )}
       </Modal>
-
-      {soporte && <ModalCorregirCobro corregir={corregir} onClose={() => setCorregir(null)} />}
 
       <ModalComprobanteExterno
         doc={externo && { origen: externo.origen, id: externo.id, documento: externo.documento, externo: externo.externo }}
@@ -555,90 +471,6 @@ export function ModalComprobanteExterno({
           </div>
         </form>
       )}
-    </Modal>
-  );
-}
-
-/** SOPORTE: editar (monto, fecha, caja/banco, N° operación, observación) o eliminar un cobro, validado con PIN. */
-function ModalCorregirCobro({ corregir, onClose }: { corregir: { cobro: CobroVenta; eliminar: boolean } | null; onClose: () => void }) {
-  const [rol] = useRol();
-  const [form, setForm] = useState({ monto: 0, fecha: "", cuenta: "", referencia: "", observacion: "" });
-  const [pin, setPin] = useState("");
-  const [abiertoPara, setAbiertoPara] = useState("");
-  const clave = corregir ? `${corregir.cobro.id}-${corregir.eliminar}` : "";
-  if (clave !== abiertoPara) {
-    setAbiertoPara(clave);
-    setPin("");
-    if (corregir) {
-      const c = corregir.cobro;
-      setForm({ monto: c.monto, fecha: c.fecha, cuenta: c.cuenta, referencia: c.referencia, observacion: c.observacion ?? "" });
-    }
-  }
-  if (!corregir) return null;
-  const { cobro: c, eliminar } = corregir;
-  const doc = c.npId ? c.npNumero : c.comprobanteNumero;
-  const cuentas = CUENTAS_COBRO.includes(form.cuenta) || !form.cuenta ? CUENTAS_COBRO : [form.cuenta, ...CUENTAS_COBRO];
-  const guardar = () => {
-    const ok = eliminar
-      ? ejecutar(() => eliminarCobro(c.id, pin, rol), "Cobro eliminado")
-      : ejecutar(() => editarCobro(c.id, { ...form, medio: medioCobro(form.cuenta) }, pin, rol), "Cobro actualizado");
-    if (ok) onClose();
-  };
-  return (
-    <Modal open onClose={onClose} title={`${eliminar ? "Eliminar" : "Editar"} cobro · ${doc ?? ""}`}>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          guardar();
-        }}
-        className="space-y-3"
-      >
-        <p className="text-sm text-plomo-600">
-          {c.cliente} · {fechaPE(c.fecha)} · <b>{soles(c.monto)}</b> · {c.cuenta} · ref. {c.referencia || "-"}
-        </p>
-        {eliminar ? (
-          <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            El monto de este cobro vuelve al saldo por cobrar de {doc} y se registra el asiento de reversa. No se puede deshacer.
-          </p>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Monto S/">
-              <Input type="number" min={0} step="0.01" value={form.monto || ""} onChange={(e) => setForm({ ...form, monto: parseFloat(e.target.value) || 0 })} autoFocus />
-            </Field>
-            <Field label="Fecha">
-              <Input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} />
-            </Field>
-            <Field label="Caja / Banco">
-              <Select value={form.cuenta} onChange={(e) => setForm({ ...form, cuenta: e.target.value })} options={cuentas.map((x) => ({ value: x, label: x }))} />
-            </Field>
-            <Field label="N° operación / referencia">
-              <Input value={form.referencia} onChange={(e) => setForm({ ...form, referencia: e.target.value })} />
-            </Field>
-            <Field label="Observación" className="sm:col-span-2">
-              <Textarea rows={2} value={form.observacion} onChange={(e) => setForm({ ...form, observacion: e.target.value })} />
-            </Field>
-          </div>
-        )}
-        <Field label="PIN de validación (SOPORTE) *">
-          <Input
-            type="password"
-            inputMode="numeric"
-            autoComplete="off"
-            value={pin}
-            placeholder="••••••"
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-            autoFocus={eliminar}
-          />
-        </Field>
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" variant={eliminar ? "danger" : "warning"} disabled={!pin}>
-            <Lock size={14} /> {eliminar ? "Eliminar cobro" : "Guardar cambios"}
-          </Button>
-        </div>
-      </form>
     </Modal>
   );
 }

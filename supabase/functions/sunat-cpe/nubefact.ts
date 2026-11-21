@@ -4,7 +4,10 @@
 //
 // Secretos: NUBEFACT_RUTA (URL única de la cuenta, p. ej. https://api.nubefact.com/api/v1/xxxxxxxx-...)
 //           NUBEFACT_TOKEN (token de la misma pantalla "API - Integración" del panel de Nubefact)
-
+// @ts-ignore - Deno es global en Supabase Edge Functions
+declare const Deno: {
+  env: { get(key: string): string | undefined };
+};
 import { type DocumentoCpe, m2, r10 } from "./documento.ts";
 
 /** Catálogo de Nubefact: 1 factura, 2 boleta, 3 nota de crédito, 4 nota de débito. */

@@ -2,11 +2,11 @@
 
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useEffect, useState } from "react";
-import { Ban, FilePlus2, Send, Trash2, Truck } from "lucide-react";
-import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Textarea, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
+import { Ban, FilePlus2, FileText, Printer, Send, Trash2, Truck } from "lucide-react";
+import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Textarea, cn, ejecutar, ejecutarAsync } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/client";
-import { imprimirComprobanteVenta, pdfComprobanteVenta } from "@/lib/pdf";
+import { pdfComprobanteVenta, pdfTicketVenta } from "@/lib/pdf";
 import { KEYS, fechaPE, hoy, previewNumero, puede, r2, soles, useRol, useStore } from "@/lib/storage";
 import {
   SERIE,
@@ -24,10 +24,6 @@ import {
 } from "@/lib/ventas";
 import type { ComprobanteVenta, FormaPagoVenta, NotaPedido, OrdenDespacho, TipoComprobanteVenta } from "@/lib/types";
 import { CUENTAS_COBRO, DatosDespachoForm, medioCobro, LineasEditor, SelectorCliente, TotalesVenta, useVentas } from "./comun";
-import { enviarSunat, sunatValido, useSunat } from "@/lib/sunat";
-import { AccionesSunat, EstadoSunatChip, ModalBaja, ModalNota } from "./sunat";
-import { ArchivosSunat } from "./archivosSunat";
-import { BotonesPdf } from "./botonesPdf";
 
 type Filtro = "TODOS" | TipoComprobanteVenta;
 
@@ -37,7 +33,6 @@ const datosVacios = (): DatosComprobante => ({
   clienteId: "",
   items: [lineaVacia()],
   conIgv: true,
-  preciosConIgv: true,
   descuento: 0,
   formaPago: "CONTADO",
   condPagoId: "",
@@ -124,9 +119,6 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
   const [anular, setAnular] = useState<ComprobanteVenta | null>(null);
   const [motivo, setMotivo] = useState("");
   const [enviando, setEnviando] = useState(false);
-  const sunat = useSunat();
-  const [nota, setNota] = useState<ComprobanteVenta | null>(null);
-  const [baja, setBaja] = useState<ComprobanteVenta | null>(null);
   const habilitado = puede(rol, "venta.gestionar");
   const vendedor = getSesion()?.usuario ?? "";
   const aprobadas = notas.filter((n) => n.estado === "APROBADA");
@@ -143,7 +135,6 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
       clienteId: np.clienteId,
       items: np.items.map((l) => ({ ...l })),
       conIgv: cliente?.tipoDoc === "RUC" ? true : np.conIgv,
-      preciosConIgv: np.preciosConIgv === true, // mismos precios que la NP (las anteriores, sin IGV)
       descuento: np.descuento,
       condPagoId: np.condPagoId,
       // Los días que se pactaron en la nota de pedido (crédito / personalizado)
@@ -172,7 +163,7 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
   }, [nuevoPedido]);
 
   const npConOD = form?.npId ? notas.find((n) => n.id === form.npId && n.odId) : undefined;
-  const t = form ? totalesVenta(form.items, form.tipo === "FACTURA" ? true : form.conIgv, form.descuento, form.preciosConIgv !== false) : null;
+  const t = form ? totalesVenta(form.items, form.tipo === "FACTURA" ? true : form.conIgv, form.descuento) : null;
   const cond = condiciones.find((c) => c.id === form?.condPagoId);
 
   const elegirCondicion = (id: string) => {
@@ -197,30 +188,14 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
   const accion = async (emitir: boolean) => {
     if (!form) return;
     setEnviando(true);
-    let emitido: ComprobanteVenta | undefined;
     const ok = emitir
       ? await ejecutarAsync(
-          async () => {
-            emitido = await emitirComprobante(form, vendedor, rol, cobro, borradorId);
-          },
+          () => emitirComprobante(form, vendedor, rol, cobro, borradorId),
           "Comprobante emitido: asiento contable y orden de despacho generados"
         )
       : ejecutar(() => guardarBorrador(form, vendedor, rol, borradorId), "Borrador guardado");
     setEnviando(false);
     if (ok) cerrar();
-    // Facturación electrónica: se envía a SUNAT apenas se emite (si falla, queda el botón "Enviar SUNAT")
-    if (emitido) {
-      const c = emitido;
-      try {
-        const r = await enviarSunat(c, rol);
-        if (sunatValido(r.estado)) toast(`${c.numero}: ${r.descripcion || "aceptado por SUNAT"}`, "ok");
-        else toast(`${c.numero}: ${r.estado} ${r.codigo ?? ""} ${r.descripcion ?? ""}`.trim(), "error");
-      } catch (e) {
-        toast(`${c.numero} emitido, pero no se envió a SUNAT: ${e instanceof Error ? e.message : e}`, "error");
-      } finally {
-        sunat.recargar();
-      }
-    }
   };
 
   const abrirBorrador = (c: ComprobanteVenta) => {
@@ -232,7 +207,6 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
       npId: c.npId,
       items: c.items,
       conIgv: c.conIgv,
-      preciosConIgv: c.preciosConIgv === true,
       descuento: c.descuento,
       formaPago: c.formaPago,
       condPagoId: c.condPagoId,
@@ -300,8 +274,6 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
               <span className="font-semibold text-fg">{c.numero || <span className="text-slate-400">{c.serie}-(borrador)</span>}</span>
               {c.npNumero && <span className="ml-1.5 text-xs text-plomo-500">{c.npNumero}</span>}
               <span className="ml-2 inline-block align-middle"><Badge estado={c.estado} /></span>
-              <EstadoSunatChip c={c} f={sunat.filas[c.id]} />
-              {c.ref && <span className="ml-1.5 text-xs text-plomo-500">modifica {c.ref.numero}</span>}
             </>
           ),
           total: (
@@ -313,8 +285,12 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
           acciones: (
             <>
               <div className="flex flex-wrap gap-1">
-                <BotonesPdf numero={c.numero || "borrador"} ver={(t) => pdfComprobanteVenta(c, t)} imprimir={(t) => imprimirComprobanteVenta(c, t)} />
-                <ArchivosSunat c={c} />
+                <Button size="sm" variant="secondary" onClick={() => pdfComprobanteVenta(c)} title="PDF A4">
+                  <FileText size={14} /> A4
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => pdfTicketVenta(c)} title="Ticket 80 mm">
+                  <Printer size={14} />
+                </Button>
                 {habilitado && c.estado === "BORRADOR" && (
                   <>
                     <Button size="sm" variant="warning" onClick={() => abrirBorrador(c)}>
@@ -325,9 +301,8 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
                     </Button>
                   </>
                 )}
-                <AccionesSunat c={c} f={sunat.filas[c.id]} rol={rol} habilitado={habilitado} onNota={setNota} onBaja={setBaja} recargar={sunat.recargar} />
-                {habilitado && c.estado === "EMITIDO" && !sunatValido(sunat.filas[c.id]?.estado ?? c.estadoSunat) && sunat.filas[c.id]?.estado !== "ENVIADO" && (
-                  <Button size="sm" variant="ghost" title="Anular (solo comprobantes que SUNAT no aceptó)" onClick={() => { setMotivo(""); setAnular(c); }}>
+                {habilitado && c.estado === "EMITIDO" && (
+                  <Button size="sm" variant="ghost" title="Anular" onClick={() => { setMotivo(""); setAnular(c); }}>
                     <Ban size={14} className="text-red-600" />
                   </Button>
                 )}
@@ -428,7 +403,7 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
                 })()}
               />
             )}
-            <LineasEditor items={form.items} onChange={(items) => setForm({ ...form, items })} stock={stock} preciosConIgv={form.preciosConIgv !== false} />
+            <LineasEditor items={form.items} onChange={(items) => setForm({ ...form, items })} stock={stock} />
             <div className="flex flex-wrap items-start gap-4">
               <div className="space-y-3">
                 {form.tipo === "BOLETA" ? (
@@ -442,10 +417,10 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
                   <Input type="number" min={0} step="0.01" value={form.descuento || ""} onChange={(e) => setForm({ ...form, descuento: parseFloat(e.target.value) || 0 })} className="w-40" />
                 </Field>
               </div>
-              <TotalesVenta items={form.items} conIgv={form.tipo === "FACTURA" ? true : form.conIgv} descuento={form.descuento} preciosConIgv={form.preciosConIgv !== false} />
+              <TotalesVenta items={form.items} conIgv={form.tipo === "FACTURA" ? true : form.conIgv} descuento={form.descuento} />
             </div>
-            <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-900">
-              Facturación electrónica: al emitir, el ERP genera el XML UBL 2.1, lo firma con el certificado digital y lo envía a SUNAT; la constancia (CDR) queda guardada con el comprobante.
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Estado SUNAT: el comprobante queda como NO ENVIADO. El ERP aún no está conectado a un OSE/PSE de facturación electrónica.
             </p>
             <div className="flex flex-wrap justify-end gap-2 border-t border-plomo-100 pt-4">
               <Button variant="secondary" onClick={cerrar}>
@@ -476,8 +451,6 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
           </Button>
         </div>
       </Modal>
-      <ModalNota origen={nota} onClose={() => setNota(null)} rol={rol} vendedor={vendedor} recargar={sunat.recargar} />
-      <ModalBaja c={baja} onClose={() => setBaja(null)} rol={rol} recargar={sunat.recargar} />
     </Card>
   );
 }

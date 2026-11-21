@@ -12,7 +12,10 @@ import { useEffect, useState } from "react";
 import { createClient } from "./supabase/client";
 import type { Rol } from "./types";
 import { DOMINIO, puedeVer, soloSecocha, tieneSecocha, veDashboard, RUTA_GERENCIA, RUTA_SUCURSAL, RUTA_SUCURSAL_ANTIGUA, type RolAuth, type Sesion } from "./permisos";
-import { esAdminSede, homeAsignado, isAdmin } from "./permisosPlanta";
+import { homeAsignado, isAdmin } from "./permisosPlanta";
+import { localDb } from "./offline/localDb";
+import { esErrorDeRed } from "./offline/red";
+import { offlineActivo } from "./offline/storageOffline";
 
 export * from "./permisos";
 
@@ -27,7 +30,6 @@ const ROL_NEGOCIO: Record<RolAuth, Rol> = {
   planilla: "CONTADOR",
   gerencia: "CONTADOR",
   sucursal: "CONTADOR", // escribe solo en su módulo (lib/sucursal.ts) y sus REQ-SUC
-  ventas: "VENTAS", // módulo Ventas: pedidos, comprobantes y cobranza (2026-11-16)
 };
 
 const EVENTO = "erp:sesion";
@@ -43,12 +45,48 @@ function fijar(s: Sesion | null): void {
 
 const USUARIO_INACTIVO = "Usuario desactivado. Pida a SOPORTE que lo active.";
 
-/** Lee el usuario autenticado y su perfil. */
+/**
+ * Lee el usuario autenticado y su perfil. En la app de Windows / Android, sin señal, usa el último perfil
+ * que entró en este equipo (mismo rol, módulos y solo lectura: los permisos no cambian sin señal).
+ */
 async function cargarSesion(): Promise<Sesion | null> {
+  if (!offlineActivo()) return cargarSesionServidor();
+  try {
+    const s = await cargarSesionServidor();
+    if (s) void guardarSesionLocal(s);
+    return s;
+  } catch (e) {
+    if (!esErrorDeRed(e)) throw e;
+    return sesionLocal();
+  }
+}
+
+async function guardarSesionLocal(s: Sesion): Promise<void> {
+  try {
+    const { data } = await createClient().auth.getSession();
+    const uid = data.session?.user.id;
+    if (uid) await localDb().guardarSesion({ uid, usuario: s.usuario, rol: s.rol, soloLectura: s.soloLectura, sesion: s, actualizadoEn: new Date().toISOString() });
+  } catch {
+    /* sin base local: solo no habrá modo sin señal */
+  }
+}
+
+async function sesionLocal(): Promise<Sesion | null> {
+  // getSession lee el token guardado en el equipo (no usa la red)
+  const { data } = await createClient().auth.getSession();
+  const uid = data.session?.user.id;
+  if (!uid) return null;
+  const g = await localDb().leerSesion(uid);
+  return g ? (g.sesion as Sesion) : null;
+}
+
+async function cargarSesionServidor(): Promise<Sesion | null> {
   const sb = createClient();
   const {
     data: { user },
+    error: errUsuario,
   } = await sb.auth.getUser();
+  if (errUsuario && esErrorDeRed(errUsuario)) throw errUsuario;
   if (!user) return null;
   // "*": las columnas nuevas (avatar_iniciales, modulo_asignado, activo…) son opcionales hasta correr su SQL
   const { data, error } = await sb.from("perfiles").select("*").eq("id", user.id).maybeSingle();
@@ -65,7 +103,6 @@ async function cargarSesion(): Promise<Sesion | null> {
     nombreCompleto: data.nombre_completo ?? undefined,
     iniciales: data.avatar_iniciales ?? undefined,
     moduloAsignado: data.modulo_asignado ?? undefined,
-    permisos: Array.isArray(data.permisos) ? data.permisos : [],
   };
 }
 
@@ -178,9 +215,7 @@ export function inicioDe(sesion: Sesion): string {
 }
 
 /** Rol de negocio; un rol desconocido (ej. uno antiguo de la tabla) queda sin permisos de escritura. */
-export const rolNegocio = (sesion: Sesion | null): Rol =>
-  // Administrador de Secocha: los mismos permisos de negocio que SOPORTE, limitados a Secocha por la base
-  sesion && esAdminSede(sesion) ? "GERENCIA" : sesion ? ROL_NEGOCIO[sesion.rol as RolAuth] ?? "CONTADOR" : "CONTADOR";
+export const rolNegocio = (sesion: Sesion | null): Rol => (sesion ? ROL_NEGOCIO[sesion.rol as RolAuth] ?? "CONTADOR" : "CONTADOR");
 
 // =====================================================================
 // Módulos del login: el usuario elige su módulo ANTES de ingresar.
@@ -197,8 +232,7 @@ export type ModuloLogin = "ventas" | "contable" | "tesoreria" | "produccion" | "
  * `roles`: roles que también pertenecen al módulo (además del rol con el mismo nombre y creador).
  */
 export const MODULOS_LOGIN: Record<ModuloLogin, { nombre: string; ruta: string; rutas: string[]; roles?: RolAuth[] }> = {
-  // VENTAS: módulo propio desde 2026-11-16 (antes dentro de Logística); entra a su INICIO /ventas
-  ventas: { nombre: "Ventas", ruta: "/ventas", rutas: ["/ventas", "/dashboard/ventas"] },
+  ventas: { nombre: "Ventas", ruta: "/dashboard/ventas", rutas: ["/dashboard/ventas"] },
   contable: { nombre: "Área Contable", ruta: "/dashboard/contable", rutas: ["/dashboard/contable"] },
   tesoreria: { nombre: "Tesorería (Planilla - Compras)", ruta: "/dashboard/compras", rutas: ["/dashboard/compras", "/dashboard/planilla"], roles: ["planilla"] },
   produccion: { nombre: "Producción", ruta: "/produccion", rutas: ["/produccion", "/dashboard/produccion", "/dashboard/almacen"], roles: ["almacen"] },
@@ -249,7 +283,6 @@ const CARGOS: Record<RolAuth, string> = {
   planilla: "Jefe de RRHH",
   gerencia: "Gerente General",
   sucursal: "Jefe de Sucursal - COMBOY VID SUCURSAL",
-  ventas: "Ventas - pedidos, facturación y cobranza",
 };
 export const cargoDe = (s: Sesion): string => (s.rol === "creador" ? CARGOS.creador : s.cargo?.trim() || CARGOS[s.rol] || s.rol);
 
@@ -258,7 +291,7 @@ const NOMBRES: Partial<Record<RolAuth, string>> = {
   tesoreria: "LIZBETH CAHUANA APFATA",
   almacen: "JOSE MANUEL ORTIZ ARAPA",
 };
-export const nombreDe = (s: Sesion): string => (esSoporte(s) && !esAdminSede(s) ? ETIQUETA_SOPORTE : s.nombreCompleto?.trim() || NOMBRES[s.rol] || s.nombre);
+export const nombreDe = (s: Sesion): string => (esSoporte(s) ? ETIQUETA_SOPORTE : s.nombreCompleto?.trim() || NOMBRES[s.rol] || s.nombre);
 
 /** El rol creador se muestra como SOPORTE (Dueño): solo cambia lo que se ve, el rol en la base sigue siendo "creador". */
 export const esSoporte = (s: Sesion | null): boolean => isAdmin(s);

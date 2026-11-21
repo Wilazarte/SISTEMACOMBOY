@@ -1,0 +1,88 @@
+# App de Windows con Tauri v2 (carpeta src-tauri/).
+# En cada push a main que toque src-tauri/ (o a mano desde Actions → "Run workflow"):
+#   1. compila el instalador COMBOY-ERP-Setup.exe en Windows,
+#   2. lo firma para el actualizador (secretos TAURI_SIGNING_PRIVATE_KEY / _PASSWORD),
+#   3. publica un Release de GitHub con el .exe y latest.json.
+# Las apps instaladas leen latest.json al abrir y ofrecen "Nueva versión disponible".
+# Los cambios de pantallas del ERP NO necesitan esto: llegan solos al publicar en Vercel.
+name: App Windows (Tauri)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["src-tauri/**", ".github/workflows/tauri-windows.yml"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tauri-windows
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Revisar la clave del actualizador
+        shell: bash
+        env:
+          CLAVE: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$CLAVE" ]; then
+            echo "::error::Falta el secreto TAURI_SIGNING_PRIVATE_KEY (Settings → Secrets and variables → Actions). Ver docs/APP-WINDOWS-TAURI.md"
+            exit 1
+          fi
+
+      - name: Versión 1.0.<número de ejecución>
+        id: version
+        shell: bash
+        run: |
+          V="1.0.${{ github.run_number }}"
+          node -e "const f='src-tauri/tauri.conf.json';const c=require('./'+f);c.version='$V';require('fs').writeFileSync(f,JSON.stringify(c,null,2)+'\n')"
+          echo "v=$V" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        id: tauri
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: app-v${{ steps.version.outputs.v }}
+          releaseName: "COMBOY VID ERP ${{ steps.version.outputs.v }} (Windows)"
+          releaseBody: |
+            Instalador para Windows: descargue **COMBOY-ERP-Setup.exe** y ábralo.
+            Las PCs que ya tienen la app se actualizan solas al abrirla ("Nueva versión disponible").
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
+
+      - name: Copia con nombre fijo COMBOY-ERP-Setup.exe
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EXE=$(ls src-tauri/target/release/bundle/nsis/*-setup.exe | head -1)
+          cp "$EXE" COMBOY-ERP-Setup.exe
+          gh release upload "app-v${{ steps.version.outputs.v }}" COMBOY-ERP-Setup.exe --clobber
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: COMBOY-ERP-Setup-${{ steps.version.outputs.v }}
+          path: COMBOY-ERP-Setup.exe

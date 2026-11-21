@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>COMBOY VID ERP</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: grid; place-items: center;
+    background: radial-gradient(1200px 600px at 20% 10%, #12306b 0%, #0b1530 55%, #070d1f 100%);
+    color: #e6edf7; font: 15px/1.5 "Segoe UI", system-ui, sans-serif;
+  }
+  .caja { width: min(440px, calc(100% - 32px)); text-align: center; padding: 32px 28px;
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); border-radius: 18px;
+    backdrop-filter: blur(14px); }
+  img { width: 96px; height: 96px; object-fit: contain; }
+  h1 { font-size: 20px; margin: 12px 0 4px; letter-spacing: .02em; }
+  p { margin: 6px 0; color: #b8c6dc; }
+  .estado { margin-top: 16px; font-weight: 600; color: #7fd3ff; }
+  .error { color: #ff8a7a; }
+  button { margin-top: 18px; padding: 10px 22px; border-radius: 10px; border: 0; cursor: pointer;
+    background: #1e6bff; color: #fff; font: 600 14px "Segoe UI", sans-serif; }
+  button:hover { background: #00b8ff; }
+  .punto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #7fd3ff;
+    margin-right: 8px; animation: lat 1s infinite alternate; }
+  @keyframes lat { from { opacity: .3 } to { opacity: 1 } }
+  small { display: block; margin-top: 14px; color: #7d8ba3; }
+</style>
+</head>
+<body>
+<div class="caja">
+  <img src="logo.png" alt="" />
+  <h1>COMBOY VID ERP</h1>
+  <p id="sub">Conectando con el servidor…</p>
+  <div id="estado" class="estado"><span class="punto"></span>Un momento</div>
+  <button id="reintentar" hidden>Reintentar</button>
+  <small id="pie"></small>
+</div>
+<script>
+// Página de arranque (incluida en el .exe). Entra al ERP en Vercel; sin señal, entra igual si esta PC
+// ya guardó el ERP para trabajar offline (service worker + SQLite). La primera vez necesita internet.
+(function () {
+  var ERP_URL = "https://sistemacomboy.vercel.app";
+  var DB = "sqlite:comboy-erp.db";
+  var T = window.__TAURI__;
+  var $ = function (id) { return document.getElementById(id); };
+
+  function invoke(cmd, args) {
+    return T && T.core ? T.core.invoke(cmd, args) : Promise.reject(new Error("sin Tauri"));
+  }
+  function ajuste(k) {
+    return invoke("plugin:sql|load", { db: DB })
+      .then(function () { return invoke("plugin:sql|select", { db: DB, query: "SELECT v FROM ajustes WHERE k = $1", values: [k] }); })
+      .then(function (filas) { return filas && filas[0] ? filas[0].v : null; })
+      .catch(function () { return null; });
+  }
+  function hayServidor() {
+    var ctrl = new AbortController();
+    var t = setTimeout(function () { ctrl.abort(); }, 6000);
+    return fetch(ERP_URL + "/robots.txt?t=" + Date.now(), { mode: "no-cors", cache: "no-store", signal: ctrl.signal })
+      .then(function () { return true; }, function () { return false; })
+      .finally(function () { clearTimeout(t); });
+  }
+  function ir(ruta) { location.replace(ERP_URL + (ruta || "/")); }
+
+  function intentar() {
+    $("reintentar").hidden = true;
+    $("estado").className = "estado";
+    $("estado").innerHTML = '<span class="punto"></span>Un momento';
+    Promise.all([hayServidor(), ajuste("shell_cacheado"), ajuste("ultima_ruta")]).then(function (r) {
+      var online = r[0], cacheado = r[1] === "1", ultima = r[2];
+      if (online) return ir(ultima || "/");
+      if (cacheado) {
+        $("sub").textContent = "Sin señal: abriendo el ERP en modo offline";
+        $("estado").textContent = "Los cambios se guardan en esta PC y se suben solos al volver la señal.";
+        return setTimeout(function () { ir(ultima || "/"); }, 900);
+      }
+      $("sub").textContent = "Sin conexión a internet";
+      $("estado").className = "estado error";
+      $("estado").textContent = "La primera vez la app necesita internet para guardar el ERP en esta PC. Luego funciona sin señal.";
+      $("reintentar").hidden = false;
+      setTimeout(intentar, 15000);
+    });
+  }
+  $("reintentar").addEventListener("click", intentar);
+  if (T && T.app && T.app.getVersion) T.app.getVersion().then(function (v) { $("pie").textContent = "Versión " + v; });
+  intentar();
+})();
+</script>
+</body>
+</html>

@@ -1,31 +1,29 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { FolderOpen, Video } from "lucide-react";
-import { useSesion } from "@/lib/auth";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { BadgeCheck, Boxes, ClipboardList, FilePlus, FileSearch, FolderOpen, Landmark, LayoutGrid, MessageSquare, PackageCheck, Send, Truck, Video, type LucideIcon } from "lucide-react";
+import { useSesion, type Sesion } from "@/lib/auth";
+import { useChat } from "@/lib/chat";
 import { recargarExpedientes, useExpedientes } from "@/lib/expedientes";
-import { SALA_MODULO, TITULO_INICIO, accionesPermitidas, type ModuloInicio } from "@/lib/inicioModulos";
+import { GRUPO_EXPEDIENTE, SALA_MODULO, TITULO_INICIO, accionesPermitidas, fasePrincipal, fasesFlujo, urlBoton, type AccionInicio, type ModuloInicio } from "@/lib/inicioModulos";
 import { irA } from "@/lib/navegacion";
 import { urlSala } from "@/lib/presencia";
 import { recargarDatos, type StoreKey, KEYS } from "@/lib/storage";
 import { AccesosModulos, type ModuloPlanta } from "@/components/logistica/planta";
-import { permisosPlanta } from "@/lib/permisosPlanta";
+import { isAdmin, permisosPlanta } from "@/lib/permisosPlanta";
 import { estiloSeccion } from "@/lib/seccionColor";
 import { HOOK_KPIS, type KpiInicio } from "./kpis";
 import { NotificacionesEnVivo } from "./NotificacionesEnVivo";
-import { PanelResumen } from "./PanelResumen";
 
-// INICIO de cada módulo (ERP v3.0; rediseño de Williams 2026-11-16): encabezado INICIO [MÓDULO] + código 26W y
-// videollamada; fila de 4 KPIs reales; a la izquierda (3/12) los avisos del módulo, fijos al hacer scroll; a la derecha
-// (9/12) tareas pendientes y gráficos de barras del módulo (PanelResumen). Los accesos rápidos van en la barra azul
-// de la derecha (BarraAccesos). Sin mapa de fondo.
+// INICIO de cada módulo (ERP v3.0, rediseño de Williams 2026-10-30): encabezado INICIO [MÓDULO] + código 26W; a la
+// izquierda (3/12) 4 KPIs reales, notificaciones en vivo y el chat del grupo; a la derecha (9/12) las acciones: el flujo
+// 26W en orden (Fase 1 → 8, la fase propia en azul eléctrico, tema GLASS) y debajo los demás grupos en columnas. Sin mapa de fondo.
 // Todo abre en la misma ventana.
 
 /** Abre una pantalla del ERP en la misma ventana (Atrás vuelve al INICIO). Nombre antiguo: antes abría pestaña nueva. */
 export const abrirEnPestana = (href: string) => irA(href);
 
-/** Código 26W elegido en el INICIO (por módulo): la barra de accesos rápidos lo usa al abrir una acción. */
-export const CLAVE_DOC = "erp-inicio-doc";
+const CLAVE_DOC = "erp-inicio-doc";
 
 /** Datos que se vuelven a pedir a Supabase cuando una pestaña guarda y avisa (postMessage reload). */
 const RECARGAR: StoreKey[] = [KEYS.ORDENES, KEYS.FACTURAS, KEYS.COTIZACIONES, KEYS.STOCK, KEYS.PRODUCCION, KEYS.DESPACHOS, KEYS.NOTAS_PEDIDO, KEYS.COMPROBANTES];
@@ -33,8 +31,7 @@ const RECARGAR: StoreKey[] = [KEYS.ORDENES, KEYS.FACTURAS, KEYS.COTIZACIONES, KE
 export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
   const { sesion } = useSesion();
   const acciones = useMemo(() => accionesPermitidas(sesion, modulo), [sesion, modulo]);
-  // VENTAS no trabaja expedientes 26W: solo se descargan si el módulo tiene botones del flujo
-  const exp = useExpedientes((modulo !== "soporte" && modulo !== "ventas") || acciones.some((a) => a.destino.startsWith("/erp")));
+  const exp = useExpedientes(modulo !== "soporte" || acciones.some((a) => a.destino.startsWith("/erp")));
   const abiertos = exp.expedientes.filter((x) => x.estado === "ABIERTO").sort((a, b) => b.codigo_expediente.localeCompare(a.codigo_expediente));
   const [doc, setDoc] = useState("");
 
@@ -67,6 +64,16 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
     return () => window.removeEventListener("message", oir);
   }, []);
 
+  // Flujo 26W en orden (Fase 1 → 8) y, debajo, los demás grupos en columnas (Compras nacionales, Ventas, Transporte…)
+  const fases = useMemo(() => (acciones.some((a) => a.grupo === GRUPO_EXPEDIENTE) ? fasesFlujo(modulo) : []), [acciones, modulo]);
+  const extrasFlujo = acciones.filter((a) => a.grupo === GRUPO_EXPEDIENTE && !a.fase);
+  const principal = fasePrincipal(modulo);
+  const grupos = useMemo(() => {
+    const m = new Map<string, AccionInicio[]>();
+    acciones.filter((a) => a.grupo !== GRUPO_EXPEDIENTE).forEach((a) => m.set(a.grupo, [...(m.get(a.grupo) ?? []), a]));
+    return [...m.entries()];
+  }, [acciones]);
+  const abrir = (a: AccionInicio) => abrirEnPestana(urlBoton(modulo, a, docValido || undefined));
 
   return (
     <div className="w-full space-y-4 text-white">
@@ -79,16 +86,8 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
             INICIO {TITULO_INICIO[modulo]}
             {docValido && <span className="texto-azul ml-3 align-middle text-2xl lg:text-3xl">{docValido}</span>}
           </h1>
-          <p className="text-[13px] text-[#9CA3AF]">Resumen del módulo: tareas pendientes y gráficos. Los accesos rápidos están en la barra azul de la derecha.</p>
+          <p className="text-[13px] text-[#9CA3AF]">Cada botón abre su pantalla aquí mismo; con Atrás vuelve al INICIO.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => window.open(urlSala(`Planta ${SALA_MODULO[modulo]}`), "_blank", "noopener")}
-          className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-[13px] font-semibold btn-glass text-[#E5E7EB] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00f2fe]/60"
-        >
-          <Video size={16} /> Videollamada {SALA_MODULO[modulo]}
-        </button>
         {!exp.faltaTabla && abiertos.length > 0 && (
           <label className="flex items-center gap-2 text-[13px] font-semibold text-[#D1D5DB]">
             <FolderOpen size={16} className="text-[#00f2fe]" /> Expediente
@@ -103,35 +102,100 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
             </select>
           </label>
         )}
-        </div>
       </header>
 
-      {/* KPIs del módulo en una fila (Williams 2026-11-16: la columna izquierda queda solo para los avisos) */}
-      <FilaKpis key={modulo} modulo={modulo} />
-
-      {/* Izquierda (3/12): avisos del módulo en una columna FIJA al hacer scroll (sticky bajo la barra superior, la lista
-          con scroll propio); derecha (9/12) gráficos y tareas pendientes */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        <div className="lg:col-span-3 lg:sticky lg:top-20 lg:self-start">
+      {/* Rediseño 2026-10-30: izquierda (3/12) KPIs, notificaciones en vivo y mensajes; derecha (9/12) acciones por flujo */}
+      <div className="grid gap-4 lg:grid-cols-12">
+        <div className="space-y-4 lg:col-span-4 xl:col-span-3">
+          <FilaKpis key={modulo} modulo={modulo} />
           <NotificacionesEnVivo sesion={sesion} modulo={modulo} />
+          <ChatModulo sesion={sesion} modulo={modulo} todos={modulo === "soporte" && isAdmin(sesion)} />
         </div>
 
-        {/* Parte principal (Williams 2026-11-16): los accesos rápidos están en la barra azul de la derecha; aquí van los
-            gráficos de barras y las tareas pendientes del módulo */}
-        <div className="lg:col-span-9">
-          <PanelResumen key={modulo} modulo={modulo} />
-        </div>
+        <section className="space-y-5 rounded-xl border border-white/[0.08] glass-card glass-blur p-5 lg:col-span-8 xl:col-span-9">
+          <h2 className="flex items-center gap-2 text-[15px] font-semibold text-white">
+            <LayoutGrid size={16} /> Acciones rápidas
+          </h2>
+          {acciones.length === 0 && <p className="text-[13px] text-[#9CA3AF]">Su usuario no tiene funciones habilitadas en este módulo.</p>}
+
+          {fases.length > 0 && (
+            <div className="seccion rounded-xl border bg-white/[0.02] p-4" style={estiloSeccion(0)}>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="seccion-titulo text-[13px] font-bold uppercase tracking-wide">{GRUPO_EXPEDIENTE}</p>
+                {extrasFlujo.map((a) => (
+                  <button key={a.slug} type="button" onClick={() => abrir(a)} className="rounded-lg px-3 py-1 text-[12px] font-semibold btn-glass text-[#E5E7EB] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00f2fe]/60">
+                    {a.label}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                {fases.map((a) => {
+                  const Icono = ICONO_FASE[a.fase ?? 1];
+                  const esPrincipal = a.fase === principal;
+                  return (
+                    <button
+                      key={a.slug}
+                      type="button"
+                      onClick={() => abrir(a)}
+                      className={`flex min-h-[64px] items-start gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13px] leading-snug transition ${
+                        esPrincipal ? "grad-azul font-semibold hover-cian" : "btn-glass text-[#E5E7EB] hover:text-white"
+                      }`}
+                    >
+                      <Icono size={18} strokeWidth={1.75} className="mt-0.5 shrink-0" />
+                      <span>{a.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {grupos.length > 0 && (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 min-[1800px]:grid-cols-4">
+              {grupos.map(([grupo, lista], i) => (
+                // Cada grupo con su color de marca (rojo, cian, naranja…) para distinguirlo de un vistazo
+                <div key={grupo} className="seccion rounded-xl border bg-white/[0.02] p-4" style={estiloSeccion(i + 1)}>
+                  <p className="seccion-titulo mb-3 text-[13px] font-bold uppercase tracking-wide">{grupo}</p>
+                  <div className="grid grid-cols-1 gap-2">
+                    {lista.map((a) => (
+                      <button
+                        key={a.slug}
+                        type="button"
+                        onClick={() => abrir(a)}
+                        className="flex min-h-[40px] w-full items-center justify-center rounded-lg px-3 py-2 text-center text-[13px] font-semibold leading-snug btn-glass text-[#E5E7EB] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00f2fe]/60"
+                      >
+                        <span>{a.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="border-t border-white/[0.08] pt-4">
+            <button
+              type="button"
+              onClick={() => window.open(urlSala(`Planta ${SALA_MODULO[modulo]}`), "_blank", "noopener")}
+              className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-[13px] font-semibold btn-glass text-[#E5E7EB] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00f2fe]/60"
+            >
+              <Video size={16} /> Iniciar videollamada {SALA_MODULO[modulo]}
+            </button>
+          </div>
+        </section>
       </div>
     </div>
   );
 }
 
+/** Íconos de línea de las 8 fases del flujo 26W. */
+const ICONO_FASE: Record<number, LucideIcon> = { 1: FilePlus, 2: ClipboardList, 3: Boxes, 4: FileSearch, 5: Landmark, 6: Truck, 7: PackageCheck, 8: BadgeCheck };
 
 function FilaKpis({ modulo }: { modulo: ModuloInicio }) {
   const useKpis = HOOK_KPIS[modulo];
   const kpis = useKpis(true);
   return (
-    <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2">
       {kpis.map((k, i) => (
         <TarjetaKpi key={k.titulo} k={k} i={i} />
       ))}
@@ -146,6 +210,113 @@ function TarjetaKpi({ k, i }: { k: KpiInicio; i: number }) {
       <span className="mt-0.5 block truncate text-xl font-bold text-white">{k.valor}</span>
       <span className={`mt-0.5 block truncate text-[11px] ${k.alerta ? "text-[#ff6a5f]" : "text-[#4ade80]"}`}>{k.detalle}</span>
     </button>
+  );
+}
+
+const CLAVE_LEIDO = "erp-chat-leido";
+
+/** Mensajes del grupo del módulo (tabla chat_mensajes, columna modulo). "Sin leer": lo nuevo desde la última vez que se abrió. */
+/** Grupos que SOPORTE ve en pestañas (cada modulador ve solo el de su módulo; RLS chat_leer hace lo mismo en la base). */
+const SALAS_SOPORTE = [SALA_MODULO.soporte, SALA_MODULO.logistica, SALA_MODULO.almacen, SALA_MODULO.finanzas, SALA_MODULO.produccion, "Gerencia"];
+
+function ChatModulo({ sesion, modulo, todos }: { sesion: Sesion | null; modulo: ModuloInicio; todos?: boolean }) {
+  const [sala, setSala] = useState(SALA_MODULO[modulo]);
+  const { mensajes, enviar, faltaTabla } = useChat(sesion, sala, true);
+  const [texto, setTexto] = useState("");
+  const [error, setError] = useState("");
+  const [leido, setLeido] = useState<string | null>(null);
+  const lista = useRef<HTMLUListElement>(null);
+
+  useEffect(() => {
+    lista.current?.scrollTo({ top: lista.current.scrollHeight });
+  }, [mensajes]);
+
+  // Última lectura (por navegador): se marca leído al abrir el INICIO y al escribir
+  useEffect(() => {
+    try {
+      setLeido(window.localStorage.getItem(`${CLAVE_LEIDO}:${sala}`) ?? "");
+    } catch {
+      setLeido("");
+    }
+  }, [sala]);
+  const ultimo = mensajes[mensajes.length - 1]?.creado;
+  useEffect(() => {
+    if (!ultimo || leido === null) return;
+    const t = setTimeout(() => {
+      try {
+        window.localStorage.setItem(`${CLAVE_LEIDO}:${sala}`, ultimo);
+      } catch {
+        /* almacenamiento bloqueado */
+      }
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [ultimo, leido, sala]);
+  const sinLeer = leido ? mensajes.filter((m) => m.creado > leido && m.usuario !== sesion?.usuario).length : 0;
+
+  const mandar = async (e: FormEvent) => {
+    e.preventDefault();
+    const err = await enviar(texto);
+    setError(err ?? "");
+    if (!err) setTexto("");
+  };
+
+  return (
+    <section className="aviso-glass glass-blur flex min-h-[320px] flex-col rounded-xl p-4 pl-5" data-sin-guardar>
+      <h2 className="mb-3 flex items-center justify-between gap-2 text-[15px] font-semibold text-white">
+        <span className="flex items-center gap-2">
+          <MessageSquare size={17} /> Mensajes del grupo {sala}
+        </span>
+        {sinLeer > 0 && <span className="rounded-full grad-fuego px-2 py-0.5 text-[11px] font-bold">{sinLeer} sin leer</span>}
+      </h2>
+      {todos && (
+        <div className="mb-3 flex flex-wrap gap-1.5" role="tablist" aria-label="Grupos de chat">
+          {SALAS_SOPORTE.map((s) => (
+            <button
+              key={s}
+              type="button"
+              role="tab"
+              aria-selected={s === sala}
+              onClick={() => setSala(s)}
+              className={`rounded-full border px-3 py-1 text-[12px] font-semibold transition ${s === sala ? "grad-azul" : "border-white/[0.08] bg-white/[0.04] text-[#D1D5DB] hover:border-[#00f2fe] hover:text-white"}`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+      {faltaTabla ? (
+        <p className="rounded-lg bg-white/[0.04] px-3 py-2 text-[12px] italic text-[#a1a1aa]">Falta activar el chat: ejecute supabase/migrations/20261104_chat_grupal.sql en Supabase.</p>
+      ) : (
+        <>
+          <ul ref={lista} className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1 lg:max-h-[520px]">
+            {mensajes.length === 0 && <li className="text-[12px] text-[#a1a1aa]">Sin mensajes todavía.</li>}
+            {mensajes.map((m) => (
+              <li key={m.id} className={`rounded-lg px-3 py-1.5 ${leido && m.creado > leido && m.usuario !== sesion?.usuario ? "border border-[#ff2a5f]/60 bg-[#ff2a5f]/[0.06]" : "bg-white/[0.04]"}`}>
+                <span className="flex justify-between gap-2 text-[11px] text-[#a1a1aa]">
+                  <span className="truncate font-semibold text-[#7dd3fc]">{m.nombre || m.usuario}</span>
+                  <span>{new Date(m.creado).toLocaleString("es-PE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false })}</span>
+                </span>
+                <span className="block break-words text-[13px] text-white">{m.texto}</span>
+              </li>
+            ))}
+          </ul>
+          <form onSubmit={mandar} className="mt-3 flex gap-2">
+            <input
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              maxLength={1000}
+              placeholder="Nuevo mensaje para el grupo…"
+              aria-label={`Mensaje para el grupo ${sala}`}
+              className="min-w-0 flex-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-[13px] text-white placeholder:text-[#71717a] focus:border-[#00f2fe] focus:outline-none"
+            />
+            <button type="submit" disabled={!texto.trim()} aria-label="Enviar" className="grad-azul rounded-lg px-3 disabled:opacity-50">
+              <Send size={15} />
+            </button>
+          </form>
+          {error && <p className="mt-1 text-[11px] text-[#fca5a5]">{error}</p>}
+        </>
+      )}
+    </section>
   );
 }
 

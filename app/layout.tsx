@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
-import { TablasMovil } from "@/components/TablasMovil";
+import { AppNativa } from "@/components/app-nativa/AppNativa";
 
 export const metadata: Metadata = {
   title: "ERP COMBOY VID",
@@ -21,8 +21,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       </head>
       <body>
         {children}
-        {/* Celular: tablas como tarjetas, sin barra horizontal (app/globals.css) */}
-        <TablasMovil />
+        <AppNativa />
       </body>
     </html>
   );

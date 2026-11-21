@@ -126,6 +126,16 @@ export interface Bancarizacion {
   caja: string; // CAJA GENERAL, CAJA CHICA…
 }
 
+/** Foto de guía de remisión tomada por el almacenero con la app Android. */
+export interface FotoGuia {
+  /** Ruta en el bucket "guias": <ocId>/<fecha>.jpg */
+  ruta: string;
+  fecha: string;
+  usuario: string;
+  /** false mientras la foto solo está en el celular (sin señal). */
+  subida: boolean;
+}
+
 export interface OrdenCompra {
   id: string;
   numero: string; // OC-2026-0001
@@ -165,6 +175,8 @@ export interface OrdenCompra {
   voucherTipo?: string;
   voucherMonto?: number;
   historial: EventoHistorial[];
+  /** Fotos de la guía física tomadas con el celular (bucket "guias" de Supabase Storage, ver lib/movil/fotosGuia.ts). */
+  fotosGuia?: FotoGuia[];
 }
 
 /**

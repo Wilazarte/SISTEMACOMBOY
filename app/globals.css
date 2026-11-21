@@ -386,458 +386,74 @@ body[data-modo-pestana] [data-guardar-pestana] {
   box-shadow: 0 0 15px rgb(var(--sec) / 0.35);
 }
 
-/* ── Chat grupal único (components/chat/ChatGlobal.tsx, 2026-11-16) ───────────────────────────── */
-@keyframes chat-parpadeo {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
-  50% { opacity: 0.5; box-shadow: 0 0 20px 5px rgba(255, 42, 60, 0.9); }
-}
-.chat-parpadeo { animation: chat-parpadeo 1s ease-in-out infinite; }
-.chat-resaltado { background: rgba(196, 0, 28, 0.12); }
-.chat-claro { background-color: #e5e7eb; }
-.chat-fondo {
-  background-image: radial-gradient(rgba(0, 0, 0, 0.06) 1px, transparent 1px);
-  background-size: 18px 18px;
-}
-/* Fondo rojo de la barra del chat (pedido de Williams 2026-11-16: izquierda, fondo rojo) */
-.chat-rojo { background-color: #4a0710; }
-.tema-planta .chat-rojo.seccion { position: fixed; background-color: rgba(74, 7, 16, 0.94); border-color: rgb(var(--sec) / 0.55); }
-@media (max-width: 1023px) { .tema-planta .chat-rojo.seccion { background-color: #4a0710; } }
-/* Pestaña "Guardar y Cerrar" (barra fija abajo, z-60): el chat termina encima de ella */
-@media (min-width: 1024px) {
-  body[data-modo-pestana] aside.chat-barra { bottom: 64px; }
-}
-
-/* Barra azul de accesos rápidos (Williams 2026-11-16, color de su imagen de referencia) con el estilo abstracto del
-   tema GLASS: manchas de luz, arcos y trazo diagonal en azul eléctrico sobre el azul marino. */
-.barra-accesos {
-  background-color: #1e2a5a;
-  background-image:
-    radial-gradient(140% 22% at 100% 0%, transparent 52%, rgba(120, 160, 255, 0.28) 53%, transparent 55%),
-    radial-gradient(140% 22% at 100% 0%, transparent 30%, rgba(120, 160, 255, 0.18) 31%, transparent 33%),
-    radial-gradient(160% 26% at 0% 100%, transparent 50%, rgba(0, 242, 254, 0.2) 51%, transparent 53%),
-    repeating-linear-gradient(135deg, rgba(150, 180, 255, 0.07) 0 1px, transparent 1px 11px),
-    radial-gradient(120% 40% at 50% 0%, rgba(61, 139, 255, 0.35) 0%, transparent 70%),
-    radial-gradient(120% 35% at 50% 100%, rgba(0, 242, 254, 0.14) 0%, transparent 70%),
-    linear-gradient(180deg, #2b3b7a 0%, #1e2a5a 45%, #161f45 100%);
-  border: 1px solid rgba(120, 160, 255, 0.35);
-}
-
-/* Barra superior con el rojo abstracto del chat grupal (Williams 2026-11-16): mismo fondo #4a0710, línea de luz,
-   manchas y trazo diagonal en rojo COMBOY; las letras van en blanco/dorado para resaltar. */
-.tema-planta .cabecera-roja {
-  background-color: rgba(74, 7, 16, 0.96);
-  background-image:
-    linear-gradient(90deg, transparent 0%, rgb(227 6 19) 30%, rgb(255 106 0) 70%, transparent 100%),
-    radial-gradient(60% 220% at 100% 0%, transparent 52%, rgb(227 6 19 / 0.35) 53%, transparent 54.5%),
-    radial-gradient(60% 220% at 100% 0%, transparent 32%, rgb(227 6 19 / 0.22) 33%, transparent 34.5%),
-    radial-gradient(40% 200% at 0% 100%, transparent 50%, rgb(255 106 0 / 0.22) 51%, transparent 52.5%),
-    repeating-linear-gradient(135deg, rgb(227 6 19 / 0.16) 0 1px, transparent 1px 11px),
-    radial-gradient(80% 160% at 50% 0%, rgb(227 6 19 / 0.35) 0%, transparent 70%);
-  background-size: 100% 2px, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
-  background-position: bottom, center, center, center, center, center;
-  background-repeat: no-repeat;
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgb(227 6 19 / 0.55);
-}
-.cabecera-roja .texto-modulo {
-  color: #ffffff;
-  text-shadow: 0 0 18px rgba(255, 214, 102, 0.55), 0 2px 0 rgba(0, 0, 0, 0.45);
-  letter-spacing: 0.06em;
-}
-/* El logo (rojo y azul) se pierde sobre el rojo: va sobre una placa grafito como en el tema anterior */
-.cabecera-roja .logo-placa { background: rgba(10, 11, 14, 0.88); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 10px; padding: 3px 8px; }
-
-/* ===================== Celular sin desplazamiento horizontal (Williams 2026-11-17) =====================
-   "Que no haya la necesidad de desplazarse para ver un texto completo": en pantallas de menos de 640 px
-   - las tablas se ven como tarjetas (una por fila: COLUMNA a la izquierda, valor a la derecha, con salto de línea).
-     components/TablasMovil.tsx pone a cada celda su data-label; una tabla que deba quedar como tabla lleva .tabla-fija;
-   - los textos cortados con "…" (truncate) pasan a la línea siguiente;
-   - las columnas de las grillas no se estiran más que la pantalla (antes el INICIO medía 498 px de ancho).
-   En PC (640 px o más) nada cambia. */
-@media (max-width: 639px) {
-  .grid > * { min-width: 0; }
-  /* Tooltips (.tip): en el celular no hay cursor y, aun invisibles, ensanchaban la página a la derecha */
-  .tip::after { content: none; }
-
-  main .truncate,
-  .tema-claro .truncate {
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
-
-  /* El contenedor con barra horizontal ya no la necesita */
-  .overflow-x-auto:has(> table.tabla-movil) { overflow-x: visible; }
-
-  table.tabla-movil {
-    display: block;
-    width: 100%;
-    min-width: 0 !important;
-  }
-  table.tabla-movil > thead {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-  }
-  table.tabla-movil > tbody,
-  table.tabla-movil > tfoot {
-    display: block;
-    width: 100%;
-    background: transparent;
-    box-shadow: none;
-  }
-  table.tabla-movil > tbody > tr,
-  table.tabla-movil > tfoot > tr {
-    display: block;
+/* -------------------------------------------------------------------------
+   Tablas como tarjetas en celular (app Android y navegador móvil).
+   ErpTable tarjetas / Kardex: cada fila es una tarjeta; cada celda muestra su cabecera
+   a la izquierda (la pone EtiquetasTarjeta en components/erp/ErpTable.tsx).
+   ------------------------------------------------------------------------- */
+@media (max-width: 767px) {
+  .tabla-tarjetas table { min-width: 0 !important; }
+  .tabla-tarjetas thead { display: none; }
+  .tabla-tarjetas table,
+  .tabla-tarjetas tbody,
+  .tabla-tarjetas tr,
+  .tabla-tarjetas td { display: block; width: 100%; }
+  .tabla-tarjetas tbody { background: transparent !important; }
+  .tabla-tarjetas tr {
     margin: 0 0 10px;
-    padding: 4px 0;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    border-radius: 12px;
-    background-color: rgba(20, 23, 31, 0.78);
+    padding: 6px 12px;
+    border: 1px solid rgba(147, 197, 253, 0.18) !important;
+    border-radius: 14px;
   }
-  .tema-claro table.tabla-movil > tbody > tr,
-  .tema-claro table.tabla-movil > tfoot > tr { background-color: rgb(var(--surface)); border-color: rgb(var(--plomo-200)) !important; }
-  table.tabla-movil > tbody > tr > :is(td, th),
-  table.tabla-movil > tfoot > tr > :is(td, th) {
-    width: auto !important;
-    min-width: 0 !important;
-    max-width: none !important;
-    padding: 6px 12px !important;
-    border: 0 !important;
+  .tabla-tarjetas td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0 !important;
     text-align: right !important;
     white-space: normal !important;
-    overflow-wrap: anywhere;
-    display: flow-root; /* contiene la etiqueta flotante */
+    word-break: break-word;
+    border: 0 !important;
   }
-  table.tabla-movil > tbody > tr > :is(td, th) + :is(td, th) { border-top: 1px solid rgba(255, 255, 255, 0.05) !important; }
-  /* Etiqueta de la columna a la izquierda; el valor ocupa el resto y salta de línea si no cabe */
-  table.tabla-movil :is(td, th)[data-label]:not([data-label=""])::before {
-    content: attr(data-label);
-    float: left;
-    max-width: 42%;
-    margin-right: 12px;
-    padding-top: 2px;
+  .tabla-tarjetas td + td { border-top: 1px dashed rgba(147, 197, 253, 0.12) !important; }
+  .tabla-tarjetas td::before {
+    flex-shrink: 0;
+    max-width: 45%;
     text-align: left;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
-    line-height: 1.3;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
     color: #93c5fd;
   }
-  .tema-claro table.tabla-movil :is(td, th)[data-label]:not([data-label=""])::before { color: rgb(var(--plomo-500)); }
-  /* Celdas sin título (casillas, acciones, detalle desplegado): el contenido va completo */
-  table.tabla-movil :is(td, th):is(:not([data-label]), [data-label=""]) { text-align: left !important; }
-  /* Botones e íconos dentro de la celda: a la derecha y en varias líneas si hace falta */
-  table.tabla-movil td > .flex:not(.flex-col) { flex-wrap: wrap; justify-content: flex-end; }
-  table.tabla-movil td[data-label=""] > .flex:not(.flex-col) { justify-content: flex-start; }
-  table.tabla-movil td :is(input, select, textarea) { max-width: 100%; }
-  /* Celda vacía (fila en blanco al final de una tabla editable) */
-  table.tabla-movil > tbody > tr > td:empty { display: none; }
+  .tabla-tarjetas td:empty { display: none; }
+  /* Botones de acciones: a todo el ancho de la tarjeta */
+  .tabla-tarjetas td:last-child:has(button) { justify-content: flex-end; flex-wrap: wrap; }
 }
 
-/* ===================== Estilo LOGIN en todo el ERP (prueba, Williams 2026-11-17) =====================
-   Mismo lenguaje visual que el inicio de sesión de dos paneles (components/login/LoginDosPaneles.tsx):
-   fondo claro #F1F3F2 con ondas azul/cian al pie, tarjetas blancas con borde #CCD0CF, texto azul marino #11212D,
-   íconos en círculo rojo COMBOY, seleccionado en azul marino, foco cian y botón principal rojo→azul→cian.
-   La barra superior toma el panel oscuro del login (azul noche con ondas). La estructura no cambia: solo colores.
-   Se activa con la clase .tema-login junto a .tema-planta (ErpLayout). */
-.tema-planta.tema-login {
-  color-scheme: light;
-  --canvas: 238 242 248;
-  --surface: 255 255 255;
-  --fg: 17 33 45;
-  --fg-2: 75 91 120;
-  --corp: 0 102 255;
-  --vino-900: 0 82 220;
-  --vino: 196 30 58;
-  --rojo: 196 30 58;
-  --rojo-soft: 253 236 240;
-  --rojo-tenue: 250 200 210;
-  --azul-900: 17 33 45;
-  --azul-700: 43 59 92;
-  --azul-500: 90 103 130;
-  --plomo-50: 246 248 252;
-  --plomo-100: 238 242 249;
-  --plomo-200: 225 231 242;
-  --plomo-500: 90 103 130;
-  --plomo-600: 75 91 120;
-  --slate-100: 241 245 251; --slate-200: 225 231 242; --slate-300: 203 213 230; --slate-400: 122 135 158;
-  --slate-600: 75 91 120; --slate-700: 43 59 92; --slate-900: 17 33 45;
-  --red-50: 254 242 242; --red-100: 254 226 226; --red-200: 254 202 202; --red-300: 252 165 165; --red-400: 248 113 113;
-  --red-500: 239 68 68; --red-600: 220 38 38; --red-700: 185 28 28; --red-800: 153 27 27; --red-900: 127 29 29;
-  --emerald-50: 236 253 245; --emerald-100: 209 250 229; --emerald-200: 167 243 208; --emerald-400: 52 211 153;
-  --emerald-500: 16 185 129; --emerald-600: 5 150 105; --emerald-700: 4 120 87; --emerald-800: 6 95 70;
-  --amber-50: 255 251 235; --amber-100: 254 243 199; --amber-200: 253 230 138; --amber-300: 252 211 77; --amber-400: 251 191 36;
-  --amber-500: 245 158 11; --amber-600: 217 119 6; --amber-700: 180 83 9; --amber-800: 146 64 14; --amber-900: 120 53 15;
-  --orange-50: 255 247 237; --orange-300: 253 186 116; --orange-600: 234 88 12; --orange-700: 194 65 12; --orange-800: 154 52 18;
-  --blue-50: 239 246 255; --blue-200: 191 219 254; --blue-600: 37 99 235; --blue-800: 30 64 175;
-  --glass-bg: #ffffff;
-  --glass-borde: #CCD0CF;
-  --grad-azul: linear-gradient(90deg, #800021 0%, #294D61 55%, #00d4fe 100%);
-  --cian: #294D61;
-  color: #11212D;
+/* ===================== Gerencia: terminal bursátil (Williams, 2026-11-07) =====================
+   Solo dentro de .tema-bolsa (Dashboard Gerencia): cifras y símbolos en monoespaciada como una terminal de bolsa
+   (excepción acotada a la regla Times New Roman), cinta de cotizaciones en movimiento y punto "en vivo". */
+.tema-bolsa .mono,
+.tema-bolsa .mono *,
+.tema-bolsa svg text {
+  font-family: ui-monospace, "Cascadia Mono", "Consolas", "SFMono-Regular", "Menlo", "Courier New", monospace !important;
+  font-variant-numeric: tabular-nums;
 }
-/* Fondo: el panel claro del login, con ondas azul eléctrico / cian al pie */
-.fondo-login {
-  background-color: #E6E9E8;
-  background-image:
-    radial-gradient(circle at 8% 0%, rgba(41, 77, 97, 0.1) 0%, transparent 40%),
-    radial-gradient(circle at 100% 30%, rgba(128, 0, 33, 0.05) 0%, transparent 35%),
-    radial-gradient(rgba(17, 33, 45, 0.05) 1px, transparent 1px),
-    linear-gradient(180deg, #F1F3F2 0%, #DDE1E0 100%);
-  background-size: 100% 100%, 100% 100%, 22px 22px, 100% 100%;
+.tema-bolsa .cinta-pista { animation: cinta-bolsa 45s linear infinite; }
+.tema-bolsa .cinta-bolsa:hover .cinta-pista { animation-play-state: paused; }
+.tema-bolsa .cinta-bolsa::before,
+.tema-bolsa .cinta-bolsa::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 28px; z-index: 1; pointer-events: none;
 }
-
-/* Barra superior: panel oscuro del login (azul noche con ondas y trazo rojo fuego) */
-.tema-login .cabecera-roja {
-  background-color: #11212D;
-  background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 64' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='a' x1='0' x2='1'%3E%3Cstop offset='0' stop-color='%23294D61' stop-opacity='.55'/%3E%3Cstop offset='1' stop-color='%23CCD0CF' stop-opacity='.12'/%3E%3C/linearGradient%3E%3ClinearGradient id='f' x1='0' x2='1'%3E%3Cstop offset='0' stop-color='%23800021' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23800021' stop-opacity='.7'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0 0H1600V30C1350 60 1150 5 900 30S400 52 0 22Z' fill='url(%23a)'/%3E%3Cpath d='M0 48C300 20 650 70 1000 40S1450 30 1600 52' fill='none' stroke='%23CCD0CF' stroke-opacity='.3' stroke-width='1.5'/%3E%3Cpath d='M600 64C900 38 1200 70 1600 40' fill='none' stroke='url(%23f)' stroke-width='2'/%3E%3C/svg%3E");
-  background-size: 100% 100%;
-  background-repeat: no-repeat;
-  border-bottom: 1px solid rgba(204, 208, 207, 0.25);
-  box-shadow: 0 6px 24px rgba(17, 33, 45, 0.25);
+.tema-bolsa .cinta-bolsa::before { left: 0; background: linear-gradient(90deg, #000, transparent); }
+.tema-bolsa .cinta-bolsa::after { right: 0; background: linear-gradient(270deg, #000, transparent); }
+@keyframes cinta-bolsa { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.tema-bolsa .punto-vivo { animation: punto-vivo 1.6s ease-in-out infinite; }
+@keyframes punto-vivo { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) {
+  .tema-bolsa .cinta-pista { animation: none; }
+  .tema-bolsa .cinta-bolsa { overflow-x: auto; }
+  .tema-bolsa .punto-vivo { animation: none; }
 }
-.tema-login .cabecera-roja .texto-modulo { color: #fff; text-shadow: 0 0 18px rgba(204, 208, 207, 0.45); }
-.tema-login .cabecera-roja .logo-placa { background: #F1F3F2; border-color: rgba(255, 255, 255, 0.6); }
-
-/* Tarjetas, secciones y cajas: blancas como las opciones del login */
-.tema-login .bg-surface,
-.tema-login .glass-card,
-.tema-login :is(main, [role="dialog"]) .glass-blur,
-.tema-login .btn-glass,
-.tema-login .aviso-glass {
-  background-color: #ffffff;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  border-color: #CCD0CF;
-  color: #11212D;
-}
-.tema-login .bg-surface.shadow-pop { background-color: #ffffff; border-color: #CCD0CF; box-shadow: 0 20px 50px rgba(17, 33, 45, 0.18); }
-.tema-login .glass-card,
-.tema-login .shadow-card { box-shadow: 0 6px 22px rgba(17, 33, 45, 0.07); }
-.tema-login .border-plomo-200 { border-color: #CCD0CF; }
-.tema-login .btn-glass { box-shadow: 0 1px 2px rgba(17, 33, 45, 0.04); }
-.tema-login .btn-glass:hover,
-.tema-login .hover-cian:hover,
-.tema-login .seccion .btn-glass:hover,
-.tema-login .seccion .hover-cian:hover { border-color: #294D61; box-shadow: 0 4px 14px rgba(41, 77, 97, 0.2); background-color: #ffffff; }
-
-/* Principal: el botón "Ingresar" del login. Activo / seleccionado: azul marino como la opción elegida. */
-.tema-login .bg-corp,
-.tema-login .grad-azul { background-image: linear-gradient(90deg, #800021 0%, #294D61 55%, #00d4fe 100%); color: #fff; box-shadow: 0 6px 18px rgba(41, 77, 97, 0.28); }
-.tema-login .grad-fuego { box-shadow: 0 4px 12px rgba(128, 0, 33, 0.22); }
-
-/* Secciones: tarjeta blanca con la franja de color arriba y un arco suave en la esquina */
-.tema-login :is(main, [role="dialog"]) .seccion {
-  background-color: #ffffff;
-  border-color: #CCD0CF;
-  background-image:
-    linear-gradient(90deg, rgb(var(--sec)) 0%, rgb(var(--sec) / 0.35) 45%, transparent 90%),
-    radial-gradient(120% 90% at 100% 0%, rgb(var(--sec) / 0.06) 0%, transparent 55%);
-  background-size: 100% 3px, 100% 100%;
-}
-.tema-login :is(main, [role="dialog"]) .seccion::after { opacity: 0.45; }
-.tema-login :is(main, [role="dialog"]) .seccion-titulo { color: color-mix(in srgb, rgb(var(--sec)) 70%, #11212D); }
-.tema-login :is(main, [role="dialog"]) .seccion-titulo::before { box-shadow: none; }
-
-/* Textos claros pensados para el fondo negro: pasan a azul marino / gris azulado dentro del contenido */
-.tema-login :is(main, [role="dialog"]) :is(.text-white, .text-fg, .text-\[\#e5e7eb\], .text-\[\#fff\], .text-\[\#ffffff\]) { color: #11212D; }
-.tema-login :is(main, [role="dialog"]) :is(.text-\[\#d4d4d8\], .text-\[\#D1D5DB\], .text-\[\#d1d5db\]) { color: #294D61; }
-.tema-login :is(main, [role="dialog"]) :is(.text-\[\#a1a1aa\], .text-\[\#9CA3AF\], .text-\[\#9ca3af\], .text-\[\#71717a\], .text-\[\#6b7280\], .text-\[\#6B7280\], .text-\[\#6b7080\]) { color: #4F6B7B; }
-.tema-login :is(main, [role="dialog"]) :is(.text-\[\#4ade80\], .text-\[\#86efac\]) { color: #059669; }
-.tema-login :is(main, [role="dialog"]) :is(.text-\[\#60a5fa\], .text-\[\#93c5fd\], .text-\[\#00f2fe\]) { color: #294D61; }
-.tema-login :is(main, [role="dialog"]) :is(.text-\[\#fcd34d\], .text-\[\#fde68a\], .text-\[\#FFB27A\], .text-\[\#FF9A4D\]) { color: #c2410c; }
-.tema-login :is(main, [role="dialog"]) :is(.text-\[\#ff6a7f\], .text-\[\#ff6a5f\], .text-\[\#f87171\], .text-\[\#fca5a5\]) { color: #800021; }
-/* …salvo sobre fondos de color (botones principales, chips, avisos rojos, tooltips oscuros) */
-.tema-login :is(main, [role="dialog"]) :is(.bg-corp, .grad-azul, .grad-fuego, [class*="bg-gradient"], .bg-\[\#2a7bff\], .bg-\[\#E30613\], .bg-\[\#c4001c\], .bg-\[\#ff2a5f\], .bg-\[\#FF6D00\], .bg-\[\#22c55e\], .bg-azul-900, .bg-red-600, .bg-emerald-600, .bg-blue-600) :is(.text-white, .text-fg),
-.tema-login :is(main, [role="dialog"]) :is(.bg-corp, .grad-azul, .grad-fuego, [class*="bg-gradient"], .bg-\[\#2a7bff\], .bg-\[\#E30613\], .bg-\[\#c4001c\], .bg-\[\#ff2a5f\], .bg-\[\#FF6D00\], .bg-\[\#22c55e\], .bg-azul-900, .bg-red-600, .bg-emerald-600, .bg-blue-600).text-white { color: #fff; }
-
-/* Fondos y bordes translúcidos blancos (hechos para el negro) → tintes azul marino suaves */
-.tema-login :is(main, [role="dialog"]) :is(.border-white\/5, .border-white\/10, .border-white\/15, .border-white\/20, [class*="border-white/["]) { border-color: #CCD0CF; }
-.tema-login :is(main, [role="dialog"]) :is(.bg-white\/5, .bg-white\/10, [class*="bg-white/["]) { background-color: rgba(17, 33, 45, 0.035); }
-.tema-login :is(main, [role="dialog"]) :is(.hover\:bg-white\/10:hover, [class*="hover:bg-white/"]:hover) { background-color: rgba(41, 77, 97, 0.08); color: #11212D; }
-.tema-login :is(main, [role="dialog"]) :is(.bg-\[\#212a3a\], .bg-\[\#2a3445\], .bg-\[\#222222\], .bg-\[\#1A1A1A\], .bg-\[\#1a1a1a\]) { background-color: #E3E8EA; color: #11212D; }
-.tema-login :is(main, [role="dialog"]) :is(.border-\[\#333333\], .border-\[\#3a4558\], .border-\[\#444444\], .border-\[\#343846\], .border-\[\#2a2d38\]) { border-color: #CCD0CF; }
-
-/* Barras y cajas oscuras con color fijo (navegación INICIO › …, menús, botones grafito) → claras */
-.tema-login :is(main, [role="dialog"]) :is([class*="bg-[#0"], [class*="bg-[#1"], .bg-slate-700, .bg-slate-800, .bg-slate-900, .bg-black) { background-color: #ffffff; color: #11212D; }
-.tema-login :is(main, [role="dialog"]) :is([class*="bg-[#0"], [class*="bg-[#1"]).backdrop-blur { background-color: rgba(241, 243, 242, 0.92); }
-.tema-login :is(main, [role="dialog"]) :is(.hover\:bg-slate-700:hover, [class*="hover:bg-[#2"]:hover) { background-color: #E3E8EA; }
-.tema-login :is(main, [role="dialog"]) :is(.border-slate-600, .border-slate-700, [class*="border-[#2a7bff]"]) { border-color: #B4BBBA; }
-.tema-login :is(main, [role="dialog"]) .hover\:border-slate-400:hover { border-color: #294D61; }
-
-/* Tablas: cabecera gris azulado como los rótulos del login, filas blancas */
-.tema-login table thead { background-color: #E3E8EA; }
-.tema-login table thead th { color: #4F6B7B; }
-.tema-login table tbody tr:hover { background-color: rgba(41, 77, 97, 0.05); }
-
-/* Campos: blancos, borde #B4BBBA y foco cian (como Usuario / Contraseña, en claro) */
-.tema-login :is(main, [role="dialog"]) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea):not(.bg-transparent),
-.tema-login .shadow-pop :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):not(.bg-transparent) {
-  background-color: #ffffff;
-  border-color: #B4BBBA;
-  color: #11212D;
-}
-.tema-login :is(input, select, textarea):not(.bg-transparent):focus { border-color: #294D61; box-shadow: 0 0 0 3px rgb(41 77 97 / 0.18); }
-.tema-login ::placeholder { color: #8E9A9F; }
-
-/* Pie */
-.tema-login > footer { background: rgba(255, 255, 255, 0.85); border-color: #CCD0CF; color: #4F6B7B; }
-.tema-login > footer .text-white { color: #11212D; }
-
-/* Celular: tarjetas de las tablas en blanco */
-@media (max-width: 639px) {
-  .tema-login table.tabla-movil > tbody > tr,
-  .tema-login table.tabla-movil > tfoot > tr { background-color: #ffffff; border-color: #CCD0CF !important; box-shadow: 0 2px 8px rgba(17, 33, 45, 0.05); }
-  .tema-login table.tabla-movil > tbody > tr > :is(td, th) + :is(td, th) { border-top-color: #E6E9E8 !important; }
-  .tema-login table.tabla-movil :is(td, th)[data-label]:not([data-label=""])::before { color: #4F6B7B; }
-}
-
-/* ===================== Paleta COMBOY VID (Williams 2026-11-17) =====================
-   Todo el ERP con cuatro colores exactos:
-     #11212D azul noche  → cabecera, textos, elemento seleccionado
-     #800021 vino        → acción principal, chat, contadores y avisos
-     #294D61 azul acero  → barra de accesos, enlaces, foco, cabeceras de tabla y gráficos
-     #CCD0CF gris claro  → fondo de pantalla, bordes y texto sobre los colores oscuros
-   Las tarjetas siguen blancas para que se lea bien. La estructura no cambia: solo colores.
-   Verde / ámbar de los estados (aprobado, pendiente) se conservan porque son señales, no decoración. */
-.tema-planta.tema-login {
-  --noche: #11212D;
-  --vinoc: #800021;
-  --acero: #294D61;
-  --gris: #CCD0CF;
-  --canvas: 230 233 232;
-  --fg: 17 33 45;
-  --fg-2: 62 92 109;
-  --corp: 128 0 33;
-  --vino-900: 96 0 25;
-  --vino: 128 0 33;
-  --rojo: 128 0 33;
-  --rojo-soft: 243 228 232;
-  --rojo-tenue: 226 190 199;
-  --azul-900: 17 33 45;
-  --azul-700: 41 77 97;
-  --azul-500: 79 107 123;
-  --plomo-50: 244 245 245;
-  --plomo-100: 233 235 235;
-  --plomo-200: 204 208 207;
-  --plomo-500: 79 107 123;
-  --plomo-600: 41 77 97;
-  --slate-100: 233 235 235; --slate-200: 204 208 207; --slate-300: 176 183 182; --slate-400: 127 143 150;
-  --slate-600: 62 92 109; --slate-700: 41 77 97; --slate-900: 17 33 45;
-  --blue-50: 228 234 237; --blue-200: 180 197 206; --blue-600: 41 77 97; --blue-800: 17 33 45;
-  --grad-azul: linear-gradient(135deg, #294D61 0%, #11212D 100%);
-  --cian: #294D61;
-}
-
-/* Fondo: gris claro de la paleta con una luz de acero arriba y de vino a la derecha */
-.tema-login .fondo-login {
-  background-color: #CCD0CF;
-  background-image:
-    radial-gradient(circle at 8% 0%, rgba(41, 77, 97, 0.16) 0%, transparent 42%),
-    radial-gradient(circle at 100% 30%, rgba(128, 0, 33, 0.07) 0%, transparent 36%),
-    radial-gradient(rgba(17, 33, 45, 0.06) 1px, transparent 1px),
-    linear-gradient(180deg, #E9EBEB 0%, #D9DDDC 100%);
-  background-size: 100% 100%, 100% 100%, 22px 22px, 100% 100%;
-}
-
-/* Marca de agua: logo COMBOY VID en vino, fija al centro de la pantalla, sobre el contenido pero sin estorbar
-   (no recibe clics, se multiplica con el fondo y queda debajo de menús, modales, chat y barras). No sale al imprimir
-   ni en el inicio de sesión (el login no usa ErpLayout). */
-.marca-agua {
-  position: fixed;
-  inset: 64px 0 0 0;
-  z-index: 5;
-  pointer-events: none;
-  background: url("/marca-agua.png") center 46% / min(62vw, 980px) auto no-repeat;
-  opacity: 0.065;
-  mix-blend-mode: multiply;
-}
-@media (max-width: 1023px) { .marca-agua { background-size: 86vw auto; background-position: center 42%; opacity: 0.085; } }
-@media print { .marca-agua { display: none; } }
-
-/* Cabecera: azul noche con ondas de acero y filo vino */
-.tema-login .cabecera-roja {
-  background-color: #11212D;
-  border-bottom: 3px solid #800021;
-  box-shadow: 0 6px 24px rgba(17, 33, 45, 0.3);
-}
-.tema-login .cabecera-roja .texto-modulo { color: #CCD0CF; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35); }
-.tema-login .cabecera-roja .logo-placa { background: #CCD0CF; border-color: rgba(255, 255, 255, 0.5); }
-.tema-login .cabecera-roja .grad-fuego { background-image: none; background-color: #800021; color: #fff; box-shadow: none; }
-
-/* Barra de accesos: azul acero que baja a azul noche, arcos en gris claro y un destello vino */
-.tema-login .barra-accesos {
-  background-color: #294D61;
-  background-image:
-    radial-gradient(140% 22% at 100% 0%, transparent 52%, rgba(204, 208, 207, 0.3) 53%, transparent 55%),
-    radial-gradient(140% 22% at 100% 0%, transparent 30%, rgba(204, 208, 207, 0.18) 31%, transparent 33%),
-    radial-gradient(160% 26% at 0% 100%, transparent 50%, rgba(128, 0, 33, 0.55) 51%, transparent 53%),
-    repeating-linear-gradient(135deg, rgba(204, 208, 207, 0.06) 0 1px, transparent 1px 11px),
-    linear-gradient(180deg, #294D61 0%, #1d3747 55%, #11212D 100%);
-  border: 1px solid rgba(204, 208, 207, 0.35);
-}
-
-/* Chat grupal: vino */
-.tema-login .chat-rojo,
-.tema-planta.tema-login .chat-rojo.seccion { background-color: #800021; background-image: linear-gradient(180deg, #800021 0%, #5c0018 100%); border-color: rgba(204, 208, 207, 0.3); }
-.tema-login .chat-rojo.seccion::after { display: none; }
-@keyframes chat-parpadeo-vino {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(204, 208, 207, 0.7); }
-  50% { opacity: 0.55; box-shadow: 0 0 20px 5px rgba(128, 0, 33, 0.9); }
-}
-.tema-login .chat-parpadeo { animation-name: chat-parpadeo-vino; }
-.tema-login .chat-resaltado { background: rgba(128, 0, 33, 0.1); }
-
-/* Botón principal: vino. Seleccionado (pestaña activa, opción elegida): acero → noche. */
-.tema-login .bg-corp { background-image: linear-gradient(135deg, #800021 0%, #650019 100%); color: #fff; box-shadow: 0 6px 16px rgba(128, 0, 33, 0.25); }
-.tema-login .bg-corp:hover { background-image: linear-gradient(135deg, #6b001b 0%, #4f0014 100%); }
-.tema-login .grad-azul { background-image: linear-gradient(135deg, #294D61 0%, #11212D 100%); color: #fff; box-shadow: 0 6px 16px rgba(17, 33, 45, 0.25); }
-.tema-login .grad-fuego { background-image: none; background-color: #800021; color: #fff; box-shadow: 0 4px 12px rgba(128, 0, 33, 0.22); }
-.tema-login .texto-azul { background-image: none; -webkit-text-fill-color: currentColor; color: #294D61; }
-
-/* Tarjetas: blancas con borde gris de la paleta y sombra azul noche */
-.tema-login .glass-card,
-.tema-login .shadow-card { box-shadow: 0 6px 22px rgba(17, 33, 45, 0.1); }
-.tema-login :is(main, [role="dialog"]) .seccion-titulo { color: color-mix(in srgb, rgb(var(--sec)) 78%, #11212D); }
-
-/* Tablas: cabecera en acero suave con filo acero, filas blancas, hover gris */
-.tema-login table thead { background-color: #DCE3E6; box-shadow: inset 0 -2px 0 #294D61; }
-.tema-login table thead th { color: #11212D; }
-.tema-login table tbody tr:hover { background-color: rgba(41, 77, 97, 0.06); }
-
-/* Colores fijos escritos en las pantallas (azules eléctricos, naranjas y rojos del tema anterior) → paleta */
-.tema-login :is(.text-\[\#2a7bff\], .text-\[\#60a5fa\], .text-\[\#93c5fd\], .text-\[\#00f2fe\], .text-\[\#0066ff\], .hover\:text-\[\#93c5fd\]:hover) { color: #294D61; }
-.tema-login :is(.text-\[\#FF6D00\], .text-\[\#FFB27A\], .text-\[\#FF9A4D\], .text-\[\#c4001c\], .text-\[\#E30613\], .text-\[\#ff2a5f\], .text-\[\#b91c1c\], .hover\:text-\[\#FF9A4D\]:hover, .hover\:text-\[\#c4001c\]:hover) { color: #800021; }
-.tema-login :is(main, [role="dialog"]) :is(.text-\[\#fcd34d\], .text-\[\#fde68a\], .text-\[\#ff6a7f\], .text-\[\#ff6a5f\], .text-\[\#f87171\], .text-\[\#fca5a5\]) { color: #800021; }
-.tema-login :is(.bg-\[\#2a7bff\], .bg-\[\#0066ff\], .bg-\[\#3b82f6\], .bg-\[\#1e3a8a\], .hover\:bg-\[\#2a7bff\]:hover) { background-color: #294D61; color: #fff; }
-.tema-login :is(.bg-\[\#FF6D00\], .bg-\[\#E30613\], .bg-\[\#ff2a5f\], .bg-\[\#ff1a1a\], .bg-\[\#c4001c\], .bg-\[\#d50000\], .bg-\[\#e0001b\], .bg-\[\#9b0016\]) { background-color: #800021; color: #fff; }
-.tema-login :is(.hover\:bg-\[\#E65C00\]:hover, .hover\:bg-\[\#c4001c\]:hover, .hover\:bg-\[\#B91C1C\]:hover) { background-color: #650019; color: #fff; }
-.tema-login :is(.border-\[\#2a7bff\], .border-\[\#60a5fa\], .border-b-\[\#2a7bff\], .hover\:border-\[\#00f2fe\]:hover, .focus\:border-\[\#60a5fa\]:focus, .focus\:border-\[\#00f2fe\]:focus) { border-color: #294D61; }
-.tema-login :is(.border-\[\#FF6D00\], .border-b-\[\#FF6D00\], .border-\[\#ff2a5f\], .border-\[\#ff1a1a\], .border-\[\#E30613\], .border-\[\#d50000\], .focus\:border-\[\#FF6D00\]:focus) { border-color: #800021; }
-.tema-login :is(.ring-\[\#2a7bff\], .ring-\[\#3b82f6\], .focus\:ring-\[\#00f2fe\]:focus, .focus-visible\:ring-\[\#00f2fe\]:focus-visible) { --tw-ring-color: #294D61; }
-.tema-login :is(.ring-\[\#FF6D00\], .ring-\[\#ff2a5f\]) { --tw-ring-color: #800021; }
-.tema-login .accent-\[\#2a7bff\] { accent-color: #294D61; }
-.tema-login :is(input[type="checkbox"], input[type="radio"], input[type="range"], progress) { accent-color: #294D61; }
-.tema-login :is(main, [role="dialog"]) :is(.from-\[\#0066ff\]) { --tw-gradient-from: #294D61 var(--tw-gradient-from-position); }
-.tema-login :is(main, [role="dialog"]) :is(.via-\[\#0066ff\]) { --tw-gradient-via: #294D61; }
-/* texto blanco que sí va sobre color */
-.tema-login :is(main, [role="dialog"]) :is(.bg-\[\#2a7bff\], .bg-\[\#0066ff\], .bg-\[\#3b82f6\], .bg-\[\#1e3a8a\], .bg-\[\#FF6D00\], .bg-\[\#E30613\], .bg-\[\#ff2a5f\], .bg-\[\#ff1a1a\], .bg-\[\#c4001c\], .bg-\[\#d50000\]) :is(.text-white, .text-fg),
-.tema-login :is(main, [role="dialog"]) :is(.bg-\[\#2a7bff\], .bg-\[\#0066ff\], .bg-\[\#3b82f6\], .bg-\[\#1e3a8a\], .bg-\[\#FF6D00\], .bg-\[\#E30613\], .bg-\[\#ff2a5f\], .bg-\[\#ff1a1a\], .bg-\[\#c4001c\], .bg-\[\#d50000\]).text-white { color: #fff; }
-
-/* Enlaces y selección de texto */
-.tema-login ::selection { background: rgba(41, 77, 97, 0.28); }
-
-/* Pie */
-.tema-login > footer { background: rgba(233, 235, 235, 0.92); border-color: #CCD0CF; color: #294D61; }
-
-/* Barras de desplazamiento con la paleta */
-.tema-login * { scrollbar-color: #294D61 transparent; }
-.tema-login .chat-rojo .seccion-titulo { color: #ffffff; }
-.tema-login .chat-rojo .seccion-titulo::before { display: none; }
-.tema-login .chat-rojo :is(.text-\[\#c4001c\], .text-\[\#ff2a5f\]) { color: #800021; }
