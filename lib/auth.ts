@@ -13,6 +13,9 @@ import { createClient } from "./supabase/client";
 import type { Rol } from "./types";
 import { DOMINIO, puedeVer, soloSecocha, tieneSecocha, veDashboard, RUTA_GERENCIA, RUTA_SUCURSAL, RUTA_SUCURSAL_ANTIGUA, type RolAuth, type Sesion } from "./permisos";
 import { homeAsignado, isAdmin } from "./permisosPlanta";
+import { localDb } from "./offline/localDb";
+import { esErrorDeRed } from "./offline/red";
+import { offlineActivo } from "./offline/storageOffline";
 
 export * from "./permisos";
 
@@ -42,12 +45,48 @@ function fijar(s: Sesion | null): void {
 
 const USUARIO_INACTIVO = "Usuario desactivado. Pida a SOPORTE que lo active.";
 
-/** Lee el usuario autenticado y su perfil. */
+/**
+ * Lee el usuario autenticado y su perfil. En la app de Windows / Android, sin señal, usa el último perfil
+ * que entró en este equipo (mismo rol, módulos y solo lectura: los permisos no cambian sin señal).
+ */
 async function cargarSesion(): Promise<Sesion | null> {
+  if (!offlineActivo()) return cargarSesionServidor();
+  try {
+    const s = await cargarSesionServidor();
+    if (s) void guardarSesionLocal(s);
+    return s;
+  } catch (e) {
+    if (!esErrorDeRed(e)) throw e;
+    return sesionLocal();
+  }
+}
+
+async function guardarSesionLocal(s: Sesion): Promise<void> {
+  try {
+    const { data } = await createClient().auth.getSession();
+    const uid = data.session?.user.id;
+    if (uid) await localDb().guardarSesion({ uid, usuario: s.usuario, rol: s.rol, soloLectura: s.soloLectura, sesion: s, actualizadoEn: new Date().toISOString() });
+  } catch {
+    /* sin base local: solo no habrá modo sin señal */
+  }
+}
+
+async function sesionLocal(): Promise<Sesion | null> {
+  // getSession lee el token guardado en el equipo (no usa la red)
+  const { data } = await createClient().auth.getSession();
+  const uid = data.session?.user.id;
+  if (!uid) return null;
+  const g = await localDb().leerSesion(uid);
+  return g ? (g.sesion as Sesion) : null;
+}
+
+async function cargarSesionServidor(): Promise<Sesion | null> {
   const sb = createClient();
   const {
     data: { user },
+    error: errUsuario,
   } = await sb.auth.getUser();
+  if (errUsuario && esErrorDeRed(errUsuario)) throw errUsuario;
   if (!user) return null;
   // "*": las columnas nuevas (avatar_iniciales, modulo_asignado, activo…) son opcionales hasta correr su SQL
   const { data, error } = await sb.from("perfiles").select("*").eq("id", user.id).maybeSingle();

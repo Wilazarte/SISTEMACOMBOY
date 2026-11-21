@@ -99,7 +99,7 @@ export function CondicionesPago() {
           )
         }
       />
-      <Table head={["Código", "Nombre", "Tipo", "Medio / Días", "% Inicial", "Contraentrega", "Estado", ""]} empty={condiciones.length === 0}>
+      <Table tarjetas head={["Código", "Nombre", "Tipo", "Medio / Días", "% Inicial", "Contraentrega", "Estado", ""]} empty={condiciones.length === 0}>
         {condiciones.map((c) => (
           <tr key={c.id} className={cn("hover:bg-plomo-50", !c.activo && "opacity-50")}>
             <Td className="font-semibold">{c.codigo}</Td>
@@ -191,7 +191,7 @@ export function Clientes() {
           </div>
         }
       />
-      <Table head={["Documento", "Razón social / Nombres", "Contacto", "Cond. pago", "Línea crédito", "Saldo", "Estado", ""]} empty={lista.length === 0}>
+      <Table tarjetas head={["Documento", "Razón social / Nombres", "Contacto", "Cond. pago", "Línea crédito", "Saldo", "Estado", ""]} empty={lista.length === 0}>
         {lista.map((c) => {
           const saldo = saldoCliente(c.id);
           return (

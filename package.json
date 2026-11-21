@@ -2,20 +2,31 @@
   "name": "erp-comboy-vid",
   "version": "0.1.0",
   "private": true,
-"scripts": {
-  "dev": "next dev",
-  "build": "next build",
-  "start": "next start",
-  "tauri:dev": "tauri dev",
-  "tauri:build": "tauri build"
-},
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "cap:sync": "cap sync android",
+    "cap:abrir": "cap open android",
+    "apk": "cap sync android && cd android && ./gradlew assembleDebug"
+  },
   "dependencies": {
+    "@capacitor/android": "^6.2.3",
+    "@capacitor/camera": "^6.1.3",
+    "@capacitor/core": "^6.2.3",
+    "@capacitor/filesystem": "^6.0.4",
+    "@capacitor/network": "^6.0.4",
+    "@capacitor/preferences": "^6.0.4",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
     "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/plugin-dialog": "^2.8.4",
+    "@tauri-apps/plugin-process": "^2.4.0",
     "@tauri-apps/plugin-sql": "^2.6.0",
     "@tauri-apps/plugin-updater": "^2.14.1",
-    "dotenv": "^18.0.4",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",
     "lucide-react": "^0.447.0",
@@ -24,9 +35,11 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "recharts": "^2.15.4",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "dotenv": "^18.0.4"
   },
   "devDependencies": {
+    "@capacitor/cli": "^6.2.3",
     "@tauri-apps/cli": "^2.12.4",
     "@types/node": "^20.16.10",
     "@types/qrcode": "^1.5.6",

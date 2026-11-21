@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Ban, FilePlus2, FileText, Printer, Send, Trash2, Truck } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Textarea, cn, ejecutar, ejecutarAsync } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/client";
 import { pdfComprobanteVenta, pdfTicketVenta } from "@/lib/pdf";
 import { KEYS, fechaPE, hoy, previewNumero, puede, r2, soles, useRol, useStore } from "@/lib/storage";
 import {
@@ -41,6 +42,68 @@ const datosVacios = (): DatosComprobante => ({
   lugarEntrega: "",
   despacho: despachoVacio(),
 });
+
+// TEMPORAL: pruebas de NubeFact con las series DEMO F005 / B005 (y sus notas FC05/BC05/FD05/BD05).
+// Quitar cuando termine la prueba. No tocan el flujo normal de ventas ni guardan nada en el ERP.
+type DemoNubefact = "BOLETA" | "FACTURA" | "NC" | "ND";
+
+function demoNubefact(cual: DemoNubefact) {
+  const fecha = hoy();
+  const comun = { conIgv: true, preciosConIgv: true, descuento: 0, formaPago: "CONTADO", estado: "EMITIDO" };
+  const boleta = {
+    ...comun, id: "demo-B005-1", tipo: "BOLETA", serie: "B005", numero: "B005-1",
+    fecha, cliente: "JUAN PEREZ QUISPE", clienteDoc: "DNI 12345678",
+    items: [{ productoNombre: "Producto de prueba", descripcion: "", unidad: "UND", cantidad: 1, precio: 10 }],
+    base: 8.47, igv: 1.53, total: 10,
+  };
+  switch (cual) {
+    case "BOLETA":
+      return { comprobante: boleta };
+    case "FACTURA":
+      return { comprobante: {
+        ...comun, id: "demo-F005-1", tipo: "FACTURA", serie: "F005", numero: "F005-1",
+        fecha, cliente: "EMPRESA DE PRUEBA SAC", clienteDoc: "RUC 20123456789",
+        items: [{ productoNombre: "Producto de prueba", descripcion: "", unidad: "UND", cantidad: 1, precio: 118 }],
+        base: 100, igv: 18, total: 118,
+      }};
+    case "NC":
+      return { comprobante: {
+        ...comun, id: "demo-BC05-1", tipo: "NOTA_CREDITO", serie: "BC05", numero: "BC05-1",
+        fecha, cliente: boleta.cliente, clienteDoc: boleta.clienteDoc,
+        items: boleta.items, base: 8.47, igv: 1.53, total: 10,
+        ref: { id: boleta.id, tipo: "BOLETA", numero: boleta.numero, fecha },
+        motivoCodigo: "01", motivoDescripcion: "ANULACION DE LA OPERACION",
+      }, referencia: boleta };
+    case "ND":
+      return { comprobante: {
+        ...comun, id: "demo-BD05-1", tipo: "NOTA_DEBITO", serie: "BD05", numero: "BD05-1",
+        fecha, cliente: boleta.cliente, clienteDoc: boleta.clienteDoc,
+        items: [{ productoNombre: "Intereses por mora", descripcion: "", unidad: "UND", cantidad: 1, precio: 5 }],
+        base: 4.24, igv: 0.76, total: 5,
+        ref: { id: boleta.id, tipo: "BOLETA", numero: boleta.numero, fecha },
+        motivoCodigo: "01", motivoDescripcion: "INTERESES POR MORA",
+      }, referencia: boleta };
+  }
+}
+
+async function probarDemoNubefact(cual: DemoNubefact) {
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase.functions.invoke("emitir-comprobante", { body: demoNubefact(cual) });
+    if (error) {
+      let detalle: unknown = error.message;
+      try { detalle = await (error as { context?: Response }).context?.json(); } catch { /* sin cuerpo JSON */ }
+      console.log("PRUEBA NUBEFACT - ERROR", detalle);
+      alert("ERROR:\n" + JSON.stringify(detalle, null, 2));
+      return;
+    }
+    console.log("PRUEBA NUBEFACT - OK", data);
+    alert(`OK\nNúmero: ${data?.numero}\nPDF: ${data?.enlacePdf}`);
+  } catch (e) {
+    console.log("PRUEBA NUBEFACT - EXCEPCIÓN", e);
+    alert("EXCEPCIÓN: " + (e instanceof Error ? e.message : String(e)));
+  }
+}
 
 export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: string; onListo: () => void; /** Sube con "Emitir Nuevo" de la isla: abre el formulario. */ nuevoPedido?: number }) {
   const [rol] = useRol();
@@ -180,6 +243,24 @@ export function Comprobantes({ preNp, onListo, nuevoPedido = 0 }: { preNp?: stri
             {f === "TODOS" ? "Todos" : tipoLabel[f]}
           </button>
         ))}
+        {/* TEMPORAL: botones de prueba NubeFact (series DEMO) */}
+        <div className="ml-auto flex flex-wrap gap-1">
+          {([
+            ["BOLETA", "PROBAR BOLETA DEMO B005-1"],
+            ["FACTURA", "PROBAR FACTURA DEMO F005-1"],
+            ["NC", "PROBAR NOTA CREDITO DEMO BC05-1"],
+            ["ND", "PROBAR NOTA DEBITO DEMO BD05-1"],
+          ] as [DemoNubefact, string][]).map(([cual, texto]) => (
+            <button
+              key={cual}
+              type="button"
+              onClick={() => probarDemoNubefact(cual)}
+              className="rounded border border-dashed border-amber-400 px-2 py-1 text-[10px] font-medium text-amber-700 hover:bg-amber-50"
+            >
+              {texto}
+            </button>
+          ))}
+        </div>
       </div>
       <ListaDocs
           tipo="ventas"

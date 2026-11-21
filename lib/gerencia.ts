@@ -135,7 +135,10 @@ export function useGerencia() {
       porEtapa,
       porModulo,
       ticker: {
+        /** Monto (S/) de las OC activas. */
         comprasActivas: log.totalOcActivas,
+        /** Cantidad de OC activas. */
+        ocActivas: log.ocActivas.length,
         enTransito: log.odsTransito.length + log.trasladosCamino.length,
         opActivas: log.opsActivas.length,
         ptDisponible: log.ptDisponible.length,

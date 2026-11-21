@@ -117,7 +117,7 @@ export function RequerimientosSecocha({ datos, onIrNotas }: { datos: DatosSecoch
         title="Requerimientos de Secocha"
         subtitle={`${datos.pendientes} por aceptar · Aceptar → Nota de Pedido (costos) → Aprobar → Orden de Despacho → OT + guía → Traslado a Secocha`}
       />
-      <Table head={["Documento", "Fecha", "Solicitante / cliente", "Productos", "Estado", "Acciones"]} empty={filas.length === 0}>
+      <Table tarjetas head={["Documento", "Fecha", "Solicitante / cliente", "Productos", "Estado", "Acciones"]} empty={filas.length === 0}>
         {filas.map((f) => (
           <tr key={`${f.tipo}:${f.id}`}>
             <Td>

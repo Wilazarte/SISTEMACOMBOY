@@ -106,13 +106,13 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
 
       {/* Rediseño 2026-10-30: izquierda (3/12) KPIs, notificaciones en vivo y mensajes; derecha (9/12) acciones por flujo */}
       <div className="grid gap-4 lg:grid-cols-12">
-        <div className="space-y-4 lg:col-span-3">
+        <div className="space-y-4 lg:col-span-4 xl:col-span-3">
           <FilaKpis key={modulo} modulo={modulo} />
           <NotificacionesEnVivo sesion={sesion} modulo={modulo} />
           <ChatModulo sesion={sesion} modulo={modulo} todos={modulo === "soporte" && isAdmin(sesion)} />
         </div>
 
-        <section className="space-y-5 rounded-xl border border-white/[0.08] glass-card glass-blur p-5 lg:col-span-9">
+        <section className="space-y-5 rounded-xl border border-white/[0.08] glass-card glass-blur p-5 lg:col-span-8 xl:col-span-9">
           <h2 className="flex items-center gap-2 text-[15px] font-semibold text-white">
             <LayoutGrid size={16} /> Acciones rápidas
           </h2>
@@ -151,7 +151,7 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
           )}
 
           {grupos.length > 0 && (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 min-[1800px]:grid-cols-4">
               {grupos.map(([grupo, lista], i) => (
                 // Cada grupo con su color de marca (rojo, cian, naranja…) para distinguirlo de un vistazo
                 <div key={grupo} className="seccion rounded-xl border bg-white/[0.02] p-4" style={estiloSeccion(i + 1)}>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
+import { AppNativa } from "@/components/app-nativa/AppNativa";
 
 export const metadata: Metadata = {
   title: "ERP COMBOY VID",
@@ -18,7 +19,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: SCRIPT_TEMA }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <AppNativa />
+      </body>
     </html>
   );
 }
