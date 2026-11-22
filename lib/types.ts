@@ -393,6 +393,12 @@ export interface Trabajador {
   observacionesMedicas?: string; // alergias, condiciones
   fechaBaja?: string; // YYYY-MM-DD (al dar de baja)
   motivoBaja?: string;
+  // ---- Datos de RENIEC (botón Verificar junto al DNI; `nombre` guarda el nombre completo) ----
+  nombres?: string;
+  apellidoPaterno?: string;
+  apellidoMaterno?: string;
+  /** ISO: cuándo se verificó el DNI en RENIEC (vacío = ingresado a mano). */
+  dniVerificadoAt?: string;
   // ---- Cuenta bancaria para el pago (en planilla.data; no hay tabla trabajadores) ----
   bancoNombre?: string; // BCP, BBVA, Interbank…
   bancoTipoCuenta?: "Ahorros" | "Corriente";
@@ -517,6 +523,13 @@ export interface Proveedor {
   creadoEn?: string;
   /** Sede que lo registró (solo informativo: la base es compartida). */
   sedeId?: string;
+  /** RUC (por defecto, registros antiguos) / DNI / CE / PASAPORTE. El número va en `ruc` en todos los casos. */
+  tipoDoc?: "RUC" | "DNI" | "CE" | "PASAPORTE";
+  /** Persona natural con DNI (RENIEC): razonSocial guarda el nombre completo. */
+  nombres?: string;
+  apellidoPaterno?: string;
+  apellidoMaterno?: string;
+  dniVerificadoAt?: string;
 }
 
 /** Mismos tipos que el gasto sin stock (lib/comprobantes.ts). */
@@ -655,7 +668,7 @@ export interface AsistenciaPeriodo {
 // (documentos JSON en la tabla public.ventas; despachos en public.almacen)
 // =====================================================================
 
-export type TipoDocCliente = "DNI" | "RUC" | "CE";
+export type TipoDocCliente = "DNI" | "RUC" | "CE" | "PASAPORTE";
 
 export interface Cliente {
   id: string;
@@ -677,6 +690,12 @@ export interface Cliente {
   clasificacion?: string;
   /** Sede que lo registró (solo informativo: la base es compartida). */
   sedeId?: string;
+  // ---- Persona con DNI (RENIEC vía Decolecta): razonSocial guarda el nombre completo ----
+  nombres?: string;
+  apellidoPaterno?: string;
+  apellidoMaterno?: string;
+  /** ISO: cuándo se verificó el DNI en RENIEC (vacío = ingresado a mano). */
+  dniVerificadoAt?: string;
 }
 
 /** Clasificación de clientes (documento tipo 'clasificacion_cliente' de public.ventas). */

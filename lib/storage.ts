@@ -2203,6 +2203,10 @@ const CAMPOS_FICHA_TEXTO = [
   "bancoNumeroCuenta",
   "bancoCci",
   "bancoTitular",
+  "nombres",
+  "apellidoPaterno",
+  "apellidoMaterno",
+  "dniVerificadoAt",
 ] as const;
 export const SERVICIOS_CONTRATISTA: Record<ServicioContratista, string> = {
   ASESORIA: "Asesoría",
@@ -2263,7 +2267,7 @@ export function useTrabajadores(): Trabajador[] {
 function validarTrabajador(t: Trabajador): void {
   if (!t.id) throw new ErpError("Ingrese el N° de huella.");
   if (!t.nombre) throw new ErpError("Ingrese el nombre completo.");
-  if (t.dni && !/^\d{8}$/.test(t.dni)) throw new ErpError("DNI inválido (8 dígitos).");
+  if (t.dni && !/^\d{8}$/.test(t.dni)) throw new ErpError("El DNI debe tener 8 dígitos.");
   if (t.bancoNumeroCuenta && !/^\d{6,20}$/.test(t.bancoNumeroCuenta)) throw new ErpError("N° de cuenta inválido: solo números (sin guiones).");
   if (t.bancoCci && !/^\d{20}$/.test(t.bancoCci)) throw new ErpError("El CCI debe tener 20 dígitos (solo números).");
   if ((t.bancoNumeroCuenta || t.bancoCci) && !t.bancoNombre) throw new ErpError("Seleccione el banco de la cuenta.");
@@ -2292,7 +2296,8 @@ export function guardarTrabajador(data: Trabajador, idOriginal?: string): Trabaj
   const lista = getTrabajadores();
   const otros = lista.filter((x) => x.id !== (idOriginal ?? t.id));
   if (otros.some((x) => x.id === t.id)) throw new ErpError(`El N° de huella ${t.id} ya está asignado a otro trabajador.`);
-  if (t.dni && otros.some((x) => x.dni === t.dni)) throw new ErpError(`El DNI ${t.dni} ya está registrado.`);
+  const mismoDni = t.dni ? otros.find((x) => x.dni === t.dni) : undefined;
+  if (mismoDni) throw new ErpError(`Este DNI ya está registrado como ${mismoDni.nombre}.`);
   const i = lista.findIndex((x) => x.id === (idOriginal ?? t.id));
   if (i >= 0) lista[i] = t;
   else lista.push(t);
@@ -2549,15 +2554,33 @@ export const getProveedores = () => leer<Proveedor[]>(KEYS.PROVEEDORES, []);
 export const getCompras = () => leer<Compra[]>(KEYS.COMPRAS, []);
 export const getStock = () => leer<StockItem[]>(KEYS.STOCK, []);
 
-export function crearProveedor(data: Pick<Proveedor, "razonSocial" | "ruc">): Proveedor {
+export function crearProveedor(data: Pick<Proveedor, "razonSocial" | "ruc"> & Partial<Pick<Proveedor, "tipoDoc" | "nombres" | "apellidoPaterno" | "apellidoMaterno" | "dniVerificadoAt">>): Proveedor {
   const razonSocial = data.razonSocial.trim().toUpperCase();
   const ruc = data.ruc.trim();
-  if (!razonSocial) throw new ErpError("Ingrese la razón social del proveedor.");
-  if (!rucValido(ruc)) throw new ErpError("RUC inválido (11 dígitos con dígito verificador correcto).");
-  exigirRucSunat(ruc, "del proveedor");
+  // 8 dígitos = persona natural con DNI (verificado en RENIEC o a mano); si no, RUC validado en SUNAT
+  const esDni = data.tipoDoc === "DNI" || (!data.tipoDoc && /^\d{8}$/.test(ruc));
+  if (!razonSocial) throw new ErpError(esDni ? "Ingrese los nombres y apellidos del proveedor." : "Ingrese la razón social del proveedor.");
+  if (esDni) {
+    if (!/^\d{8}$/.test(ruc)) throw new ErpError("El DNI debe tener 8 dígitos.");
+  } else {
+    if (!rucValido(ruc)) throw new ErpError("RUC inválido (11 dígitos con dígito verificador correcto).");
+    exigirRucSunat(ruc, "del proveedor");
+  }
   const lista = getProveedores();
-  if (lista.some((p) => p.ruc === ruc)) throw new ErpError(`El RUC ${ruc} ya está registrado.`);
-  const prov: Proveedor = { id: uid(), razonSocial, ruc };
+  const dup = lista.find((p) => p.ruc === ruc);
+  if (dup) throw new ErpError(esDni ? `Este DNI ya está registrado como ${dup.razonSocial}.` : `El RUC ${ruc} ya está registrado.`);
+  const prov: Proveedor = esDni
+    ? {
+        id: uid(),
+        razonSocial,
+        ruc,
+        tipoDoc: "DNI",
+        nombres: data.nombres?.trim().toUpperCase() || undefined,
+        apellidoPaterno: data.apellidoPaterno?.trim().toUpperCase() || undefined,
+        apellidoMaterno: data.apellidoMaterno?.trim().toUpperCase() || undefined,
+        dniVerificadoAt: data.dniVerificadoAt || undefined,
+      }
+    : { id: uid(), razonSocial, ruc };
   escribir(KEYS.PROVEEDORES, [...lista, prov].sort((a, b) => a.razonSocial.localeCompare(b.razonSocial)));
   return prov;
 }

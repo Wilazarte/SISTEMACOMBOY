@@ -248,9 +248,9 @@ export function FormOrdenServicio({
               setRuc(n);
               // RUC ya validado en el sistema: reemplaza VARIOS/SIN DATOS por su razón social
               const sunat = n.length === 11 ? rucSunat(n) : undefined;
-              if (sunat) setProveedor((p) => (esProveedorVarios(p) ? sunat.razon_social : p));
+              if (sunat) setProveedor(sunat.razon_social);
             }} onFocus={(e) => ruc === RUC_VARIOS && e.target.select()} placeholder="11 dígitos" inputMode="numeric" />
-            <EstadoRuc ruc={ruc} onValidado={(r) => setProveedor((p) => (p.trim() && !esProveedorVarios(p) ? p : r.razon_social))} />
+            <EstadoRuc ruc={ruc} onValidado={(r) => setProveedor(r.razon_social)} />
           </Field>
           <Field label="Fecha OS">
             <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
