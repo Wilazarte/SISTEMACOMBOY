@@ -5,7 +5,7 @@ import { AlertTriangle, ClipboardList, Inbox, Contact, FilePlus2, History, Packa
 import { abrirBuscadorDePagina } from "@/components/layout/IslandMenu";
 import { CatalogoProductos } from "@/components/productos/CatalogoProductos";
 import { Button, Tabs } from "@/components/ui";
-import { KEYS, useStore } from "@/lib/storage";
+import { KEYS, enSucursal, useStore } from "@/lib/storage";
 import { estadoOD, filasCxC, npsSinDespacho } from "@/lib/ventas";
 import type { ComprobanteVenta, GuiaRemision, NotaPedido, OrdenDespacho } from "@/lib/types";
 import { OrdenesDespacho } from "../almacen/despacho";
@@ -38,10 +38,13 @@ export default function VentasPage() {
   const sinOD = npsSinDespacho(notas, despachos);
   const vencidos = filasCxC(notas, comprobantes).filter((f) => f.estado === "VENCIDO").length;
   const secocha = useSecocha();
+  // Dentro de Secocha no existe "Requerimientos de Secocha": es la bandeja de Ventas Arequipa (Williams 2026-11-22).
+  // Secocha pide desde Almacén › Nuevo requerimiento (a ADM Secocha o al Almacén de Arequipa).
+  const modoSecocha = enSucursal();
   // Campana "Requerimiento de Secocha": /dashboard/ventas?tab=secocha
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("tab") === "secocha") setTab("secocha");
-  }, []);
+    if (!modoSecocha && new URLSearchParams(window.location.search).get("tab") === "secocha") setTab("secocha");
+  }, [modoSecocha]);
 
   return (
     <div className="w-full space-y-6">
@@ -51,7 +54,7 @@ export default function VentasPage() {
           <h1 className="sr-only">Ventas</h1>
           <p className="mt-1 text-[13px] text-plomo-600">Nota de pedido → Aprobada (orden de despacho a Almacén) → Factura / Boleta → Cobro · seguimiento del despacho</p>
         </div>
-        {secocha.pendientes > 0 && (
+        {!modoSecocha && secocha.pendientes > 0 && (
           <button
             type="button"
             onClick={() => setTab("secocha")}
@@ -89,7 +92,7 @@ export default function VentasPage() {
           },
         ]}
         tabs={[
-          { id: "secocha", label: "Requerimientos de Secocha", icon: <Inbox size={16} />, count: secocha.pendientes },
+          ...(modoSecocha ? [] : [{ id: "secocha" as const, label: "Requerimientos de Secocha", icon: <Inbox size={16} />, count: secocha.pendientes }]),
           { id: "notas", label: "Notas de pedido", icon: <ClipboardList size={16} />, count: notas.filter((n) => n.estado === "APROBADA").length },
           { id: "comprobantes", label: "Comprobantes", icon: <Receipt size={16} />, count: comprobantes.filter((c) => c.estado === "BORRADOR").length },
           { id: "guias", label: "Guías de Remisión", icon: <ScrollText size={16} />, count: guias.filter((g) => g.estado === "EMITIDA" && g.estadoSunat === "NO_ENVIADO").length },
@@ -105,7 +108,7 @@ export default function VentasPage() {
           { id: "cobrar", label: "Cuentas por cobrar", icon: <Wallet size={16} />, count: vencidos },
         ]}
       />
-      {tab === "secocha" && <RequerimientosSecocha datos={secocha} onIrNotas={() => setTab("notas")} />}
+      {tab === "secocha" && !modoSecocha && <RequerimientosSecocha datos={secocha} onIrNotas={() => setTab("notas")} />}
       {tab === "notas" && (
         <NotasPedido
           onFacturar={(npId) => {

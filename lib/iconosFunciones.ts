@@ -128,6 +128,7 @@ const ICONO_ACCION: Record<string, LucideIcon> = {
   // Ventas
   "notas-pedido": FileText,
   "requerimientos-secocha": Store,
+  "reqs-de-secocha": Store,
   despachos: Route,
   comprobantes: Receipt,
   "configuracion-ventas": Settings,

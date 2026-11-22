@@ -101,6 +101,8 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
 
     { slug: "nuevo-requerimiento", label: "Nuevo requerimiento", grupo: "Requerimientos", destino: `${A}?tab=nuevo` },
     { slug: "requerimientos", label: "Requerimientos emitidos", grupo: "Requerimientos", destino: `${A}?tab=lista` },
+    // REQ que Secocha envía al Almacén de Arequipa (Williams 2026-11-22); en Secocha no se muestra
+    { slug: "reqs-de-secocha", label: "REQ de Secocha (atender desde Arequipa)", grupo: "Requerimientos", destino: `${A}?tab=secocha` },
 
     { slug: "recepcion", label: "Recepción MP (Ingresos · V°B° de guía)", grupo: "Ingresos y stock", destino: `${A}?tab=ingresos` },
     { slug: "ingresar-equipo", label: "Ingresar equipo de producción (modelo, N° serie, V°B° QC)", grupo: "Ingresos y stock", destino: `${A}?tab=equipos&nuevo=1` },
@@ -215,6 +217,8 @@ export function accionesPermitidas(sesion: Sesion | null, modulo: ModuloInicio):
     // Ya dentro de Secocha: sin enlace a la Secocha antigua
     if (enSucursal()) {
       if (modulo === "soporte" && a.slug === "secocha") return false;
+      // La bandeja "Requerimientos de Secocha" es de Ventas Arequipa: no va dentro de Secocha (Williams 2026-11-22)
+      if (a.slug === "requerimientos-secocha" || a.slug === "reqs-de-secocha") return false;
       // Secocha solo vende, no fabrica (Williams 2026-11-17): sin Producción ni el flujo de OP / Expediente 26W
       if (modulo === "produccion" || a.grupo === EXP || a.fase || SOLO_PLANTA.has(a.slug)) return false;
     }

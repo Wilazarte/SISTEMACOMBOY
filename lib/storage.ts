@@ -38,6 +38,7 @@ import type {
   ItemServicio,
   Proveedor,
   Requerimiento,
+  EstadoReq,
   Rol,
   StockItem,
   MovimientoKardex,
@@ -107,6 +108,8 @@ export const KEYS = {
   COBROS: "ventas_cobros",
   ASIENTOS: "ventas_asientos",
   DESPACHOS: "almacen_despachos",
+  /** REQ de Secocha dirigidos al Almacén de Arequipa (Williams 2026-11-22): almacen tipo req_secocha. */
+  REQS_SECOCHA_AQP: "almacen_reqs_secocha",
   // Planilla (nuevas)
   LIQUIDACIONES: "planilla_liquidaciones",
   CONTRATISTAS: "planilla_contratistas",
@@ -311,6 +314,7 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.COBROS]: { tabla: "ventas", tipo: "cobro", forma: "lista" },
   [KEYS.ASIENTOS]: { tabla: "ventas", tipo: "asiento", forma: "lista" },
   [KEYS.DESPACHOS]: { tabla: "almacen", tipo: "despacho", forma: "lista" },
+  [KEYS.REQS_SECOCHA_AQP]: { tabla: "almacen", tipo: "req_secocha", forma: "lista" },
   [KEYS.LIQUIDACIONES]: { tabla: "planilla", tipo: "liquidacion", forma: "lista" },
   [KEYS.CONTRATISTAS]: { tabla: "planilla", tipo: "contratista", forma: "lista" },
   [KEYS.HUELLAS_ALIAS]: { tabla: "planilla", tipo: "huella_alias", forma: "objeto" },
@@ -402,9 +406,16 @@ const esAlmacenSecocha = (x: unknown): boolean => /secocha/i.test(String((x as {
  */
 const COMPARTIDAS_SEDES = new Set<string>([KEYS.PROVEEDORES, KEYS.CLIENTES, KEYS.CLASIF_CLIENTES]);
 
+/**
+ * REQ de Secocha al Almacén de Arequipa (Williams 2026-11-22): son filas de la sede Secocha, pero Arequipa (ERP central)
+ * las ve para atenderlas. Secocha ve solo las suyas (RLS).
+ */
+const VISIBLES_EN_CENTRAL = new Set<string>([KEYS.REQS_SECOCHA_AQP]);
+
 const filtraSede = (key: StoreKey): boolean => {
   const d = DESTINOS[key];
   if (!vistaSede || d.forma !== "lista" || !TABLAS_POR_SEDE.has(d.tabla) || COMPARTIDAS_SEDES.has(key)) return false;
+  if (vistaSede.modo === "central" && VISIBLES_EN_CENTRAL.has(key)) return false;
   return !(vistaSede.modo === "central" && COMPARTIDAS_ALMACEN.has(key));
 };
 const visibleEnSede = (x: unknown): boolean => {
@@ -1247,13 +1258,82 @@ export async function crearRequerimiento(
     ...data,
     items,
     id: uid(),
-    numero: formatear("REQ", await siguiente("REQ")),
+    // Secocha: REQ-SEC-001 (numeración propia de la sede); Arequipa: REQ-ALM-001
+    numero: marcarSede(formatear("REQ", await siguiente("REQ"))),
     estado: "PENDIENTE",
     creadoPor: usuarioActual(),
+    ...(enSucursal() ? { destino: DESTINO_ADM_SECOCHA } : {}),
     historial: [evento(rol, "Requerimiento emitido", `${items.length} producto(s) · Sede ${data.sede}`)],
   };
   escribir(KEYS.REQS_PENDIENTES, [req, ...getPendientes()]);
   return req;
+}
+
+// ---------------------------------------------------------------------
+// REQ DE SECOCHA AL ALMACÉN DE AREQUIPA (Williams 2026-11-22)
+// En Secocha › Almacén el requerimiento elige destino: ADM Secocha (la Tesorería de la sede, flujo de compras normal)
+// o el Almacén del Taller Principal en Arequipa (lo atiende con su stock: aceptar, observar, atender / enviar).
+// ---------------------------------------------------------------------
+
+/** Nombre de la Tesorería de Secocha (Williams 2026-11-22). */
+export const DESTINO_ADM_SECOCHA = "ADM Secocha";
+export const DESTINO_ALMACEN_AQP = "Almacén Taller Principal (Arequipa)";
+
+export const getReqsSecochaAqp = () => leer<Requerimiento[]>(KEYS.REQS_SECOCHA_AQP, []);
+
+export async function crearReqAlmacenAqp(data: Omit<Requerimiento, "id" | "numero" | "estado" | "historial">, rol: Rol): Promise<Requerimiento> {
+  if (!enSucursal() || vistaSede?.modo !== "sucursal") throw new ErpError("Solo Secocha envía requerimientos al Almacén de Arequipa.");
+  if (!data.sede.trim()) throw new ErpError("Seleccione la sede.");
+  if (!data.solicitante.trim()) throw new ErpError("Ingrese el solicitante.");
+  if (!data.motivo.trim()) throw new ErpError("Ingrese el motivo del requerimiento.");
+  const items = itemsDeReq("BIEN", data.items);
+  if (items.length === 0) throw new ErpError("Agregue al menos un producto.");
+  if (items.some((i) => !(i.cantidad > 0))) throw new ErpError("Todas las cantidades deben ser mayores a 0.");
+  const req: Requerimiento = {
+    ...data,
+    tipo: "BIEN", // el Almacén atiende bienes; los servicios van a ADM Secocha (Orden de Servicio)
+    items,
+    id: uid(),
+    numero: marcarSede(formatear("REQ", await siguiente("REQ"))),
+    estado: "PENDIENTE",
+    destino: DESTINO_ALMACEN_AQP,
+    sedeId: vistaSede.propia,
+    creadoPor: usuarioActual(),
+    historial: [evento(rol, "Requerimiento emitido al Almacén de Arequipa", `${items.length} producto(s) · Sede ${data.sede}`)],
+  };
+  escribir(KEYS.REQS_SECOCHA_AQP, [req, ...getReqsSecochaAqp()]);
+  return req;
+}
+
+export type AccionReqAqp = "ACEPTAR" | "OBSERVAR" | "ATENDER";
+
+/** Almacén de Arequipa responde un REQ de Secocha: aceptar (en atención), observar (Secocha corrige) o atender (enviado). */
+export function responderReqSecocha(id: string, accion: AccionReqAqp, nota: string, rol: Rol): void {
+  const lista = getReqsSecochaAqp();
+  const req = lista.find((r) => r.id === id);
+  if (!req) throw new ErpError("El requerimiento ya no existe.");
+  const texto = nota.trim();
+  if (accion === "OBSERVAR" && !texto) throw new ErpError("Indique el motivo de la observación.");
+  if (accion === "ATENDER" && !texto) throw new ErpError("Indique cómo se atendió (guía, traslado u orden de despacho).");
+  if (req.estado === "FINALIZADO") throw new ErpError("El requerimiento ya fue atendido.");
+  const estado: EstadoReq = accion === "ACEPTAR" ? "ACEPTADO" : accion === "OBSERVAR" ? "OBSERVADO" : "FINALIZADO";
+  const accionTxt = accion === "ACEPTAR" ? "Aceptado por Almacén Arequipa" : accion === "OBSERVAR" ? "Observado por Almacén Arequipa" : "Atendido por Almacén Arequipa";
+  const actualizado: Requerimiento = {
+    ...req,
+    estado,
+    observacion: accion === "OBSERVAR" ? texto : accion === "ATENDER" ? texto : undefined,
+    historial: [...req.historial, evento(rol, accionTxt, texto || undefined)],
+  };
+  escribir(KEYS.REQS_SECOCHA_AQP, lista.map((r) => (r.id === id ? actualizado : r)));
+}
+
+/** Secocha anula un REQ que Arequipa aún no atiende (pendiente u observado). */
+export function anularReqSecocha(id: string): void {
+  const lista = getReqsSecochaAqp();
+  const req = lista.find((r) => r.id === id);
+  if (!req) return;
+  if (req.estado !== "PENDIENTE" && req.estado !== "OBSERVADO") throw new ErpError("Ya está en atención en Arequipa: no se puede anular.");
+  escribir(KEYS.REQS_SECOCHA_AQP, lista.filter((r) => r.id !== id));
 }
 
 /**

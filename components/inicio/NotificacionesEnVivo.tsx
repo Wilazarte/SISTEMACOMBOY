@@ -57,7 +57,8 @@ export function NotificacionesEnVivo({ sesion, modulo }: { sesion: Sesion | null
   // que la base todavía no avisó (sin el SQL 20261117), para que Finanzas siempre vea cada REQ pendiente.
   const veReqs = modulo === "finanzas" || modulo === "soporte";
   const calc: Aviso[] = calculadas
-    .filter((n) => !flujo.disponible || (veReqs && n.clave.startsWith("req:")))
+    // REQ de Secocha ↔ Almacén de Arequipa: siempre calculados (no tienen aviso en la base)
+    .filter((n) => !flujo.disponible || (veReqs && n.clave.startsWith("req:")) || ((modulo === "almacen" || veReqs) && n.clave.startsWith("reqaqp:")))
     .map((n) => ({ id: n.clave, titulo: n.titulo, detalle: `${n.modulo} · ${n.detalle}`, href: n.href, nueva: true, fecha: "" }));
   const avisos: Aviso[] = [...calc, ...deTabla]
     .sort((a, b) => Number(b.nueva) - Number(a.nueva) || b.fecha.localeCompare(a.fecha))

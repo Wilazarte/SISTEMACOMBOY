@@ -299,14 +299,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     !esInicio && moduloNav
       ? [
           { label: "INICIO", href: RUTA_INICIO[moduloNav] },
-          { label: TITULO_INICIO[moduloNav], href: RUTA_INICIO[moduloNav] },
+          { label: modoSecocha && moduloNav === "finanzas" ? "ADM SECOCHA" : TITULO_INICIO[moduloNav], href: RUTA_INICIO[moduloNav] },
           { label: pantalla },
         ]
       : null;
 
   return (
     <ModuloLayout
-      moduleName={modoSecocha ? `${nombreModulo} · SECOCHA` : nombreModulo}
+      // Secocha: la Tesorería / Finanzas de la sede se llama ADM Secocha (Williams 2026-11-22)
+      moduleName={modoSecocha ? (["TESORERIA", "FINANZAS"].includes(nombreModulo) ? "ADM SECOCHA" : `${nombreModulo} · SECOCHA`) : nombreModulo}
       sinMapa={esInicio}
       // Barra azul de accesos rápidos a la derecha: deja su espacio en PC
       mainClassName={moduloNav ? "lg:pr-24" : ""}

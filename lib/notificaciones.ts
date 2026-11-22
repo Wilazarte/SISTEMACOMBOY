@@ -10,7 +10,7 @@ import { useMemo } from "react";
 import { RUTA_SUCURSAL, puedeVer, type Sesion } from "./auth";
 import { getEquipos } from "./equipos";
 import { mantenimientosPendientes, normalizarActivo, type Activo } from "./activos";
-import { KEYS, fechaPE, hoy, soles, useStore } from "./storage";
+import { KEYS, enSucursal, fechaPE, hoy, soles, useStore } from "./storage";
 import type { Factura, OrdenDespacho, Requerimiento, StockItem } from "./types";
 import { esAdminProductos, useCatalogo } from "./productos";
 import type { CierreCaja, Derivacion, ReqSucursal, StockLocal, Traslado, VentaSucursal } from "./sucursal-modelos";
@@ -55,7 +55,10 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
   const veSuc = ve(RUTA_SUCURSAL);
   const opera = veSuc && ["creador", "sucursal"].includes(rol);
   // REQ-SECOCHA y ventas derivadas de Secocha: solo a Ventas Arequipa (bandeja "Requerimientos de Secocha")
-  const veSecVentas = ve("/dashboard/ventas");
+  // En modo Secocha no hay bandeja "Requerimientos de Secocha" (Williams 2026-11-22)
+  const veSecVentas = ve("/dashboard/ventas") && !enSucursal();
+  // REQ de Secocha al Almacén de Arequipa: aviso al Almacén de Arequipa y la respuesta a Secocha
+  const reqsAqp = useStore<Requerimiento[]>(KEYS.REQS_SECOCHA_AQP, [], veAlmacen);
   const derivaciones = useStore<Derivacion[]>(KEYS.SUC_DERIVACIONES, [], veSecVentas);
   const reqsSec = useStore<ReqSucursal[]>(KEYS.SUC_REQS, [], veSecVentas);
   const traslados = useStore<Traslado[]>(KEYS.SUC_TRASLADOS, [], opera);
@@ -81,6 +84,33 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
     if (ve("/dashboard/almacen") && ["creador", "almacen"].includes(sesion.rol))
       for (const o of odsNuevas(ods))
         out.push({ clave: `od:${o.id}`, tipo: "despacho", titulo: `Nueva orden de despacho ${o.numero}`, detalle: avisoOD(o), modulo: "Almacén", href: "/dashboard/almacen?tab=despacho", prioridad: 1 });
+
+    // Secocha › Almacén -> Almacén de Arequipa (Williams 2026-11-22)
+    if (ve("/dashboard/almacen")) {
+      if (!enSucursal()) {
+        for (const r of reqsAqp.filter((x) => x.estado === "PENDIENTE"))
+          out.push({
+            clave: `reqaqp:${r.id}:${r.historial.length}`,
+            tipo: "requerimiento",
+            titulo: `${r.numero} de Secocha para Almacén`,
+            detalle: `${r.sede} · ${r.solicitante} · ${r.items.length} producto(s)`,
+            modulo: "Secocha → Almacén Arequipa",
+            href: "/dashboard/almacen?tab=secocha",
+            prioridad: 1,
+          });
+      } else {
+        for (const r of reqsAqp.filter((x) => x.estado === "OBSERVADO"))
+          out.push({
+            clave: `reqaqp:${r.id}:${r.historial.length}`,
+            tipo: "requerimiento",
+            titulo: `${r.numero} observado por Almacén Arequipa`,
+            detalle: r.observacion ?? `${r.items.length} producto(s)`,
+            modulo: "Almacén Arequipa → Secocha",
+            href: "/dashboard/almacen?tab=lista",
+            prioridad: 1,
+          });
+      }
+    }
 
     // Secocha -> Ventas Arequipa: REQ-SECOCHA y ventas derivadas por aceptar (crean la Nota de Pedido)
     if (veSecVentas) {
@@ -201,5 +231,5 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
     return out.sort((a, b) => a.prioridad - b.prioridad);
     // equiposRaw: getEquipos() lee la misma caché; se usa para recalcular cuando cambia
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sesion, ods, reqs, facturas, stock, equiposRaw, derivaciones, reqsSec, traslados, ventasSuc, stockSuc, cierres, solicitudes, activos, exp, perfil, flujo.disponible, flujo.items]);
+  }, [sesion, ods, reqs, reqsAqp, facturas, stock, equiposRaw, derivaciones, reqsSec, traslados, ventasSuc, stockSuc, cierres, solicitudes, activos, exp, perfil, flujo.disponible, flujo.items]);
 }
