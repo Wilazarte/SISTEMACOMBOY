@@ -2,7 +2,8 @@
 import { assert, assertEquals } from "jsr:@std/assert@1";
 import { armarDocumento, type ComprobanteErp } from "../documento.ts";
 import { EMISOR_DEFECTO } from "../config.ts";
-import { anularNubefact, generarNubefact, jsonNubefact } from "../nubefact.ts";
+import { anularNubefact, diferenciaQr, estadoPse, generarNubefact, jsonNubefact, mapaSeries, type RespuestaPse } from "../nubefact.ts";
+import { assertThrows } from "jsr:@std/assert@1";
 
 const fac: ComprobanteErp = {
   id: "c1",
@@ -102,4 +103,38 @@ Deno.test("cliente Nubefact contra servidor simulado", async () => {
     ac.abort();
     await server.finished;
   }
+});
+
+const resp = (x: Partial<RespuestaPse>): RespuestaPse => ({
+  ok: true, aceptada: false, codigo: "", descripcion: "", observaciones: [], hash: "", qr: "", enlacePdf: "", enlaceXml: "", enlaceCdr: "", ...x,
+});
+
+Deno.test("Homologación: el estado sale de la respuesta (nunca se asume ACEPTADO)", () => {
+  assertEquals(estadoPse(resp({ aceptada: true, codigo: "0" })), "ACEPTADO");
+  assertEquals(estadoPse(resp({ aceptada: true, codigo: "4287", observaciones: ["obs"] })), "OBSERVADO");
+  assertEquals(estadoPse(resp({ codigo: "2800" })), "RECHAZADO");
+  assertEquals(estadoPse(resp({})), "ENVIADO");
+  assertEquals(estadoPse(resp({ ok: false, error: "x" })), "EXCEPCION");
+});
+
+Deno.test("Homologación: un número ya ocupado por OTRO comprobante no se da por propio", () => {
+  const d = armarDocumento(fac, EMISOR_DEFECTO);
+  const propio = `20613238566|01|F001|7|${d.igv.toFixed(2)}|${d.total.toFixed(2)}|2026-11-16|6|${d.cliente.numDoc}|hash|`;
+  assertEquals(diferenciaQr(resp({ qr: propio }), d), "");
+  const ajeno = `20613238566|01|F001|7|18.00|118.00|2026-11-16|6|20123456789|hash|`;
+  assert(diferenciaQr(resp({ qr: ajeno }), d).length > 0);
+});
+
+Deno.test("Homologación: NUBEFACT_SERIES (demo) no se usa en producción", () => {
+  Deno.env.set("SUNAT_ENTORNO", "produccion");
+  try {
+    assertThrows(() => mapaSeries("F001=FFF1"));
+    assertEquals(mapaSeries(""), {});
+  } finally {
+    Deno.env.delete("SUNAT_ENTORNO");
+  }
+});
+
+Deno.test("Homologación: fecha de emisión futura se rechaza", () => {
+  assertThrows(() => armarDocumento({ ...fac, fecha: "2999-01-01" }, EMISOR_DEFECTO));
 });

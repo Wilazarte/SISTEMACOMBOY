@@ -1049,6 +1049,10 @@ export async function emitirComprobante(
   const existente = borradorId ? getComprobantes().find((c) => c.id === borradorId) : undefined;
   if (existente && existente.estado !== "BORRADOR") throw new ErpError("Este comprobante ya fue emitido.");
   const c = armarComprobante(data, existente);
+  // SUNAT: fecha de emisión no futura y dentro del plazo máximo de envío (3 días calendario)
+  if (c.fecha > hoy()) throw new ErpError("La fecha de emisión no puede ser posterior a hoy.");
+  if (c.fecha < sumarDias(hoy(), -3))
+    throw new ErpError("La fecha de emisión supera el plazo de envío a SUNAT (3 días calendario): emita con la fecha de hoy.");
   // Si viene de una NP aprobada, su Orden de Despacho ya existe: solo se vincula
   const np = c.npId ? getNotasPedido().find((n) => n.id === c.npId) : undefined;
   const odNP = np ? odDeNP(np) : undefined;
@@ -1152,6 +1156,9 @@ export function anularComprobante(id: string, motivo: string, rol: Rol, opciones
     throw new ErpError(
       `${c.numero} ya fue aceptado por SUNAT: anúlelo con "Baja" (anulación ante SUNAT) o con una nota de crédito (motivo 01).`
     );
+  // Recibido por el PSE y en espera de SUNAT: no se puede anular solo en el ERP (quedaría vigente ante SUNAT)
+  if (!opciones.porSunat && c.estadoSunat === "ENVIADO")
+    throw new ErpError(`${c.numero} ya se envió a SUNAT y espera respuesta: use Consultar y, si es aceptado, anúlelo con "Baja" o nota de crédito.`);
   // Las notas de crédito / débito no tienen asiento ni orden de despacho propios
   if (c.tipo === "NOTA_CREDITO" || c.tipo === "NOTA_DEBITO") {
     escribir(KEYS.COMPROBANTES, lista.map((x) => (x.id === id ? { ...c, estado: "ANULADO" as const, historial: [...c.historial, nuevoEvento(rol, "Anulado", motivo.trim())] } : x)));
