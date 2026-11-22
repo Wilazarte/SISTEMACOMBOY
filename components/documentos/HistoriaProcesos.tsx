@@ -191,7 +191,7 @@ export function HistoriaProcesos({
 
       <div className="grid gap-3 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
         {/* Lista de procesos */}
-        <Tarjeta className="overflow-hidden lg:max-h-[78vh] lg:overflow-y-auto">
+        <Tarjeta className="overflow-hidden">
           {filtrados.length === 0 ? (
             <Vacio texto={procesos.length ? "Ningún proceso coincide con la búsqueda." : "Cargando los procesos de los módulos…"} icono={<Route size={26} />} />
           ) : (

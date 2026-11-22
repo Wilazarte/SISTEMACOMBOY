@@ -7,6 +7,7 @@ import { toast } from "@/components/ui";
 import { recargarExpedientes } from "@/lib/expedientes";
 import { RUTA_INICIO, type ModuloInicio } from "@/lib/inicioModulos";
 import { esperarGuardado } from "@/lib/storage";
+import { cerrarPestanaActiva, esEdicionReal, olvidarCambios } from "@/components/shell/PestanasERP";
 
 // Pantalla de una acción (abierta desde un botón del INICIO, en la misma ventana): barra NavegacionERP arriba
 // (components/NavegacionERP) y pie con Cancelar y Guardar y Cerrar. Guardar y Cerrar envía el formulario que se está
@@ -14,6 +15,8 @@ import { esperarGuardado } from "@/lib/storage";
 // Un formulario marca su botón de guardar con data-guardar-pestana: en esta pantalla ese botón se oculta
 // (app/globals.css) y el pie toma su texto ("Guardar compra e ingresar a stock"), así hay un solo botón de guardar.
 // "¿Guardar y crear nuevo registro?" marcado: guarda y se queda en la pantalla con el formulario limpio.
+// Williams 2026-11-21: el pie SOLO aparece en un formulario real de crear / editar (pantalla con data-guardar-pestana o
+// un campo de formulario ya editado). En las listas, consultas y reportes no hay barra: el contenido termina limpio.
 
 const EV_TOAST = "erp:toast";
 const ESPERA_MS = 8000;
@@ -63,9 +66,15 @@ function objetivoGuardar(editado: Element | null): Objetivo {
 export function PiePestana({ modulo }: { modulo: ModuloInicio }) {
   const router = useRouter();
   const inicio = RUTA_INICIO[modulo];
-  const cerrar = () => router.push(inicio);
+  // Cancelar / Guardar y Cerrar cierran la pestaña (vuelve a la anterior o al INICIO)
+  const cerrar = () => {
+    olvidarCambios();
+    cerrarPestanaActiva(router, inicio, true);
+  };
   const [guardando, setGuardando] = useState(false);
   const [crearNuevo, setCrearNuevo] = useState(false);
+  // ¿Hay un formulario de crear / editar en curso? (si no, no se dibuja la barra)
+  const [enFormulario, setEnFormulario] = useState(false);
   // Texto y estado del botón del formulario (data-guardar-pestana): el pie lo reemplaza
   const [principal, setPrincipal] = useState<{
     texto: string;
@@ -75,6 +84,9 @@ export function PiePestana({ modulo }: { modulo: ModuloInicio }) {
     document.body.dataset.modoPestana = "1";
     const leer = () => {
       const b = botonPrincipal();
+      const e = editado.current;
+      const obj = !b && e && e.isConnected && visible(e) ? objetivoGuardar(e) : null;
+      setEnFormulario(!!b || (!!obj && !("sinBoton" in obj)));
       const texto = b?.textContent?.trim() ?? "";
       setPrincipal((p) => (!b ? null : p?.texto === texto && p.deshabilitado === b.disabled ? p : { texto, deshabilitado: b.disabled }));
     };
@@ -83,6 +95,7 @@ export function PiePestana({ modulo }: { modulo: ModuloInicio }) {
     return () => {
       clearInterval(reloj);
       delete document.body.dataset.modoPestana;
+      delete document.body.dataset.piePestana;
     };
   }, []);
   const limpiar = useRef<() => void>(() => undefined);
@@ -91,7 +104,7 @@ export function PiePestana({ modulo }: { modulo: ModuloInicio }) {
   useEffect(() => {
     const alEditar = (e: Event) => {
       const t = e.target as Element | null;
-      if (t && !t.closest("[data-sin-guardar]")) editado.current = t;
+      if (esEdicionReal(t)) editado.current = t;
     };
     const alAvisar = (e: Event) => {
       if ((e as CustomEvent<{ tipo?: string }>).detail?.tipo !== "error") editado.current = null;
@@ -166,6 +179,14 @@ export function PiePestana({ modulo }: { modulo: ModuloInicio }) {
     limpiar.current();
     cerrar();
   };
+
+  // El chat (PC) termina encima de la barra solo mientras se ve
+  useEffect(() => {
+    if (enFormulario || guardando) document.body.dataset.piePestana = "1";
+    else delete document.body.dataset.piePestana;
+  }, [enFormulario, guardando]);
+
+  if (!enFormulario && !guardando) return null;
 
   return (
     <div

@@ -402,9 +402,9 @@ body[data-modo-pestana] [data-guardar-pestana] {
 .chat-rojo { background-color: #4a0710; }
 .tema-planta .chat-rojo.seccion { position: fixed; background-color: rgba(74, 7, 16, 0.94); border-color: rgb(var(--sec) / 0.55); }
 @media (max-width: 1023px) { .tema-planta .chat-rojo.seccion { background-color: #4a0710; } }
-/* Pestaña "Guardar y Cerrar" (barra fija abajo, z-60): el chat termina encima de ella */
+/* Pestaña "Guardar y Cerrar" (barra fija abajo, z-60, solo en formularios): el chat termina encima de ella */
 @media (min-width: 1024px) {
-  body[data-modo-pestana] aside.chat-barra { bottom: 64px; }
+  body[data-pie-pestana] aside.chat-barra { bottom: 64px; }
 }
 
 /* Barra azul de accesos rápidos (Williams 2026-11-16, color de su imagen de referencia) con el estilo abstracto del
@@ -841,3 +841,27 @@ body[data-modo-pestana] [data-guardar-pestana] {
 .tema-login .chat-rojo .seccion-titulo { color: #ffffff; }
 .tema-login .chat-rojo .seccion-titulo::before { display: none; }
 .tema-login .chat-rojo :is(.text-\[\#c4001c\], .text-\[\#ff2a5f\]) { color: #800021; }
+
+/* ===================== Pestañas tipo navegador (Williams 2026-11-21) =====================
+   components/shell/PestanasERP: una pestaña por función abierta, con su nombre y X. Paleta #11212D / #800021 /
+   #294D61 / #CCD0CF. En celular la barra se desliza de lado (sin desplazar la página). */
+.pestanas-erp { scrollbar-width: none; }
+.pestanas-erp::-webkit-scrollbar { display: none; }
+.pestana-erp {
+  color: #11212D;
+  background-color: rgba(204, 208, 207, 0.55);
+  border: 1px solid rgba(17, 33, 45, 0.14);
+  border-bottom: 0;
+  transition: background-color 0.15s, color 0.15s;
+}
+.pestana-erp:hover { color: #11212D; background-color: #CCD0CF; }
+.pestana-erp.pestana-activa {
+  color: #ffffff;
+  background-color: #294D61;
+  border-color: #294D61;
+  box-shadow: inset 0 3px 0 #800021;
+}
+.pestana-cerrar { color: inherit; opacity: 0.75; }
+.pestana-cerrar:hover { opacity: 1; background-color: rgba(128, 0, 33, 0.85); color: #ffffff; }
+/* Celular: el nombre de la pestaña no salta de línea (se corta con …) */
+.pestanas-erp .pestana-erp, .pestanas-erp .pestana-erp * { white-space: nowrap !important; overflow-wrap: normal !important; word-break: normal !important; }

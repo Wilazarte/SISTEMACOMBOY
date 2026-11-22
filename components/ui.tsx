@@ -327,23 +327,18 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
   }, [open, onClose]);
   if (!open) return null;
   const modal = (
-    // z-[70]: por encima de la barra fija "Guardar y Cerrar" de la pestaña nueva (z-[60]), que tapaba el final del formulario.
-    // pb-28: aire al final para que los botones del modal se vean completos al hacer scroll.
-    <div className="fixed inset-0 z-[70] flex animate-velo items-start justify-center overflow-y-auto overscroll-contain bg-black/50 p-4 pb-28 pt-[6vh] backdrop-blur-[2px]" onMouseDown={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className={cn("w-full animate-emerger rounded-2xl border border-plomo-200 bg-surface shadow-pop", wide ? "max-w-4xl" : "max-w-lg")}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between gap-3 border-b border-plomo-200 px-5 py-4">
-          <h3 className="text-[15px] font-semibold text-fg">{title}</h3>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-plomo-500 transition hover:bg-plomo-100 hover:text-fg" aria-label="Cerrar">
-            <X size={18} />
+    // Pantalla completa (Williams 2026-11-21: nada de ventanas recortadas ni scroll interno chico): ocupa todo debajo del
+    // encabezado, con su título y X arriba. z-[70]: por encima de la barra fija "Guardar y Cerrar" (z-[60]).
+    // `wide` se conserva por compatibilidad: todas las ventanas usan ya el ancho completo.
+    <div className="modal-completo fixed inset-x-0 bottom-0 top-16 z-[70] animate-velo overflow-y-auto overscroll-contain bg-canvas">
+      <div role="dialog" aria-modal="true" aria-label={title} data-ancho={wide ? "amplio" : "normal"} className="min-h-full w-full animate-emerger bg-surface">
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-plomo-200 bg-surface px-4 py-3 sm:px-6 lg:px-8">
+          <h3 className="min-w-0 truncate text-[16px] font-semibold text-fg">{title}</h3>
+          <button onClick={onClose} className="flex shrink-0 items-center gap-1.5 rounded-lg border border-plomo-200 px-2.5 py-1.5 text-[13px] font-semibold text-plomo-600 transition hover:bg-plomo-100 hover:text-fg" aria-label="Cerrar">
+            <X size={16} /> <span className="hidden sm:inline">Cerrar</span>
           </button>
         </div>
-        <div className="p-5">{children}</div>
+        <div className="px-4 pb-10 pt-5 sm:px-6 lg:px-8">{children}</div>
       </div>
     </div>
   );

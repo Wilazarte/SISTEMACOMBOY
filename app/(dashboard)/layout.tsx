@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, ArrowLeftRight, CloudUpload, Eye, Loader2, MapPin, Search, ShieldAlert } from "lucide-react";
 import { EV_PESTANA, Kbd, Toaster, toast, type PestanaActiva } from "@/components/ui";
 import { VisorPDF } from "@/components/VisorPDF";
@@ -16,6 +16,7 @@ import { ModuloContenido, ModuloLayout, SEDE_PLANTA_PRINCIPAL } from "@/componen
 import { PiePestana } from "@/components/inicio/ModoPestana";
 import { BarraAccesos } from "@/components/inicio/BarraAccesos";
 import { NavegacionERP, type MigaERP } from "@/components/NavegacionERP";
+import { BarraPestanasERP, olvidarPestanas } from "@/components/shell/PestanasERP";
 import { DatalistCatalogo } from "@/components/productos/ProductoInput";
 import { detenerCatalogo, iniciarCatalogo } from "@/lib/productos";
 import { cargarSedes, elegirSedeErp, esUsuarioDeSede, getSedeActual, olvidarSedes, useSedes } from "@/lib/sedes";
@@ -72,6 +73,27 @@ const NOMBRE_MODULO: [string, string][] = [
  * Pestaña de una acción del INICIO (ERP v3.0): ?pestana=<módulo> (la pone /{modulo}/{accion}) o una sub-ruta de
  * la home de un módulo (/logistica/agencias, /almacen/panel…). Lleva "Volver a INICIO" y Cancelar / Guardar y Cerrar.
  */
+/**
+ * /{modulo}/{accion} (o /soporte/{accion}) que solo redirige a la pantalla real (IrAccion): no va como pestaña,
+ * la pestaña es la pantalla a la que lleva.
+ */
+function esRedireccion(path: string): boolean {
+  for (const m of Object.keys(RUTA_INICIO) as ModuloInicio[]) {
+    const base = m === "soporte" ? "/soporte" : RUTA_INICIO[m];
+    if (!path.startsWith(`${base}/`)) continue;
+    const a = buscarAccion(m, path.slice(base.length + 1).split("/")[0]);
+    if (a && !a.externo && a.destino.split("?")[0] !== path) return true;
+  }
+  return false;
+}
+
+/** Avisa la búsqueda de la URL (?pestana=&accion=…) al layout; va dentro de un Suspense. */
+function VigiaBusqueda({ onCambio }: { onCambio: (qs: string) => void }) {
+  const qs = useSearchParams().toString();
+  useEffect(() => onCambio(qs), [qs, onCambio]);
+  return null;
+}
+
 function pestanaDe(path: string, search: string): { modulo: ModuloInicio; titulo?: string } | null {
   const q = new URLSearchParams(search);
   const p = q.get("pestana");
@@ -101,13 +123,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [pestana, setPestana] = useState<PestanaActiva | null>(null);
   const [locales, setLocales] = useState(0);
   const [subiendo, setSubiendo] = useState(false);
-  // Pestaña de una acción del INICIO (se lee de la URL al cambiar de ruta)
-  const [pestanaAccion, setPestanaAccion] = useState<ReturnType<typeof pestanaDe>>(null);
-  const [busqueda, setBusqueda] = useState("");
-  useEffect(() => {
-    setPestanaAccion(pestanaDe(path, window.location.search));
-    setBusqueda(window.location.search);
-  }, [path]);
+  // Pestaña de una acción del INICIO (se lee de la URL: ruta y búsqueda ?pestana= / ?accion=; dos pestañas pueden ser
+  // la misma ruta con otra función, así que se recalcula también al cambiar solo la búsqueda)
+  // (la lee VigiaBusqueda dentro de un Suspense: useSearchParams en el layout impedía generar las páginas)
+  const [qs, setQs] = useState("");
+  const pestanaAccion = useMemo(() => pestanaDe(path, qs), [path, qs]);
+  const busqueda = qs ? `?${qs}` : "";
   // Todos los botones del ERP navegan en esta misma ventana (lib/navegacion: irA)
   useEffect(() => registrarNavegador(ir), [ir]);
 
@@ -227,6 +248,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     await detenerDatos();
     await detenerCatalogo();
     olvidarSedes();
+    olvidarPestanas();
     await logout();
     limpiarPrefs();
     router.replace("/login");
@@ -369,7 +391,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       overlays={
         <>
           {/* ERP v3.0: sin dock, sin barra lateral ni botón de acciones; la navegación son los botones del INICIO.
-              Avisos: la campana del encabezado. En la pestaña de una acción, el pie Cancelar / Guardar y Cerrar. */}
+              Avisos: la campana del encabezado. En la pestaña de una acción, el pie Cancelar / Guardar y Cerrar
+              (solo mientras se llena un formulario de crear / editar; nunca en listas ni consultas). */}
           {pestanaAccion && <PiePestana modulo={pestanaAccion.modulo} />}
           {/* Barra azul de accesos rápidos (Williams 2026-11-16): derecha, en todas las pantallas del módulo */}
           {moduloNav && sesion.modulos.length > 0 && (
@@ -383,6 +406,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               onSalir={salir}
             />
           )}
+          <Suspense fallback={null}>
+            <VigiaBusqueda onCambio={setQs} />
+          </Suspense>
           <CommandPalette abierto={paleta} onCerrar={() => setPaleta(false)} comandos={comandos} documentos={documentos} />
           <DocViewerHost />
           <DatalistCatalogo />
@@ -409,7 +435,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       ) : (
         <ModuloContenido
           key={path}
-          encabezado={migas && moduloNav && <NavegacionERP migas={migas} inicio={RUTA_INICIO[moduloNav]} />}
+          encabezado={
+            moduloNav && (
+              // Pestañas tipo navegador (Williams 2026-11-21) + ruta INICIO > MÓDULO > pantalla, fijas al hacer scroll
+              <div className="sticky top-16 z-30 -mx-4 mb-4 border-b border-white/[0.08] bg-[#0e1219]/95 backdrop-blur print:hidden sm:-mx-6 lg:-mx-8" data-sin-guardar>
+                <BarraPestanasERP label={pantalla} registrar={!esInicio && !esRedireccion(path)} esInicio={esInicio} inicio={RUTA_INICIO[moduloNav]} />
+                {migas && <NavegacionERP migas={migas} inicio={RUTA_INICIO[moduloNav]} />}
+              </div>
+            )
+          }
           avisos={
             <>
               {sesion.soloLectura && (

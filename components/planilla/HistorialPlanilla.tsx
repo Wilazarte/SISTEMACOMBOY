@@ -84,7 +84,7 @@ export function HistorialPlanilla({ lista, cargando, error }: { lista: Periodo[]
               text={lista.length ? "Ningún periodo coincide con la búsqueda." : "Aún no hay semanas cerradas. Use “Cerrar semana y guardar en historial” en la planilla del periodo."}
             />
           ) : (
-            <div className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
+            <div className="space-y-2">
               {carpetas.map(([clave, c]) => {
                 const abiertaC = !cerradas.has(clave);
                 return (

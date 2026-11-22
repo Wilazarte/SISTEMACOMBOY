@@ -62,7 +62,7 @@ export function EditarListaSemana({ periodo, filas, onClose }: { periodo: string
             {marcados.size} de {filas.length} marcados
           </span>
         </div>
-        <div className="max-h-[50vh] overflow-y-auto rounded-xl border border-plomo-200">
+        <div className="overflow-x-auto rounded-xl border border-plomo-200">
           {lista.map((f) => (
             <label
               key={f.id}
