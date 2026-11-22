@@ -128,18 +128,18 @@ export function PanelDocumento({ doc, rol, usuario, onCerrar, onCambio }: { doc:
 
   // Portal al body: por encima de la cabecera y del chat del ERP
   return createPortal(
-    <div className="fixed inset-0 z-[90] flex justify-end bg-[#11212D]/40" onMouseDown={onCerrar}>
+    <div className="fixed inset-0 z-[90] flex justify-end bg-tema-fuerte/40" onMouseDown={onCerrar}>
       <aside
         className="flex h-full w-full flex-col bg-white shadow-2xl sm:w-[min(680px,100vw)]"
         onMouseDown={(e) => e.stopPropagation()}
         aria-label={`Documento ${doc.codigo_unico}`}
       >
         {/* Cabecera del panel */}
-        <div className="!bg-[#11212D] px-4 py-3 !text-white sm:px-5">
+        <div className="!bg-tema-fuerte px-4 py-3 !text-white sm:px-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="flex flex-wrap items-center gap-2 text-[12px] font-semibold tracking-wider text-white/70">
-                {doc.codigo_unico} · {doc.version_actual} {doc.es_confidencial && <span className="inline-flex items-center gap-1 rounded !bg-[#800021] px-1.5 py-0.5 text-[10px] !text-white"><Lock size={10} /> CONFIDENCIAL</span>}
+                {doc.codigo_unico} · {doc.version_actual} {doc.es_confidencial && <span className="inline-flex items-center gap-1 rounded !bg-tema-acento px-1.5 py-0.5 text-[10px] !text-white"><Lock size={10} /> CONFIDENCIAL</span>}
               </p>
               <h2 className="mt-0.5 break-words text-[16px] font-semibold leading-snug">{doc.nombre}</h2>
             </div>
@@ -152,7 +152,7 @@ export function PanelDocumento({ doc, rol, usuario, onCerrar, onCambio }: { doc:
               <ChipEstado estado={doc.estado} />
             </span>
             {doc.integridad === "ALERTA" && (
-              <span className="inline-flex items-center gap-1 rounded-full !bg-[#800021] px-2.5 py-0.5 text-[11px] font-bold !text-white">
+              <span className="inline-flex items-center gap-1 rounded-full !bg-tema-acento px-2.5 py-0.5 text-[11px] font-bold !text-white">
                 <ShieldAlert size={12} /> ALERTA DE INTEGRIDAD
               </span>
             )}
@@ -161,7 +161,7 @@ export function PanelDocumento({ doc, rol, usuario, onCerrar, onCambio }: { doc:
         </div>
 
         {/* Acciones */}
-        <div className="flex flex-wrap gap-2 border-b border-[#11212D]/10 px-4 py-2.5 sm:px-5">
+        <div className="flex flex-wrap gap-2 border-b border-tema-texto/10 px-4 py-2.5 sm:px-5">
           {det?.puede_resolver && (
             <>
               <Boton tono="secundario" disabled={ocupado} onClick={() => accion(() => aprobar(doc.id), `${doc.codigo_unico} aprobado (paso ${det.paso_pendiente?.paso}).`)}>
@@ -207,7 +207,7 @@ export function PanelDocumento({ doc, rol, usuario, onCerrar, onCambio }: { doc:
             </Boton>
           )}
           {!archivado && (nivel >= 5 || r === "Gerencia") && (
-            <Boton className="border-[#800021]/40 text-[#800021]" onClick={() => setModal("archivar")}>
+            <Boton className="border-tema-acento/40 text-tema-tinta" onClick={() => setModal("archivar")}>
               <Archive size={15} /> Eliminar (archivar)
             </Boton>
           )}
@@ -217,12 +217,12 @@ export function PanelDocumento({ doc, rol, usuario, onCerrar, onCambio }: { doc:
             </Boton>
           )}
           {det && !det.puede_resolver && det.paso_pendiente && (
-            <span className="self-center text-[12px] text-[#800021]">Esperando aprobación de {et(det.paso_pendiente.aprobador_rol)} (paso {det.paso_pendiente.paso})</span>
+            <span className="self-center text-[12px] text-tema-tinta">Esperando aprobación de {et(det.paso_pendiente.aprobador_rol)} (paso {det.paso_pendiente.paso})</span>
           )}
         </div>
 
         {/* Pestañas */}
-        <div className="flex gap-1 overflow-x-auto border-b border-[#11212D]/10 px-2 sm:px-4" role="tablist">
+        <div className="flex gap-1 overflow-x-auto border-b border-tema-texto/10 px-2 sm:px-4" role="tablist">
           {(
             [
               ["detalle", "Detalle", Eye],
@@ -238,7 +238,7 @@ export function PanelDocumento({ doc, rol, usuario, onCerrar, onCambio }: { doc:
               onClick={() => setPestana(id)}
               className={cx(
                 "flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] font-semibold",
-                pestana === id ? "border-[#800021] text-[#11212D]" : "border-transparent text-[#11212D]/55 hover:text-[#11212D]"
+                pestana === id ? "border-tema-acento text-tema-texto" : "border-transparent text-tema-texto/55 hover:text-tema-texto"
               )}
             >
               <Icono size={14} /> {label}
@@ -248,7 +248,7 @@ export function PanelDocumento({ doc, rol, usuario, onCerrar, onCambio }: { doc:
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 sm:px-5">
           {cargando && !det ? (
-            <p className="flex items-center gap-2 text-[13px] text-[#11212D]/70">
+            <p className="flex items-center gap-2 text-[13px] text-tema-texto/70">
               <Loader2 size={15} className="animate-spin" /> Cargando…
             </p>
           ) : !det ? (
@@ -344,8 +344,8 @@ export function PanelDocumento({ doc, rol, usuario, onCerrar, onCambio }: { doc:
 function Dato({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-[#11212D]/55">{label}</p>
-      <div className="break-words text-[13px] text-[#11212D]">{children || "—"}</div>
+      <p className="text-[10px] font-bold uppercase tracking-wider text-tema-texto/55">{label}</p>
+      <div className="break-words text-[13px] text-tema-texto">{children || "—"}</div>
     </div>
   );
 }
@@ -371,7 +371,7 @@ function Detalle({ doc, usuario, versionPrevia }: { doc: DocumentoGD; usuario: s
               type="button"
               title="Ver la historia clínica del proceso"
               onClick={() => window.dispatchEvent(new CustomEvent("gd:proceso", { detail: doc.referencia_externa }))}
-              className="inline-flex items-center gap-1 text-left font-semibold text-[#294D61] underline-offset-2 hover:underline"
+              className="inline-flex items-center gap-1 text-left font-semibold text-tema-sec underline-offset-2 hover:underline"
             >
               <Link2 size={13} /> {doc.referencia_externa} · ver historia
             </button>
@@ -379,19 +379,19 @@ function Detalle({ doc, usuario, versionPrevia }: { doc: DocumentoGD; usuario: s
         )}
         {doc.motivo_archivo && <Dato label="Motivo de archivo">{doc.motivo_archivo}</Dato>}
       </div>
-      {doc.descripcion && <p className="whitespace-pre-wrap rounded-lg bg-[#CCD0CF]/30 px-3 py-2 text-[13px] text-[#11212D]">{doc.descripcion}</p>}
-      <div className="rounded-lg border border-[#11212D]/10 px-3 py-2">
-        <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#11212D]/55">
+      {doc.descripcion && <p className="whitespace-pre-wrap rounded-lg bg-tema-borde/30 px-3 py-2 text-[13px] text-tema-texto">{doc.descripcion}</p>}
+      <div className="rounded-lg border border-tema-texto/10 px-3 py-2">
+        <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-tema-texto/55">
           <Fingerprint size={12} /> Hash SHA-256 ({doc.version_actual})
         </p>
-        <p className="break-all font-mono text-[11px] text-[#11212D]">{doc.hash_sha256}</p>
-        <p className="mt-1 flex items-center gap-1 text-[11px]" style={{ color: doc.integridad === "ALERTA" ? "#800021" : "#294D61" }}>
+        <p className="break-all font-mono text-[11px] text-tema-texto">{doc.hash_sha256}</p>
+        <p className="mt-1 flex items-center gap-1 text-[11px]" style={{ color: doc.integridad === "ALERTA" ? "var(--accent)" : "var(--secundario)" }}>
           {doc.integridad === "ALERTA" ? <ShieldAlert size={12} /> : <ShieldCheck size={12} />}
           {doc.integridad === "OK" ? "Integridad verificada" : doc.integridad === "ALERTA" ? "El archivo no coincide con su hash" : "Se verifica cada vez que se abre o descarga"}
         </p>
       </div>
       <div>
-        <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#11212D]/75">
+        <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-tema-texto/75">
           Vista previa {versionPrevia !== doc.version_actual && `· ${versionPrevia}`} (sin descarga)
         </p>
         <VistaPrevia key={versionPrevia} docId={doc.id} version={versionPrevia} usuario={usuario} />
@@ -420,35 +420,35 @@ function Historial({
   const versiones = [...det.versiones].reverse();
   return (
     <div className="space-y-5">
-      <p className="flex flex-wrap items-center gap-1 text-[12px] font-semibold text-[#11212D]">
+      <p className="flex flex-wrap items-center gap-1 text-[12px] font-semibold text-tema-texto">
         {det.versiones.map((v, i) => (
           <span key={v.version} className="inline-flex items-center gap-1">
-            {i > 0 && <span className="text-[#11212D]/40">→</span>}
-            <span className={cx("rounded px-1.5 py-0.5", v.version === versionActual ? "!bg-[#294D61] !text-white" : "bg-[#CCD0CF]/60")}>{v.version}</span>
+            {i > 0 && <span className="text-tema-texto/40">→</span>}
+            <span className={cx("rounded px-1.5 py-0.5", v.version === versionActual ? "!bg-tema-sec !text-white" : "bg-tema-borde/60")}>{v.version}</span>
           </span>
         ))}
       </p>
-      <ol className="relative space-y-4 border-l-2 border-[#294D61]/30 pl-5">
+      <ol className="relative space-y-4 border-l-2 border-tema-sec/30 pl-5">
         {versiones.map((v) => {
           const ronda = det.flujo.filter((f) => f.version === v.version);
           return (
             <li key={v.version} className="relative">
-              <span className={cx("absolute -left-[27px] top-1 h-3 w-3 rounded-full border-2 border-white", v.version === versionActual ? "!bg-[#294D61]" : "!bg-[#11212D]/40")} />
+              <span className={cx("absolute -left-[27px] top-1 h-3 w-3 rounded-full border-2 border-white", v.version === versionActual ? "!bg-tema-sec" : "!bg-tema-fuerte/40")} />
               <div className="flex flex-wrap items-center gap-2">
-                <b className="text-[14px] text-[#11212D]">{v.version}</b>
-                {v.version === versionActual && <span className="rounded !bg-[#294D61] px-1.5 text-[10px] font-bold uppercase !text-white">actual</span>}
-                <span className="text-[12px] text-[#11212D]/70">
+                <b className="text-[14px] text-tema-texto">{v.version}</b>
+                {v.version === versionActual && <span className="rounded !bg-tema-sec px-1.5 text-[10px] font-bold uppercase !text-white">actual</span>}
+                <span className="text-[12px] text-tema-texto/70">
                   {fechaHora(v.fecha)} · {v.cambiado_por}
                 </span>
               </div>
-              <p className="mt-0.5 text-[13px] text-[#11212D]">{v.motivo_cambio}</p>
-              <p className="mt-0.5 break-all font-mono text-[10px] text-[#11212D]/60">
+              <p className="mt-0.5 text-[13px] text-tema-texto">{v.motivo_cambio}</p>
+              <p className="mt-0.5 break-all font-mono text-[10px] text-tema-texto/60">
                 SHA-256 {v.hash_sha256} · {v.archivo_nombre} · {pesoArchivo(v.archivo_bytes)}
               </p>
               {ronda.length > 0 && (
                 <ul className="mt-1.5 space-y-0.5">
                   {ronda.map((f) => (
-                    <li key={f.paso} className="text-[12px]" style={{ color: f.estado === "Aprobado" ? "#294D61" : f.estado === "Rechazado" || f.estado === "Pendiente" ? "#800021" : "#11212D" }}>
+                    <li key={f.paso} className="text-[12px]" style={{ color: f.estado === "Aprobado" ? "var(--secundario)" : f.estado === "Rechazado" || f.estado === "Pendiente" ? "var(--accent)" : "var(--text)" }}>
                       Paso {f.paso} · {et(f.aprobador_rol)}: <b>{f.estado}</b>
                       {f.aprobador && ` por ${f.aprobador}`}
                       {f.fecha_aprobacion && ` · ${fechaHora(f.fecha_aprobacion)}`}
@@ -485,13 +485,13 @@ function Permisos({ det, doc, editable, onCambio }: { det: DetalleGD; doc: Docum
   const actual = (rol: RolGD): PermisoGD => det.permisos.find((p) => p.rol === rol)?.permiso ?? "Sin Acceso";
   return (
     <div className="space-y-3">
-      <p className="text-[12px] text-[#11212D]/70">
+      <p className="text-[12px] text-tema-texto/70">
         Por defecto nadie ve nada. Además de estos roles: el dueño ({doc.dueno_nombre}) tiene Control Total y SOPORTE administra. Archivado = solo Gerencia.
         {editable ? " Cada cambio queda en la auditoría con el permiso anterior y el nuevo." : " Solo quien tiene Control Total cambia permisos."}
       </p>
-      <div className="overflow-hidden rounded-lg border border-[#11212D]/10">
+      <div className="overflow-hidden rounded-lg border border-tema-texto/10">
         <table className="w-full text-[13px]">
-          <thead className="[&_th]:!text-white !bg-[#11212D] text-left text-[11px] uppercase tracking-wider !text-white">
+          <thead className="[&_th]:!text-white !bg-tema-fuerte text-left text-[11px] uppercase tracking-wider !text-white">
             <tr>
               <th className="px-3 py-2">Rol</th>
               <th className="px-3 py-2">Permiso</th>
@@ -504,13 +504,13 @@ function Permisos({ det, doc, editable, onCambio }: { det: DetalleGD; doc: Docum
               const p = actual(rol);
               const n = PERMISOS_GD.indexOf(p);
               return (
-                <tr key={rol} className="border-t border-[#11212D]/10">
-                  <td className="px-3 py-2 font-semibold text-[#11212D]">{et(rol)}</td>
+                <tr key={rol} className="border-t border-tema-texto/10">
+                  <td className="px-3 py-2 font-semibold text-tema-texto">{et(rol)}</td>
                   <td className="px-3 py-1.5">
                     {editable ? (
                       <div className="flex items-center gap-1.5">
                         <select
-                          className={cx(claseInput, "w-auto py-1 text-[12px]", n > 0 && "border-[#294D61] font-semibold text-[#294D61]")}
+                          className={cx(claseInput, "w-auto py-1 text-[12px]", n > 0 && "border-tema-sec font-semibold text-tema-sec")}
                           value={p}
                           disabled={ocupado === rol}
                           onChange={async (e) => {
@@ -532,10 +532,10 @@ function Permisos({ det, doc, editable, onCambio }: { det: DetalleGD; doc: Docum
                             </option>
                           ))}
                         </select>
-                        {ocupado === rol && <Loader2 size={14} className="animate-spin text-[#294D61]" />}
+                        {ocupado === rol && <Loader2 size={14} className="animate-spin text-tema-sec" />}
                       </div>
                     ) : (
-                      <span className={n > 0 ? "font-semibold text-[#294D61]" : "text-[#11212D]/50"}>{et(p)}</span>
+                      <span className={n > 0 ? "font-semibold text-tema-sec" : "text-tema-texto/50"}>{et(p)}</span>
                     )}
                   </td>
                   <td className="hidden px-3 py-2 sm:table-cell">{n >= 1 ? "Sí" : "No"}</td>
@@ -556,10 +556,10 @@ function Auditoria({ docId }: { docId: string }) {
   useEffect(() => {
     auditoriaDocumento(docId).then(setFilas, (e) => setError((e as Error).message));
   }, [docId]);
-  if (error) return <p className="text-[13px] font-semibold text-[#800021]">{error}</p>;
+  if (error) return <p className="text-[13px] font-semibold text-tema-tinta">{error}</p>;
   if (!filas)
     return (
-      <p className="flex items-center gap-2 text-[13px] text-[#11212D]/70">
+      <p className="flex items-center gap-2 text-[13px] text-tema-texto/70">
         <Loader2 size={15} className="animate-spin" /> Cargando auditoría…
       </p>
     );
@@ -571,9 +571,9 @@ export function TablaAuditoria({ filas, sinDocumento }: { filas: AuditoriaGD[]; 
   if (filas.length === 0) return <Vacio texto="Sin registros." />;
   return (
     <>
-      <div className="hidden overflow-hidden rounded-lg border border-[#11212D]/10 md:block">
+      <div className="hidden overflow-hidden rounded-lg border border-tema-texto/10 md:block">
         <table className="tabla-fija w-full table-fixed text-[12px]">
-          <thead className="[&_th]:!text-white !bg-[#11212D] text-left text-[10px] uppercase tracking-wider !text-white">
+          <thead className="[&_th]:!text-white !bg-tema-fuerte text-left text-[10px] uppercase tracking-wider !text-white">
             <tr>
               <th className="w-12 px-2 py-2">N°</th>
               <th className="w-[118px] px-2 py-2">Fecha y hora</th>
@@ -586,26 +586,26 @@ export function TablaAuditoria({ filas, sinDocumento }: { filas: AuditoriaGD[]; 
           </thead>
           <tbody>
             {filas.map((a) => (
-              <tr key={a.id} className="border-t border-[#11212D]/10 align-top text-[#11212D]">
-                <td className="px-2 py-1.5 text-[#11212D]/60">{a.secuencia}</td>
+              <tr key={a.id} className="border-t border-tema-texto/10 align-top text-tema-texto">
+                <td className="px-2 py-1.5 text-tema-texto/60">{a.secuencia}</td>
                 <td className="px-2 py-1.5">{fechaHora(a.fecha_hora)}</td>
                 <td className="break-words px-2 py-1.5">{a.usuario_nombre}</td>
-                <td className={cx("break-words px-2 py-1.5 font-semibold", ACCION_CRITICA.has(a.accion) ? "text-[#800021]" : "text-[#294D61]")}>{ACCION_TEXTO[a.accion] ?? a.accion}</td>
+                <td className={cx("break-words px-2 py-1.5 font-semibold", ACCION_CRITICA.has(a.accion) ? "text-tema-tinta" : "text-tema-sec")}>{ACCION_TEXTO[a.accion] ?? a.accion}</td>
                 {!sinDocumento && (
                   <td className="break-words px-2 py-1.5">
                     {a.codigo_documento ?? "—"} {a.version}
-                    {a.confidencial && <Lock size={11} className="ml-1 inline text-[#800021]" />}
+                    {a.confidencial && <Lock size={11} className="ml-1 inline text-tema-tinta" />}
                   </td>
                 )}
                 <td className="break-words px-2 py-1.5">
                   {a.detalle}
                   {(a.valor_anterior != null || a.valor_nuevo != null) && (
-                    <span className="mt-0.5 block text-[11px] text-[#11212D]/60">
+                    <span className="mt-0.5 block text-[11px] text-tema-texto/60">
                       {valorTexto(a.valor_anterior) || "—"} → {valorTexto(a.valor_nuevo) || "—"}
                     </span>
                   )}
                 </td>
-                <td className="break-words px-2 py-1.5 text-[11px] text-[#11212D]/70" title={a.dispositivo ?? ""}>
+                <td className="break-words px-2 py-1.5 text-[11px] text-tema-texto/70" title={a.dispositivo ?? ""}>
                   {a.ip ?? "—"}
                   <span className="block truncate">{(a.dispositivo ?? "").split(" · ").slice(0, 2).join(" · ")}</span>
                 </td>
@@ -616,10 +616,10 @@ export function TablaAuditoria({ filas, sinDocumento }: { filas: AuditoriaGD[]; 
       </div>
       <ul className="space-y-2 md:hidden">
         {filas.map((a) => (
-          <li key={a.id} className="rounded-lg border border-[#11212D]/10 bg-white px-3 py-2 text-[12px] text-[#11212D]">
+          <li key={a.id} className="rounded-lg border border-tema-texto/10 bg-white px-3 py-2 text-[12px] text-tema-texto">
             <div className="flex flex-wrap items-center justify-between gap-1">
-              <b className={ACCION_CRITICA.has(a.accion) ? "text-[#800021]" : "text-[#294D61]"}>{ACCION_TEXTO[a.accion] ?? a.accion}</b>
-              <span className="text-[#11212D]/60">
+              <b className={ACCION_CRITICA.has(a.accion) ? "text-tema-tinta" : "text-tema-sec"}>{ACCION_TEXTO[a.accion] ?? a.accion}</b>
+              <span className="text-tema-texto/60">
                 N° {a.secuencia} · {fechaHora(a.fecha_hora)}
               </span>
             </div>
@@ -627,7 +627,7 @@ export function TablaAuditoria({ filas, sinDocumento }: { filas: AuditoriaGD[]; 
               {a.usuario_nombre}
               {!sinDocumento && a.codigo_documento && ` · ${a.codigo_documento} ${a.version ?? ""}`} · IP {a.ip ?? "—"}
             </p>
-            {a.detalle && <p className="break-words text-[#11212D]/80">{a.detalle}</p>}
+            {a.detalle && <p className="break-words text-tema-texto/80">{a.detalle}</p>}
           </li>
         ))}
       </ul>

@@ -54,10 +54,10 @@ interface Resumen {
 }
 
 // Paleta COMBOY (2026-11-17): acero, vino, acero claro y azul noche
-const AZUL = "41 77 97";
-const ROJO = "128 0 33";
-const CIAN = "127 156 171";
-const NARANJA = "128 0 33";
+const AZUL = "var(--graf-azul, 41 77 97)"; // temas de color: app/themes.css
+const ROJO = "var(--graf-rojo, 128 0 33)";
+const CIAN = "var(--graf-cian, 127 156 171)";
+const NARANJA = "var(--graf-rojo, 128 0 33)";
 
 /** Stock escaso: 5 unidades o menos (igual que los KPIs). */
 const STOCK_CRITICO = 5;

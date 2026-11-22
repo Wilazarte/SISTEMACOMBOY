@@ -571,22 +571,22 @@ table, .tabular { font-variant-numeric: tabular-nums; }
   --glass-borde: #CCD0CF;
   --grad-azul: linear-gradient(90deg, #800021 0%, #294D61 55%, #00d4fe 100%);
   --cian: #294D61;
-  color: #11212D;
+  color: var(--text);
 }
 /* Fondo: el panel claro del login, con ondas azul eléctrico / cian al pie */
 .fondo-login {
-  background-color: #E6E9E8;
+  background-color: var(--bg);
   background-image:
-    radial-gradient(circle at 8% 0%, rgba(41, 77, 97, 0.1) 0%, transparent 40%),
-    radial-gradient(circle at 100% 30%, rgba(128, 0, 33, 0.05) 0%, transparent 35%),
-    radial-gradient(rgba(17, 33, 45, 0.05) 1px, transparent 1px),
+    radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--secundario) 10%, transparent) 0%, transparent 40%),
+    radial-gradient(circle at 100% 30%, color-mix(in srgb, var(--accent) 5%, transparent) 0%, transparent 35%),
+    radial-gradient(color-mix(in srgb, var(--text) 5%, transparent) 1px, transparent 1px),
     linear-gradient(180deg, #F1F3F2 0%, #DDE1E0 100%);
   background-size: 100% 100%, 100% 100%, 22px 22px, 100% 100%;
 }
 
 /* Barra superior: panel oscuro del login (azul noche con ondas y trazo rojo fuego) */
 .tema-login .cabecera-roja {
-  background-color: #11212D;
+  background-color: var(--fuerte);
   background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 64' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='a' x1='0' x2='1'%3E%3Cstop offset='0' stop-color='%23294D61' stop-opacity='.55'/%3E%3Cstop offset='1' stop-color='%23CCD0CF' stop-opacity='.12'/%3E%3C/linearGradient%3E%3ClinearGradient id='f' x1='0' x2='1'%3E%3Cstop offset='0' stop-color='%23800021' stop-opacity='0'/%3E%3Cstop offset='1' stop-color='%23800021' stop-opacity='.7'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M0 0H1600V30C1350 60 1150 5 900 30S400 52 0 22Z' fill='url(%23a)'/%3E%3Cpath d='M0 48C300 20 650 70 1000 40S1450 30 1600 52' fill='none' stroke='%23CCD0CF' stroke-opacity='.3' stroke-width='1.5'/%3E%3Cpath d='M600 64C900 38 1200 70 1600 40' fill='none' stroke='url(%23f)' stroke-width='2'/%3E%3C/svg%3E");
   background-size: 100% 100%;
@@ -594,7 +594,7 @@ table, .tabular { font-variant-numeric: tabular-nums; }
   border-bottom: 1px solid rgba(204, 208, 207, 0.25);
   box-shadow: 0 6px 24px rgba(17, 33, 45, 0.25);
 }
-.tema-login .cabecera-roja .texto-modulo { color: #fff; text-shadow: 0 0 18px rgba(204, 208, 207, 0.45); }
+.tema-login .cabecera-roja .texto-modulo { color: var(--on-accent); text-shadow: 0 0 18px rgba(204, 208, 207, 0.45); }
 .tema-login .cabecera-roja .logo-placa { background: #F1F3F2; border-color: rgba(255, 255, 255, 0.6); }
 
 /* Tarjetas, secciones y cajas: blancas como las opciones del login */
@@ -603,91 +603,91 @@ table, .tabular { font-variant-numeric: tabular-nums; }
 .tema-login :is(main, [role="dialog"]) .glass-blur,
 .tema-login .btn-glass,
 .tema-login .aviso-glass {
-  background-color: #ffffff;
+  background-color: var(--card-bg);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  border-color: #CCD0CF;
-  color: #11212D;
+  border-color: var(--border);
+  color: var(--text);
 }
-.tema-login .bg-surface.shadow-pop { background-color: #ffffff; border-color: #CCD0CF; box-shadow: 0 20px 50px rgba(17, 33, 45, 0.18); }
+.tema-login .bg-surface.shadow-pop { background-color: var(--card-bg); border-color: var(--border); box-shadow: 0 20px 50px rgba(17, 33, 45, 0.18); }
 .tema-login .glass-card,
 .tema-login .shadow-card { box-shadow: 0 6px 22px rgba(17, 33, 45, 0.07); }
-.tema-login .border-plomo-200 { border-color: #CCD0CF; }
+.tema-login .border-plomo-200 { border-color: var(--border); }
 .tema-login .btn-glass { box-shadow: 0 1px 2px rgba(17, 33, 45, 0.04); }
 .tema-login .btn-glass:hover,
 .tema-login .hover-cian:hover,
 .tema-login .seccion .btn-glass:hover,
-.tema-login .seccion .hover-cian:hover { border-color: #294D61; box-shadow: 0 4px 14px rgba(41, 77, 97, 0.2); background-color: #ffffff; }
+.tema-login .seccion .hover-cian:hover { border-color: var(--secundario); box-shadow: 0 4px 14px color-mix(in srgb, var(--secundario) 20%, transparent); background-color: var(--card-bg); }
 
 /* Principal: el botón "Ingresar" del login. Activo / seleccionado: azul marino como la opción elegida. */
 .tema-login .bg-corp,
-.tema-login .grad-azul { background-image: linear-gradient(90deg, #800021 0%, #294D61 55%, #00d4fe 100%); color: #fff; box-shadow: 0 6px 18px rgba(41, 77, 97, 0.28); }
+.tema-login .grad-azul { background-image: linear-gradient(90deg, var(--accent) 0%, var(--secundario) 55%, #00d4fe 100%); color: var(--on-accent); box-shadow: 0 6px 18px color-mix(in srgb, var(--secundario) 28%, transparent); }
 .tema-login .grad-fuego { box-shadow: 0 4px 12px rgba(128, 0, 33, 0.22); }
 
 /* Secciones: tarjeta blanca con la franja de color arriba y un arco suave en la esquina */
 .tema-login :is(main, [role="dialog"]) .seccion {
-  background-color: #ffffff;
-  border-color: #CCD0CF;
+  background-color: var(--card-bg);
+  border-color: var(--border);
   background-image:
     linear-gradient(90deg, rgb(var(--sec)) 0%, rgb(var(--sec) / 0.35) 45%, transparent 90%),
     radial-gradient(120% 90% at 100% 0%, rgb(var(--sec) / 0.06) 0%, transparent 55%);
   background-size: 100% 3px, 100% 100%;
 }
 .tema-login :is(main, [role="dialog"]) .seccion::after { opacity: 0.45; }
-.tema-login :is(main, [role="dialog"]) .seccion-titulo { color: color-mix(in srgb, rgb(var(--sec)) 70%, #11212D); }
+.tema-login :is(main, [role="dialog"]) .seccion-titulo { color: color-mix(in srgb, rgb(var(--sec)) 70%, var(--text)); }
 .tema-login :is(main, [role="dialog"]) .seccion-titulo::before { box-shadow: none; }
 
 /* Textos claros pensados para el fondo negro: pasan a azul marino / gris azulado dentro del contenido */
-.tema-login :is(main, [role="dialog"]) :is(.text-white, .text-fg, .text-\[\#e5e7eb\], .text-\[\#fff\], .text-\[\#ffffff\]) { color: #11212D; }
-.tema-login :is(main, [role="dialog"]) :is(.text-\[\#d4d4d8\], .text-\[\#D1D5DB\], .text-\[\#d1d5db\]) { color: #294D61; }
-.tema-login :is(main, [role="dialog"]) :is(.text-\[\#a1a1aa\], .text-\[\#9CA3AF\], .text-\[\#9ca3af\], .text-\[\#71717a\], .text-\[\#6b7280\], .text-\[\#6B7280\], .text-\[\#6b7080\]) { color: #4F6B7B; }
+.tema-login :is(main, [role="dialog"]) :is(.text-white, .text-fg, .text-\[\#e5e7eb\], .text-\[\#fff\], .text-\[\#ffffff\]) { color: var(--text); }
+.tema-login :is(main, [role="dialog"]) :is(.text-\[\#d4d4d8\], .text-\[\#D1D5DB\], .text-\[\#d1d5db\]) { color: var(--secundario); }
+.tema-login :is(main, [role="dialog"]) :is(.text-\[\#a1a1aa\], .text-\[\#9CA3AF\], .text-\[\#9ca3af\], .text-\[\#71717a\], .text-\[\#6b7280\], .text-\[\#6B7280\], .text-\[\#6b7080\]) { color: var(--text-muted); }
 .tema-login :is(main, [role="dialog"]) :is(.text-\[\#4ade80\], .text-\[\#86efac\]) { color: #059669; }
-.tema-login :is(main, [role="dialog"]) :is(.text-\[\#60a5fa\], .text-\[\#93c5fd\], .text-\[\#00f2fe\]) { color: #294D61; }
+.tema-login :is(main, [role="dialog"]) :is(.text-\[\#60a5fa\], .text-\[\#93c5fd\], .text-\[\#00f2fe\]) { color: var(--secundario); }
 .tema-login :is(main, [role="dialog"]) :is(.text-\[\#fcd34d\], .text-\[\#fde68a\], .text-\[\#FFB27A\], .text-\[\#FF9A4D\]) { color: #c2410c; }
-.tema-login :is(main, [role="dialog"]) :is(.text-\[\#ff6a7f\], .text-\[\#ff6a5f\], .text-\[\#f87171\], .text-\[\#fca5a5\]) { color: #800021; }
+.tema-login :is(main, [role="dialog"]) :is(.text-\[\#ff6a7f\], .text-\[\#ff6a5f\], .text-\[\#f87171\], .text-\[\#fca5a5\]) { color: var(--accent-ink); }
 /* …salvo sobre fondos de color (botones principales, chips, avisos rojos, tooltips oscuros) */
 .tema-login :is(main, [role="dialog"]) :is(.bg-corp, .grad-azul, .grad-fuego, [class*="bg-gradient"], .bg-\[\#2a7bff\], .bg-\[\#E30613\], .bg-\[\#c4001c\], .bg-\[\#ff2a5f\], .bg-\[\#FF6D00\], .bg-\[\#22c55e\], .bg-azul-900, .bg-red-600, .bg-emerald-600, .bg-blue-600) :is(.text-white, .text-fg),
-.tema-login :is(main, [role="dialog"]) :is(.bg-corp, .grad-azul, .grad-fuego, [class*="bg-gradient"], .bg-\[\#2a7bff\], .bg-\[\#E30613\], .bg-\[\#c4001c\], .bg-\[\#ff2a5f\], .bg-\[\#FF6D00\], .bg-\[\#22c55e\], .bg-azul-900, .bg-red-600, .bg-emerald-600, .bg-blue-600).text-white { color: #fff; }
+.tema-login :is(main, [role="dialog"]) :is(.bg-corp, .grad-azul, .grad-fuego, [class*="bg-gradient"], .bg-\[\#2a7bff\], .bg-\[\#E30613\], .bg-\[\#c4001c\], .bg-\[\#ff2a5f\], .bg-\[\#FF6D00\], .bg-\[\#22c55e\], .bg-azul-900, .bg-red-600, .bg-emerald-600, .bg-blue-600).text-white { color: var(--on-accent); }
 
 /* Fondos y bordes translúcidos blancos (hechos para el negro) → tintes azul marino suaves */
-.tema-login :is(main, [role="dialog"]) :is(.border-white\/5, .border-white\/10, .border-white\/15, .border-white\/20, [class*="border-white/["]) { border-color: #CCD0CF; }
-.tema-login :is(main, [role="dialog"]) :is(.bg-white\/5, .bg-white\/10, [class*="bg-white/["]) { background-color: rgba(17, 33, 45, 0.035); }
-.tema-login :is(main, [role="dialog"]) :is(.hover\:bg-white\/10:hover, [class*="hover:bg-white/"]:hover) { background-color: rgba(41, 77, 97, 0.08); color: #11212D; }
-.tema-login :is(main, [role="dialog"]) :is(.bg-\[\#212a3a\], .bg-\[\#2a3445\], .bg-\[\#222222\], .bg-\[\#1A1A1A\], .bg-\[\#1a1a1a\]) { background-color: #E3E8EA; color: #11212D; }
-.tema-login :is(main, [role="dialog"]) :is(.border-\[\#333333\], .border-\[\#3a4558\], .border-\[\#444444\], .border-\[\#343846\], .border-\[\#2a2d38\]) { border-color: #CCD0CF; }
+.tema-login :is(main, [role="dialog"]) :is(.border-white\/5, .border-white\/10, .border-white\/15, .border-white\/20, [class*="border-white/["]) { border-color: var(--border); }
+.tema-login :is(main, [role="dialog"]) :is(.bg-white\/5, .bg-white\/10, [class*="bg-white/["]) { background-color: color-mix(in srgb, var(--text) 3.5%, transparent); }
+.tema-login :is(main, [role="dialog"]) :is(.hover\:bg-white\/10:hover, [class*="hover:bg-white/"]:hover) { background-color: color-mix(in srgb, var(--secundario) 8%, transparent); color: var(--text); }
+.tema-login :is(main, [role="dialog"]) :is(.bg-\[\#212a3a\], .bg-\[\#2a3445\], .bg-\[\#222222\], .bg-\[\#1A1A1A\], .bg-\[\#1a1a1a\]) { background-color: var(--soft); color: var(--text); }
+.tema-login :is(main, [role="dialog"]) :is(.border-\[\#333333\], .border-\[\#3a4558\], .border-\[\#444444\], .border-\[\#343846\], .border-\[\#2a2d38\]) { border-color: var(--border); }
 
 /* Barras y cajas oscuras con color fijo (navegación INICIO › …, menús, botones grafito) → claras */
-.tema-login :is(main, [role="dialog"]) :is([class*="bg-[#0"], [class*="bg-[#1"], .bg-slate-700, .bg-slate-800, .bg-slate-900, .bg-black) { background-color: #ffffff; color: #11212D; }
-.tema-login :is(main, [role="dialog"]) :is([class*="bg-[#0"], [class*="bg-[#1"]).backdrop-blur { background-color: rgba(241, 243, 242, 0.92); }
-.tema-login :is(main, [role="dialog"]) :is(.hover\:bg-slate-700:hover, [class*="hover:bg-[#2"]:hover) { background-color: #E3E8EA; }
-.tema-login :is(main, [role="dialog"]) :is(.border-slate-600, .border-slate-700, [class*="border-[#2a7bff]"]) { border-color: #B4BBBA; }
-.tema-login :is(main, [role="dialog"]) .hover\:border-slate-400:hover { border-color: #294D61; }
+.tema-login :is(main, [role="dialog"]) :is([class*="bg-[#0"], [class*="bg-[#1"], .bg-slate-700, .bg-slate-800, .bg-slate-900, .bg-black) { background-color: var(--card-bg); color: var(--text); }
+.tema-login :is(main, [role="dialog"]) :is([class*="bg-[#0"], [class*="bg-[#1"]).backdrop-blur { background-color: var(--card-vidrio); }
+.tema-login :is(main, [role="dialog"]) :is(.hover\:bg-slate-700:hover, [class*="hover:bg-[#2"]:hover) { background-color: var(--soft); }
+.tema-login :is(main, [role="dialog"]) :is(.border-slate-600, .border-slate-700, [class*="border-[#2a7bff]"]) { border-color: var(--input-border); }
+.tema-login :is(main, [role="dialog"]) .hover\:border-slate-400:hover { border-color: var(--secundario); }
 
 /* Tablas: cabecera gris azulado como los rótulos del login, filas blancas */
-.tema-login table thead { background-color: #E3E8EA; }
-.tema-login table thead th { color: #4F6B7B; }
-.tema-login table tbody tr:hover { background-color: rgba(41, 77, 97, 0.05); }
+.tema-login table thead { background-color: var(--soft); }
+.tema-login table thead th { color: var(--text-muted); }
+.tema-login table tbody tr:hover { background-color: color-mix(in srgb, var(--secundario) 5%, transparent); }
 
 /* Campos: blancos, borde #B4BBBA y foco cian (como Usuario / Contraseña, en claro) */
 .tema-login :is(main, [role="dialog"]) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea):not(.bg-transparent),
 .tema-login .shadow-pop :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):not(.bg-transparent) {
-  background-color: #ffffff;
-  border-color: #B4BBBA;
-  color: #11212D;
+  background-color: var(--card-bg);
+  border-color: var(--input-border);
+  color: var(--text);
 }
-.tema-login :is(input, select, textarea):not(.bg-transparent):focus { border-color: #294D61; box-shadow: 0 0 0 3px rgb(41 77 97 / 0.18); }
-.tema-login ::placeholder { color: #8E9A9F; }
+.tema-login :is(input, select, textarea):not(.bg-transparent):focus { border-color: var(--secundario); box-shadow: 0 0 0 3px color-mix(in srgb, var(--secundario) 18%, transparent); }
+.tema-login ::placeholder { color: var(--text-muted); }
 
 /* Pie */
-.tema-login > footer { background: rgba(255, 255, 255, 0.85); border-color: #CCD0CF; color: #4F6B7B; }
-.tema-login > footer .text-white { color: #11212D; }
+.tema-login > footer { background: color-mix(in srgb, var(--card-bg) 85%, transparent); border-color: var(--border); color: var(--text-muted); }
+.tema-login > footer .text-white { color: var(--text); }
 
 /* Celular: tarjetas de las tablas en blanco */
 @media (max-width: 639px) {
   .tema-login table.tabla-movil > tbody > tr,
-  .tema-login table.tabla-movil > tfoot > tr { background-color: #ffffff; border-color: #CCD0CF !important; box-shadow: 0 2px 8px rgba(17, 33, 45, 0.05); }
-  .tema-login table.tabla-movil > tbody > tr > :is(td, th) + :is(td, th) { border-top-color: #E6E9E8 !important; }
-  .tema-login table.tabla-movil :is(td, th)[data-label]:not([data-label=""])::before { color: #4F6B7B; }
+  .tema-login table.tabla-movil > tfoot > tr { background-color: var(--card-bg); border-color: var(--border) !important; box-shadow: 0 2px 8px rgba(17, 33, 45, 0.05); }
+  .tema-login table.tabla-movil > tbody > tr > :is(td, th) + :is(td, th) { border-top-color: var(--soft) !important; }
+  .tema-login table.tabla-movil :is(td, th)[data-label]:not([data-label=""])::before { color: var(--text-muted); }
 }
 
 /* ===================== Paleta COMBOY VID (Williams 2026-11-17) =====================
@@ -729,12 +729,12 @@ table, .tabular { font-variant-numeric: tabular-nums; }
 
 /* Fondo: gris claro de la paleta con una luz de acero arriba y de vino a la derecha */
 .tema-login .fondo-login {
-  background-color: #CCD0CF;
+  background-color: var(--bg);
   background-image:
-    radial-gradient(circle at 8% 0%, rgba(41, 77, 97, 0.16) 0%, transparent 42%),
-    radial-gradient(circle at 100% 30%, rgba(128, 0, 33, 0.07) 0%, transparent 36%),
-    radial-gradient(rgba(17, 33, 45, 0.06) 1px, transparent 1px),
-    linear-gradient(180deg, #E9EBEB 0%, #D9DDDC 100%);
+    radial-gradient(circle at 8% 0%, var(--fondo-luz-1) 0%, transparent 42%),
+    radial-gradient(circle at 100% 30%, var(--fondo-luz-2) 0%, transparent 36%),
+    radial-gradient(color-mix(in srgb, var(--text) 6%, transparent) 1px, transparent 1px),
+    var(--fondo-img);
   background-size: 100% 100%, 100% 100%, 22px 22px, 100% 100%;
 }
 
@@ -755,81 +755,81 @@ table, .tabular { font-variant-numeric: tabular-nums; }
 
 /* Cabecera: azul noche con ondas de acero y filo vino */
 .tema-login .cabecera-roja {
-  background-color: #11212D;
-  border-bottom: 3px solid #800021;
+  background-color: var(--sidebar-bg);
+  border-bottom: 3px solid var(--accent);
   box-shadow: 0 6px 24px rgba(17, 33, 45, 0.3);
 }
-.tema-login .cabecera-roja .texto-modulo { color: #CCD0CF; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35); }
-.tema-login .cabecera-roja .logo-placa { background: #CCD0CF; border-color: rgba(255, 255, 255, 0.5); }
-.tema-login .cabecera-roja .grad-fuego { background-image: none; background-color: #800021; color: #fff; box-shadow: none; }
+.tema-login .cabecera-roja .texto-modulo { color: var(--sidebar-text); text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35); }
+.tema-login .cabecera-roja .logo-placa { background: var(--logo-placa); border-color: rgba(255, 255, 255, 0.5); }
+.tema-login .cabecera-roja .grad-fuego { background-image: none; background-color: var(--accent); color: var(--on-accent); box-shadow: none; }
 
 /* Barra de accesos: azul acero que baja a azul noche, arcos en gris claro y un destello vino */
 .tema-login .barra-accesos {
-  background-color: #294D61;
+  background-color: var(--barra-color);
   background-image:
     radial-gradient(140% 22% at 100% 0%, transparent 52%, rgba(204, 208, 207, 0.3) 53%, transparent 55%),
     radial-gradient(140% 22% at 100% 0%, transparent 30%, rgba(204, 208, 207, 0.18) 31%, transparent 33%),
-    radial-gradient(160% 26% at 0% 100%, transparent 50%, rgba(128, 0, 33, 0.55) 51%, transparent 53%),
+    radial-gradient(160% 26% at 0% 100%, transparent 50%, var(--barra-destello) 51%, transparent 53%),
     repeating-linear-gradient(135deg, rgba(204, 208, 207, 0.06) 0 1px, transparent 1px 11px),
-    linear-gradient(180deg, #294D61 0%, #1d3747 55%, #11212D 100%);
+    var(--barra-img);
   border: 1px solid rgba(204, 208, 207, 0.35);
 }
 
 /* Chat grupal: vino */
 .tema-login .chat-rojo,
-.tema-planta.tema-login .chat-rojo.seccion { background-color: #800021; background-image: linear-gradient(180deg, #800021 0%, #5c0018 100%); border-color: rgba(204, 208, 207, 0.3); }
+.tema-planta.tema-login .chat-rojo.seccion { background-color: var(--chat-color); background-image: var(--chat-img); border-color: rgba(204, 208, 207, 0.3); }
 .tema-login .chat-rojo.seccion::after { display: none; }
 @keyframes chat-parpadeo-vino {
   0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(204, 208, 207, 0.7); }
   50% { opacity: 0.55; box-shadow: 0 0 20px 5px rgba(128, 0, 33, 0.9); }
 }
 .tema-login .chat-parpadeo { animation-name: chat-parpadeo-vino; }
-.tema-login .chat-resaltado { background: rgba(128, 0, 33, 0.1); }
+.tema-login .chat-resaltado { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 
 /* Botón principal: vino. Seleccionado (pestaña activa, opción elegida): acero → noche. */
-.tema-login .bg-corp { background-image: linear-gradient(135deg, #800021 0%, #650019 100%); color: #fff; box-shadow: 0 6px 16px rgba(128, 0, 33, 0.25); }
-.tema-login .bg-corp:hover { background-image: linear-gradient(135deg, #6b001b 0%, #4f0014 100%); }
-.tema-login .grad-azul { background-image: linear-gradient(135deg, #294D61 0%, #11212D 100%); color: #fff; box-shadow: 0 6px 16px rgba(17, 33, 45, 0.25); }
-.tema-login .grad-fuego { background-image: none; background-color: #800021; color: #fff; box-shadow: 0 4px 12px rgba(128, 0, 33, 0.22); }
-.tema-login .texto-azul { background-image: none; -webkit-text-fill-color: currentColor; color: #294D61; }
+.tema-login .bg-corp { background-image: var(--btn-img); color: var(--on-accent); box-shadow: 0 6px 16px var(--btn-sombra); }
+.tema-login .bg-corp:hover { background-image: var(--btn-img-hover); }
+.tema-login .grad-azul { background-image: var(--sel-img); color: var(--on-sel); box-shadow: 0 6px 16px rgba(17, 33, 45, 0.25); }
+.tema-login .grad-fuego { background-image: none; background-color: var(--accent); color: var(--on-accent); box-shadow: 0 4px 12px rgba(128, 0, 33, 0.22); }
+.tema-login .texto-azul { background-image: none; -webkit-text-fill-color: currentColor; color: var(--secundario); }
 
 /* Tarjetas: blancas con borde gris de la paleta y sombra azul noche */
 .tema-login .glass-card,
 .tema-login .shadow-card { box-shadow: 0 6px 22px rgba(17, 33, 45, 0.1); }
-.tema-login :is(main, [role="dialog"]) .seccion-titulo { color: color-mix(in srgb, rgb(var(--sec)) 78%, #11212D); }
+.tema-login :is(main, [role="dialog"]) .seccion-titulo { color: color-mix(in srgb, rgb(var(--sec)) 78%, var(--text)); }
 
 /* Tablas: cabecera en acero suave con filo acero, filas blancas, hover gris */
-.tema-login table thead { background-color: #DCE3E6; box-shadow: inset 0 -2px 0 #294D61; }
-.tema-login table thead th { color: #11212D; }
-.tema-login table tbody tr:hover { background-color: rgba(41, 77, 97, 0.06); }
+.tema-login table thead { background-color: var(--thead-bg); box-shadow: inset 0 -2px 0 var(--secundario); }
+.tema-login table thead th { color: var(--text); }
+.tema-login table tbody tr:hover { background-color: color-mix(in srgb, var(--secundario) 6%, transparent); }
 
 /* Colores fijos escritos en las pantallas (azules eléctricos, naranjas y rojos del tema anterior) → paleta */
-.tema-login :is(.text-\[\#2a7bff\], .text-\[\#60a5fa\], .text-\[\#93c5fd\], .text-\[\#00f2fe\], .text-\[\#0066ff\], .hover\:text-\[\#93c5fd\]:hover) { color: #294D61; }
-.tema-login :is(.text-\[\#FF6D00\], .text-\[\#FFB27A\], .text-\[\#FF9A4D\], .text-\[\#c4001c\], .text-\[\#E30613\], .text-\[\#ff2a5f\], .text-\[\#b91c1c\], .hover\:text-\[\#FF9A4D\]:hover, .hover\:text-\[\#c4001c\]:hover) { color: #800021; }
-.tema-login :is(main, [role="dialog"]) :is(.text-\[\#fcd34d\], .text-\[\#fde68a\], .text-\[\#ff6a7f\], .text-\[\#ff6a5f\], .text-\[\#f87171\], .text-\[\#fca5a5\]) { color: #800021; }
-.tema-login :is(.bg-\[\#2a7bff\], .bg-\[\#0066ff\], .bg-\[\#3b82f6\], .bg-\[\#1e3a8a\], .hover\:bg-\[\#2a7bff\]:hover) { background-color: #294D61; color: #fff; }
-.tema-login :is(.bg-\[\#FF6D00\], .bg-\[\#E30613\], .bg-\[\#ff2a5f\], .bg-\[\#ff1a1a\], .bg-\[\#c4001c\], .bg-\[\#d50000\], .bg-\[\#e0001b\], .bg-\[\#9b0016\]) { background-color: #800021; color: #fff; }
-.tema-login :is(.hover\:bg-\[\#E65C00\]:hover, .hover\:bg-\[\#c4001c\]:hover, .hover\:bg-\[\#B91C1C\]:hover) { background-color: #650019; color: #fff; }
-.tema-login :is(.border-\[\#2a7bff\], .border-\[\#60a5fa\], .border-b-\[\#2a7bff\], .hover\:border-\[\#00f2fe\]:hover, .focus\:border-\[\#60a5fa\]:focus, .focus\:border-\[\#00f2fe\]:focus) { border-color: #294D61; }
-.tema-login :is(.border-\[\#FF6D00\], .border-b-\[\#FF6D00\], .border-\[\#ff2a5f\], .border-\[\#ff1a1a\], .border-\[\#E30613\], .border-\[\#d50000\], .focus\:border-\[\#FF6D00\]:focus) { border-color: #800021; }
-.tema-login :is(.ring-\[\#2a7bff\], .ring-\[\#3b82f6\], .focus\:ring-\[\#00f2fe\]:focus, .focus-visible\:ring-\[\#00f2fe\]:focus-visible) { --tw-ring-color: #294D61; }
-.tema-login :is(.ring-\[\#FF6D00\], .ring-\[\#ff2a5f\]) { --tw-ring-color: #800021; }
-.tema-login .accent-\[\#2a7bff\] { accent-color: #294D61; }
-.tema-login :is(input[type="checkbox"], input[type="radio"], input[type="range"], progress) { accent-color: #294D61; }
-.tema-login :is(main, [role="dialog"]) :is(.from-\[\#0066ff\]) { --tw-gradient-from: #294D61 var(--tw-gradient-from-position); }
-.tema-login :is(main, [role="dialog"]) :is(.via-\[\#0066ff\]) { --tw-gradient-via: #294D61; }
+.tema-login :is(.text-\[\#2a7bff\], .text-\[\#60a5fa\], .text-\[\#93c5fd\], .text-\[\#00f2fe\], .text-\[\#0066ff\], .hover\:text-\[\#93c5fd\]:hover) { color: var(--secundario); }
+.tema-login :is(.text-\[\#FF6D00\], .text-\[\#FFB27A\], .text-\[\#FF9A4D\], .text-\[\#c4001c\], .text-\[\#E30613\], .text-\[\#ff2a5f\], .text-\[\#b91c1c\], .hover\:text-\[\#FF9A4D\]:hover, .hover\:text-\[\#c4001c\]:hover) { color: var(--accent-ink); }
+.tema-login :is(main, [role="dialog"]) :is(.text-\[\#fcd34d\], .text-\[\#fde68a\], .text-\[\#ff6a7f\], .text-\[\#ff6a5f\], .text-\[\#f87171\], .text-\[\#fca5a5\]) { color: var(--accent-ink); }
+.tema-login :is(.bg-\[\#2a7bff\], .bg-\[\#0066ff\], .bg-\[\#3b82f6\], .bg-\[\#1e3a8a\], .hover\:bg-\[\#2a7bff\]:hover) { background-color: var(--secundario); color: var(--on-accent); }
+.tema-login :is(.bg-\[\#FF6D00\], .bg-\[\#E30613\], .bg-\[\#ff2a5f\], .bg-\[\#ff1a1a\], .bg-\[\#c4001c\], .bg-\[\#d50000\], .bg-\[\#e0001b\], .bg-\[\#9b0016\]) { background-color: var(--accent); color: var(--on-accent); }
+.tema-login :is(.hover\:bg-\[\#E65C00\]:hover, .hover\:bg-\[\#c4001c\]:hover, .hover\:bg-\[\#B91C1C\]:hover) { background-color: var(--accent-hover); color: var(--on-accent); }
+.tema-login :is(.border-\[\#2a7bff\], .border-\[\#60a5fa\], .border-b-\[\#2a7bff\], .hover\:border-\[\#00f2fe\]:hover, .focus\:border-\[\#60a5fa\]:focus, .focus\:border-\[\#00f2fe\]:focus) { border-color: var(--secundario); }
+.tema-login :is(.border-\[\#FF6D00\], .border-b-\[\#FF6D00\], .border-\[\#ff2a5f\], .border-\[\#ff1a1a\], .border-\[\#E30613\], .border-\[\#d50000\], .focus\:border-\[\#FF6D00\]:focus) { border-color: var(--accent); }
+.tema-login :is(.ring-\[\#2a7bff\], .ring-\[\#3b82f6\], .focus\:ring-\[\#00f2fe\]:focus, .focus-visible\:ring-\[\#00f2fe\]:focus-visible) { --tw-ring-color: var(--secundario); }
+.tema-login :is(.ring-\[\#FF6D00\], .ring-\[\#ff2a5f\]) { --tw-ring-color: var(--accent); }
+.tema-login .accent-\[\#2a7bff\] { accent-color: var(--secundario); }
+.tema-login :is(input[type="checkbox"], input[type="radio"], input[type="range"], progress) { accent-color: var(--secundario); }
+.tema-login :is(main, [role="dialog"]) :is(.from-\[\#0066ff\]) { --tw-gradient-from: var(--secundario) var(--tw-gradient-from-position); }
+.tema-login :is(main, [role="dialog"]) :is(.via-\[\#0066ff\]) { --tw-gradient-via: var(--secundario); }
 /* texto blanco que sí va sobre color */
 .tema-login :is(main, [role="dialog"]) :is(.bg-\[\#2a7bff\], .bg-\[\#0066ff\], .bg-\[\#3b82f6\], .bg-\[\#1e3a8a\], .bg-\[\#FF6D00\], .bg-\[\#E30613\], .bg-\[\#ff2a5f\], .bg-\[\#ff1a1a\], .bg-\[\#c4001c\], .bg-\[\#d50000\]) :is(.text-white, .text-fg),
-.tema-login :is(main, [role="dialog"]) :is(.bg-\[\#2a7bff\], .bg-\[\#0066ff\], .bg-\[\#3b82f6\], .bg-\[\#1e3a8a\], .bg-\[\#FF6D00\], .bg-\[\#E30613\], .bg-\[\#ff2a5f\], .bg-\[\#ff1a1a\], .bg-\[\#c4001c\], .bg-\[\#d50000\]).text-white { color: #fff; }
+.tema-login :is(main, [role="dialog"]) :is(.bg-\[\#2a7bff\], .bg-\[\#0066ff\], .bg-\[\#3b82f6\], .bg-\[\#1e3a8a\], .bg-\[\#FF6D00\], .bg-\[\#E30613\], .bg-\[\#ff2a5f\], .bg-\[\#ff1a1a\], .bg-\[\#c4001c\], .bg-\[\#d50000\]).text-white { color: var(--on-accent); }
 
 /* Enlaces y selección de texto */
-.tema-login ::selection { background: rgba(41, 77, 97, 0.28); }
+.tema-login ::selection { background: color-mix(in srgb, var(--secundario) 28%, transparent); }
 
 /* Pie */
-.tema-login > footer { background: rgba(233, 235, 235, 0.92); border-color: #CCD0CF; color: #294D61; }
+.tema-login > footer { background: var(--pie-bg); border-color: var(--border); color: var(--secundario); }
 
 /* Barras de desplazamiento con la paleta */
-.tema-login * { scrollbar-color: #294D61 transparent; }
+.tema-login * { scrollbar-color: var(--secundario) transparent; }
 .tema-login .chat-rojo .seccion-titulo { color: #ffffff; }
 .tema-login .chat-rojo .seccion-titulo::before { display: none; }
-.tema-login .chat-rojo :is(.text-\[\#c4001c\], .text-\[\#ff2a5f\]) { color: #800021; }
+.tema-login .chat-rojo :is(.text-\[\#c4001c\], .text-\[\#ff2a5f\]) { color: var(--accent-ink); }

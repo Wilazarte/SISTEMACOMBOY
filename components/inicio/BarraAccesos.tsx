@@ -238,14 +238,14 @@ export function BarraAccesos({
                       role="menuitem"
                       onClick={() => ir(urlBoton(panel.modulo, a, panel.modulo === modulo ? docElegido() : undefined))}
                       className={`group/acc flex items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[13px] leading-snug transition ${
-                        activa ? "bg-[#CCD0CF] font-semibold text-[#11212D]" : "text-white/90 hover:bg-white/10 hover:text-white"
+                        activa ? "icono-tema font-semibold" : "text-white/90 hover:bg-white/10 hover:text-white"
                       }`}
                     >
                       {/* Un ícono por función (lib/iconosFunciones.ts) */}
                       <span
                         aria-hidden
                         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition ${
-                          activa ? "bg-[#800021] text-white" : "bg-white/10 text-[#CCD0CF] group-hover/acc:bg-[#800021] group-hover/acc:text-white"
+                          activa ? "bg-tema-acento text-[var(--on-accent)]" : "bg-white/10 text-[var(--barra-tenue)] group-hover/acc:bg-tema-acento group-hover/acc:text-[var(--on-accent)]"
                         }`}
                       >
                         <I size={17} strokeWidth={1.7} />
@@ -275,7 +275,7 @@ function Icono({ icono: I, label, activo, onClick, burbuja = 0 }: { icono: Lucid
         aria-current={activo ? "page" : undefined}
         className={`relative flex items-center justify-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
           activo
-            ? "h-14 w-14 bg-[#CCD0CF] text-[#11212D] shadow-[0_6px_18px_-4px_rgba(204,208,207,0.7)]"
+            ? "icono-tema h-14 w-14 shadow-[0_6px_18px_-4px_rgba(204,208,207,0.7)]"
             : "h-12 w-12 text-white/80 hover:bg-white/10 hover:text-white"
         }`}
       >
@@ -283,7 +283,7 @@ function Icono({ icono: I, label, activo, onClick, burbuja = 0 }: { icono: Lucid
         {burbuja > 0 && <Burbuja n={burbuja} />}
       </button>
       {/* Tooltip (solo PC) */}
-      <span className="pointer-events-none absolute right-[calc(100%+18px)] hidden whitespace-nowrap rounded-md bg-[#11212D] px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-lg transition group-hover:opacity-100 lg:block">
+      <span className="pointer-events-none absolute right-[calc(100%+18px)] hidden whitespace-nowrap rounded-md bg-tema-fuerte px-3 py-1.5 text-[13px] font-medium text-white opacity-0 shadow-lg transition group-hover:opacity-100 lg:block">
         {label}
       </span>
     </div>
@@ -292,7 +292,7 @@ function Icono({ icono: I, label, activo, onClick, burbuja = 0 }: { icono: Lucid
 
 function Burbuja({ n }: { n: number }) {
   return (
-    <span className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-[#800021] px-1 text-center text-[10px] font-bold leading-[18px] text-white ring-2 ring-[#CCD0CF]">
+    <span className="absolute -right-0.5 -top-0.5 min-w-[18px] rounded-full bg-tema-acento px-1 text-center text-[10px] font-bold leading-[18px] text-white ring-2 ring-tema-borde">
       {n > 99 ? "99+" : n}
     </span>
   );

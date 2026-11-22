@@ -53,7 +53,7 @@ function SelectorArchivo({ archivo, onCambio }: { archivo: File | null; onCambio
   const [encima, setEncima] = useState(false);
   return (
     <div
-      className={cx("rounded-lg border border-dashed p-3 transition", encima ? "border-[#800021] bg-[#CCD0CF]/60" : "border-[#294D61]/50 bg-[#CCD0CF]/25")}
+      className={cx("rounded-lg border border-dashed p-3 transition", encima ? "border-tema-acento bg-tema-borde/60" : "border-tema-sec/50 bg-tema-borde/25")}
       onDragOver={(e) => {
         e.preventDefault();
         setEncima(true);
@@ -79,12 +79,12 @@ function SelectorArchivo({ archivo, onCambio }: { archivo: File | null; onCambio
         <Boton tono="neutro" onClick={() => ref.current?.click()}>
           <Upload size={15} /> {archivo ? "Cambiar archivo" : "Seleccionar archivo de la PC"}
         </Boton>
-        <span className="min-w-0 break-words text-[12px] text-[#11212D]/70">{archivo ? archivo.name : "o arrastre el archivo aquí"}</span>
+        <span className="min-w-0 break-words text-[12px] text-tema-texto/70">{archivo ? archivo.name : "o arrastre el archivo aquí"}</span>
       </div>
       {archivo && (
-        <div className="mt-2 space-y-0.5 text-[11px] text-[#11212D]/75">
+        <div className="mt-2 space-y-0.5 text-[11px] text-tema-texto/75">
           <p>
-            {archivo.name} · {pesoArchivo(archivo.size)} {archivo.size > MAX && <b className="text-[#800021]">· supera 25 MB</b>}
+            {archivo.name} · {pesoArchivo(archivo.size)} {archivo.size > MAX && <b className="text-tema-tinta">· supera 25 MB</b>}
           </p>
           <p className="flex items-center gap-1 break-all font-mono">
             <Fingerprint size={12} className="shrink-0" /> SHA-256: {calculando ? "calculando…" : hash}
@@ -170,7 +170,7 @@ export function SubirDocumento({
   return (
     <VentanaGD abierta={abierta} titulo="Subir documento" onCerrar={onCerrar} ancha>
       {modulos.length === 0 ? (
-        <p className="text-[13px] text-[#800021]">Su rol no puede subir documentos.</p>
+        <p className="text-[13px] text-tema-tinta">Su rol no puede subir documentos.</p>
       ) : (
         <div className="space-y-4">
           <SelectorArchivo archivo={archivo} onCambio={setArchivo} />
@@ -207,22 +207,22 @@ export function SubirDocumento({
             </Campo>
           </div>
 
-          <label className="flex items-start gap-2 rounded-lg border border-[#800021]/30 px-3 py-2 text-[13px] text-[#11212D]">
-            <input type="checkbox" className="mt-0.5 accent-[#800021]" checked={d.es_confidencial} onChange={(e) => set("es_confidencial", e.target.checked)} />
+          <label className="flex items-start gap-2 rounded-lg border border-tema-acento/30 px-3 py-2 text-[13px] text-tema-texto">
+            <input type="checkbox" className="mt-0.5 accent-tema-acento" checked={d.es_confidencial} onChange={(e) => set("es_confidencial", e.target.checked)} />
             <span>
-              <b className="text-[#800021]">Confidencial.</b> Descargar exigirá doble confirmación y el PDF saldrá con marca de agua (usuario + fecha + IP).
+              <b className="text-tema-tinta">Confidencial.</b> Descargar exigirá doble confirmación y el PDF saldrá con marca de agua (usuario + fecha + IP).
             </span>
           </label>
 
           <div>
-            <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-[#11212D]/75">Permisos de acceso por rol</p>
-            <p className="mb-2 text-[11px] text-[#11212D]/60">Por defecto nadie ve nada. Usted (dueño) tiene Control Total. Cada aprobador recibe al menos Aprobación.</p>
+            <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-tema-texto/75">Permisos de acceso por rol</p>
+            <p className="mb-2 text-[11px] text-tema-texto/60">Por defecto nadie ve nada. Usted (dueño) tiene Control Total. Cada aprobador recibe al menos Aprobación.</p>
             <div className="grid gap-2 sm:grid-cols-2">
               {d.permisos.map((p) => (
-                <div key={p.rol} className="flex items-center justify-between gap-2 rounded-lg border border-[#11212D]/10 px-3 py-1.5">
-                  <span className="text-[13px] font-semibold text-[#11212D]">{et(p.rol)}</span>
+                <div key={p.rol} className="flex items-center justify-between gap-2 rounded-lg border border-tema-texto/10 px-3 py-1.5">
+                  <span className="text-[13px] font-semibold text-tema-texto">{et(p.rol)}</span>
                   <select
-                    className={cx(claseInput, "w-auto py-1 text-[12px]", p.permiso !== "Sin Acceso" && "border-[#294D61] font-semibold text-[#294D61]")}
+                    className={cx(claseInput, "w-auto py-1 text-[12px]", p.permiso !== "Sin Acceso" && "border-tema-sec font-semibold text-tema-sec")}
                     value={p.permiso}
                     onChange={(e) => setPermiso(p.rol, e.target.value as PermisoGD)}
                   >
@@ -238,19 +238,19 @@ export function SubirDocumento({
           </div>
 
           <div>
-            <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-[#11212D]/75">Ruta de aprobación (en orden)</p>
+            <p className="mb-1 text-[11px] font-bold uppercase tracking-wider text-tema-texto/75">Ruta de aprobación (en orden)</p>
             <ol className="space-y-1.5">
               {d.aprobadores.map((a, i) => (
-                <li key={a} className="flex items-center gap-2 rounded-lg bg-[#CCD0CF]/40 px-3 py-1.5 text-[13px] text-[#11212D]">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full !bg-[#11212D] text-[11px] font-bold !text-white">{i + 1}</span>
+                <li key={a} className="flex items-center gap-2 rounded-lg bg-tema-borde/40 px-3 py-1.5 text-[13px] text-tema-texto">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full !bg-tema-fuerte text-[11px] font-bold !text-white">{i + 1}</span>
                   <span className="flex-1 font-semibold">{et(a)}</span>
-                  <button type="button" onClick={() => mover(i, -1)} aria-label="Subir" className="p-1 text-[#11212D]/70 hover:text-[#11212D]">
+                  <button type="button" onClick={() => mover(i, -1)} aria-label="Subir" className="p-1 text-tema-texto/70 hover:text-tema-texto">
                     <ArrowUp size={14} />
                   </button>
-                  <button type="button" onClick={() => mover(i, 1)} aria-label="Bajar" className="p-1 text-[#11212D]/70 hover:text-[#11212D]">
+                  <button type="button" onClick={() => mover(i, 1)} aria-label="Bajar" className="p-1 text-tema-texto/70 hover:text-tema-texto">
                     <ArrowDown size={14} />
                   </button>
-                  <button type="button" onClick={() => set("aprobadores", d.aprobadores.filter((x) => x !== a))} aria-label="Quitar" className="p-1 text-[#800021]">
+                  <button type="button" onClick={() => set("aprobadores", d.aprobadores.filter((x) => x !== a))} aria-label="Quitar" className="p-1 text-tema-tinta">
                     <Trash2 size={14} />
                   </button>
                 </li>
@@ -281,12 +281,12 @@ export function SubirDocumento({
             )}
           </div>
 
-          <label className="flex items-center gap-2 text-[13px] text-[#11212D]">
-            <input type="checkbox" className="accent-[#294D61]" checked={d.enviar} onChange={(e) => set("enviar", e.target.checked)} />
+          <label className="flex items-center gap-2 text-[13px] text-tema-texto">
+            <input type="checkbox" className="accent-tema-sec" checked={d.enviar} onChange={(e) => set("enviar", e.target.checked)} />
             Enviar a revisión ahora (si no, queda como Borrador)
           </label>
 
-          {error && <p className="rounded-lg border border-[#800021] px-3 py-2 text-[13px] font-semibold text-[#800021]">{error}</p>}
+          {error && <p className="rounded-lg border border-tema-acento px-3 py-2 text-[13px] font-semibold text-tema-tinta">{error}</p>}
           <div className="flex flex-wrap justify-end gap-2">
             <Boton onClick={onCerrar}>Cancelar</Boton>
             <Boton tono="critico" onClick={guardar} disabled={guardando}>
@@ -337,7 +337,7 @@ export function NuevaVersion({ abierta, onCerrar, onListo, docId, codigo, versio
   return (
     <VentanaGD abierta={abierta} titulo={`Nueva versión de ${codigo}`} onCerrar={onCerrar}>
       <div className="space-y-3">
-        <p className="rounded-lg bg-[#CCD0CF]/40 px-3 py-2 text-[12px] text-[#11212D]">
+        <p className="rounded-lg bg-tema-borde/40 px-3 py-2 text-[12px] text-tema-texto">
           La versión {versionActual} NO se borra: queda intacta y recuperable en el historial. La nueva versión vuelve a revisión.
         </p>
         <SelectorArchivo archivo={archivo} onCambio={setArchivo} />
@@ -348,20 +348,20 @@ export function NuevaVersion({ abierta, onCerrar, onListo, docId, codigo, versio
                 key={t}
                 type="button"
                 onClick={() => setTipo(t)}
-                className={cx("flex-1 rounded-lg border px-3 py-2 text-[13px] font-semibold", tipo === t ? "border-[#294D61] !bg-[#294D61] !text-white" : "border-[#11212D]/20 text-[#11212D]")}
+                className={cx("flex-1 rounded-lg border px-3 py-2 text-[13px] font-semibold", tipo === t ? "border-tema-sec !bg-tema-sec !text-white" : "border-tema-texto/20 text-tema-texto")}
               >
                 {t === "menor" ? "Cambio menor" : "Cambio mayor"}
               </button>
             ))}
           </div>
         </Campo>
-        <p className="text-[13px] text-[#11212D]">
+        <p className="text-[13px] text-tema-texto">
           {versionActual} → <b>{siguiente}</b>
         </p>
         <Campo label="Motivo del cambio (obligatorio)">
           <textarea className={claseInput} rows={3} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Qué cambió y por qué" />
         </Campo>
-        {error && <p className="rounded-lg border border-[#800021] px-3 py-2 text-[13px] font-semibold text-[#800021]">{error}</p>}
+        {error && <p className="rounded-lg border border-tema-acento px-3 py-2 text-[13px] font-semibold text-tema-tinta">{error}</p>}
         <div className="flex justify-end gap-2">
           <Boton onClick={onCerrar}>Cancelar</Boton>
           <Boton tono="secundario" onClick={guardar} disabled={guardando}>
@@ -405,11 +405,11 @@ export function PedirMotivo({
   return (
     <VentanaGD abierta={abierta} titulo={titulo} onCerrar={onCerrar}>
       <div className="space-y-3">
-        <p className="text-[13px] text-[#11212D]">{texto}</p>
+        <p className="text-[13px] text-tema-texto">{texto}</p>
         <Campo label={etiqueta}>
           <textarea className={claseInput} rows={3} value={motivo} onChange={(e) => setMotivo(e.target.value)} autoFocus />
         </Campo>
-        {error && <p className="text-[13px] font-semibold text-[#800021]">{error}</p>}
+        {error && <p className="text-[13px] font-semibold text-tema-tinta">{error}</p>}
         <div className="flex justify-end gap-2">
           <Boton onClick={onCerrar}>Cancelar</Boton>
           <Boton
@@ -450,8 +450,8 @@ export function ConfirmarDescarga({ abierta, codigo, version, onCerrar, onConfir
   }, [abierta]);
   return (
     <VentanaGD abierta={abierta} titulo="Descarga de documento CONFIDENCIAL" onCerrar={onCerrar}>
-      <div className="space-y-3 text-[13px] text-[#11212D]">
-        <p className="flex items-start gap-2 rounded-lg border-2 border-[#800021] px-3 py-2 font-semibold text-[#800021]">
+      <div className="space-y-3 text-[13px] text-tema-texto">
+        <p className="flex items-start gap-2 rounded-lg border-2 border-tema-acento px-3 py-2 font-semibold text-tema-tinta">
           <Lock size={16} className="mt-0.5 shrink-0" /> {codigo} {version} es confidencial. La descarga queda registrada con su nombre, fecha, hora e IP, y el PDF sale con marca de agua a su nombre.
         </p>
         {paso === 1 ? (
@@ -466,7 +466,7 @@ export function ConfirmarDescarga({ abierta, codigo, version, onCerrar, onConfir
             <Campo label={`Confirmación 2 de 2: escriba el código ${codigo}`}>
               <input className={claseInput} value={escrito} onChange={(e) => setEscrito(e.target.value.toUpperCase())} autoFocus />
             </Campo>
-            {error && <p className="font-semibold text-[#800021]">{error}</p>}
+            {error && <p className="font-semibold text-tema-tinta">{error}</p>}
             <div className="flex justify-end gap-2">
               <Boton onClick={onCerrar}>Cancelar</Boton>
               <Boton

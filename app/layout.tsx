@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import "./globals.css";
+// 5 temas de color + COMBOY VID (predeterminado): variables por data-tema (ver lib/temas.ts)
+import "./themes.css";
 import { TablasMovil } from "@/components/TablasMovil";
 import { AppNativa } from "@/components/app-nativa/AppNativa";
 

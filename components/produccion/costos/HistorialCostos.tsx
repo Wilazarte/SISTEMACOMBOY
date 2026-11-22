@@ -36,7 +36,7 @@ function Diferencia({ r }: { r: RegistroAudit }) {
     <ul className="space-y-0.5 text-[11.5px]">
       {claves.slice(0, 6).map((k) => (
         <li key={k} className="break-words">
-          <b>{k}</b>: <span className="text-[#800021] line-through">{String(a[k] ?? "—")}</span> → <span className="font-semibold text-[#294D61]">{String(b[k] ?? "—")}</span>
+          <b>{k}</b>: <span className="text-tema-tinta line-through">{String(a[k] ?? "—")}</span> → <span className="font-semibold text-tema-sec">{String(b[k] ?? "—")}</span>
         </li>
       ))}
     </ul>
@@ -68,7 +68,7 @@ export function HistorialCostos({ hoja, datos, onCerrar }: { hoja: HojaCosto; da
 
   return (
     <Modal open onClose={onCerrar} title={`Historial de costos · ${hoja.codigo} · ${hoja.orden_produccion_id}`} wide>
-      <div className="space-y-3 text-[#11212D]">
+      <div className="space-y-3 text-tema-texto">
         <div className="flex flex-wrap gap-1.5">
           {(
             [
@@ -88,7 +88,7 @@ export function HistorialCostos({ hoja, datos, onCerrar }: { hoja: HojaCosto; da
           <>
             <Tabla head={["Versión", "Tipo", "Costo total", "Costo unit.", "Margen", "Usuario", "Fecha", "Motivo", "Hash"]}>
               {versiones.map((v) => (
-                <tr key={v.id} className="cursor-pointer hover:bg-[#CCD0CF]/30" onClick={() => void versionCompleta(v.id).then(setDetalle)}>
+                <tr key={v.id} className="cursor-pointer hover:bg-tema-borde/30" onClick={() => void versionCompleta(v.id).then(setDetalle)}>
                   <Celda className="font-bold">v{v.version}</Celda>
                   <Celda>
                     <span className="rounded px-1.5 py-0.5 text-[10.5px] font-bold uppercase" style={pinta(v.tipo === "FINAL_REAL" || v.tipo === "ESTIMADO" ? ACERO : v.tipo === "BORRADOR" ? "#5a6670" : VINO)}>{NOMBRE_TIPO_VERSION[v.tipo]}</span>
@@ -103,15 +103,15 @@ export function HistorialCostos({ hoja, datos, onCerrar }: { hoja: HojaCosto; da
                 </tr>
               ))}
             </Tabla>
-            <p className="text-[11px] text-[#294D61]">Ninguna versión se sobrescribe: cada una guarda la foto completa de la hoja y el hash de la anterior. Toque una fila para ver su detalle.</p>
+            <p className="text-[11px] text-tema-sec">Ninguna versión se sobrescribe: cada una guarda la foto completa de la hoja y el hash de la anterior. Toque una fila para ver su detalle.</p>
             {detalle?.snapshot && (
-              <div className="rounded-lg border border-[#294D61] p-3">
-                <p className="mb-2 text-[12px] font-bold uppercase text-[#294D61]">
+              <div className="rounded-lg border border-tema-sec p-3">
+                <p className="mb-2 text-[12px] font-bold uppercase text-tema-sec">
                   Detalle v{detalle.version} · {NOMBRE_TIPO_VERSION[detalle.tipo]} · hash {detalle.hash}
                 </p>
                 <Tabla head={["Sección", "Descripción", "Cantidad", "Costo unit.", "Subtotal", "Estado"]}>
                   {(detalle.snapshot.items ?? []).map((i) => (
-                    <tr key={i.id} className={cn(i.estado === "ANULADO" && "text-[#11212D]/50 line-through")}>
+                    <tr key={i.id} className={cn(i.estado === "ANULADO" && "text-tema-texto/50 line-through")}>
                       <Celda>{NOMBRE_SECCION[i.seccion].slice(3)}</Celda>
                       <Celda>{i.descripcion}</Celda>
                       <Celda>{Number(i.cantidad)}</Celda>
@@ -162,8 +162,8 @@ export function HistorialCostos({ hoja, datos, onCerrar }: { hoja: HojaCosto; da
           ) : (
             <div className="grid gap-3 sm:grid-cols-3">
               {firmas.map((f) => (
-                <div key={f.id} className={cn("rounded-lg border-2 p-3", f.decision === "APROBADO" ? "border-[#294D61]" : "border-[#800021]")}>
-                  <p className={cn("text-[11px] font-bold uppercase", f.decision === "APROBADO" ? "text-[#294D61]" : "text-[#800021]")}>
+                <div key={f.id} className={cn("rounded-lg border-2 p-3", f.decision === "APROBADO" ? "border-tema-sec" : "border-tema-acento")}>
+                  <p className={cn("text-[11px] font-bold uppercase", f.decision === "APROBADO" ? "text-tema-sec" : "text-tema-tinta")}>
                     {NOMBRE_ETAPA[f.etapa]} · {f.decision}
                   </p>
                   {f.firma && <img src={f.firma} alt={`Firma de ${f.nombre ?? f.usuario}`} className="my-1 h-14 w-full object-contain" />}
@@ -172,7 +172,7 @@ export function HistorialCostos({ hoja, datos, onCerrar }: { hoja: HojaCosto; da
                     {f.cargo} · {fecha(f.created_at)} · v{f.version}
                   </p>
                   {f.motivo && <p className="mt-1 text-[11.5px] italic">“{f.motivo}”</p>}
-                  <p className="mt-1 break-all font-mono text-[10px] text-[#294D61]">Sello {f.sello}</p>
+                  <p className="mt-1 break-all font-mono text-[10px] text-tema-sec">Sello {f.sello}</p>
                 </div>
               ))}
             </div>

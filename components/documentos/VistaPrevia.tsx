@@ -38,7 +38,7 @@ export function VistaPrevia({ docId, version, usuario }: { docId: string; versio
             const c = document.createElement("canvas");
             c.width = Math.ceil(vp.width);
             c.height = Math.ceil(vp.height);
-            c.className = "mb-3 block h-auto w-full rounded border border-[#11212D]/10 bg-white";
+            c.className = "mb-3 block h-auto w-full rounded border border-tema-texto/10 bg-white";
             await p.render({ canvasContext: c.getContext("2d")!, viewport: vp }).promise;
             destino.appendChild(c);
           }
@@ -89,18 +89,18 @@ export function VistaPrevia({ docId, version, usuario }: { docId: string; versio
   return (
     <div className="space-y-2">
       {info?.integridad === "ALERTA" && (
-        <div className="flex items-start gap-2 rounded-lg border-2 border-[#800021] bg-white px-3 py-2 text-[13px] font-semibold text-[#800021]">
+        <div className="flex items-start gap-2 rounded-lg border-2 border-tema-acento bg-white px-3 py-2 text-[13px] font-semibold text-tema-tinta">
           <AlertTriangle size={18} className="mt-0.5 shrink-0" />
           ALERTA DE INTEGRIDAD: el archivo guardado no coincide con su hash SHA-256. Pudo ser modificado fuera del sistema. Ya se avisó a Gerencia.
         </div>
       )}
       {info?.integridad === "OK" && (
-        <p className="flex items-center gap-1.5 text-[11px] text-[#294D61]">
+        <p className="flex items-center gap-1.5 text-[11px] text-tema-sec">
           <ShieldCheck size={14} /> Integridad verificada al abrir: el hash SHA-256 coincide ({info.version}).
         </p>
       )}
       <div
-        className="gd-vista-protegida relative max-h-[62vh] select-none overflow-y-auto overflow-x-hidden rounded-lg border border-[#11212D]/15 bg-[#CCD0CF]/50 p-2"
+        className="gd-vista-protegida relative max-h-[62vh] select-none overflow-y-auto overflow-x-hidden rounded-lg border border-tema-texto/15 bg-tema-borde/50 p-2"
         onContextMenu={(e) => e.preventDefault()}
         onDragStart={(e) => e.preventDefault()}
         onCopy={(e) => e.preventDefault()}
@@ -110,24 +110,24 @@ export function VistaPrevia({ docId, version, usuario }: { docId: string; versio
         {estado === "listo" && (
           <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
             {Array.from({ length: 8 }).map((_, i) => (
-              <span key={i} className="absolute left-[-10%] w-[130%] -rotate-[24deg] text-center text-[13px] font-bold tracking-widest text-[#800021]/[0.13]" style={{ top: `${6 + i * 13}%` }}>
+              <span key={i} className="absolute left-[-10%] w-[130%] -rotate-[24deg] text-center text-[13px] font-bold tracking-widest text-tema-tinta/[0.13]" style={{ top: `${6 + i * 13}%` }}>
                 {sello} · {sello}
               </span>
             ))}
           </div>
         )}
         {estado === "cargando" && (
-          <p className="flex items-center justify-center gap-2 py-16 text-[13px] text-[#11212D]/70">
+          <p className="flex items-center justify-center gap-2 py-16 text-[13px] text-tema-texto/70">
             <Loader2 size={16} className="animate-spin" /> Cargando vista previa (queda registrada en la auditoría)…
           </p>
         )}
         {estado === "sin-vista" && (
-          <p className="flex flex-col items-center justify-center gap-2 py-12 text-center text-[13px] text-[#11212D]/70">
+          <p className="flex flex-col items-center justify-center gap-2 py-12 text-center text-[13px] text-tema-texto/70">
             <FileQuestion size={28} />
             Este tipo de archivo no tiene vista previa en el navegador. Solo se puede descargar con permiso &quot;Lectura y Descarga&quot; o superior.
           </p>
         )}
-        {estado === "error" && <p className="px-3 py-10 text-center text-[13px] font-semibold text-[#800021]">{error}</p>}
+        {estado === "error" && <p className="px-3 py-10 text-center text-[13px] font-semibold text-tema-tinta">{error}</p>}
       </div>
       <style>{`@media print { .gd-vista-protegida { display: none !important; } }`}</style>
     </div>

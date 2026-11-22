@@ -6,7 +6,15 @@ import type { CSSProperties } from "react";
  * Paleta COMBOY (2026-11-17): azul acero #294D61, vino #800021, azul noche #11212D y sus tonos medios
  * (acero claro, vino claro, gris oscuro).
  */
-export const COLORES_SECCION = ["41 77 97", "128 0 33", "17 33 45", "84 113 129", "160 51 77", "127 143 150"] as const;
+// Temas de color (2026-11-22): cada tema redefine --sec-1…6 en app/themes.css; el respaldo es la paleta COMBOY
+export const COLORES_SECCION = [
+  "var(--sec-1, 41 77 97)",
+  "var(--sec-2, 128 0 33)",
+  "var(--sec-3, 17 33 45)",
+  "var(--sec-4, 84 113 129)",
+  "var(--sec-5, 160 51 77)",
+  "var(--sec-6, 127 143 150)",
+] as const;
 
 /** Color por posición (secciones vecinas nunca repiten color). */
 export const colorPorIndice = (i: number): string => COLORES_SECCION[((i % COLORES_SECCION.length) + COLORES_SECCION.length) % COLORES_SECCION.length];

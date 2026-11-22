@@ -4,6 +4,8 @@ import type { Config } from "tailwindcss";
 // así el modo oscuro (clase .dark en <html>) cambia la paleta sin tocar los componentes.
 const v = (nombre: string) => `rgb(var(--${nombre}) / <alpha-value>)`;
 const escala = (familia: string, tonos: number[]) => Object.fromEntries(tonos.map((t) => [t, v(`${familia}-${t}`)]));
+// Temas de color (app/themes.css): variables en hex; la opacidad (/10, /60…) se aplica con color-mix
+const t = (nombre: string) => `color-mix(in srgb, var(--${nombre}) calc(<alpha-value> * 100%), transparent)`;
 
 const config: Config = {
   darkMode: "class",
@@ -29,6 +31,21 @@ const config: Config = {
         orange: escala("orange", [50, 300, 600, 700, 800]),
         slate: escala("slate", [100, 200, 300, 400, 600, 700, 900]),
         blue: escala("blue", [50, 200, 600, 800]),
+        // Sistema de 5 temas (Williams 2026-11-22): reemplazan los hex fijos #11212D / #800021 / #294D61 / #CCD0CF
+        tema: {
+          texto: t("text"), // antes text-[#11212D]
+          muted: t("text-muted"),
+          fuerte: t("fuerte"), // antes bg-[#11212D]
+          acento: t("accent"), // antes bg/border-[#800021]
+          tinta: t("accent-ink"), // antes text-[#800021]
+          sec: t("secundario"), // antes [#294D61]
+          borde: t("border"), // antes [#CCD0CF]
+          card: t("card-bg"),
+          fondo: t("bg"),
+          icono: t("icon-bg"),
+          boton: t("button-bg"),
+          tenue: t("barra-tenue"), // antes text-[#CCD0CF] sobre fondo oscuro
+        },
       },
       boxShadow: {
         card: "0 1px 2px rgb(10 10 11 / 0.05)",

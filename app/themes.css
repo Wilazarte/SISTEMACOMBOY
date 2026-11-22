@@ -1,0 +1,568 @@
+/* =====================================================================
+   SISTEMA DE TEMAS DE COLOR (Williams 2026-11-22)
+   Solo colores: ningún tamaño, margen, posición ni texto cambia entre temas.
+
+   Uso: ErpLayout pone data-tema="comboy|oscuro|claro|rosas|cielo|menta" en su <div> raíz
+   (ver components/temas/TemaProvider.tsx y lib/temas.ts). Prioridad: módulo > usuario > global.
+
+   Variables pedidas (todas en hex):
+     --bg  --sidebar-bg  --card-bg  --text  --text-muted  --accent  --accent-2  --border  --icon-bg  --button-bg
+   Derivadas que usa el ERP:
+     --sidebar-text (texto de la cabecera), --accent-ink (acento como texto legible), --secundario (2° color fuerte,
+     antes azul acero #294D61), --fuerte (fondo oscuro de chips / tooltips), --soft / --thead-bg (fondos suaves),
+     --icon-fg, --on-accent (texto sobre el acento), barra de accesos, chat, botón principal, ondas del fondo,
+     colores de sección (--sec-1…6, canales r g b) y de gráficos (--graf-*).
+   Además cada tema redefine los tokens de Tailwind (--canvas, --surface, --fg, --plomo-*, --corp…).
+   Las reglas de app/globals.css (bloques "Estilo LOGIN" y "Paleta COMBOY VID") ya leen estas variables.
+   ===================================================================== */
+
+/* COMBOY VID · predeterminado: exactamente los colores que el ERP tenía (paleta #11212D / #800021 / #294D61 / #CCD0CF) */
+.tema-planta.tema-login {
+  --bg: #CCD0CF;
+  --sidebar-bg: #11212D;
+  --card-bg: #ffffff;
+  --text: #11212D;
+  --text-muted: #4F6B7B;
+  --accent: #800021;
+  --accent-2: #294D61;
+  --border: #CCD0CF;
+  --icon-bg: #CCD0CF;
+  --button-bg: #800021;
+
+  --sidebar-text: #CCD0CF;
+  --accent-ink: #800021;
+  --accent-hover: #650019;
+  --secundario: #294D61;
+  --icon-fg: #11212D;
+  --on-accent: #ffffff;
+  --on-sel: #ffffff;
+  --fuerte: #11212D;
+  --soft: #E3E8EA;
+  --thead-bg: #DCE3E6;
+  --input-border: #B4BBBA;
+  --logo-placa: #CCD0CF;
+  --pie-bg: rgba(233, 235, 235, 0.92);
+  --fondo-img: linear-gradient(180deg, #E9EBEB 0%, #D9DDDC 100%);
+  --fondo-luz-1: rgba(41, 77, 97, 0.16);
+  --fondo-luz-2: rgba(128, 0, 33, 0.07);
+  --barra-color: #294D61;
+  --barra-img: linear-gradient(180deg, #294D61 0%, #1d3747 55%, #11212D 100%);
+  --barra-destello: rgba(128, 0, 33, 0.55);
+  --chat-color: #800021;
+  --chat-img: linear-gradient(180deg, #800021 0%, #5c0018 100%);
+  --btn-img: linear-gradient(135deg, #800021 0%, #650019 100%);
+  --btn-img-hover: linear-gradient(135deg, #6b001b 0%, #4f0014 100%);
+  --btn-sombra: rgba(128, 0, 33, 0.25);
+  --sel-img: linear-gradient(135deg, #294D61 0%, #11212D 100%);
+  --onda-1: #294D61;
+  --onda-2: #800021;
+  --onda-3: #11212D;
+  --sec-1: 41 77 97;
+  --sec-2: 128 0 33;
+  --sec-3: 17 33 45;
+  --sec-4: 84 113 129;
+  --sec-5: 160 51 77;
+  --sec-6: 127 143 150;
+  --graf-azul: 41 77 97;
+  --graf-rojo: 128 0 33;
+  --graf-cian: 127 156 171;
+  --barra-tenue: #CCD0CF;
+  --card-vidrio: rgba(241, 243, 242, 0.92);
+}
+
+/* OSCURO · Premium */
+.tema-planta.tema-login[data-tema="oscuro"] {
+  color-scheme: dark;
+  /* Variables pedidas */
+  --bg: #1A1D29;
+  --sidebar-bg: #12141F;
+  --card-bg: #232736;
+  --text: #FFFFFF;
+  --text-muted: #A0A3B1;
+  --accent: #C9A227;
+  --accent-2: #6E8FC9;
+  --border: #2E3242;
+  --icon-bg: #3A3322;
+  --button-bg: #C9A227;
+  /* Derivadas del tema */
+  --sidebar-text: #FFFFFF;
+  --accent-ink: #D9B53A;
+  --accent-hover: #A58520;
+  --secundario: #7E9BD3;
+  --icon-fg: #C9A227;
+  --on-accent: #1A1D29;
+  --on-sel: #FFFFFF;
+  --fuerte: #12141F;
+  --soft: #2A2E3D;
+  --thead-bg: #2A2E3D;
+  --input-border: #3A3F52;
+  --logo-placa: #F2F4F7;
+  --pie-bg: #1E2230eb;
+  --fondo-img: linear-gradient(180deg, #1E2230 0%, #161925 100%);
+  --fondo-luz-1: rgba(201, 162, 39, 0.08);
+  --fondo-luz-2: rgba(110, 143, 201, 0.08);
+  --barra-color: #232736;
+  --barra-img: linear-gradient(180deg, #232736 0%, #1A1D29 55%, #12141F 100%);
+  --barra-destello: rgba(201, 162, 39, 0.55);
+  --chat-color: #1B1F2E;
+  --chat-img: linear-gradient(180deg, #1B1F2E 0%, #0E1019 100%);
+  --btn-img: linear-gradient(135deg, #D4AE34 0%, #A8851C 100%);
+  --btn-img-hover: linear-gradient(135deg, #BB992E 0%, #8F7118 100%);
+  --btn-sombra: #C9A22740;
+  --sel-img: linear-gradient(135deg, #3A4058 0%, #12141F 100%);
+  --onda-1: #7E9BD3;
+  --onda-2: #C9A227;
+  --onda-3: #12141F;
+  --sec-1: 201 162 39;
+  --sec-2: 126 155 211;
+  --sec-3: 160 163 177;
+  --sec-4: 227 199 102;
+  --sec-5: 150 172 220;
+  --sec-6: 120 126 150;
+  --graf-azul: 126 155 211;
+  --graf-rojo: 201 162 39;
+  --graf-cian: 160 163 177;
+  /* Tokens de Tailwind (canales r g b) */
+  --canvas: 26 29 41;
+  --surface: 35 39 54;
+  --fg: 255 255 255;
+  --fg-2: 208 209 216;
+  --corp: 201 162 39;
+  --vino-900: 165 133 32;
+  --vino: 217 181 58;
+  --rojo: 217 181 58;
+  --rojo-soft: 55 54 52;
+  --rojo-tenue: 85 76 50;
+  --azul-900: 18 20 31;
+  --azul-700: 126 155 211;
+  --azul-500: 160 163 177;
+  --plomo-50: 42 45 60;
+  --plomo-100: 42 46 61;
+  --plomo-200: 46 50 66;
+  --plomo-500: 160 163 177;
+  --plomo-600: 203 204 212;
+  --slate-100: 42 46 61; --slate-200: 46 50 66; --slate-300: 83 87 98; --slate-400: 160 163 177;
+  --slate-600: 203 204 212; --slate-700: 126 155 211; --slate-900: 255 255 255;
+  --blue-50: 46 53 73; --blue-200: 67 80 109; --blue-600: 126 155 211; --blue-800: 190 205 233;
+  --sb: 18 20 31;
+  --sb-borde: 46 50 66;
+  --sb-activo: 201 162 39;
+  --red-50: 42 18 21; --red-100: 59 21 25; --red-200: 92 29 34; --red-300: 127 29 36; --red-400: 185 35 44;
+  --red-500: 239 68 68; --red-600: 229 72 77; --red-700: 252 165 165; --red-800: 254 202 202; --red-900: 254 226 226;
+  --emerald-50: 13 42 32; --emerald-100: 16 55 42; --emerald-200: 19 78 58; --emerald-400: 5 150 105;
+  --emerald-500: 16 185 129; --emerald-600: 52 211 153; --emerald-700: 110 231 183; --emerald-800: 167 243 208;
+  --amber-50: 43 33 8; --amber-100: 58 44 10; --amber-200: 90 66 13; --amber-300: 122 90 16; --amber-400: 183 121 31;
+  --amber-500: 245 158 11; --amber-600: 251 191 36; --amber-700: 252 211 77; --amber-800: 253 230 138; --amber-900: 254 243 199;
+  --orange-50: 44 26 11; --orange-300: 124 58 18; --orange-600: 251 146 60; --orange-700: 253 186 116; --orange-800: 254 215 170;
+  --barra-tenue: rgba(255, 255, 255, 0.85);
+  --card-vidrio: color-mix(in srgb, var(--card-bg) 92%, transparent);
+  --glass-bg: var(--card-bg);
+  --glass-borde: var(--border);
+  --cian: var(--secundario);
+  color: var(--text);
+}
+
+/* CLARO · Limpio formal */
+.tema-planta.tema-login[data-tema="claro"] {
+  color-scheme: light;
+  /* Variables pedidas */
+  --bg: #F2F4F7;
+  --sidebar-bg: #FFFFFF;
+  --card-bg: #FFFFFF;
+  --text: #1A1D29;
+  --text-muted: #6B7280;
+  --accent: #1E3A5F;
+  --accent-2: #2F5D8A;
+  --border: #E5E7EB;
+  --icon-bg: #E3EAF3;
+  --button-bg: #1E3A5F;
+  /* Derivadas del tema */
+  --sidebar-text: #1A1D29;
+  --accent-ink: #1E3A5F;
+  --accent-hover: #19304E;
+  --secundario: #2F5D8A;
+  --icon-fg: #1E3A5F;
+  --on-accent: #FFFFFF;
+  --on-sel: #FFFFFF;
+  --fuerte: #1E3A5F;
+  --soft: #EEF1F5;
+  --thead-bg: #E9EDF3;
+  --input-border: #D1D5DB;
+  --logo-placa: #F2F4F7;
+  --pie-bg: #F8FAFBeb;
+  --fondo-img: linear-gradient(180deg, #F7F8FA 0%, #ECEFF3 100%);
+  --fondo-luz-1: rgba(30, 58, 95, 0.06);
+  --fondo-luz-2: rgba(47, 93, 138, 0.05);
+  --barra-color: #24476F;
+  --barra-img: linear-gradient(180deg, #24476F 0%, #1C365B 55%, #15294A 100%);
+  --barra-destello: rgba(126, 160, 200, 0.5);
+  --chat-color: #1E3A5F;
+  --chat-img: linear-gradient(180deg, #1E3A5F 0%, #15294A 100%);
+  --btn-img: linear-gradient(135deg, #1E3A5F 0%, #15294A 100%);
+  --btn-img-hover: linear-gradient(135deg, #1A3354 0%, #12233F 100%);
+  --btn-sombra: #1E3A5F40;
+  --sel-img: linear-gradient(135deg, #2F5D8A 0%, #1E3A5F 100%);
+  --onda-1: #2F5D8A;
+  --onda-2: #1E3A5F;
+  --onda-3: #1E3A5F;
+  --sec-1: 30 58 95;
+  --sec-2: 47 93 138;
+  --sec-3: 26 29 41;
+  --sec-4: 90 120 160;
+  --sec-5: 107 114 128;
+  --sec-6: 60 80 110;
+  --graf-azul: 47 93 138;
+  --graf-rojo: 30 58 95;
+  --graf-cian: 140 165 195;
+  /* Tokens de Tailwind (canales r g b) */
+  --canvas: 242 244 247;
+  --surface: 255 255 255;
+  --fg: 26 29 41;
+  --fg-2: 66 72 84;
+  --corp: 30 58 95;
+  --vino-900: 25 48 78;
+  --vino: 30 58 95;
+  --rojo: 30 58 95;
+  --rojo-soft: 228 231 236;
+  --rojo-tenue: 188 196 207;
+  --azul-900: 30 58 95;
+  --azul-700: 47 93 138;
+  --azul-500: 107 114 128;
+  --plomo-50: 248 248 249;
+  --plomo-100: 238 241 245;
+  --plomo-200: 229 231 235;
+  --plomo-500: 107 114 128;
+  --plomo-600: 71 76 89;
+  --slate-100: 238 241 245; --slate-200: 229 231 235; --slate-300: 205 205 208; --slate-400: 107 114 128;
+  --slate-600: 71 76 89; --slate-700: 47 93 138; --slate-900: 26 29 41;
+  --blue-50: 230 236 241; --blue-200: 182 198 214; --blue-600: 47 93 138; --blue-800: 36 61 90;
+  --sb: 255 255 255;
+  --sb-borde: 229 231 235;
+  --sb-activo: 30 58 95;
+  --barra-tenue: rgba(255, 255, 255, 0.85);
+  --card-vidrio: color-mix(in srgb, var(--card-bg) 92%, transparent);
+  --glass-bg: var(--card-bg);
+  --glass-borde: var(--border);
+  --cian: var(--secundario);
+  color: var(--text);
+}
+
+/* ROSAS · Elegante femenino */
+.tema-planta.tema-login[data-tema="rosas"] {
+  color-scheme: light;
+  /* Variables pedidas */
+  --bg: #FDF2F4;
+  --sidebar-bg: #FCE7EB;
+  --card-bg: #FFFFFF;
+  --text: #3D1F2B;
+  --text-muted: #9A6B7A;
+  --accent: #E75480;
+  --accent-2: #F8A5C2;
+  --border: #FADCE3;
+  --icon-bg: #FCE7EB;
+  --button-bg: #E75480;
+  /* Derivadas del tema */
+  --sidebar-text: #3D1F2B;
+  --accent-ink: #C93A68;
+  --accent-hover: #BD4569;
+  --secundario: #B83A66;
+  --icon-fg: #E75480;
+  --on-accent: #FFFFFF;
+  --on-sel: #FFFFFF;
+  --fuerte: #3D1F2B;
+  --soft: #FCEEF1;
+  --thead-bg: #FCE7EB;
+  --input-border: #F3C6D3;
+  --logo-placa: #FFFFFF;
+  --pie-bg: #FEF8FAeb;
+  --fondo-img: linear-gradient(180deg, #FFF7F9 0%, #FBE9EE 100%);
+  --fondo-luz-1: rgba(231, 84, 128, 0.08);
+  --fondo-luz-2: rgba(248, 165, 194, 0.16);
+  --barra-color: #E75480;
+  --barra-img: linear-gradient(180deg, #E75480 0%, #C4416C 55%, #A8325C 100%);
+  --barra-destello: rgba(248, 165, 194, 0.7);
+  --chat-color: #E75480;
+  --chat-img: linear-gradient(180deg, #E75480 0%, #B83A66 100%);
+  --btn-img: linear-gradient(135deg, #E75480 0%, #D23F6E 100%);
+  --btn-img-hover: linear-gradient(135deg, #CB4A71 0%, #B2365E 100%);
+  --btn-sombra: #E7548040;
+  --sel-img: linear-gradient(135deg, #B83A66 0%, #8E2A50 100%);
+  --onda-1: #B83A66;
+  --onda-2: #E75480;
+  --onda-3: #F8A5C2;
+  --sec-1: 231 84 128;
+  --sec-2: 184 58 102;
+  --sec-3: 61 31 43;
+  --sec-4: 240 140 175;
+  --sec-5: 154 107 122;
+  --sec-6: 200 110 140;
+  --graf-azul: 184 58 102;
+  --graf-rojo: 231 84 128;
+  --graf-cian: 248 165 194;
+  /* Tokens de Tailwind (canales r g b) */
+  --canvas: 253 242 244;
+  --surface: 255 255 255;
+  --fg: 61 31 43;
+  --fg-2: 108 69 82;
+  --corp: 231 84 128;
+  --vino-900: 189 69 105;
+  --vino: 201 58 104;
+  --rojo: 201 58 104;
+  --rojo-soft: 252 234 240;
+  --rojo-tenue: 248 204 217;
+  --azul-900: 61 31 43;
+  --azul-700: 184 58 102;
+  --azul-500: 154 107 122;
+  --plomo-50: 249 248 249;
+  --plomo-100: 252 238 241;
+  --plomo-200: 250 220 227;
+  --plomo-500: 154 107 122;
+  --plomo-600: 112 73 86;
+  --slate-100: 252 238 241; --slate-200: 250 220 227; --slate-300: 212 206 208; --slate-400: 154 107 122;
+  --slate-600: 112 73 86; --slate-700: 184 58 102; --slate-900: 61 31 43;
+  --blue-50: 246 231 237; --blue-200: 230 186 201; --blue-600: 184 58 102; --blue-800: 122 44 72;
+  --sb: 252 231 235;
+  --sb-borde: 250 220 227;
+  --sb-activo: 231 84 128;
+  --barra-tenue: rgba(255, 255, 255, 0.85);
+  --card-vidrio: color-mix(in srgb, var(--card-bg) 92%, transparent);
+  --glass-bg: var(--card-bg);
+  --glass-borde: var(--border);
+  --cian: var(--secundario);
+  color: var(--text);
+}
+
+/* CIELO · Fresco formal */
+.tema-planta.tema-login[data-tema="cielo"] {
+  color-scheme: light;
+  /* Variables pedidas */
+  --bg: #EAF6FF;
+  --sidebar-bg: #D6EFFF;
+  --card-bg: #FFFFFF;
+  --text: #0F2B46;
+  --text-muted: #5A7A9A;
+  --accent: #2D9CDB;
+  --accent-2: #7ED6FF;
+  --border: #CDEBFF;
+  --icon-bg: #D6EFFF;
+  --button-bg: #2D9CDB;
+  /* Derivadas del tema */
+  --sidebar-text: #0F2B46;
+  --accent-ink: #1C7DB5;
+  --accent-hover: #2580B4;
+  --secundario: #1F7FB8;
+  --icon-fg: #2D9CDB;
+  --on-accent: #FFFFFF;
+  --on-sel: #FFFFFF;
+  --fuerte: #0F2B46;
+  --soft: #EEF7FE;
+  --thead-bg: #DDF0FF;
+  --input-border: #B5DCF5;
+  --logo-placa: #FFFFFF;
+  --pie-bg: #F4FAFFeb;
+  --fondo-img: linear-gradient(180deg, #F2FAFF 0%, #E2F2FD 100%);
+  --fondo-luz-1: rgba(45, 156, 219, 0.1);
+  --fondo-luz-2: rgba(126, 214, 255, 0.16);
+  --barra-color: #2D9CDB;
+  --barra-img: linear-gradient(180deg, #2D9CDB 0%, #2380B8 55%, #1A6A9C 100%);
+  --barra-destello: rgba(126, 214, 255, 0.7);
+  --chat-color: #2D9CDB;
+  --chat-img: linear-gradient(180deg, #2D9CDB 0%, #1C7DB5 100%);
+  --btn-img: linear-gradient(135deg, #2D9CDB 0%, #1C7DB5 100%);
+  --btn-img-hover: linear-gradient(135deg, #2889C1 0%, #186A9A 100%);
+  --btn-sombra: #2D9CDB40;
+  --sel-img: linear-gradient(135deg, #1F7FB8 0%, #0F2B46 100%);
+  --onda-1: #1F7FB8;
+  --onda-2: #2D9CDB;
+  --onda-3: #7ED6FF;
+  --sec-1: 45 156 219;
+  --sec-2: 31 127 184;
+  --sec-3: 15 43 70;
+  --sec-4: 126 214 255;
+  --sec-5: 90 122 154;
+  --sec-6: 60 150 200;
+  --graf-azul: 31 127 184;
+  --graf-rojo: 45 156 219;
+  --graf-cian: 126 214 255;
+  /* Tokens de Tailwind (canales r g b) */
+  --canvas: 234 246 255;
+  --surface: 255 255 255;
+  --fg: 15 43 70;
+  --fg-2: 52 82 112;
+  --corp: 45 156 219;
+  --vino-900: 37 128 180;
+  --vino: 28 125 181;
+  --rojo: 28 125 181;
+  --rojo-soft: 230 243 251;
+  --rojo-tenue: 192 225 244;
+  --azul-900: 15 43 70;
+  --azul-700: 31 127 184;
+  --azul-500: 90 122 154;
+  --plomo-50: 248 249 249;
+  --plomo-100: 238 247 254;
+  --plomo-200: 205 235 255;
+  --plomo-500: 90 122 154;
+  --plomo-600: 56 86 116;
+  --slate-100: 238 247 254; --slate-200: 205 235 255; --slate-300: 202 208 214; --slate-400: 90 122 154;
+  --slate-600: 56 86 116; --slate-700: 31 127 184; --slate-900: 15 43 70;
+  --blue-50: 228 240 246; --blue-200: 177 210 230; --blue-600: 31 127 184; --blue-800: 23 85 127;
+  --sb: 214 239 255;
+  --sb-borde: 205 235 255;
+  --sb-activo: 45 156 219;
+  --barra-tenue: rgba(255, 255, 255, 0.85);
+  --card-vidrio: color-mix(in srgb, var(--card-bg) 92%, transparent);
+  --glass-bg: var(--card-bg);
+  --glass-borde: var(--border);
+  --cian: var(--secundario);
+  color: var(--text);
+}
+
+/* VERDE MENTA / TIERRA · Natural moderno */
+.tema-planta.tema-login[data-tema="menta"] {
+  color-scheme: light;
+  /* Variables pedidas */
+  --bg: #EFF7F2;
+  --sidebar-bg: #DFF0E4;
+  --card-bg: #FFFFFF;
+  --text: #1C2E26;
+  --text-muted: #5E7A6B;
+  --accent: #2E9E6B;
+  --accent-2: #C9B99A;
+  --border: #D8E8DD;
+  --icon-bg: #DFF0E4;
+  --button-bg: #2E9E6B;
+  /* Derivadas del tema */
+  --sidebar-text: #1C2E26;
+  --accent-ink: #23804F;
+  --accent-hover: #268258;
+  --secundario: #7A6545;
+  --icon-fg: #2E9E6B;
+  --on-accent: #FFFFFF;
+  --on-sel: #FFFFFF;
+  --fuerte: #1C2E26;
+  --soft: #F1F7F3;
+  --thead-bg: #E3F1E8;
+  --input-border: #C3DACB;
+  --logo-placa: #FFFFFF;
+  --pie-bg: #F7FBF8eb;
+  --fondo-img: linear-gradient(180deg, #F5FBF7 0%, #E6F2EA 100%);
+  --fondo-luz-1: rgba(46, 158, 107, 0.08);
+  --fondo-luz-2: rgba(201, 185, 154, 0.2);
+  --barra-color: #2E9E6B;
+  --barra-img: linear-gradient(180deg, #2E9E6B 0%, #268459 55%, #1F6E4B 100%);
+  --barra-destello: rgba(201, 185, 154, 0.75);
+  --chat-color: #2E9E6B;
+  --chat-img: linear-gradient(180deg, #2E9E6B 0%, #23804F 100%);
+  --btn-img: linear-gradient(135deg, #2E9E6B 0%, #23804F 100%);
+  --btn-img-hover: linear-gradient(135deg, #288B5E 0%, #1E6D43 100%);
+  --btn-sombra: #2E9E6B40;
+  --sel-img: linear-gradient(135deg, #7A6545 0%, #1C2E26 100%);
+  --onda-1: #7A6545;
+  --onda-2: #2E9E6B;
+  --onda-3: #C9B99A;
+  --sec-1: 46 158 107;
+  --sec-2: 122 101 69;
+  --sec-3: 28 46 38;
+  --sec-4: 201 185 154;
+  --sec-5: 94 122 107;
+  --sec-6: 80 140 110;
+  --graf-azul: 122 101 69;
+  --graf-rojo: 46 158 107;
+  --graf-cian: 201 185 154;
+  /* Tokens de Tailwind (canales r g b) */
+  --canvas: 239 247 242;
+  --surface: 255 255 255;
+  --fg: 28 46 38;
+  --fg-2: 61 84 72;
+  --corp: 46 158 107;
+  --vino-900: 38 130 88;
+  --vino: 35 128 79;
+  --rojo: 35 128 79;
+  --rojo-soft: 230 243 237;
+  --rojo-tenue: 192 226 211;
+  --azul-900: 28 46 38;
+  --azul-700: 122 101 69;
+  --azul-500: 94 122 107;
+  --plomo-50: 248 249 248;
+  --plomo-100: 241 247 243;
+  --plomo-200: 216 232 221;
+  --plomo-500: 94 122 107;
+  --plomo-600: 64 88 76;
+  --slate-100: 241 247 243; --slate-200: 216 232 221; --slate-300: 205 209 207; --slate-400: 94 122 107;
+  --slate-600: 64 88 76; --slate-700: 122 101 69; --slate-900: 28 46 38;
+  --blue-50: 239 237 233; --blue-200: 208 201 190; --blue-600: 122 101 69; --blue-800: 75 74 54;
+  --sb: 223 240 228;
+  --sb-borde: 216 232 221;
+  --sb-activo: 46 158 107;
+  --barra-tenue: rgba(255, 255, 255, 0.85);
+  --card-vidrio: color-mix(in srgb, var(--card-bg) 92%, transparent);
+  --glass-bg: var(--card-bg);
+  --glass-borde: var(--border);
+  --cian: var(--secundario);
+  color: var(--text);
+}
+
+/* ---------------------------------------------------------------------
+   Ajustes por tema que no salen solo de las variables
+   --------------------------------------------------------------------- */
+
+/* Cabecera clara (Claro, Rosas, Cielo, Menta): sidebar claro → textos e íconos oscuros */
+.tema-login:is([data-tema="claro"], [data-tema="rosas"], [data-tema="cielo"], [data-tema="menta"]) .cabecera-roja {
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--text) 10%, transparent);
+  border-bottom-color: var(--accent);
+}
+.tema-login:is([data-tema="claro"], [data-tema="rosas"], [data-tema="cielo"], [data-tema="menta"]) .cabecera-roja .texto-modulo { color: var(--sidebar-text); text-shadow: none; }
+.tema-login:is([data-tema="claro"], [data-tema="rosas"], [data-tema="cielo"], [data-tema="menta"]) .cabecera-roja :is(.text-white, .text-\[\#d4d4d8\], .text-\[\#e5e7eb\], .text-\[\#E5E7EB\], .text-\[\#a1a1aa\], .text-amber-200) { color: var(--sidebar-text); }
+.tema-login:is([data-tema="claro"], [data-tema="rosas"], [data-tema="cielo"], [data-tema="menta"]) .cabecera-roja :is(.glass-card, .glass-blur) {
+  background-color: color-mix(in srgb, var(--sidebar-text) 5%, var(--sidebar-bg));
+  border-color: color-mix(in srgb, var(--sidebar-text) 14%, transparent);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.tema-login:is([data-tema="claro"], [data-tema="rosas"], [data-tema="cielo"], [data-tema="menta"]) .cabecera-roja :is(.hover\:text-white:hover, .hover-cian:hover) { color: var(--accent-ink); }
+.tema-login:is([data-tema="claro"], [data-tema="rosas"], [data-tema="cielo"], [data-tema="menta"]) .cabecera-roja .hover\:bg-white\/10:hover { background-color: color-mix(in srgb, var(--accent) 10%, transparent); }
+.tema-login:is([data-tema="claro"], [data-tema="rosas"], [data-tema="cielo"], [data-tema="menta"]) .cabecera-roja .logo-placa { border-color: var(--border); }
+/* Avatar del usuario (bg-[#3f3f46]): toma el acento del tema */
+.tema-login[data-tema]:not([data-tema="comboy"]) .cabecera-roja .bg-\[\#3f3f46\] { background-color: var(--accent); color: var(--on-accent); }
+.tema-login[data-tema]:not([data-tema="comboy"]) .cabecera-roja .logo-placa { background: var(--logo-placa); }
+
+/* Íconos: el círculo de cada ícono toma --icon-bg y el trazo --accent (barra de accesos, INICIO, KPIs) */
+.tema-login .icono-tema { background-color: var(--icon-bg); color: var(--icon-fg); }
+
+/* Chat: su fondo siempre es fuerte, el título va en blanco */
+.tema-login .chat-rojo .seccion-titulo { color: #ffffff; }
+
+/* Cabecera de los temas nuevos: color liso del tema (sin las ondas azul acero de COMBOY) */
+.tema-login[data-tema]:not([data-tema="comboy"]) .cabecera-roja { background-image: none; }
+
+/* Marca de agua: el logo toma el color de acento del tema (máscara sobre el mismo PNG) */
+.tema-login[data-tema]:not([data-tema="comboy"]) .marca-agua {
+  background: var(--accent);
+  -webkit-mask: url("/marca-agua.png") center 46% / min(62vw, 980px) auto no-repeat;
+  mask: url("/marca-agua.png") center 46% / min(62vw, 980px) auto no-repeat;
+  mix-blend-mode: normal;
+  opacity: 0.06;
+}
+@media (max-width: 1023px) {
+  .tema-login[data-tema]:not([data-tema="comboy"]) .marca-agua { -webkit-mask-size: 86vw auto; mask-size: 86vw auto; -webkit-mask-position: center 42%; mask-position: center 42%; opacity: 0.08; }
+}
+
+/* Fondo de pantalla de los temas nuevos: color liso del tema + luces suaves del acento */
+.tema-login[data-tema]:not([data-tema="comboy"]) .fondo-login { background-color: var(--bg); }
+.tema-login[data-tema]:not([data-tema="comboy"]) > footer { background: var(--pie-bg); }
+
+/* OSCURO: cajas que venían blancas o claras de fábrica pasan a la tarjeta oscura del tema */
+.tema-login[data-tema="oscuro"] :is(main, [role="dialog"], .shadow-pop) :is(.bg-white, .bg-white\/80, .bg-white\/90, .bg-white\/95, [class*="bg-[#f"], [class*="bg-[#F"], .bg-\[\#fff\], .bg-\[\#FFFFFF\]) { background-color: var(--card-bg); color: var(--text); }
+.tema-login[data-tema="oscuro"] :is(main, [role="dialog"], .shadow-pop) :is([class*="bg-[#e"], [class*="bg-[#E"], [class*="bg-[#d"], [class*="bg-[#D"], .bg-gray-100, .bg-gray-50) { background-color: var(--soft); color: var(--text); }
+.tema-login[data-tema="oscuro"] :is(main, [role="dialog"], .shadow-pop) :is(.hover\:bg-white:hover, .hover\:bg-gray-50:hover, .hover\:bg-gray-100:hover) { background-color: var(--soft); }
+.tema-login[data-tema="oscuro"] :is(main, [role="dialog"]) :is(.text-black, .text-gray-900, .text-gray-800, .text-gray-700) { color: var(--text); }
+.tema-login[data-tema="oscuro"] :is(main, [role="dialog"]) .text-gray-500 { color: var(--text-muted); }
+.tema-login[data-tema="oscuro"] .marca-agua { opacity: 0.07; }
+.tema-login[data-tema="oscuro"] table thead { box-shadow: inset 0 -2px 0 var(--accent); }
+.tema-login[data-tema="oscuro"] ::placeholder { color: #6E7284; }
+/* Texto oscuro sobre botones dorados */
+.tema-login[data-tema="oscuro"] :is(.bg-corp, .grad-fuego, .bg-tema-acento) :is(.text-white, .text-fg),
+.tema-login[data-tema="oscuro"] :is(.bg-corp, .grad-fuego, .bg-tema-acento).text-white { color: var(--on-accent); }
+
+/* Selector de temas (popover de la cabecera): siempre con los colores del tema activo */
+.tema-login .selector-tema { background-color: var(--card-bg); color: var(--text); border-color: var(--border); }

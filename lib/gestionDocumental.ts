@@ -48,7 +48,8 @@ export const PREFIJO: Record<CategoriaGD, string> = {
 };
 
 /** Paleta obligatoria del módulo: solo estos 4 colores (más blanco para las tarjetas). */
-export const COLOR = { noche: "#11212D", burdeos: "#800021", petroleo: "#294D61", fondo: "#CCD0CF" } as const;
+// Colores del tema activo (app/themes.css); con COMBOY VID son #11212D, #800021, #294D61 y #CCD0CF
+export const COLOR = { noche: "var(--fuerte)", burdeos: "var(--accent)", petroleo: "var(--secundario)", fondo: "var(--border)" } as const;
 
 /** Color de cada estado: Aprobado = petróleo; Pendiente / En Revisión / Rechazado = burdeos; Archivado = noche. */
 export function colorEstado(e: string): { fondo: string; texto: string; borde: string; relleno: boolean } {
@@ -56,7 +57,7 @@ export function colorEstado(e: string): { fondo: string; texto: string; borde: s
   if (e === "Rechazado" || e === "Vencido") return { fondo: COLOR.burdeos, texto: "#FFFFFF", borde: COLOR.burdeos, relleno: true };
   if (e === "Pendiente" || e === "En Revision") return { fondo: "transparent", texto: COLOR.burdeos, borde: COLOR.burdeos, relleno: false };
   if (e === "Archivado") return { fondo: COLOR.noche, texto: "#FFFFFF", borde: COLOR.noche, relleno: true };
-  return { fondo: "transparent", texto: COLOR.noche, borde: COLOR.noche, relleno: false }; // Borrador
+  return { fondo: "transparent", texto: "var(--text)", borde: "var(--text)", relleno: false }; // Borrador
 }
 
 export const NIVEL: Record<PermisoGD, number> = { "Sin Acceso": 0, "Solo Lectura": 1, "Lectura y Descarga": 2, Edicion: 3, Aprobacion: 4, "Control Total": 5 };

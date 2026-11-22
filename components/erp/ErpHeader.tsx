@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { LogOut } from "lucide-react";
+import { BotonTema } from "@/components/temas/SelectorTema";
 
 const TIMES = '"Times New Roman", Times, serif';
 export const NOMBRE_EMPRESA = "COMBOY VID";
@@ -55,6 +56,8 @@ export function ErpHeader({
       )}
 
       <div className="z-10 flex items-center gap-2">
+        {/* Tema de color (paleta): mi usuario / este módulo / todo el ERP */}
+        <BotonTema />
         {extra}
         {usuario && (
           <div className="flex items-center gap-3 rounded-full border border-white/[0.08] glass-blur py-1 pl-1 pr-3 lg:px-3 lg:py-1.5" title={nombre ?? usuario}>

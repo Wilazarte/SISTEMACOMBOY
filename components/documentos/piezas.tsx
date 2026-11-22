@@ -25,10 +25,10 @@ export function ChipEstado({ estado }: { estado: string }) {
 
 type Tono = "critico" | "secundario" | "neutro" | "borde";
 const TONO: Record<Tono, string> = {
-  critico: "!bg-[#800021] !text-white hover:bg-[#800021]/90 border-[#800021]",
-  secundario: "!bg-[#294D61] !text-white hover:bg-[#294D61]/90 border-[#294D61]",
-  neutro: "!bg-[#11212D] !text-white hover:bg-[#11212D]/90 border-[#11212D]",
-  borde: "bg-white text-[#11212D] hover:bg-[#CCD0CF]/40 border-[#11212D]/25",
+  critico: "!bg-tema-acento !text-white hover:bg-tema-acento/90 border-tema-acento",
+  secundario: "!bg-tema-sec !text-white hover:bg-tema-sec/90 border-tema-sec",
+  neutro: "!bg-tema-fuerte !text-white hover:bg-tema-fuerte/90 border-tema-texto",
+  borde: "bg-white text-tema-texto hover:bg-tema-borde/40 border-tema-texto/25",
 };
 
 export function Boton({ tono = "borde", className, children, ...p }: ButtonHTMLAttributes<HTMLButtonElement> & { tono?: Tono }) {
@@ -50,15 +50,15 @@ export function Boton({ tono = "borde", className, children, ...p }: ButtonHTMLA
 export function Campo({ label, children, ayuda, className }: { label: string; children: ReactNode; ayuda?: string; className?: string }) {
   return (
     <label className={cx("block", className)}>
-      <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-[#11212D]/75">{label}</span>
+      <span className="mb-1 block text-[11px] font-bold uppercase tracking-wider text-tema-texto/75">{label}</span>
       {children}
-      {ayuda && <span className="mt-1 block text-[11px] text-[#11212D]/60">{ayuda}</span>}
+      {ayuda && <span className="mt-1 block text-[11px] text-tema-texto/60">{ayuda}</span>}
     </label>
   );
 }
 
 export const claseInput =
-  "w-full rounded-lg border border-[#11212D]/20 bg-white px-3 py-2 text-[13px] text-[#11212D] outline-none placeholder:text-[#11212D]/40 focus:border-[#294D61] focus:ring-2 focus:ring-[#294D61]/25";
+  "w-full rounded-lg border border-tema-texto/20 bg-white px-3 py-2 text-[13px] text-tema-texto outline-none placeholder:text-tema-texto/40 focus:border-tema-sec focus:ring-2 focus:ring-tema-sec/25";
 
 /** Ventana modal propia (no depende del tema del ERP para respetar la paleta). */
 export function VentanaGD({ abierta, titulo, onCerrar, children, ancha }: { abierta: boolean; titulo: string; onCerrar: () => void; children: ReactNode; ancha?: boolean }) {
@@ -70,7 +70,7 @@ export function VentanaGD({ abierta, titulo, onCerrar, children, ancha }: { abie
   }, [abierta, onCerrar]);
   if (!abierta || typeof document === "undefined") return null;
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto !bg-[#11212D]/55 p-3 pb-24 pt-[5vh] sm:p-4" onMouseDown={onCerrar}>
+    <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto !bg-tema-fuerte/55 p-3 pb-24 pt-[5vh] sm:p-4" onMouseDown={onCerrar}>
       <div
         role="dialog"
         aria-modal="true"
@@ -78,7 +78,7 @@ export function VentanaGD({ abierta, titulo, onCerrar, children, ancha }: { abie
         className={cx("w-full overflow-hidden rounded-2xl bg-white shadow-2xl", ancha ? "max-w-3xl" : "max-w-lg")}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-3 !bg-[#11212D] px-5 py-3.5 !text-white">
+        <div className="flex items-center justify-between gap-3 !bg-tema-fuerte px-5 py-3.5 !text-white">
           <h3 className="text-[15px] font-semibold">{titulo}</h3>
           <button onClick={onCerrar} className="rounded-md p-1 text-white/80 hover:bg-white/10 hover:text-white" aria-label="Cerrar">
             <X size={18} />
@@ -109,7 +109,7 @@ export function FondoOndas() {
 
 export function Vacio({ texto, icono }: { texto: string; icono?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 px-4 py-12 text-center text-[13px] text-[#11212D]/60">
+    <div className="flex flex-col items-center justify-center gap-2 px-4 py-12 text-center text-[13px] text-tema-texto/60">
       {icono}
       {texto}
     </div>
@@ -118,5 +118,5 @@ export function Vacio({ texto, icono }: { texto: string; icono?: ReactNode }) {
 
 /** Tarjeta blanca del módulo. */
 export function Tarjeta({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cx("rounded-xl border border-[#11212D]/10 bg-white shadow-[0_1px_3px_rgba(17,33,45,0.08)]", className)}>{children}</div>;
+  return <div className={cx("rounded-xl border border-tema-texto/10 bg-white shadow-[0_1px_3px_rgba(17,33,45,0.08)]", className)}>{children}</div>;
 }
