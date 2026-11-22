@@ -749,7 +749,7 @@ export async function clonarNP(id: string, vendedor: string, rol: Rol): Promise<
 // Comprobantes (Factura / Boleta) -> asiento + Orden de Despacho + cobro / CxC
 // ---------------------------------------------------------------------
 
-export const SERIE: Record<"FACTURA" | "BOLETA", "F005" | "B005"> = { FACTURA: "F005", BOLETA: "B005" }; // las viejas F001 / B001 quedan como están
+export const SERIE: Record<"FACTURA" | "BOLETA", "F006" | "B006"> = { FACTURA: "F006", BOLETA: "B006" }; // las viejas F001 / B001 / F005 / B005 quedan como están
 
 export interface DatosComprobante {
   tipo: "FACTURA" | "BOLETA";
@@ -1036,7 +1036,7 @@ function lineaDespacho(l: LineaVenta): LineaDespacho {
 }
 
 /**
- * Guardar y emitir: 1) número F005/B005, 2) asiento contable, 3) Orden de Despacho PENDIENTE en Almacén,
+ * Guardar y emitir: 1) número F006/B006, 2) asiento contable, 3) Orden de Despacho PENDIENTE en Almacén,
  * 4) CONTADO -> cobrado; CRÉDITO -> queda en Cuentas por Cobrar (con la inicial cobrada si hay).
  */
 export async function emitirComprobante(
