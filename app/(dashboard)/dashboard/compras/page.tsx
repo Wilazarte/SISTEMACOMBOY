@@ -1053,7 +1053,7 @@ function RegistrarCompra({
               />
               <EstadoRuc
                 ruc={nuevoProv.ruc}
-                onValidado={(r) => setNuevoProv((p) => (p && !p.razonSocial.trim() ? { ...p, razonSocial: r.razon_social } : p))}
+                onValidado={(r) => setNuevoProv((p) => p && { ...p, razonSocial: r.razon_social })}
                 onDni={(r) =>
                   setNuevoProv((p) =>
                     p && { ...p, razonSocial: nombreDesdeDni(r), nombres: r.nombres, apellidoPaterno: r.apellidoPaterno, apellidoMaterno: r.apellidoMaterno, dniVerificadoAt: r.verificadoAt },
@@ -1245,7 +1245,7 @@ function Cotizaciones({
                 className={cn(ruc.length === 11 && (rucValido(ruc) ? "border-emerald-400" : "border-red-400"))}
                 placeholder="20XXXXXXXXX"
               />
-              <EstadoRuc ruc={ruc} onValidado={(r) => setProveedor((p) => p.trim() || r.razon_social)} />
+              <EstadoRuc ruc={ruc} onValidado={(r) => setProveedor(r.razon_social)} />
             </Field>
           </div>
           {items.length > 0 && (

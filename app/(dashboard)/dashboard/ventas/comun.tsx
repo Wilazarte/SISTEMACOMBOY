@@ -295,7 +295,7 @@ export function FormCliente({
           <EstadoRuc
             ruc={form.numDoc}
             onValidado={(r) =>
-              onChange({ ...form, razonSocial: form.razonSocial.trim() || r.razon_social, direccionFiscal: form.direccionFiscal.trim() || r.direccion })
+              onChange({ ...form, razonSocial: r.razon_social, direccionFiscal: r.direccion || form.direccionFiscal })
             }
           />
         )}

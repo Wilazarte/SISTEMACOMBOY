@@ -6,6 +6,7 @@ import { Button, Field, Input, Modal, Select, Textarea, cn, ejecutar } from "@/c
 import { numeroAutomatico } from "@/lib/comprobantes";
 import { COMPROBANTES_GASTO, TIPOS_GASTO, editarGasto, fechaPE, parseFechaPE, rucValido, soles } from "@/lib/storage";
 import { EstadoRuc } from "@/components/EstadoRuc";
+import { nombreDesdeDni } from "@/lib/dni";
 import type { Factura, Rol, TipoGasto } from "@/lib/types";
 
 /** DD/MM/AAAA mientras se escribe (igual que en "Registrar gasto / compra"). */
@@ -78,7 +79,7 @@ export function EditarGasto({ gasto, rol, onClose }: { gasto: Factura; rol: Rol;
             onChange={(e) => setRuc(e.target.value.replace(/\D/g, ""))}
             className={cn(ruc.length === 11 && (rucMal ? "border-red-400" : "border-emerald-400"))}
           />
-          <EstadoRuc ruc={ruc} />
+          <EstadoRuc ruc={ruc} onValidado={(r) => setProveedor(r.razon_social)} onDni={(r) => setProveedor(nombreDesdeDni(r))} />
         </Field>
       </div>
       <p className="mt-3 text-xs text-plomo-500">Total actual: {soles(gasto.total)}. Solo se editan gastos por pagar; al pagarlos quedan cerrados.</p>

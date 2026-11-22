@@ -231,7 +231,7 @@ function FormProveedor({ form, onChange }: { form: Proveedor; onChange: (p: Prov
           />
           <EstadoRuc
             ruc={form.ruc}
-            onValidado={(r) => onChange({ ...form, razonSocial: form.razonSocial.trim() || r.razon_social, direccion: (form.direccion ?? "").trim() || r.direccion })}
+            onValidado={(r) => onChange({ ...form, razonSocial: r.razon_social, direccion: r.direccion || form.direccion })}
           />
         </Field>
       ) : (

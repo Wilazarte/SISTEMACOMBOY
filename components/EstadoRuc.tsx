@@ -38,8 +38,7 @@ export function EstadoRuc({
     setConsultando(true);
     setError("");
     try {
-      const res = await validarRuc(n, { forzar });
-      cb.current?.(res);
+      await validarRuc(n, { forzar }); // el efecto de abajo completa la razón social con la respuesta
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo consultar SUNAT.");
     } finally {
@@ -56,6 +55,14 @@ export function EstadoRuc({
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [n, aplica]);
+
+  // RUC ya validado en el sistema (o recién validado): la razón social se llena siempre, sin pulsar nada
+  const avisado = useRef<RucSunat | null>(null);
+  useEffect(() => {
+    if (!aplica || !r || avisado.current === r) return;
+    avisado.current = r;
+    cb.current?.(r);
+  }, [aplica, r]);
 
   if (!aplica) return onDni && n.length === 8 ? <VerificarDni dni={n} onVerificado={onDni} className={className} /> : null;
   const aviso = avisoRuc(r);

@@ -4,7 +4,7 @@
 // (misma conexión que el RUC) y entrega nombres y apellidos para autocompletar. Si no se puede verificar,
 // muestra el aviso y deja seguir a mano: el DNI nunca bloquea el formulario.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Loader2, Search, ShieldCheck } from "lucide-react";
 import { MSG_DNI_8, MSG_DNI_FALLO, useDniVerificado, verificarDni, type DniReniec } from "@/lib/dni";
 import { cn } from "@/components/ui";
@@ -26,6 +26,40 @@ export function VerificarDni({
   const r = useDniVerificado(n);
   const [consultando, setConsultando] = useState(false);
   const [error, setError] = useState<{ dni: string; msg: string } | null>(null);
+  const cb = useRef(onVerificado);
+  cb.current = onVerificado;
+
+  const verificar = async () => {
+    setConsultando(true);
+    setError(null);
+    try {
+      await verificarDni(n); // el efecto de abajo completa nombres y apellidos
+    } catch (e) {
+      setError({ dni: n, msg: e instanceof Error ? e.message : `${MSG_DNI_FALLO}.` });
+    } finally {
+      setConsultando(false);
+    }
+  };
+
+  // Con 8 dígitos se consulta solo (una vez por número); si ya estaba verificado no gasta consulta
+  const intentado = useRef("");
+  useEffect(() => {
+    if (n.length !== 8 || intentado.current === n || verificadoAt || r) return;
+    const t = setTimeout(() => {
+      intentado.current = n; // se marca al consultar (en desarrollo React monta dos veces y cancela el primer intento)
+      void verificar();
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [n]);
+
+  // Datos de RENIEC (recién consultados o ya verificados en el sistema): se llenan siempre en el formulario
+  const avisado = useRef<DniReniec | null>(null);
+  useEffect(() => {
+    if (!r || avisado.current === r) return;
+    avisado.current = r;
+    cb.current?.(r);
+  }, [r]);
 
   if (!n) return null;
   if (n.length !== 8)
@@ -35,17 +69,6 @@ export function VerificarDni({
       </span>
     );
 
-  const verificar = async () => {
-    setConsultando(true);
-    setError(null);
-    try {
-      onVerificado?.(await verificarDni(n));
-    } catch (e) {
-      setError({ dni: n, msg: e instanceof Error ? e.message : `${MSG_DNI_FALLO}.` });
-    } finally {
-      setConsultando(false);
-    }
-  };
   const err = error?.dni === n ? error.msg : "";
   const fecha = r?.verificadoAt ?? verificadoAt;
 

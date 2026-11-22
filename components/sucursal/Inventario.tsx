@@ -318,7 +318,7 @@ function FormCliente({ item, onListo }: { item?: ClienteSuc; onListo: () => void
         </Field>
         <Field label="DNI / RUC">
           <Input value={f.doc} onChange={set("doc")} inputMode="numeric" />
-          <EstadoRuc ruc={f.doc} onValidado={(r) => setF((x) => (x.nombre.trim() ? x : { ...x, nombre: r.razon_social }))} onDni={(r) => setF((x) => ({ ...x, nombre: nombreDesdeDni(r) }))} />
+          <EstadoRuc ruc={f.doc} onValidado={(r) => setF((x) => ({ ...x, nombre: r.razon_social }))} onDni={(r) => setF((x) => ({ ...x, nombre: nombreDesdeDni(r) }))} />
         </Field>
         <Field label="Teléfono">
           <Input value={f.telefono} onChange={set("telefono")} />

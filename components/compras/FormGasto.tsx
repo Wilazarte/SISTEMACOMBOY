@@ -368,13 +368,13 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
               const ruc = e.target.value.replace(/\D/g, "");
               // RUC ya validado en el sistema: reemplaza PROVEEDORES VARIOS por su razón social
               const sunat = ruc.length === 11 ? rucSunat(ruc) : undefined;
-              setD((x) => ({ ...x, ruc, proveedor: sunat && esProveedorVarios(x.proveedor) ? sunat.razon_social : x.proveedor }));
+              setD((x) => ({ ...x, ruc, proveedor: sunat ? sunat.razon_social : x.proveedor }));
             }}
             className={cn(d.ruc.length === 11 && (rucMal ? "border-red-400" : "border-emerald-400"))}
           />
           <EstadoRuc
             ruc={d.ruc}
-            onValidado={(r) => setD((x) => (x.proveedor.trim() && !esProveedorVarios(x.proveedor) ? x : { ...x, proveedor: r.razon_social }))}
+            onValidado={(r) => setD((x) => ({ ...x, proveedor: r.razon_social }))}
             onDni={(r) => setD((x) => ({ ...x, proveedor: nombreDesdeDni(r) }))}
           />
         </Field>
