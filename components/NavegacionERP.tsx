@@ -2,8 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, ChevronRight, History, X } from "lucide-react";
-import { cerrarPestanaActiva } from "@/components/shell/PestanasERP";
+import { ArrowLeft, ArrowRight, ChevronRight, History } from "lucide-react";
 
 export interface MigaERP {
   label: string;
@@ -47,7 +46,7 @@ function useRecientes(label: string): Reciente[] {
 
 /**
  * Barra de navegación de todas las pantallas del ERP (pedido de Williams, 2026-10-30): Atrás / Adelante del
- * navegador, ruta "INICIO > ALMACEN > Recepción MP" y X que cierra la pestaña (components/shell/PestanasERP). Todo en la misma ventana.
+ * navegador y ruta "INICIO > ALMACEN > Recepción MP" (INICIO vuelve al módulo). Sin X (Williams 2026-11-21).
  */
 export function NavegacionERP({ migas, inicio }: { migas: MigaERP[]; inicio: string }) {
   const router = useRouter();
@@ -62,7 +61,7 @@ export function NavegacionERP({ migas, inicio }: { migas: MigaERP[]; inicio: str
   }, [verRecientes]);
   return (
     <div
-      className="flex items-center justify-between gap-3 px-4 py-2.5 print:hidden sm:px-6 lg:px-8"
+      className="sticky top-16 z-30 -mx-4 mb-4 flex items-center justify-between gap-3 border-b border-white/[0.08] bg-[#0e1219]/95 px-4 py-2.5 backdrop-blur print:hidden sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8"
       data-sin-guardar
     >
       <div className="flex min-w-0 items-center gap-3">
@@ -126,15 +125,6 @@ export function NavegacionERP({ migas, inicio }: { migas: MigaERP[]; inicio: str
           })}
         </nav>
       </div>
-      <button
-        type="button"
-        onClick={() => cerrarPestanaActiva(router, inicio)}
-        className="shrink-0 rounded-lg border border-[#2a7bff] p-2 text-white transition hover:bg-[#2a7bff]/20"
-        title="Cerrar esta pestaña"
-        aria-label="Cerrar esta pestaña"
-      >
-        <X size={18} />
-      </button>
     </div>
   );
 }

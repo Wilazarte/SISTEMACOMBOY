@@ -285,7 +285,7 @@ function KardexModal({ item, onClose }: { item: StockItem; onClose: () => void }
       </p>
       {/* En celular, cada movimiento se ve como tarjeta (app Android) */}
       <EtiquetasTarjeta id="kardex" head={CABECERA_KARDEX} />
-      <div className="tabla-tarjetas overflow-x-auto rounded-xl border border-plomo-200" data-tt="kardex">
+      <div className="tabla-tarjetas max-h-[60vh] overflow-auto rounded-xl border border-plomo-200" data-tt="kardex">
         <table className="w-full text-xs">
           <thead className="sticky top-0 bg-azul-900 text-left text-[10px] uppercase tracking-widest text-white">
             <tr>
