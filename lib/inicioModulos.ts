@@ -5,9 +5,10 @@
 
 import { puedeVer, type Sesion } from "./auth";
 import { permisosPlanta, type PermisosPlanta } from "./permisosPlanta";
+import { enSucursal } from "./storage";
 import { FASES, NOMBRE_PERFIL, RESPONSABLE, TITULO_FASE, type Fase } from "./expedientes";
 
-export type ModuloInicio = "logistica" | "almacen" | "finanzas" | "produccion" | "soporte";
+export type ModuloInicio = "logistica" | "almacen" | "finanzas" | "produccion" | "ventas" | "soporte";
 
 export interface AccionInicio {
   /** Segmento de la URL: /{modulo}/{slug}. */
@@ -32,6 +33,7 @@ export const TITULO_INICIO: Record<ModuloInicio, string> = {
   almacen: "ALMACEN",
   finanzas: "FINANZAS",
   produccion: "PRODUCCION",
+  ventas: "VENTAS",
   soporte: "SOPORTE",
 };
 
@@ -41,6 +43,7 @@ export const RUTA_INICIO: Record<ModuloInicio, string> = {
   almacen: "/almacen",
   finanzas: "/finanzas",
   produccion: "/produccion",
+  ventas: "/ventas",
   soporte: "/dashboard",
 };
 
@@ -50,6 +53,7 @@ export const SALA_MODULO: Record<ModuloInicio, string> = {
   almacen: "Almacén",
   finanzas: "Finanzas",
   produccion: "Producción",
+  ventas: "Ventas",
   soporte: "Soporte",
 };
 
@@ -75,15 +79,8 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "antecedentes", label: "Antecedentes (REQ procesados)", grupo: "Compras nacionales", destino: `${C}?tab=antecedentes` },
     { slug: "proveedores", label: "Proveedores Nacionales", grupo: "Compras nacionales", destino: "/logistica/proveedores" },
 
-    { slug: "requerimientos-secocha", label: "Requerimientos de Secocha", grupo: "Ventas", destino: `${V}?tab=secocha` },
-    { slug: "notas-pedido", label: "Notas de pedido", grupo: "Ventas", destino: `${V}?tab=notas` },
-    { slug: "comprobantes", label: "Emitir Factura / Boleta (Comprobantes)", grupo: "Ventas", destino: `${V}?tab=comprobantes`, requiere: "canEmitFactura" },
-    { slug: "despachos", label: "Despachos (seguimiento)", grupo: "Ventas", destino: `${V}?tab=despachos` },
-    { slug: "clientes", label: "Clientes", grupo: "Ventas", destino: `${V}?tab=clientes` },
-    { slug: "cuentas-por-cobrar", label: "Cuentas por cobrar", grupo: "Ventas", destino: `${V}?tab=cobrar` },
-    { slug: "catalogo-productos", label: "Catálogo de Productos", grupo: "Ventas", destino: `${V}?tab=productos` },
-    { slug: "solicitudes-productos", label: "Solicitudes de productos", grupo: "Ventas", destino: `${V}?tab=productos&sub=solicitudes` },
-    { slug: "configuracion-ventas", label: "Configuración (condiciones de pago)", grupo: "Ventas", destino: `${V}?tab=condiciones` },
+    { slug: "base-proveedores", label: "Base de proveedores", grupo: "Proveedores y clientes", destino: "/logistica/base-proveedores" },
+    { slug: "base-clientes", label: "Base de clientes", grupo: "Proveedores y clientes", destino: "/logistica/base-clientes" },
 
     { slug: "agencias", label: "Agencias (Marvisur · Grael · Shalom)", grupo: "Transporte", destino: "/logistica/agencias" },
     { slug: "cotizar-flete", label: "Cotizar Flete", grupo: "Transporte", destino: "/logistica/cotizar-flete" },
@@ -94,6 +91,8 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "infraestructura", label: "Infraestructura Planta", grupo: "Seguimiento", destino: "/logistica/infraestructura" },
     { slug: "historial", label: "Historial General", grupo: "Seguimiento", destino: "/logistica/historial" },
     { slug: "detalle", label: "Panel Logística (detalle)", grupo: "Seguimiento", destino: "/logistica/detalle" },
+
+    { slug: "gestion-documentaria", label: "Gestión Documentaria", grupo: "Documentos", destino: "/documentos" },
   ],
   almacen: [
     { slug: "expedientes", label: "Expedientes 26W · Tablero de lotes", grupo: EXP, destino: LOTES },
@@ -104,24 +103,31 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "requerimientos", label: "Requerimientos emitidos", grupo: "Requerimientos", destino: `${A}?tab=lista` },
 
     { slug: "recepcion", label: "Recepción MP (Ingresos · V°B° de guía)", grupo: "Ingresos y stock", destino: `${A}?tab=ingresos` },
+    { slug: "ingresar-equipo", label: "Ingresar equipo de producción (modelo, N° serie, V°B° QC)", grupo: "Ingresos y stock", destino: `${A}?tab=equipos&nuevo=1` },
+    { slug: "equipos-produccion", label: "Equipos de producción (terminados)", grupo: "Ingresos y stock", destino: `${A}?tab=equipos` },
     { slug: "stock", label: "Stock y Kardex", grupo: "Ingresos y stock", destino: `${A}?tab=stock` },
     { slug: "catalogo-productos", label: "Catálogo de Productos", grupo: "Ingresos y stock", destino: `${V}?tab=productos` },
+    { slug: "categorias-productos", label: "Categorías de productos", grupo: "Ingresos y stock", destino: `${V}?tab=productos&sub=categorias` },
 
     { slug: "ordenes-despacho", label: "Órdenes de despacho (Guía de Remisión)", grupo: "Despacho", destino: `${A}?tab=despacho` },
     { slug: "transferencias", label: "Transferencias Planta ↔ Sucursal", grupo: "Despacho", destino: "/logistica/transferencias" },
 
     { slug: "panel", label: "Panel Almacén (ubicaciones, movimientos, PT)", grupo: "Seguimiento", destino: "/almacen/panel" },
+
+    { slug: "gestion-documentaria", label: "Gestión Documentaria", grupo: "Documentos", destino: "/documentos" },
   ],
   finanzas: [
     { slug: "expedientes", label: "Expedientes 26W · Tablero de lotes", grupo: EXP, destino: LOTES },
     { slug: "pago-bancarizacion", label: "Pagar OC y Bancarización · Fase 5", grupo: EXP, destino: LOTES, fase: 5 },
 
+    { slug: "nuevos-req", label: "NUEVOS REQ (Almacén por revisar)", grupo: "Tesorería", destino: `${C}?tab=nuevos` },
     { slug: "registrar-gasto", label: "Registrar gasto (Cajas)", grupo: "Tesorería", destino: `${C}?tab=registrar` },
     { slug: "cotizaciones", label: "Cotizaciones", grupo: "Tesorería", destino: `${C}?tab=cotizaciones` },
     { slug: "ordenes-oc-os", label: "Órdenes OC / OS (bancarizar voucher)", grupo: "Tesorería", destino: `${C}?tab=ordenes` },
     { slug: "facturas", label: "Facturas · Pagar proveedor (CxP)", grupo: "Tesorería", destino: `${C}?tab=facturas` },
     { slug: "declaraciones", label: "Declaraciones juradas", grupo: "Tesorería", destino: `${C}?tab=declaraciones` },
     { slug: "antecedentes", label: "Antecedentes (REQ procesados)", grupo: "Tesorería", destino: `${C}?tab=antecedentes` },
+    { slug: "validar-costos-produccion", label: "Validar costos de producción", grupo: "Tesorería", destino: "/finanzas/costos-produccion" },
 
     { slug: "planilla", label: "Planilla periodo", grupo: "Planilla", destino: `${C}?tab=planilla&sub=planilla` },
     { slug: "trabajadores", label: "Trabajadores", grupo: "Planilla", destino: `${C}?tab=planilla&sub=trabajadores` },
@@ -134,10 +140,32 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "balance", label: "Balance", grupo: "Contabilidad", destino: `${K}?tab=balance`, requiere: "canViewFacturas" },
     { slug: "eeff", label: "Estados Financieros (EEFF)", grupo: "Contabilidad", destino: `${K}?tab=eeff`, requiere: "canViewFacturas" },
     { slug: "estados-cuenta", label: "Estados de cuenta", grupo: "Contabilidad", destino: `${K}?tab=estados`, requiere: "canViewFacturas" },
+    { slug: "activos", label: "Activos de la empresa (entrega, mantenimiento, depreciación)", grupo: "Contabilidad", destino: `${K}?tab=activos` },
     { slug: "facturas-emitidas", label: "Facturas emitidas (Registro de Ventas)", grupo: "Contabilidad", destino: `${V}?tab=comprobantes`, requiere: "canViewFacturas" },
     { slug: "cuentas-por-cobrar", label: "Cuentas por cobrar", grupo: "Contabilidad", destino: `${V}?tab=cobrar` },
 
     { slug: "panel", label: "Panel Finanzas (CxC, CxP, IGV, cajas, costeo)", grupo: "Seguimiento", destino: "/finanzas/panel" },
+
+    { slug: "gestion-documentaria", label: "Gestión Documentaria", grupo: "Documentos", destino: "/documentos" },
+  ],
+  // VENTAS (módulo propio, Williams 2026-11-16; antes era el grupo "Ventas" de Logística): pedidos, facturación,
+  // cobranza, clientes y catálogo. No participa del flujo 26W de fabricación.
+  ventas: [
+    { slug: "notas-pedido", label: "Notas de pedido (cotizar cliente)", grupo: "Pedidos", destino: `${V}?tab=notas` },
+    { slug: "requerimientos-secocha", label: "Requerimientos de Secocha", grupo: "Pedidos", destino: `${V}?tab=secocha` },
+    { slug: "despachos", label: "Despachos (seguimiento)", grupo: "Pedidos", destino: `${V}?tab=despachos` },
+
+    { slug: "comprobantes", label: "Emitir Factura / Boleta (Comprobantes)", grupo: "Facturación y cobranza", destino: `${V}?tab=comprobantes`, requiere: "canEmitFactura" },
+    { slug: "guias-remision", label: "Guías de Remisión", grupo: "Facturación y cobranza", destino: `${V}?tab=guias`, requiere: "canEmitFactura" },
+    { slug: "cuentas-por-cobrar", label: "Cuentas por cobrar", grupo: "Facturación y cobranza", destino: `${V}?tab=cobrar` },
+    { slug: "configuracion-ventas", label: "Configuración (condiciones de pago)", grupo: "Facturación y cobranza", destino: `${V}?tab=condiciones` },
+
+    { slug: "clientes", label: "Clientes", grupo: "Clientes y productos", destino: `${V}?tab=clientes` },
+    { slug: "catalogo-productos", label: "Catálogo de Productos", grupo: "Clientes y productos", destino: `${V}?tab=productos` },
+    { slug: "solicitudes-productos", label: "Solicitudes de productos", grupo: "Clientes y productos", destino: `${V}?tab=productos&sub=solicitudes` },
+    { slug: "categorias-productos", label: "Categorías de productos", grupo: "Clientes y productos", destino: `${V}?tab=productos&sub=categorias` },
+
+    { slug: "gestion-documentaria", label: "Gestión Documentaria", grupo: "Documentos", destino: "/documentos" },
   ],
   // PRODUCCION (permisos limitados, Williams 2026-10-30): no emite OP (solo Logística), no ve Finanzas ni Gerencia;
   // en Almacén solo entrega PT. Solo Panel, sus OPs, Control de calidad y Entregar PT (Fase 8), más su flujo 26W.
@@ -151,20 +179,32 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
     { slug: "ordenes", label: "Mis OPs asignadas", grupo: "Producción", destino: P },
     { slug: "calidad", label: "Control de calidad (QC con firma)", grupo: "Producción", destino: `${P}?estado=EN_FABRICACION` },
     { slug: "entregar-pt", label: "Entregar PT a Almacén (chasis y serie de motor)", grupo: "Producción", destino: LOTES, fase: 8 },
+    // Costo de Producción (Williams 2026-11-17): hoja de costo auditada por equipo (tablas production_*)
+    { slug: "costo-produccion", label: "Costo de Producción (hoja auditada por equipo)", grupo: "Producción", destino: "/produccion/costos" },
+
+    { slug: "gestion-documentaria", label: "Gestión Documentaria", grupo: "Documentos", destino: "/documentos" },
   ],
 };
 
-/** SOPORTE: funciones globales (los 4 INICIO van en el acceso rápido a los módulos, arriba del INICIO). */
+/** SOPORTE: funciones globales (los INICIO de cada módulo van en el acceso rápido a los módulos, arriba del INICIO). */
 export const ACCIONES_SOPORTE: AccionInicio[] = [
   { slug: "gerencia", label: "Dashboard Gerencia", grupo: "Módulos", destino: "/gerencia" },
   { slug: "secocha", label: "Secocha (sucursal)", grupo: "Módulos", destino: "/secocha" },
   { slug: "expedientes", label: "Expedientes 26W · Tablero de lotes", grupo: EXP, destino: LOTES },
   { slug: "resumen", label: "Dashboard general (resumen)", grupo: "Soporte", destino: "/dashboard?vista=resumen" },
   { slug: "creador", label: "Creador (usuarios, asistencia)", grupo: "Soporte", destino: "/dashboard/creador" },
+  { slug: "gestion-documentaria", label: "Gestión Documentaria", grupo: "Documentos", destino: "/documentos" },
   { slug: "conflictos", label: "Conflictos de sincronización (apps sin señal)", grupo: "Soporte", destino: "/soporte/conflictos" },
 ];
 
 export const accionesDe = (modulo: ModuloInicio): AccionInicio[] => (modulo === "soporte" ? ACCIONES_SOPORTE : ACCIONES_INICIO[modulo]);
+
+/** Funciones de fabricación que la sucursal (Secocha) no tiene. */
+const SOLO_PLANTA = new Set(["ingresar-equipo", "equipos-produccion", "crear-op", "orden-produccion", "validar-costos-produccion"]);
+
+/** Pantallas de fabricación (Producción, OP, expedientes 26W): fuera de Secocha. */
+export const esRutaProduccion = (path: string): boolean =>
+  ["/produccion", "/dashboard/produccion", "/logistica/crear-op", "/erp/lotes", "/erp/expediente"].some((r) => path === r || path.startsWith(`${r}/`));
 
 /** Las acciones que el usuario puede abrir: permiso del perfil y acceso a la pantalla de destino. */
 export function accionesPermitidas(sesion: Sesion | null, modulo: ModuloInicio): AccionInicio[] {
@@ -172,6 +212,12 @@ export function accionesPermitidas(sesion: Sesion | null, modulo: ModuloInicio):
   const permisos = permisosPlanta(sesion);
   return accionesDe(modulo).filter((a) => {
     if (a.externo) return true;
+    // Ya dentro de Secocha: sin enlace a la Secocha antigua
+    if (enSucursal()) {
+      if (modulo === "soporte" && a.slug === "secocha") return false;
+      // Secocha solo vende, no fabrica (Williams 2026-11-17): sin Producción ni el flujo de OP / Expediente 26W
+      if (modulo === "produccion" || a.grupo === EXP || a.fase || SOLO_PLANTA.has(a.slug)) return false;
+    }
     if (a.requiere && !permisos[a.requiere]) return false;
     return puedeVer(sesion, (a.permiso ?? a.destino).split("?")[0]);
   });
