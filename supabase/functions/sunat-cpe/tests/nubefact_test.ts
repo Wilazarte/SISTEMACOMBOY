@@ -138,3 +138,9 @@ Deno.test("Homologación: NUBEFACT_SERIES (demo) no se usa en producción", () =
 Deno.test("Homologación: fecha de emisión futura se rechaza", () => {
   assertThrows(() => armarDocumento({ ...fac, fecha: "2999-01-01" }, EMISOR_DEFECTO));
 });
+
+Deno.test("NUBEFACT_SERIES: series de la cuenta demo", () => {
+  const m = mapaSeries("F001=FFF1, fc01=fff1,B001=BBB1,,malo");
+  assertEquals(m, { F001: "FFF1", FC01: "FFF1", B001: "BBB1" });
+  assertEquals(mapaSeries(""), {});
+});
