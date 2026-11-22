@@ -57,5 +57,5 @@ begin
 end $function$;
 
 -- Verificación: debe devolver las dos funciones con las series 006
-select proname, prosrc ~ '006' as tiene_006 from pg_proc
+select proname, prosrc ~ '(F006|FC06)' as tiene_006 from pg_proc
 where proname in ('siguiente_numero', 'siguiente_numero_cpe') and pronamespace = 'public'::regnamespace;
