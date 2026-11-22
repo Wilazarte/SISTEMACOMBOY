@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, ChevronRight, History, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, ChevronRight, History } from "lucide-react";
 
 export interface MigaERP {
   label: string;
@@ -46,7 +46,7 @@ function useRecientes(label: string): Reciente[] {
 
 /**
  * Barra de navegación de todas las pantallas del ERP (pedido de Williams, 2026-10-30): Atrás / Adelante del
- * navegador, ruta "INICIO > ALMACEN > Recepción MP" y X que vuelve al INICIO del módulo. Todo en la misma ventana.
+ * navegador y ruta "INICIO > ALMACEN > Recepción MP" (INICIO vuelve al módulo). Sin X (Williams 2026-11-21).
  */
 export function NavegacionERP({ migas, inicio }: { migas: MigaERP[]; inicio: string }) {
   const router = useRouter();
@@ -125,15 +125,6 @@ export function NavegacionERP({ migas, inicio }: { migas: MigaERP[]; inicio: str
           })}
         </nav>
       </div>
-      <button
-        type="button"
-        onClick={() => router.push(inicio)}
-        className="shrink-0 rounded-lg border border-[#2a7bff] p-2 text-white transition hover:bg-[#2a7bff]/20"
-        title="Cerrar y volver al INICIO"
-        aria-label="Cerrar y volver al INICIO"
-      >
-        <X size={18} />
-      </button>
     </div>
   );
 }

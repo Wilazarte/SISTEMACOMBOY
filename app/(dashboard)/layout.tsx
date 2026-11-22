@@ -13,7 +13,6 @@ import { CommandPalette, IconoDoc, type Comando } from "@/components/shell/Comma
 import { useIr } from "@/components/shell/ir";
 import { accionesDe, hrefSub, moduloDe, navDe } from "@/components/shell/nav";
 import { ModuloContenido, ModuloLayout, SEDE_PLANTA_PRINCIPAL } from "@/components/layout/ModuloLayout";
-import { PiePestana } from "@/components/inicio/ModoPestana";
 import { BarraAccesos } from "@/components/inicio/BarraAccesos";
 import { NavegacionERP, type MigaERP } from "@/components/NavegacionERP";
 import { DatalistCatalogo } from "@/components/productos/ProductoInput";
@@ -70,7 +69,7 @@ const NOMBRE_MODULO: [string, string][] = [
 
 /**
  * Pestaña de una acción del INICIO (ERP v3.0): ?pestana=<módulo> (la pone /{modulo}/{accion}) o una sub-ruta de
- * la home de un módulo (/logistica/agencias, /almacen/panel…). Lleva "Volver a INICIO" y Cancelar / Guardar y Cerrar.
+ * la home de un módulo (/logistica/agencias, /almacen/panel…). Da el título de la ruta INICIO > MÓDULO > pantalla.
  */
 function pestanaDe(path: string, search: string): { modulo: ModuloInicio; titulo?: string } | null {
   const q = new URLSearchParams(search);
@@ -369,8 +368,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       overlays={
         <>
           {/* ERP v3.0: sin dock, sin barra lateral ni botón de acciones; la navegación son los botones del INICIO.
-              Avisos: la campana del encabezado. En la pestaña de una acción, el pie Cancelar / Guardar y Cerrar. */}
-          {pestanaAccion && <PiePestana modulo={pestanaAccion.modulo} />}
+              Avisos: la campana del encabezado. Sin barra inferior Guardar / Cancelar (Williams 2026-11-21): cada
+              formulario guarda con su propio botón. */}
           {/* Barra azul de accesos rápidos (Williams 2026-11-16): derecha, en todas las pantallas del módulo */}
           {moduloNav && sesion.modulos.length > 0 && (
             <BarraAccesos
