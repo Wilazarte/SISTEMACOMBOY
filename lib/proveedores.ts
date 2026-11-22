@@ -7,6 +7,7 @@
 
 import { ErpError, KEYS, escribir, getCompras, getProveedores, rucValido, uid } from "./storage";
 import { exigirRucSunat } from "./ruc";
+import { validarDocumentoPersona } from "./dni";
 import { esAdminSede, perfilPlanta } from "./permisosPlanta";
 import type { Sesion } from "./permisos";
 import type { OpcionProveedor, ProductoProveedor, Proveedor } from "./types";
@@ -34,6 +35,7 @@ export const proveedorVacio = (): Proveedor => ({
   id: "",
   razonSocial: "",
   ruc: "",
+  tipoDoc: "RUC",
   asesorVentas: "",
   contacto: "",
   correo: "",
@@ -54,25 +56,44 @@ const limpiarProductos = (lista: ProductoProveedor[] | undefined): ProductoProve
   return out;
 };
 
-/** Crea o actualiza la ficha del proveedor. El RUC debe estar validado en SUNAT (regla de todo el ERP). */
+/**
+ * Crea o actualiza la ficha del proveedor. Con RUC: validado en SUNAT (regla de todo el ERP). Con DNI / CE /
+ * pasaporte (persona natural): el número va en `ruc`; el DNI se verifica en RENIEC pero no bloquea.
+ */
 export function guardarProveedor(data: Proveedor): Proveedor {
-  const razonSocial = data.razonSocial.trim().toUpperCase();
-  const ruc = data.ruc.trim();
-  if (!rucValido(ruc)) throw new ErpError("RUC inválido (11 dígitos con dígito verificador correcto).");
-  exigirRucSunat(ruc, "del proveedor");
-  if (!razonSocial) throw new ErpError("Ingrese la razón social del proveedor.");
+  const tipoDoc = data.tipoDoc ?? "RUC";
+  const persona = tipoDoc !== "RUC";
+  const nombres = persona ? (data.nombres ?? "").trim().toUpperCase() : "";
+  const apellidoPaterno = persona ? (data.apellidoPaterno ?? "").trim().toUpperCase() : "";
+  const apellidoMaterno = persona ? (data.apellidoMaterno ?? "").trim().toUpperCase() : "";
+  const razonSocial = (data.razonSocial.trim() || [nombres, apellidoPaterno, apellidoMaterno].filter(Boolean).join(" ")).toUpperCase();
+  const ruc = data.ruc.trim().toUpperCase();
+  if (tipoDoc === "RUC") {
+    if (!rucValido(ruc)) throw new ErpError("RUC inválido (11 dígitos con dígito verificador correcto).");
+    exigirRucSunat(ruc, "del proveedor");
+  } else {
+    const err = validarDocumentoPersona(tipoDoc, ruc);
+    if (err) throw new ErpError(err);
+  }
+  if (!razonSocial) throw new ErpError(persona ? "Ingrese los nombres y apellidos del proveedor." : "Ingrese la razón social del proveedor.");
   const correo = (data.correo ?? "").trim();
   if (correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) throw new ErpError("Correo inválido.");
   const productos = limpiarProductos(data.productos);
   if (productos.length === 0) throw new ErpError("Indique al menos un producto que vende el proveedor.");
   const lista = getProveedores();
-  if (lista.some((p) => p.ruc === ruc && p.id !== data.id)) throw new ErpError(`El RUC ${ruc} ya está registrado.`);
+  const dup = lista.find((p) => p.ruc === ruc && p.id !== data.id);
+  if (dup) throw new ErpError(tipoDoc === "DNI" ? `Este DNI ya está registrado como ${dup.razonSocial}.` : `El ${tipoDoc === "RUC" ? "RUC" : "documento"} ${ruc} ya está registrado.`);
   const previo = lista.find((p) => p.id === data.id);
   const prov: Proveedor = {
     ...previo,
     id: data.id || uid(),
     razonSocial,
     ruc,
+    tipoDoc,
+    nombres: nombres || undefined,
+    apellidoPaterno: apellidoPaterno || undefined,
+    apellidoMaterno: apellidoMaterno || undefined,
+    dniVerificadoAt: tipoDoc === "DNI" ? data.dniVerificadoAt || undefined : undefined,
     asesorVentas: (data.asesorVentas ?? "").trim().toUpperCase(),
     contacto: (data.contacto ?? "").trim(),
     correo,

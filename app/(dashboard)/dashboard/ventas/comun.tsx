@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Search, Trash2, UserPlus } from "lucide-react";
 import { Button, Field, Input, Select, cn } from "@/components/ui";
+import { VerificarDni } from "@/components/VerificarDni";
+import { MAX_DOCUMENTO, TIPOS_DOCUMENTO, avisoDniDuplicado, limpiarDocumento, nombreDesdeDni } from "@/lib/dni";
 import { EstadoRuc } from "@/components/EstadoRuc";
 import { UNIDADES } from "@/lib/empresa";
 import { KEYS, cargarCondicionesPago, r2, soles, useStore } from "@/lib/storage";
@@ -256,21 +258,38 @@ export function FormCliente({
 }) {
   const set = <K extends keyof Cliente>(k: K, v: Cliente[K]) => onChange({ ...form, [k]: v });
   const errDoc = form.numDoc ? validarDocumento(form.tipoDoc, form.numDoc.trim().toUpperCase()) : null;
+  const todos = useStore<Cliente[]>(KEYS.CLIENTES, []);
+  const dupDni = form.tipoDoc === "DNI" ? avisoDniDuplicado(form.numDoc, todos.filter((c) => c.id !== form.id), (c) => c.numDoc, (c) => c.razonSocial) : null;
+  // Al cambiar nombres o apellidos a mano se rearma el nombre completo
+  const setPersona = (cambio: Partial<Pick<Cliente, "nombres" | "apellidoPaterno" | "apellidoMaterno">>) => {
+    const x = { ...form, ...cambio };
+    onChange({ ...x, razonSocial: [x.nombres, x.apellidoPaterno, x.apellidoMaterno].map((t) => (t ?? "").trim()).filter(Boolean).join(" ").toUpperCase() });
+  };
   const clasificaciones = clasificacionesCliente(useStore<ClasificacionCliente[]>(KEYS.CLASIF_CLIENTES, []));
   // Un cliente con una clasificación que ya no está en la lista la conserva hasta que se cambie
   const opcionesClasif = form.clasificacion && !clasificaciones.includes(form.clasificacion) ? [...clasificaciones, form.clasificacion] : clasificaciones;
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <Field label="Tipo doc. *">
-        <Select value={form.tipoDoc} onChange={(e) => set("tipoDoc", e.target.value as TipoDocCliente)} options={(["RUC", "DNI", "CE"] as const).map((t) => ({ value: t, label: t }))} />
+      <Field label="Tipo documento *">
+        <Select
+          value={form.tipoDoc}
+          onChange={(e) => {
+            const tipoDoc = e.target.value as TipoDocCliente;
+            onChange({ ...form, tipoDoc, numDoc: limpiarDocumento(tipoDoc, form.numDoc), dniVerificadoAt: undefined });
+          }}
+          options={TIPOS_DOCUMENTO}
+        />
       </Field>
-      <Field label="Número *" hint={errDoc ?? (form.tipoDoc === "RUC" ? "11 dígitos · se valida en SUNAT (obligatorio) y completa razón social y dirección" : LARGO_DOC[form.tipoDoc])}>
+      <Field
+        label="Número *"
+        hint={dupDni ?? errDoc ?? (form.tipoDoc === "RUC" ? "11 dígitos · se valida en SUNAT (obligatorio) y completa razón social y dirección" : form.tipoDoc === "DNI" ? "8 dígitos · pulse Verificar para traer nombres y apellidos de RENIEC" : LARGO_DOC[form.tipoDoc])}
+      >
         <Input
           value={form.numDoc}
-          inputMode={form.tipoDoc === "CE" ? "text" : "numeric"}
-          maxLength={form.tipoDoc === "RUC" ? 11 : form.tipoDoc === "DNI" ? 8 : 12}
-          onChange={(e) => set("numDoc", form.tipoDoc === "CE" ? e.target.value.toUpperCase() : e.target.value.replace(/\D/g, ""))}
-          className={cn(form.numDoc && (errDoc ? "border-red-400" : "border-emerald-400"))}
+          inputMode={form.tipoDoc === "RUC" || form.tipoDoc === "DNI" ? "numeric" : "text"}
+          maxLength={MAX_DOCUMENTO[form.tipoDoc]}
+          onChange={(e) => onChange({ ...form, numDoc: limpiarDocumento(form.tipoDoc, e.target.value), dniVerificadoAt: undefined })}
+          className={cn(form.numDoc && (errDoc || dupDni ? "border-red-400" : "border-emerald-400"))}
         />
         {form.tipoDoc === "RUC" && (
           <EstadoRuc
@@ -280,8 +299,37 @@ export function FormCliente({
             }
           />
         )}
+        {form.tipoDoc === "DNI" && (
+          <VerificarDni
+            dni={form.numDoc}
+            verificadoAt={form.dniVerificadoAt}
+            onVerificado={(r) =>
+              onChange({
+                ...form,
+                nombres: r.nombres,
+                apellidoPaterno: r.apellidoPaterno,
+                apellidoMaterno: r.apellidoMaterno,
+                razonSocial: nombreDesdeDni(r),
+                dniVerificadoAt: r.verificadoAt,
+              })
+            }
+          />
+        )}
       </Field>
-      <Field label={form.tipoDoc === "RUC" ? "Razón social *" : "Nombres y apellidos *"} className="sm:col-span-2">
+      {form.tipoDoc !== "RUC" && (
+        <>
+          <Field label="Nombres">
+            <Input value={form.nombres ?? ""} onChange={(e) => setPersona({ nombres: e.target.value })} />
+          </Field>
+          <Field label="Apellido paterno">
+            <Input value={form.apellidoPaterno ?? ""} onChange={(e) => setPersona({ apellidoPaterno: e.target.value })} />
+          </Field>
+          <Field label="Apellido materno">
+            <Input value={form.apellidoMaterno ?? ""} onChange={(e) => setPersona({ apellidoMaterno: e.target.value })} />
+          </Field>
+        </>
+      )}
+      <Field label={form.tipoDoc === "RUC" ? "Razón social *" : "Nombre completo *"} className={form.tipoDoc === "RUC" ? "sm:col-span-2" : undefined}>
         <Input value={form.razonSocial} onChange={(e) => set("razonSocial", e.target.value)} />
       </Field>
       <Field label="Dirección fiscal" className="sm:col-span-2">

@@ -31,6 +31,7 @@ import {
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
 import { EstadoRuc } from "@/components/EstadoRuc";
+import { avisoDniDuplicado, nombreDesdeDni } from "@/lib/dni";
 import { FormGasto } from "@/components/compras/FormGasto";
 import { SelectorCaja } from "@/components/SelectorCaja";
 import { FormBancarizacion, bancarizacionVacia } from "@/components/compras/FormBancarizacion";
@@ -568,7 +569,9 @@ function RegistrarCompra({
   const [modo, setModo] = useState<ModoRegistro>("GASTO");
   // Por defecto VARIOS/SIN DATOS (N° 010101), primera opción de la lista
   const [proveedorId, setProveedorId] = useState(PROVEEDOR_VARIOS_ID);
-  const [nuevoProv, setNuevoProv] = useState<{ razonSocial: string; ruc: string } | null>(null);
+  const [nuevoProv, setNuevoProv] = useState<
+    ({ razonSocial: string; ruc: string } & Partial<Pick<Proveedor, "nombres" | "apellidoPaterno" | "apellidoMaterno" | "dniVerificadoAt">>) | null
+  >(null);
   const [fechaTxt, setFechaTxt] = useState(fechaPE(hoy()));
   const [tipo, setTipo] = useState<TipoComprobanteCompra>("FACTURA");
   const [numero, setNumero] = useState("");
@@ -1029,19 +1032,37 @@ function RegistrarCompra({
             }}
             className="space-y-4"
           >
-            <Field label="Razón social">
-              <Input value={nuevoProv.razonSocial} onChange={(e) => setNuevoProv({ ...nuevoProv, razonSocial: e.target.value })} autoFocus />
-            </Field>
-            <Field label="RUC" hint={nuevoProv.ruc.length === 11 && !rucValido(nuevoProv.ruc) ? "⚠ Dígito verificador inválido" : undefined}>
+            <Field
+              label="RUC / DNI"
+              hint={
+                nuevoProv.ruc.length === 11 && !rucValido(nuevoProv.ruc)
+                  ? "⚠ Dígito verificador inválido"
+                  : nuevoProv.ruc && nuevoProv.ruc.length !== 8 && nuevoProv.ruc.length !== 11
+                    ? "RUC: 11 dígitos · DNI: 8 dígitos"
+                    : (avisoDniDuplicado(nuevoProv.ruc, proveedores, (p) => p.ruc, (p) => p.razonSocial) ?? "RUC: se valida en SUNAT · DNI: pulse Verificar (RENIEC)")
+              }
+            >
               <Input
                 value={nuevoProv.ruc}
                 maxLength={11}
                 inputMode="numeric"
-                onChange={(e) => setNuevoProv({ ...nuevoProv, ruc: e.target.value.replace(/\D/g, "") })}
+                onChange={(e) => setNuevoProv({ ...nuevoProv, ruc: e.target.value.replace(/\D/g, ""), dniVerificadoAt: undefined })}
                 className={cn(nuevoProv.ruc.length === 11 && (rucValido(nuevoProv.ruc) ? "border-emerald-400" : "border-red-400"))}
-                placeholder="20XXXXXXXXX"
+                placeholder="20XXXXXXXXX o DNI"
+                autoFocus
               />
-              <EstadoRuc ruc={nuevoProv.ruc} onValidado={(r) => setNuevoProv((p) => (p && !p.razonSocial.trim() ? { ...p, razonSocial: r.razon_social } : p))} />
+              <EstadoRuc
+                ruc={nuevoProv.ruc}
+                onValidado={(r) => setNuevoProv((p) => (p && !p.razonSocial.trim() ? { ...p, razonSocial: r.razon_social } : p))}
+                onDni={(r) =>
+                  setNuevoProv((p) =>
+                    p && { ...p, razonSocial: nombreDesdeDni(r), nombres: r.nombres, apellidoPaterno: r.apellidoPaterno, apellidoMaterno: r.apellidoMaterno, dniVerificadoAt: r.verificadoAt },
+                  )
+                }
+              />
+            </Field>
+            <Field label={nuevoProv.ruc.length === 8 ? "Nombres y apellidos" : "Razón social"}>
+              <Input value={nuevoProv.razonSocial} onChange={(e) => setNuevoProv({ ...nuevoProv, razonSocial: e.target.value })} />
             </Field>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="secondary" onClick={() => setNuevoProv(null)}>

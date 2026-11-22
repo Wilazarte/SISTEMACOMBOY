@@ -568,10 +568,11 @@ export function guardarCliente(d: Omit<ClienteSuc, "id" | "sucursalId"> & { id?:
   exigir(operaSucursal(), "Su usuario no puede editar clientes.");
   exigir(!!d.nombre.trim(), "Ingrese el nombre del cliente.");
   const doc = d.doc.trim();
-  exigir(!doc || /^(\d{8}|\d{11})$/.test(doc), "El documento debe ser DNI (8 dígitos) o RUC (11 dígitos).");
+  exigir(!doc || /^(\d{8}|\d{11})$/.test(doc), doc.length < 11 && /^\d+$/.test(doc) && doc.length !== 8 ? "El DNI debe tener 8 dígitos (o RUC de 11)." : "El documento debe ser DNI (8 dígitos) o RUC (11 dígitos).");
   exigirRucSunat(doc, "del cliente");
   const lista = getClientesSuc();
-  exigir(!doc || !lista.some((c) => c.id !== d.id && c.doc === doc), "Ya existe un cliente con ese documento.");
+  const dup = doc ? lista.find((c) => c.id !== d.id && c.doc === doc) : undefined;
+  exigir(!dup, doc.length === 8 ? `Este DNI ya está registrado como ${dup?.nombre}.` : "Ya existe un cliente con ese documento.");
   const c: ClienteSuc = { ...d, id: d.id ?? uid(), nombre: d.nombre.trim(), doc, sucursalId: getSucursal().id };
   escribirSede(KEYS.SUC_CLIENTES, d.id ? lista.map((x) => (x.id === d.id ? c : x)) : [c, ...lista]);
   return c;

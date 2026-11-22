@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, Boxes, History, PackagePlus, Pencil, Search, Star, Trash2, Users } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, cn, ejecutar, ejecutarAsync } from "@/components/ui";
 import { EstadoRuc } from "@/components/EstadoRuc";
+import { nombreDesdeDni } from "@/lib/dni";
 import { BotonFiltros, BotonNuevo } from "@/components/ui/BotonFiltros";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { UNIDADES } from "@/lib/empresa";
@@ -317,7 +318,7 @@ function FormCliente({ item, onListo }: { item?: ClienteSuc; onListo: () => void
         </Field>
         <Field label="DNI / RUC">
           <Input value={f.doc} onChange={set("doc")} inputMode="numeric" />
-          <EstadoRuc ruc={f.doc} onValidado={(r) => setF((x) => (x.nombre.trim() ? x : { ...x, nombre: r.razon_social }))} />
+          <EstadoRuc ruc={f.doc} onValidado={(r) => setF((x) => (x.nombre.trim() ? x : { ...x, nombre: r.razon_social }))} onDni={(r) => setF((x) => ({ ...x, nombre: nombreDesdeDni(r) }))} />
         </Field>
         <Field label="Teléfono">
           <Input value={f.telefono} onChange={set("telefono")} />

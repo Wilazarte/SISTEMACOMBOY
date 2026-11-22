@@ -28,6 +28,7 @@ import {
   uid,
 } from "./storage";
 import { exigirRucSunat } from "./ruc";
+import { LARGO_DOCUMENTO, validarDocumentoPersona } from "./dni";
 import { esSoporte, getSesion } from "./auth";
 import { disponibleEquipo, equipoDeLinea, marcarEquiposVendidos, sedeEquipo } from "./equipos";
 import { getDerivaciones, getReqsSuc, getSucursal, marcarAceptadoVentas, type ProductoTraslado, type Traslado } from "./sucursal";
@@ -149,13 +150,9 @@ export function totalesVenta(items: LineaVenta[], conIgv: boolean, descuento: nu
 // Clientes
 // ---------------------------------------------------------------------
 
-export const LARGO_DOC: Record<TipoDocCliente, string> = { DNI: "8 dígitos", RUC: "11 dígitos", CE: "9 a 12 caracteres" };
+export const LARGO_DOC: Record<TipoDocCliente, string> = LARGO_DOCUMENTO;
 
-export function validarDocumento(tipo: TipoDocCliente, num: string): string | null {
-  if (tipo === "DNI") return /^\d{8}$/.test(num) ? null : "El DNI debe tener 8 dígitos.";
-  if (tipo === "RUC") return rucValido(num) ? null : "RUC inválido (11 dígitos con dígito verificador correcto).";
-  return /^[A-Z0-9]{9,12}$/i.test(num) ? null : "El carné de extranjería debe tener de 9 a 12 caracteres.";
-}
+export const validarDocumento = (tipo: TipoDocCliente, num: string): string | null => validarDocumentoPersona(tipo, num);
 
 export const clienteVacio = (): Cliente => ({
   id: "",
@@ -180,16 +177,27 @@ export function guardarCliente(data: Cliente): Cliente {
   const err = validarDocumento(data.tipoDoc, numDoc);
   if (err) throw new ErpError(err);
   if (data.tipoDoc === "RUC") exigirRucSunat(numDoc, "del cliente");
-  if (!data.razonSocial.trim()) throw new ErpError("Ingrese la razón social o nombres.");
+  // Persona con DNI: nombres y apellidos por separado (de RENIEC o a mano) y el nombre completo en razonSocial
+  const persona = data.tipoDoc !== "RUC";
+  const nombres = persona ? (data.nombres ?? "").trim().toUpperCase() : "";
+  const apellidoPaterno = persona ? (data.apellidoPaterno ?? "").trim().toUpperCase() : "";
+  const apellidoMaterno = persona ? (data.apellidoMaterno ?? "").trim().toUpperCase() : "";
+  const razonSocial = (data.razonSocial.trim() || [nombres, apellidoPaterno, apellidoMaterno].filter(Boolean).join(" ")).toUpperCase();
+  if (!razonSocial) throw new ErpError(persona ? "Ingrese los nombres y apellidos." : "Ingrese la razón social o nombres.");
   if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim())) throw new ErpError("Email inválido.");
   if (!(Number(data.lineaCredito) >= 0)) throw new ErpError("La línea de crédito no puede ser negativa.");
   const lista = getClientes();
-  if (lista.some((c) => c.numDoc === numDoc && c.id !== data.id)) throw new ErpError(`Ya existe un cliente con ${data.tipoDoc} ${numDoc}.`);
+  const dup = lista.find((c) => c.numDoc === numDoc && c.id !== data.id);
+  if (dup) throw new ErpError(data.tipoDoc === "DNI" ? `Este DNI ya está registrado como ${dup.razonSocial}.` : `Ya existe un cliente con ${data.tipoDoc} ${numDoc}.`);
   const cliente: Cliente = {
     ...data,
     id: data.id || uid(),
     numDoc,
-    razonSocial: data.razonSocial.trim().toUpperCase(),
+    razonSocial,
+    nombres: nombres || undefined,
+    apellidoPaterno: apellidoPaterno || undefined,
+    apellidoMaterno: apellidoMaterno || undefined,
+    dniVerificadoAt: data.tipoDoc === "DNI" ? data.dniVerificadoAt || undefined : undefined,
     direccionFiscal: data.direccionFiscal.trim(),
     direccionesEntrega: data.direccionesEntrega.map((d) => d.trim()).filter(Boolean),
     email: data.email.trim(),
@@ -220,7 +228,7 @@ export function importarClientes(filas: Record<string, unknown>[]): { creados: n
     const numDoc = v(f, "Numero", "Número", "Num Doc", "RUC", "DNI").toUpperCase();
     if (!numDoc) return;
     const tipoTxt = v(f, "Tipo Doc", "Tipo", "TipoDoc").toUpperCase();
-    const tipoDoc: TipoDocCliente = tipoTxt === "DNI" || tipoTxt === "CE" || tipoTxt === "RUC" ? tipoTxt : numDoc.length === 8 ? "DNI" : "RUC";
+    const tipoDoc: TipoDocCliente = tipoTxt === "DNI" || tipoTxt === "CE" || tipoTxt === "RUC" || tipoTxt === "PASAPORTE" ? tipoTxt : numDoc.length === 8 ? "DNI" : "RUC";
     const err = validarDocumento(tipoDoc, numDoc);
     const razon = v(f, "Razon Social", "Razón Social", "Nombres", "Cliente");
     if (err || !razon) {

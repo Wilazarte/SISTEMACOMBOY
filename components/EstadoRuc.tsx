@@ -9,15 +9,20 @@ import { Loader2, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
 import { rucValido } from "@/lib/storage";
 import { avisoRuc, useRucSunat, validarRuc, type RucSunat } from "@/lib/ruc";
 import { cn } from "@/components/ui";
+import { VerificarDni } from "@/components/VerificarDni";
+import type { DniReniec } from "@/lib/dni";
 
 export function EstadoRuc({
   ruc,
   onValidado,
+  onDni,
   className,
 }: {
   ruc: string | undefined | null;
   /** Se llama con la respuesta de SUNAT (para completar razón social / dirección si están vacías). */
   onValidado?: (r: RucSunat) => void;
+  /** En campos "DNI / RUC": con 8 dígitos muestra el botón Verificar de RENIEC y entrega nombres y apellidos. */
+  onDni?: (r: DniReniec) => void;
   className?: string;
 }) {
   const n = (ruc ?? "").replace(/\D/g, "");
@@ -52,7 +57,7 @@ export function EstadoRuc({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [n, aplica]);
 
-  if (!aplica) return null;
+  if (!aplica) return onDni && n.length === 8 ? <VerificarDni dni={n} onVerificado={onDni} className={className} /> : null;
   const aviso = avisoRuc(r);
 
   return (

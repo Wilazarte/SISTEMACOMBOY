@@ -5,6 +5,8 @@ import { Download, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, cn, ejecutar } from "@/components/ui";
 import { FiltrosPlegables } from "@/components/ui/BotonFiltros";
 import { EstadoRuc } from "@/components/EstadoRuc";
+import { VerificarDni } from "@/components/VerificarDni";
+import { LARGO_DOCUMENTO, MAX_DOCUMENTO, TIPOS_DOCUMENTO, avisoDniDuplicado, limpiarDocumento, nombreDesdeDni, validarDocumentoPersona, type TipoDocumento } from "@/lib/dni";
 import { DatalistCatalogo, ID_LISTA_CATALOGO } from "@/components/productos/ProductoInput";
 import { useSesion } from "@/lib/auth";
 import { KEYS, rucValido, useStore } from "@/lib/storage";
@@ -55,7 +57,7 @@ export function BaseProveedores() {
   const exportar = async () => {
     const XLSX = await import("xlsx");
     const filas = lista.flatMap((p) => {
-      const base = { RUC: p.ruc, "Razon Social": p.razonSocial, "Asesor de ventas": p.asesorVentas ?? "", Contacto: p.contacto ?? "", Correo: p.correo ?? "", Direccion: p.direccion ?? "", Estado: p.estado ?? "ACTIVO" };
+      const base = { "Tipo Doc": p.tipoDoc ?? "RUC", Documento: p.ruc, "Razon Social": p.razonSocial, "Asesor de ventas": p.asesorVentas ?? "", Contacto: p.contacto ?? "", Correo: p.correo ?? "", Direccion: p.direccion ?? "", Estado: p.estado ?? "ACTIVO" };
       const prods = p.productos?.length ? p.productos : [{ nombre: "", opcion: 0 }];
       return prods.map((x) => ({ ...base, Producto: x.nombre, Opcion: x.opcion ? `${x.opcion}ª opción` : "" }));
     });
@@ -113,10 +115,13 @@ export function BaseProveedores() {
         </div>
       )}
 
-      <Table head={["RUC", "Razón social / Dirección", "Asesor de ventas / Contacto", "Productos que vende (opción)", "Estado", ""]} empty={lista.length === 0}>
+      <Table head={["Documento", "Razón social / Dirección", "Asesor de ventas / Contacto", "Productos que vende (opción)", "Estado", ""]} empty={lista.length === 0}>
         {lista.map((p) => (
           <tr key={p.id} className={cn("hover:bg-plomo-50", p.estado === "INACTIVO" && "opacity-50")}>
-            <Td className="whitespace-nowrap font-mono">{p.ruc}</Td>
+            <Td className="whitespace-nowrap font-mono">
+              {p.tipoDoc && p.tipoDoc !== "RUC" && <span className="mr-1 text-xs text-plomo-500">{p.tipoDoc}</span>}
+              {p.ruc}
+            </Td>
             <Td>
               <p className="font-semibold text-fg">{p.razonSocial}</p>
               <p className="max-w-xs text-xs text-plomo-500">{p.direccion || "-"}</p>
@@ -194,23 +199,76 @@ function FormProveedor({ form, onChange }: { form: Proveedor; onChange: (p: Prov
       productos.map((x, j) => (j === i ? { ...x, ...cambio } : x)),
     );
   const rucMal = form.ruc.length === 11 && !rucValido(form.ruc);
+  const tipo: TipoDocumento = form.tipoDoc ?? "RUC";
+  const errDoc = tipo !== "RUC" && form.ruc ? validarDocumentoPersona(tipo, form.ruc) : null;
+  const todos = useStore<Proveedor[]>(KEYS.PROVEEDORES, []);
+  const dupDni = tipo === "DNI" ? avisoDniDuplicado(form.ruc, todos.filter((p) => p.id !== form.id), (p) => p.ruc, (p) => p.razonSocial) : null;
+  const setPersona = (cambio: Partial<Pick<Proveedor, "nombres" | "apellidoPaterno" | "apellidoMaterno">>) => {
+    const x = { ...form, ...cambio };
+    onChange({ ...x, razonSocial: [x.nombres, x.apellidoPaterno, x.apellidoMaterno].map((t) => (t ?? "").trim()).filter(Boolean).join(" ").toUpperCase() });
+  };
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <Field label="RUC *" hint={rucMal ? "Dígito verificador inválido" : "11 dígitos · se valida en SUNAT y completa razón social y dirección"}>
-        <Input
-          value={form.ruc}
-          inputMode="numeric"
-          maxLength={11}
-          onChange={(e) => set("ruc", e.target.value.replace(/\D/g, ""))}
-          className={cn(form.ruc && (rucMal || form.ruc.length !== 11 ? "border-red-400" : "border-emerald-400"))}
-          autoFocus={!form.id}
-        />
-        <EstadoRuc
-          ruc={form.ruc}
-          onValidado={(r) => onChange({ ...form, razonSocial: form.razonSocial.trim() || r.razon_social, direccion: (form.direccion ?? "").trim() || r.direccion })}
+      <Field label="Tipo documento *">
+        <Select
+          value={tipo}
+          onChange={(e) => {
+            const t = e.target.value as TipoDocumento;
+            onChange({ ...form, tipoDoc: t, ruc: limpiarDocumento(t, form.ruc), dniVerificadoAt: undefined });
+          }}
+          options={TIPOS_DOCUMENTO}
         />
       </Field>
-      <Field label="Razón social *">
+      {tipo === "RUC" ? (
+        <Field label="RUC *" hint={rucMal ? "Dígito verificador inválido" : "11 dígitos · se valida en SUNAT y completa razón social y dirección"}>
+          <Input
+            value={form.ruc}
+            inputMode="numeric"
+            maxLength={11}
+            onChange={(e) => set("ruc", e.target.value.replace(/\D/g, ""))}
+            className={cn(form.ruc && (rucMal || form.ruc.length !== 11 ? "border-red-400" : "border-emerald-400"))}
+            autoFocus={!form.id}
+          />
+          <EstadoRuc
+            ruc={form.ruc}
+            onValidado={(r) => onChange({ ...form, razonSocial: form.razonSocial.trim() || r.razon_social, direccion: (form.direccion ?? "").trim() || r.direccion })}
+          />
+        </Field>
+      ) : (
+        <Field label={`${tipo === "PASAPORTE" ? "Pasaporte" : tipo} *`} hint={dupDni ?? errDoc ?? (tipo === "DNI" ? "8 dígitos · pulse Verificar para traer nombres y apellidos de RENIEC" : LARGO_DOCUMENTO[tipo])}>
+          <Input
+            value={form.ruc}
+            inputMode={tipo === "DNI" ? "numeric" : "text"}
+            maxLength={MAX_DOCUMENTO[tipo]}
+            onChange={(e) => onChange({ ...form, ruc: limpiarDocumento(tipo, e.target.value), dniVerificadoAt: undefined })}
+            className={cn(form.ruc && (errDoc || dupDni ? "border-red-400" : "border-emerald-400"))}
+            autoFocus={!form.id}
+          />
+          {tipo === "DNI" && (
+            <VerificarDni
+              dni={form.ruc}
+              verificadoAt={form.dniVerificadoAt}
+              onVerificado={(r) =>
+                onChange({ ...form, nombres: r.nombres, apellidoPaterno: r.apellidoPaterno, apellidoMaterno: r.apellidoMaterno, razonSocial: nombreDesdeDni(r), dniVerificadoAt: r.verificadoAt })
+              }
+            />
+          )}
+        </Field>
+      )}
+      {tipo !== "RUC" && (
+        <>
+          <Field label="Nombres">
+            <Input value={form.nombres ?? ""} onChange={(e) => setPersona({ nombres: e.target.value })} />
+          </Field>
+          <Field label="Apellido paterno">
+            <Input value={form.apellidoPaterno ?? ""} onChange={(e) => setPersona({ apellidoPaterno: e.target.value })} />
+          </Field>
+          <Field label="Apellido materno">
+            <Input value={form.apellidoMaterno ?? ""} onChange={(e) => setPersona({ apellidoMaterno: e.target.value })} />
+          </Field>
+        </>
+      )}
+      <Field label={tipo === "RUC" ? "Razón social *" : "Nombre completo *"}>
         <Input value={form.razonSocial} onChange={(e) => set("razonSocial", e.target.value)} />
       </Field>
       <Field label="Asesor de ventas">

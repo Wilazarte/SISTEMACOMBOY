@@ -6,6 +6,7 @@ import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Ta
 import QuickActions, { QA_IDS } from "@/components/tesoreria/QuickActions";
 import { BotonFiltros } from "@/components/ui/BotonFiltros";
 import { EstadoRuc } from "@/components/EstadoRuc";
+import { nombreDesdeDni } from "@/lib/dni";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { SEDES } from "@/lib/empresa";
 import { elegirCarpeta } from "@/lib/guardarArchivo";
@@ -235,7 +236,7 @@ function FormContratista({
             onChange={(e) => set("documento", e.target.value.replace(/\D/g, ""))}
             className={cn(datos.documento.length === 11 && (rucMal ? "border-red-400" : "border-emerald-400"))}
           />
-          <EstadoRuc ruc={datos.documento} onValidado={(r) => !datos.nombre.trim() && set("nombre", r.razon_social)} />
+          <EstadoRuc ruc={datos.documento} onValidado={(r) => !datos.nombre.trim() && set("nombre", r.razon_social)} onDni={(r) => set("nombre", nombreDesdeDni(r))} />
         </Field>
         <Field label="Tipo de servicio *">
           <Select

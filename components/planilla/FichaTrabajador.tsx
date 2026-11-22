@@ -4,8 +4,10 @@ import { useState, type ReactNode } from "react";
 import { Briefcase, HeartPulse, History, Landmark, Power, Save, Trash2, User, UserCheck, X } from "lucide-react";
 import { Badge, Button, Field, Input, Modal, Select, Textarea, cn, ejecutar, toast } from "@/components/ui";
 import { SEDES } from "@/lib/empresa";
+import { VerificarDni } from "@/components/VerificarDni";
+import { avisoDniDuplicado, nombreDesdeDni } from "@/lib/dni";
 import { historialPagosTrabajador, type PagoTrabajador } from "@/lib/historial";
-import { AFP_OPTIONS, BANCOS, ESTADOS_CIVILES, TIPOS_SUELDO, cambiarEstadoTrabajador, divisorSueldo, edad, eliminarTrabajador, fechaPE, frecuenciaPagoDe, guardarTrabajador, hoy, soles } from "@/lib/storage";
+import { AFP_OPTIONS, BANCOS, ESTADOS_CIVILES, TIPOS_SUELDO, cambiarEstadoTrabajador, divisorSueldo, edad, eliminarTrabajador, fechaPE, frecuenciaPagoDe, guardarTrabajador, hoy, soles, useTrabajadores } from "@/lib/storage";
 import type { EstadoCivil, TipoAfp, TipoSueldo, Trabajador } from "@/lib/types";
 
 // Cada tipo de sueldo dice con qué frecuencia se paga (una sola elección, no se contradicen)
@@ -47,6 +49,14 @@ export function FichaTrabajador({
   const [cargandoPagos, setCargandoPagos] = useState(false);
   const set = <K extends keyof Trabajador>(k: K, v: Trabajador[K]) => setF((x) => ({ ...x, [k]: v }));
   const nuevo = !idOriginal;
+  const todos = useTrabajadores();
+  const dupDni = avisoDniDuplicado(f.dni, todos.filter((t) => t.id !== (idOriginal ?? f.id)), (t) => t.dni, (t) => t.nombre);
+  // Al cambiar nombres o apellidos a mano se rearma el nombre completo
+  const setPersona = (cambio: Partial<Pick<Trabajador, "nombres" | "apellidoPaterno" | "apellidoMaterno">>) =>
+    setF((x) => {
+      const y = { ...x, ...cambio };
+      return { ...y, nombre: [y.nombres, y.apellidoPaterno, y.apellidoMaterno].map((t) => (t ?? "").trim()).filter(Boolean).join(" ").toUpperCase() };
+    });
   const años = edad(f.fechaNacimiento);
   const sueldo = TIPOS_SUELDO[f.tipoSueldo] ?? TIPOS_SUELDO.DIARIO;
 
@@ -105,11 +115,35 @@ export function FichaTrabajador({
             <Field label="N° de huella (reloj) *">
               <Input value={f.id} onChange={(e) => set("id", e.target.value.trim())} placeholder="Ej: 15" />
             </Field>
+            <Field label="DNI" hint={dupDni ?? "8 dígitos · pulse Verificar para traer nombres y apellidos de RENIEC"}>
+              <Input
+                value={f.dni}
+                maxLength={8}
+                inputMode="numeric"
+                onChange={(e) => setF((x) => ({ ...x, dni: e.target.value.replace(/\D/g, ""), dniVerificadoAt: undefined }))}
+                className={cn(f.dni && (f.dni.length !== 8 || dupDni ? "border-red-400" : "border-emerald-400"))}
+              />
+              {!soloLectura && (
+                <VerificarDni
+                  dni={f.dni}
+                  verificadoAt={f.dniVerificadoAt}
+                  onVerificado={(r) =>
+                    setF((x) => ({ ...x, nombres: r.nombres, apellidoPaterno: r.apellidoPaterno, apellidoMaterno: r.apellidoMaterno, nombre: nombreDesdeDni(r), dniVerificadoAt: r.verificadoAt }))
+                  }
+                />
+              )}
+            </Field>
+            <Field label="Nombres">
+              <Input value={f.nombres ?? ""} onChange={(e) => setPersona({ nombres: e.target.value })} />
+            </Field>
+            <Field label="Apellido paterno">
+              <Input value={f.apellidoPaterno ?? ""} onChange={(e) => setPersona({ apellidoPaterno: e.target.value })} />
+            </Field>
+            <Field label="Apellido materno">
+              <Input value={f.apellidoMaterno ?? ""} onChange={(e) => setPersona({ apellidoMaterno: e.target.value })} />
+            </Field>
             <Field label="Nombre completo *" className="lg:col-span-2">
               <Input value={f.nombre} onChange={(e) => set("nombre", e.target.value)} />
-            </Field>
-            <Field label="DNI">
-              <Input value={f.dni} maxLength={8} inputMode="numeric" onChange={(e) => set("dni", e.target.value.replace(/\D/g, ""))} />
             </Field>
             <Field label="Fecha de nacimiento" hint={años !== null ? `Edad: ${años} años` : undefined}>
               <Input type="date" value={f.fechaNacimiento ?? ""} onChange={(e) => set("fechaNacimiento", e.target.value || undefined)} />

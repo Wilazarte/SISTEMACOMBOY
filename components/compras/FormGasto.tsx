@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { EstadoRuc } from "@/components/EstadoRuc";
+import { nombreDesdeDni } from "@/lib/dni";
 import { rucSunat } from "@/lib/ruc";
 import { FileUp, Paperclip, Plus, Receipt, Trash2, X } from "lucide-react";
 import { FormBancarizacion, bancarizacionVacia } from "@/components/compras/FormBancarizacion";
@@ -371,7 +372,11 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
             }}
             className={cn(d.ruc.length === 11 && (rucMal ? "border-red-400" : "border-emerald-400"))}
           />
-          <EstadoRuc ruc={d.ruc} onValidado={(r) => setD((x) => (x.proveedor.trim() && !esProveedorVarios(x.proveedor) ? x : { ...x, proveedor: r.razon_social }))} />
+          <EstadoRuc
+            ruc={d.ruc}
+            onValidado={(r) => setD((x) => (x.proveedor.trim() && !esProveedorVarios(x.proveedor) ? x : { ...x, proveedor: r.razon_social }))}
+            onDni={(r) => setD((x) => ({ ...x, proveedor: nombreDesdeDni(r) }))}
+          />
         </Field>
 
         {/* Cotización emitida por el proveedor (o código interno si no la entregó) */}
