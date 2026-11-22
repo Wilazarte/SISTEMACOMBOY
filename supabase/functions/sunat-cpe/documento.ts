@@ -206,6 +206,9 @@ export function armarDocumento(c: ComprobanteErp, emisor: Emisor, ref?: Comproba
   if (familia === "FACTURA" && !/^F[A-Z0-9]{3}$/.test(serie)) throw new ErrorCpe(`La serie ${serie} no corresponde a factura (debe empezar con F).`);
   if (familia === "BOLETA" && !/^B[A-Z0-9]{3}$/.test(serie)) throw new ErrorCpe(`La serie ${serie} no corresponde a boleta (debe empezar con B).`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(c.fecha)) throw new ErrorCpe(`Fecha de emisión inválida: ${c.fecha}`);
+  // SUNAT rechaza comprobantes con fecha de emisión posterior a la fecha de envío (hora de Lima)
+  const hoyLima = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima" }).format(new Date());
+  if (c.fecha > hoyLima) throw new ErrorCpe(`La fecha de emisión (${c.fecha}) no puede ser posterior a hoy (${hoyLima}).`);
 
   // Cliente
   const [tipoDocTxt, ...resto] = (c.clienteDoc || "").trim().split(/\s+/);

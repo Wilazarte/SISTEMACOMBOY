@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "./supabase/client";
-import { ErpError, KEYS, escribir, hoy, nuevoEvento, puede, r2, serieSede, uid } from "./storage";
+import { ErpError, KEYS, escribir, esperarGuardado, hoy, nuevoEvento, puede, r2, serieSede, uid } from "./storage";
 import { anularComprobante, getComprobantes, totalesVenta } from "./ventas";
 import type { ComprobanteVenta, EstadoSunat, LineaVenta, Rol } from "./types";
 import { guardarArchivo } from "./guardarArchivo";
@@ -169,8 +169,21 @@ interface RespuestaEmision {
   enlaceXml: string;
   enlaceCdr: string;
   numero: string;
+  /** Estado real según la respuesta del PSE (ACEPTADO, OBSERVADO, RECHAZADO, ENVIADO…), calculado en el servidor. */
+  estado?: EstadoCpe;
+  entorno?: "beta" | "produccion";
   error?: string;
 }
+
+/** Estado del comprobante según la respuesta: nunca se asume ACEPTADO si SUNAT no lo aceptó. */
+function estadoDeRespuesta(r: RespuestaEmision): EstadoCpe {
+  if (r.estado) return r.estado;
+  const n = Number(r.codigo);
+  if (r.aceptada) return r.observaciones?.length || n >= 4000 ? "OBSERVADO" : "ACEPTADO";
+  if (r.codigo && n >= 2000 && n < 4000) return "RECHAZADO";
+  return "ENVIADO";
+}
+const aEstadoSunat = (e: EstadoCpe): EstadoSunat => (e === "PENDIENTE" ? "NO_ENVIADO" : e);
 
 /** Resultado de enviarSunat: lo que leen las pantallas (estado, código y descripción) + el PDF de Nubefact. */
 export type ResultadoEnvio = Pick<FilaSunat, "estado" | "codigo" | "descripcion"> & { numero: string; enlacePdf: string };
@@ -185,7 +198,10 @@ export async function enviarSunat(c: ComprobanteVenta, rol: Rol): Promise<Result
   if (c.estado !== "EMITIDO") throw new ErpError("Solo se envían comprobantes EMITIDOS.");
   const referencia = c.ref ? getComprobantes().find((x) => x.id === c.ref!.id) : undefined;
   if ((c.tipo === "NOTA_CREDITO" || c.tipo === "NOTA_DEBITO") && !referencia) throw new ErpError(`No se encontró ${c.ref?.numero ?? "el comprobante"} que modifica la nota.`);
-  const { data, error } = await createClient().functions.invoke("emitir-comprobante", { body: { comprobante: c, ...(referencia ? { referencia } : {}) } });
+  // El servidor lee el comprobante de la base (public.ventas): primero se espera a que termine de guardarse
+  const errGuardar = await esperarGuardado();
+  if (errGuardar) throw new ErpError(`${c.numero} no terminó de guardarse en el servidor: ${errGuardar}`);
+  const { data, error } = await createClient().functions.invoke("emitir-comprobante", { body: { comprobante: { id: c.id, numero: c.numero } } });
   if (error) {
     const ctx = (error as { context?: Response }).context;
     const cuerpo = ctx && typeof ctx.json === "function" ? ((await ctx.json().catch(() => null)) as { error?: string } | null) : null;
@@ -194,17 +210,18 @@ export async function enviarSunat(c: ComprobanteVenta, rol: Rol): Promise<Result
   }
   const r = data as RespuestaEmision;
   if (!r?.ok) throw new ErpError(r?.error ?? "Nubefact no devolvió una respuesta válida.");
+  const estado = estadoDeRespuesta(r);
   let actualizado: ComprobanteVenta | undefined;
   const lista = getComprobantes().map((x) => {
     if (x.id !== c.id) return x;
     actualizado = {
       ...x,
-      estadoSunat: "ACEPTADO",
+      estadoSunat: aEstadoSunat(estado),
       sunat: {
         hash: r.hash ?? "",
         codigo: r.codigo ?? "",
         descripcion: r.descripcion ?? "",
-        entorno: "beta",
+        entorno: r.entorno ?? "produccion",
         fecha: new Date().toISOString(),
         numero: r.numero ?? "",
         enlacePdf: r.enlacePdf ?? "",
@@ -215,8 +232,8 @@ export async function enviarSunat(c: ComprobanteVenta, rol: Rol): Promise<Result
     return actualizado;
   });
   if (actualizado) escribir(KEYS.COMPROBANTES, lista);
-  trasAceptar(c, "ACEPTADO", rol);
-  return { estado: "ACEPTADO", codigo: r.codigo ?? "", descripcion: r.descripcion ?? "", numero: r.numero ?? "", enlacePdf: r.enlacePdf ?? "" };
+  trasAceptar(c, estado, rol);
+  return { estado, codigo: r.codigo ?? "", descripcion: r.descripcion ?? "", numero: r.numero ?? "", enlacePdf: r.enlacePdf ?? "" };
 }
 
 /**
@@ -227,9 +244,8 @@ export async function enviarSunat(c: ComprobanteVenta, rol: Rol): Promise<Result
 export async function consultarNubefactFila(c: ComprobanteVenta, rol: Rol): Promise<ComprobanteVenta> {
   if (!puede(rol, "venta.gestionar")) throw new ErpError("Su usuario no puede consultar comprobantes en SUNAT.");
   if (!c.sunat?.enlacePdf) throw new ErpError(`${c.numero} aún no se envió a Nubefact: use Enviar SUNAT.`);
-  const referencia = c.ref ? getComprobantes().find((x) => x.id === c.ref!.id) : undefined;
   const { data, error } = await createClient().functions.invoke("emitir-comprobante", {
-    body: { comprobante: c, ...(referencia ? { referencia } : {}), consultar: true },
+    body: { comprobante: { id: c.id, numero: c.numero }, consultar: true },
   });
   if (error) {
     const ctx = (error as { context?: Response }).context;
@@ -245,11 +261,13 @@ export async function consultarNubefactFila(c: ComprobanteVenta, rol: Rol): Prom
     const s = x.sunat;
     actualizado = {
       ...x,
+      estadoSunat: aEstadoSunat(estadoDeRespuesta(r)),
       sunat: {
         ...s,
         hash: r.hash || s.hash,
         codigo: r.codigo || s.codigo,
         descripcion: r.descripcion || s.descripcion,
+        entorno: r.entorno ?? s.entorno,
         fecha: new Date().toISOString(),
         enlacePdf: r.enlacePdf || s.enlacePdf,
         enlaceXml: r.enlaceXml || s.enlaceXml,
@@ -260,6 +278,7 @@ export async function consultarNubefactFila(c: ComprobanteVenta, rol: Rol): Prom
   });
   if (!actualizado) throw new ErpError(`No se encontró ${c.numero}.`);
   escribir(KEYS.COMPROBANTES, lista);
+  trasAceptar(c, estadoDeRespuesta(r), rol);
   return actualizado;
 }
 

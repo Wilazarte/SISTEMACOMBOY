@@ -28,6 +28,10 @@ const n2 = (n: number) => Number(m2(n));
  */
 export function mapaSeries(texto = Deno.env.get("NUBEFACT_SERIES") ?? ""): Record<string, string> {
   const m: Record<string, string> = {};
+  // Homologación: en producción las series que viajan a SUNAT deben ser las mismas del ERP (y del PDF).
+  // Si NUBEFACT_SERIES quedó configurado desde la demo, se detiene aquí en vez de emitir con otra serie.
+  if (texto.trim() && (Deno.env.get("SUNAT_ENTORNO") ?? "").trim().toLowerCase() === "produccion")
+    throw new Error("NUBEFACT_SERIES es solo para la cuenta DEMO: bórrelo de los Secrets antes de emitir en producción.");
   for (const par of texto.split(",")) {
     const [de, a] = par.split("=").map((x) => x.trim().toUpperCase());
     if (de && a) m[de] = a;
@@ -132,12 +136,13 @@ export function jsonNubefact(d: DocumentoCpe): Record<string, unknown> {
 
 async function llamar(ruta: string, token: string, cuerpo: Record<string, unknown>): Promise<Record<string, unknown>> {
   let ultimo: unknown;
+  const enviado = JSON.stringify(aplicarSeries(cuerpo)); // fuera del try: un error de configuración no se reintenta
   for (let intento = 0; intento < 3; intento++) {
     try {
       const r = await fetch(ruta, {
         method: "POST",
         headers: { Authorization: `Token token="${token}"`, "Content-Type": "application/json" },
-        body: JSON.stringify(aplicarSeries(cuerpo)),
+        body: enviado,
         signal: AbortSignal.timeout(60_000),
       });
       const texto = await r.text();
@@ -253,4 +258,34 @@ export async function bajarEnlace(url: string): Promise<Uint8Array | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * Estado del comprobante según la respuesta del PSE (no se asume ACEPTADO):
+ * aceptada sin observaciones -> ACEPTADO; aceptada con observaciones (4xxx) -> OBSERVADO;
+ * código 2000-3999 -> RECHAZADO; error de validación del PSE -> EXCEPCION; sin respuesta aún -> ENVIADO.
+ */
+export function estadoPse(r: RespuestaPse): "ACEPTADO" | "OBSERVADO" | "RECHAZADO" | "EXCEPCION" | "ENVIADO" {
+  if (!r.ok) return "EXCEPCION";
+  const n = Number(r.codigo);
+  if (r.aceptada) return r.observaciones.length || n >= 4000 ? "OBSERVADO" : "ACEPTADO";
+  if (r.codigo && n >= 2000 && n < 4000) return "RECHAZADO";
+  return "ENVIADO";
+}
+
+/**
+ * Al reintentar, Nubefact responde "ya existe" y el ERP consulta ese número. Antes de darlo por propio se
+ * compara la cadena del QR (RUC|TIPO|SERIE|NÚMERO|IGV|TOTAL|FECHA|TIPO DOC|N° DOC|HASH) con el documento:
+ * si el número lo ocupa OTRO comprobante (p. ej. una prueba), se detiene en vez de marcarlo como aceptado.
+ * Devuelve el motivo de la diferencia, o "" si coincide (o si el PSE no devolvió QR para comparar).
+ */
+export function diferenciaQr(r: RespuestaPse, d: DocumentoCpe): string {
+  const p = (r.qr || "").split("|");
+  if (p.length < 9) return "";
+  const total = Number(p[5]);
+  const numDoc = (p[8] || "").trim();
+  if (Number.isFinite(total) && Math.abs(total - d.total) > 0.01)
+    return `el total registrado en el PSE es S/ ${total.toFixed(2)} y el del ERP S/ ${d.total.toFixed(2)}`;
+  if (numDoc && numDoc !== d.cliente.numDoc) return `el cliente registrado en el PSE es ${numDoc} y el del ERP ${d.cliente.numDoc}`;
+  return "";
 }
