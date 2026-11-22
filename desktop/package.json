@@ -1,7 +1,7 @@
 {
   "name": "comboy-vid-desktop",
   "productName": "COMBOY VID ERP",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "App de escritorio de COMBOY VID ERP (carga https://sistemacomboy.vercel.app)",
   "author": "INVERSIONES GLOBAL COMPANY ROUSVID S.A.C.",
   "private": true,
@@ -27,6 +27,7 @@
     },
     "files": [
       "main.js",
+      "preload.js",
       "offline/**/*",
       "build/icon.png"
     ],

@@ -3,10 +3,10 @@
 // (lib/auth.ts) y el servidor (middleware.ts) con las mismas reglas.
 // =====================================================================
 
-import { HOME_PERFIL, RUTA_NO_AUTORIZADO, homePlantaDe, isAdmin, perfilPlanta, permisosPlanta } from "./permisosPlanta";
+import { HOME_PERFIL, RUTA_NO_AUTORIZADO, esSoporteReal, homePlantaDe, isAdmin, perfilPlanta, permisosPlanta } from "./permisosPlanta";
 
 /** Roles con permisos definidos en el ERP. Cualquier otro rol de la tabla perfiles se trata como solo lectura. */
-export type RolAuth = "creador" | "tesoreria" | "almacen" | "planilla" | "gerencia" | "sucursal";
+export type RolAuth = "creador" | "tesoreria" | "almacen" | "planilla" | "gerencia" | "sucursal" | "ventas";
 
 /** Dominio de los correos de Supabase Auth: en el login basta con escribir "tesoreria". */
 export const DOMINIO = "comboyvid.local";
@@ -24,9 +24,20 @@ export interface Sesion {
   nombreCompleto?: string;
   /** Iniciales del avatar (perfiles.avatar_iniciales: AD, LC, JO, WL, MC). */
   iniciales?: string;
-  /** Módulo asignado (perfiles.modulo_asignado: TODOS, FINANZAS, ALMACEN, LOGISTICA, PRODUCCION). */
+  /** Módulo asignado (perfiles.modulo_asignado: TODOS, FINANZAS, ALMACEN, LOGISTICA, PRODUCCION, VENTAS). */
   moduloAsignado?: string;
+  /**
+   * Permisos individuales de ESTE usuario (perfiles.permisos), excepciones a la regla "cada rol solo su módulo".
+   * Ej.: "req.editar_almacen" = Tesorería puede editar los REQ de Almacén (Lizbeth, pedido de Williams 2026-11-17).
+   */
+  permisos?: string[];
 }
+
+/** Permiso individual de Tesorería para editar requerimientos de Almacén antes de revisarlos. */
+export const PERMISO_EDITAR_REQ_ALMACEN = "req.editar_almacen";
+
+/** ¿El usuario tiene este permiso individual (perfiles.permisos)? */
+export const tienePermiso = (sesion: Sesion | null, permiso: string): boolean => !!sesion?.permisos?.includes(permiso);
 
 /**
  * Permiso "editar_asistencia_creador": edición manual de DÍAS / TARD. en el Módulo Creador.
@@ -47,23 +58,30 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
   if (!sesion) return false;
   if (ruta === "/dashboard") return true; // solo redirige al primer módulo permitido
   // Pestañas de los botones del INICIO SOPORTE (/soporte/{accion}): solo SOPORTE
-  if (ruta === "/soporte" || ruta.startsWith("/soporte/")) return isAdmin(sesion);
+  if (ruta === "/soporte" || ruta.startsWith("/soporte/")) return esSoporteReal(sesion);
   // Módulo Creador: por rol, no por módulos (gerencia tiene "*" pero no debe entrar)
   if (ruta === RUTA_CREADOR || ruta.startsWith(`${RUTA_CREADOR}/`)) return puedeEditarAsistencia(sesion);
   // Producción: también Almacén (registra las órdenes de producción y el QC)
   if (ruta === RUTA_PRODUCCION || ruta.startsWith(`${RUTA_PRODUCCION}/`)) if (sesion.rol === "almacen") return true;
   if (ruta === RUTA_NO_AUTORIZADO) return true;
+  // Gestión Documentaria (/documentos): entra todo perfil, también GERENCIA; cada uno ve solo sus documentos o los que
+  // tienen permiso explícito para su rol (lo decide la base: SQL 20261204_gestion_documentaria.sql, gd_nivel)
+  if (ruta === RUTA_DOCUMENTOS || ruta.startsWith(`${RUTA_DOCUMENTOS}/`)) return true;
   // GERENCIA es visor (pedido de Williams, 2026-10-29): solo su Dashboard Gerencia, ningún módulo;
   // las reuniones y el chat grupal están dentro de /gerencia
   if (sesion.rol === "gerencia") return ruta === RUTA_GERENCIA || ruta.startsWith(`${RUTA_GERENCIA}/`);
   // Dashboard Gerencia: además de GERENCIA (arriba), solo SOPORTE
   if (ruta === RUTA_GERENCIA || ruta.startsWith(`${RUTA_GERENCIA}/`)) return isAdmin(sesion);
-  // Expedientes 26W (/erp/lotes, /erp/expediente/…): el flujo pasa por las 4 áreas de la planta; cada una actúa solo en sus fases
+  // Expedientes 26W (/erp/lotes, /erp/expediente/…): el flujo pasa por las 4 áreas de la planta; cada una actúa solo en sus fases.
+  // VENTAS no participa del flujo de fabricación (Williams, 2026-11-16: módulo propio solo de ventas)
   if (ruta === RUTA_ERP || ruta.startsWith(`${RUTA_ERP}/`)) {
     const p = perfilPlanta(sesion);
-    return !!p && p !== "gerencia";
+    return !!p && p !== "gerencia" && p !== "ventas";
   }
-  // Homes de la planta: solo SOPORTE entra a las 4; los moduladores (Finanzas, Logística, Almacén, Producción) solo a la suya
+  // Ventas es un módulo aparte (Williams, 2026-11-16): Logística ya no entra a /dashboard/ventas aunque su perfil
+  // antiguo lo tenga en perfiles.modulos (el SQL 20261127_modulo_ventas.sql también se lo quita)
+  if ((ruta === "/dashboard/ventas" || ruta.startsWith("/dashboard/ventas/")) && perfilPlanta(sesion) === "logistica") return false;
+  // Homes de la planta: solo SOPORTE entra a todas; los moduladores (Finanzas, Logística, Almacén, Producción, Ventas) solo a la suya
   const homePlanta = homePlantaDe(ruta);
   const perfil = perfilPlanta(sesion);
   if (homePlanta && perfil && perfil !== "soporte") return permisosPlanta(sesion).canViewOtherModules || homePlanta === HOME_PERFIL[perfil];
@@ -81,17 +99,22 @@ export function puedeVer(sesion: Sesion | null, ruta: string): boolean {
 }
 
 export const RUTA_PRODUCCION = "/dashboard/produccion";
+/** Gestión Documentaria auditada (módulo independiente). */
+export const RUTA_DOCUMENTOS = "/documentos";
 /** Flujo v3.0: tablero de expedientes 26W y expediente por código. */
 export const RUTA_ERP = "/erp";
 /** Dashboard Gerencia (War Room): GERENCIA y SOPORTE. */
 export const RUTA_GERENCIA = "/gerencia";
 /** Logística Planta: home de compras / ventas nacionales y agencias (solo lectura de los demás módulos). */
 export const RUTA_LOGISTICA = "/logistica";
+/** Módulo Ventas (separado de Logística el 2026-11-16): INICIO /ventas, pantallas en /dashboard/ventas. */
+export const RUTA_VENTAS = "/ventas";
 /** Homes de la planta -> módulos de trabajo que habilitan verlas. */
 const HOMES_PLANTA: Record<string, string[]> = {
   "/almacen": ["/dashboard/almacen"],
   "/finanzas": ["/dashboard/compras", "/dashboard/planilla", "/dashboard/contable"],
   "/produccion": ["/dashboard/produccion"],
+  "/ventas": ["/dashboard/ventas"],
 };
 /** Módulo Secocha (sucursal): app aparte con su propio login (/secocha/login). Arequipa es la Planta Principal (el ERP). */
 export const RUTA_SUCURSAL = "/secocha";

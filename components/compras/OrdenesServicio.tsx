@@ -1,11 +1,13 @@
 "use client";
 
+import { PROVEEDOR_VARIOS, RUC_VARIOS, esProveedorVarios } from "@/lib/comprobantes";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Ban, Check, Eye, FileText, Paperclip, Plus, Trash2, Upload, Wrench, X } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, Textarea, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import type { FilaDoc } from "@/components/ui/ListaDocs";
 import { ProductoInput } from "@/components/productos/ProductoInput";
 import { EstadoRuc } from "@/components/EstadoRuc";
+import { rucSunat } from "@/lib/ruc";
 import {
   abrirArchivo,
   anularOrdenServicio,
@@ -71,8 +73,9 @@ export function FormOrdenServicio({
   const [gastoId, setGastoId] = useState(pre?.gastoId ?? "");
   const [verBienes, setVerBienes] = useState(false);
   const [fecha, setFecha] = useState(hoy());
-  const [proveedor, setProveedor] = useState("");
-  const [ruc, setRuc] = useState("");
+  // Por defecto VARIOS/SIN DATOS (N° 010101); al elegir otro proveedor o validar un RUC se reemplaza
+  const [proveedor, setProveedor] = useState(PROVEEDOR_VARIOS);
+  const [ruc, setRuc] = useState(RUC_VARIOS);
   const [concepto, setConcepto] = useState("");
   const [formaPago, setFormaPago] = useState<FormaPago>("CONTADO");
   const [plazo, setPlazo] = useState("");
@@ -124,13 +127,15 @@ export function FormOrdenServicio({
     setFecha(gasto.fecha.slice(0, 10));
     setConcepto(gasto.descripcion ?? "");
     setConIgv(gasto.igv > 0);
-    setLineas([{ id: uid(), descripcion: gasto.descripcion || "Servicio", cantidad: 1, unidad: "SERV", precioUnit: gasto.igv > 0 ? gasto.subtotal : gasto.total }]);
+    setLineas([{ id: uid(), descripcion: gasto.descripcion || "Servicio", cantidad: 1, unidad: "SERV", precioUnit: gasto.total }]); // precio con IGV incluido (como el importe del gasto)
   }, [origen, gasto]);
 
   const elegirProveedor = (nombre: string) => {
     setProveedor(nombre);
     const p = proveedores.find((x) => x.razonSocial.toLowerCase() === nombre.trim().toLowerCase());
-    if (p) setRuc(p.ruc);
+    if (esProveedorVarios(nombre)) setRuc(RUC_VARIOS);
+    else if (p) setRuc(p.ruc);
+    else setRuc((r) => (r === RUC_VARIOS ? "" : r));
   };
   const setLinea = (id: string, cambio: Partial<Linea>) => setLineas((ls) => ls.map((l) => (l.id === id ? { ...l, ...cambio } : l)));
   const tot = totalesOS(lineas, conIgv);
@@ -227,8 +232,9 @@ export function FormOrdenServicio({
           {origen === "MANUAL" && <div className="md:col-span-2" />}
 
           <Field label="Proveedor *" className="md:col-span-2">
-            <Input value={proveedor} onChange={(e) => elegirProveedor(e.target.value)} list="os-proveedores" placeholder="Razón social" />
+            <Input value={proveedor} onChange={(e) => elegirProveedor(e.target.value)} onFocus={(e) => esProveedorVarios(proveedor) && e.target.select()} list="os-proveedores" placeholder="Razón social" />
             <datalist id="os-proveedores">
+              <option value={PROVEEDOR_VARIOS}>{RUC_VARIOS}</option>
               {proveedores.map((p) => (
                 <option key={p.id} value={p.razonSocial}>
                   {p.ruc}
@@ -237,8 +243,14 @@ export function FormOrdenServicio({
             </datalist>
           </Field>
           <Field label="RUC">
-            <Input value={ruc} onChange={(e) => setRuc(e.target.value.replace(/\D/g, "").slice(0, 11))} placeholder="11 dígitos" inputMode="numeric" />
-            <EstadoRuc ruc={ruc} onValidado={(r) => setProveedor((p) => p.trim() || r.razon_social)} />
+            <Input value={ruc} onChange={(e) => {
+              const n = e.target.value.replace(/\D/g, "").slice(0, 11);
+              setRuc(n);
+              // RUC ya validado en el sistema: reemplaza VARIOS/SIN DATOS por su razón social
+              const sunat = n.length === 11 ? rucSunat(n) : undefined;
+              if (sunat) setProveedor((p) => (esProveedorVarios(p) ? sunat.razon_social : p));
+            }} onFocus={(e) => ruc === RUC_VARIOS && e.target.select()} placeholder="11 dígitos" inputMode="numeric" />
+            <EstadoRuc ruc={ruc} onValidado={(r) => setProveedor((p) => (p.trim() && !esProveedorVarios(p) ? p : r.razon_social))} />
           </Field>
           <Field label="Fecha OS">
             <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
@@ -271,7 +283,7 @@ export function FormOrdenServicio({
                 <th className="px-2 py-2 text-left">Detalle del servicio *</th>
                 <th className="w-24 px-2 py-2 text-left">Cant. *</th>
                 <th className="w-28 px-2 py-2 text-left">Und.</th>
-                <th className="w-32 px-2 py-2 text-left">P. Unit. (sin IGV)</th>
+                <th className="w-32 px-2 py-2 text-left">{conIgv ? "P. Unit. (inc. IGV)" : "P. Unit."}</th>
                 <th className="w-28 px-2 py-2 text-right">Importe</th>
                 <th className="w-10" />
               </tr>
@@ -318,7 +330,7 @@ export function FormOrdenServicio({
               <Plus size={14} /> Agregar línea
             </Button>
             <label className="flex items-center gap-2 text-sm text-plomo-600">
-              <input type="checkbox" checked={conIgv} onChange={(e) => setConIgv(e.target.checked)} /> Afecto a IGV 18%
+              <input type="checkbox" checked={conIgv} onChange={(e) => setConIgv(e.target.checked)} /> Afecto a IGV 18% (precio incluye IGV)
             </label>
           </div>
         </div>
@@ -326,7 +338,7 @@ export function FormOrdenServicio({
         <div className="flex justify-end px-5 py-3">
           <dl className="w-72 space-y-1 text-sm">
             <div className="flex justify-between text-plomo-600">
-              <dt>Subtotal</dt>
+              <dt>{conIgv ? "Base imponible" : "Subtotal"}</dt>
               <dd>{soles(tot.subtotal)}</dd>
             </div>
             <div className="flex justify-between text-plomo-600">
@@ -424,7 +436,7 @@ function AccionesOS({ os, rol }: { os: OrdenServicio; rol: Rol }) {
               </div>
             ))}
           </dl>
-          <Table head={["Detalle", "Cant.", "Und.", "P. Unit.", "Importe"]}>
+          <Table head={["Detalle", "Cant.", "Und.", os.igv > 0 ? (os.preciosConIgv ? "P. Unit. (inc. IGV)" : "P. Unit. (sin IGV)") : "P. Unit.", "Importe"]}>
             {os.items.map((i) => (
               <tr key={i.id}>
                 <Td className="font-medium">{i.descripcion}</Td>
@@ -436,7 +448,7 @@ function AccionesOS({ os, rol }: { os: OrdenServicio; rol: Rol }) {
             ))}
           </Table>
           <p className="text-right">
-            Subtotal {soles(os.subtotal)} · IGV {soles(os.igv)} · <b>Total {soles(os.total)}</b>
+            {os.igv > 0 ? "Base imponible" : "Subtotal"} {soles(os.subtotal)} · IGV {soles(os.igv)} · <b>Total {soles(os.total)}</b>
           </p>
           <ul className="space-y-1 border-t border-plomo-100 pt-3 text-xs text-plomo-600">
             {os.historial.map((h, k) => (

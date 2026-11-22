@@ -8,7 +8,7 @@ import { useLogistica } from "./logistica";
 import type { OrdenProduccion } from "./produccion";
 import { KEYS, hoy, r2, useStore } from "./storage";
 import type { ComprobanteVenta, EventoHistorial, Factura, Guia, NotaPedido, OrdenCompra, OrdenDespacho, Requerimiento, StockItem } from "./types";
-import { estadoOD, npPorCobrar, saldoNP, vencimientoNP } from "./ventas";
+import { esVentaEmitida, estadoOD, npPorCobrar, saldoNP, vencimientoNP } from "./ventas";
 
 export type Etapa = "req" | "cot" | "oc" | "agencia" | "almacen" | "produccion" | "despacho" | "factura";
 export type ModuloGerencia = "Logística" | "Finanzas" | "Almacén" | "Producción";
@@ -122,7 +122,7 @@ export function useGerencia() {
     const porEtapa = Object.fromEntries(ETAPAS.map((e) => [e.id, filas.filter((f) => f.etapa === e.id).length])) as Record<Etapa, number>;
     const porModulo = Object.fromEntries(MODULOS_GERENCIA.map((m) => [m, filas.filter((f) => f.modulo === m).length])) as Record<ModuloGerencia, number>;
 
-    const facturacionHoy = r2(comprobantes.filter((c) => c.estado === "EMITIDO" && c.fecha.startsWith(hoyStr)).reduce((a, c) => a + (c.total || 0), 0));
+    const facturacionHoy = r2(comprobantes.filter((c) => esVentaEmitida(c) && c.fecha.startsWith(hoyStr)).reduce((a, c) => a + (c.total || 0), 0));
     const cxcVencidas = notas.filter((n) => npPorCobrar(n) && saldoNP(n) > 0 && vencimientoNP(n) < hoyStr);
     const cxpVencidas = facturas.filter((f) => f.estadoPago === "POR_PAGAR" && f.fechaVencimiento && f.fechaVencimiento.slice(0, 10) < hoyStr);
 

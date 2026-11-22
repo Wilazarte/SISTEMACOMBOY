@@ -24,6 +24,7 @@ const npVacia = (): DatosNP => ({
   lugarObra: "",
   items: [lineaVacia()],
   conIgv: true,
+  preciosConIgv: true,
   descuento: 0,
   observaciones: "",
 });
@@ -63,6 +64,7 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
       lugarObra: n.lugarObra,
       items: n.items.map((l) => ({ ...l })),
       conIgv: n.conIgv,
+      preciosConIgv: n.preciosConIgv === true, // NP anteriores: precios sin IGV
       descuento: n.descuento,
       observaciones: n.observaciones,
       diasCredito: n.diasCredito,
@@ -316,11 +318,11 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
                 </>
               )}
             </div>
-            <LineasEditor items={form.items} onChange={(items) => setForm({ ...form, items })} stock={stock} />
+            <LineasEditor items={form.items} onChange={(items) => setForm({ ...form, items })} stock={stock} preciosConIgv={form.preciosConIgv !== false} />
             <div className="flex flex-wrap items-start gap-4">
               <div className="space-y-3">
                 <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input type="checkbox" checked={form.conIgv} onChange={(e) => setForm({ ...form, conIgv: e.target.checked })} /> Agregar IGV 18 %
+                  <input type="checkbox" checked={form.conIgv} onChange={(e) => setForm({ ...form, conIgv: e.target.checked })} /> Afecto a IGV 18 % (precio incluye IGV)
                 </label>
                 <Field label="Descuento S/">
                   <Input type="number" min={0} step="0.01" value={form.descuento || ""} onChange={(e) => setForm({ ...form, descuento: parseFloat(e.target.value) || 0 })} className="w-40" />
@@ -329,7 +331,7 @@ export function NotasPedido({ onFacturar }: { onFacturar: (npId: string) => void
               <Field label="Observaciones" className="min-w-[240px] flex-1">
                 <Textarea value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} />
               </Field>
-              <TotalesVenta items={form.items} conIgv={form.conIgv} descuento={form.descuento} />
+              <TotalesVenta items={form.items} conIgv={form.conIgv} descuento={form.descuento} preciosConIgv={form.preciosConIgv !== false} />
             </div>
             <div className="flex justify-end gap-2 border-t border-plomo-100 pt-4">
               <Button variant="secondary" onClick={cerrarForm}>

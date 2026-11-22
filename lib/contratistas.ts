@@ -4,6 +4,7 @@
 
 import { ErpError, KEYS, escribir, hoy, leer, r2, rucValido, uid } from "./storage";
 import { COMPROBANTES } from "./comprobantes";
+import { errorCaja } from "./cajas";
 import { exigirRucSunat } from "./ruc";
 import type { ComprobanteContratista, ConcesionContratista, PagoContratista, TipoServicioContratista } from "./types";
 
@@ -134,7 +135,8 @@ export function registrarPago(id: string, pago: PagoContratista): ConcesionContr
   const monto = r2(Number(pago.monto));
   if (!(monto > 0)) throw new ErpError("El monto del pago debe ser mayor a 0.");
   if (!FECHA.test(pago.fecha)) throw new ErpError("Indique la fecha del pago.");
-  if (!pago.caja?.trim()) throw new ErpError("Seleccione de qué caja sale el pago.");
+  const errCaja = errorCaja(pago.caja);
+  if (errCaja) throw new ErpError(errCaja);
   return actualizar(id, (c) => {
     if (c.estado !== "ACTIVO") throw new ErpError(`La concesión está ${c.estado}: no admite pagos.`);
     if (monto > calcularSaldo(c) + 0.005) throw new ErpError(`El pago supera el saldo (S/ ${calcularSaldo(c).toFixed(2)}).`);

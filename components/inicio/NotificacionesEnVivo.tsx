@@ -11,7 +11,8 @@ import { NOMBRE_MODULO_NOTIF, marcarLeidas, useNotifFlujo } from "@/lib/notifica
 // Fuente: tabla notificaciones (avisos del flujo 26W, en vivo por Realtime; RLS: su módulo o asignadas a él).
 // Sin el SQL 20261107_notificaciones_flujo.sql, los avisos calculados del ERP (los mismos de la campana).
 
-const MAX = 6;
+/** Avisos que muestra la columna fija del INICIO (con scroll propio). */
+const MAX = 20;
 
 interface Aviso {
   id: string;
@@ -19,6 +20,8 @@ interface Aviso {
   detalle: string;
   href: string;
   nueva: boolean;
+  /** Para ordenar (los calculados no tienen fecha: van después de los de la tabla). */
+  fecha: string;
 }
 
 const hace = (iso: string): string => {
@@ -34,24 +37,35 @@ export function NotificacionesEnVivo({ sesion, modulo }: { sesion: Sesion | null
   const calculadas = useNotificaciones(sesion);
   const clave = modulo.toUpperCase();
 
-  const avisos: Aviso[] = flujo.disponible
+  const deTabla: Aviso[] = flujo.disponible
     ? flujo.items
         // SOPORTE ve todos; cada módulo, los suyos (RLS ya filtra; esto ordena lo que ve SOPORTE en otros INICIO)
         .filter((n) => modulo === "soporte" || n.modulo === clave)
-        .sort((a, b) => Number(a.leida) - Number(b.leida) || b.created_at.localeCompare(a.created_at))
-        .slice(0, MAX)
         .map((n) => ({
           id: n.id,
           titulo: n.titulo,
-          detalle: [NOMBRE_MODULO_NOTIF[n.modulo] ?? n.modulo, n.codigo_expediente, hace(n.created_at)].filter(Boolean).join(" · "),
+          detalle: (n.tipo === "REQ_ALMACEN"
+            ? ["Almacén → Tesorería", n.mensaje, hace(n.created_at)]
+            : [NOMBRE_MODULO_NOTIF[n.modulo] ?? n.modulo, n.codigo_expediente, hace(n.created_at)]
+          ).filter(Boolean).join(" · "),
           href: n.href ?? "",
           nueva: !n.leida,
+          fecha: n.created_at,
         }))
-    : calculadas.slice(0, MAX).map((n) => ({ id: n.clave, titulo: n.titulo, detalle: `${n.modulo} · ${n.detalle}`, href: n.href, nueva: true }));
+    : [];
+  // Avisos calculados: todos, si aún no se corrió el SQL 20261107; si ya está, solo los REQ de Almacén → Tesorería
+  // que la base todavía no avisó (sin el SQL 20261117), para que Finanzas siempre vea cada REQ pendiente.
+  const veReqs = modulo === "finanzas" || modulo === "soporte";
+  const calc: Aviso[] = calculadas
+    .filter((n) => !flujo.disponible || (veReqs && n.clave.startsWith("req:")))
+    .map((n) => ({ id: n.clave, titulo: n.titulo, detalle: `${n.modulo} · ${n.detalle}`, href: n.href, nueva: true, fecha: "" }));
+  const avisos: Aviso[] = [...calc, ...deTabla]
+    .sort((a, b) => Number(b.nueva) - Number(a.nueva) || b.fecha.localeCompare(a.fecha))
+    .slice(0, MAX);
   const nuevas = avisos.filter((a) => a.nueva).length;
 
   const ir = (a: Aviso) => {
-    if (flujo.disponible && a.nueva) void marcarLeidas([a.id]);
+    if (flujo.disponible && a.nueva && !a.id.includes(":")) void marcarLeidas([a.id]);
     if (a.href) irA(a.href);
   };
 
@@ -69,7 +83,7 @@ export function NotificacionesEnVivo({ sesion, modulo }: { sesion: Sesion | null
       {avisos.length === 0 ? (
         <p className="text-[13px] text-[#9CA3AF]">Sin avisos pendientes.</p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-2 lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto lg:pr-1">
           {avisos.map((a) => (
             <li key={a.id} className="flex items-center justify-between gap-3 rounded-lg border border-white/[0.06] bg-white/[0.04] p-3 hover-cian">
               <div className="min-w-0">

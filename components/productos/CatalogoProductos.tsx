@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { AlertTriangle, Check, Combine, Inbox, Package, PackagePlus, Pencil, Search, X } from "lucide-react";
+import { AlertTriangle, Check, Combine, Inbox, Package, PackagePlus, Pencil, Search, Tags, X } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutarAsync, toast } from "@/components/ui";
 import { BotonFiltros, BotonNuevo } from "@/components/ui/BotonFiltros";
 import { SolicitarProducto } from "@/components/productos/ProductoInput";
+import { FiltroCategoria, GestionCategorias, SelectCategoria, contarCategorias, pasaCategoria } from "@/components/productos/Categorias";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { getSesion } from "@/lib/auth";
 import { UNIDADES } from "@/lib/empresa";
@@ -19,6 +20,7 @@ import {
   rechazarSolicitud,
   resolverSolicitudCon,
   similitud,
+  sugerirCategoriaVigente,
   unificarProductos,
   useCatalogo,
   type DatosProducto,
@@ -28,7 +30,7 @@ import {
 import type { StockItem } from "@/lib/types";
 import type { StockLocal } from "@/lib/sucursal-modelos";
 
-type Tab = "catalogo" | "solicitudes" | "duplicados";
+type Tab = "catalogo" | "categorias" | "solicitudes" | "duplicados";
 
 /**
  * Catálogo de Productos (pestaña de VENTAS, ?tab=productos): contadores + sub-pestañas Catálogo | Solicitudes | Posibles duplicados.
@@ -40,10 +42,11 @@ export function CatalogoProductos() {
   const [tab, setTab] = useState<Tab>("catalogo");
   const pendientes = solicitudes.filter((s) => s.estado === "pendiente");
   const duplicados = useMemo(() => posiblesDuplicados(productos), [productos]);
+  const sinCategoria = productos.filter((p) => !p.categoria?.trim()).length;
   // Campana "Producto nuevo solicitado": /dashboard/ventas?tab=productos&sub=solicitudes
   useEffect(() => {
     const sub = new URLSearchParams(window.location.search).get("sub");
-    if (sub === "solicitudes" || sub === "duplicados") setTab(sub);
+    if (sub === "solicitudes" || sub === "duplicados" || sub === "categorias") setTab(sub);
   }, []);
 
   return (
@@ -63,8 +66,9 @@ export function CatalogoProductos() {
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Contador label="Total en catálogo" valor={productos.length} icon={<Package size={18} />} onClick={() => setTab("catalogo")} />
+        <Contador label="Sin categoría" valor={sinCategoria} icon={<Tags size={18} />} alerta={sinCategoria > 0} onClick={() => setTab("categorias")} />
         <Contador label="Solicitudes pendientes" valor={pendientes.length} icon={<Inbox size={18} />} alerta={pendientes.length > 0} onClick={() => setTab("solicitudes")} />
         <Contador label="Posibles duplicados" valor={duplicados.length} icon={<Combine size={18} />} alerta={duplicados.length > 0} onClick={() => setTab("duplicados")} />
       </div>
@@ -75,12 +79,14 @@ export function CatalogoProductos() {
         onChange={setTab}
         tabs={[
           { id: "catalogo", label: "Catálogo", icon: <Package size={16} />, count: productos.length },
+          { id: "categorias", label: "Categorías", icon: <Tags size={16} />, count: sinCategoria },
           { id: "solicitudes", label: "Solicitudes", icon: <Inbox size={16} />, count: pendientes.length },
           { id: "duplicados", label: "Posibles duplicados", icon: <Combine size={16} />, count: duplicados.length },
         ]}
       />
 
       {tab === "catalogo" && <Catalogo productos={productos} admin={admin} />}
+      {tab === "categorias" && <GestionCategorias productos={productos} admin={admin} />}
       {tab === "solicitudes" && <Solicitudes solicitudes={solicitudes} productos={productos} admin={admin} />}
       {tab === "duplicados" && <Duplicados pares={duplicados} admin={admin} />}
     </div>
@@ -122,8 +128,8 @@ function Catalogo({ productos, admin }: { productos: ProductoMaestro[]; admin: b
     });
     return m;
   }, [stock, stockSuc]);
-  const categorias = Array.from(new Set(productos.map((p) => p.categoria).filter(Boolean) as string[])).sort();
-  const lista = productos.filter((p) => (!q || `${p.sku} ${p.nombre_normalizado} ${p.marca ?? ""}`.includes(normalizarNombre(q))) && (!cat || p.categoria === cat));
+  const conteoCat = useMemo(() => contarCategorias(productos.map((p) => p.categoria?.trim())), [productos]);
+  const lista = productos.filter((p) => (!q || `${p.sku} ${p.nombre_normalizado} ${p.marca ?? ""}`.includes(normalizarNombre(q))) && pasaCategoria(p.categoria?.trim(), cat));
   const visibles = lista.slice(0, 200);
 
   return (
@@ -152,7 +158,7 @@ function Catalogo({ productos, admin }: { productos: ProductoMaestro[]; admin: b
                 <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-plomo-500" />
                 <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar SKU, nombre, marca…" className="pl-9" aria-label="Buscar" />
               </label>
-              {categorias.length > 0 && <Select value={cat} onChange={(e) => setCat(e.target.value)} placeholder="Categoría" options={categorias.map((c) => ({ value: c, label: c }))} className="w-48" />}
+              <FiltroCategoria value={cat} onChange={setCat} conteo={conteoCat} />
             </>
           )}
         </div>
@@ -170,7 +176,7 @@ function Catalogo({ productos, admin }: { productos: ProductoMaestro[]; admin: b
                 </Td>
                 <Td>{p.unidad}</Td>
                 <Td>{p.marca || "-"}</Td>
-                <Td>{p.categoria || "-"}</Td>
+                <Td>{p.categoria || <span className="text-xs text-amber-700">Sin categoría</span>}</Td>
                 <Td className="text-right" >
                   <span title={st ? Array.from(st.sedes).join(", ") : ""}>{st?.alm ?? 0}</span>
                 </Td>
@@ -199,6 +205,8 @@ function FormProducto({ inicial, solicitudId, onListo }: { inicial?: Partial<Dat
   const [f, setF] = useState<DatosProducto>({ nombre: inicial?.nombre ?? "", unidad: inicial?.unidad ?? "UND", marca: inicial?.marca ?? "", categoria: inicial?.categoria ?? "", descripcion: "" });
   const [aviso, setAviso] = useState<{ mensaje: string; similar: boolean } | null>(null);
   const [guardando, setGuardando] = useState(false);
+  // La categoría se sugiere por el nombre mientras no se elija a mano
+  const [catManual, setCatManual] = useState(!!inicial?.categoria);
   const guardar = async (forzar = false) => {
     setGuardando(true);
     try {
@@ -213,7 +221,7 @@ function FormProducto({ inicial, solicitudId, onListo }: { inicial?: Partial<Dat
   };
   const set = (k: keyof DatosProducto) => (e: { target: { value: string } }) => {
     setAviso(null);
-    setF({ ...f, [k]: e.target.value });
+    setF({ ...f, [k]: e.target.value, ...(k === "nombre" && !catManual ? { categoria: sugerirCategoriaVigente(e.target.value) ?? "" } : {}) });
   };
   return (
     <Card>
@@ -228,8 +236,8 @@ function FormProducto({ inicial, solicitudId, onListo }: { inicial?: Partial<Dat
         <Field label="Marca">
           <Input value={f.marca} onChange={set("marca")} />
         </Field>
-        <Field label="Categoría">
-          <Input value={f.categoria} onChange={set("categoria")} placeholder="Repuesto, insumo, servicio…" />
+        <Field label="Categoría" hint={!catManual && f.categoria ? "Sugerida por el nombre" : undefined}>
+          <SelectCategoria value={f.categoria ?? ""} onChange={(v) => (setCatManual(true), setF({ ...f, categoria: v }))} />
         </Field>
         <Field label="Descripción" className="md:col-span-3">
           <Input value={f.descripcion} onChange={set("descripcion")} />
@@ -279,7 +287,7 @@ function ModalEditar({ producto, onClose }: { producto: ProductoMaestro; onClose
           <Input value={f.marca} onChange={(e) => setF({ ...f, marca: e.target.value })} />
         </Field>
         <Field label="Categoría">
-          <Input value={f.categoria} onChange={(e) => setF({ ...f, categoria: e.target.value })} />
+          <SelectCategoria value={f.categoria} onChange={(v) => setF({ ...f, categoria: v })} />
         </Field>
         <label className="flex items-center gap-2 self-end pb-2 text-sm text-fg-2">
           <input type="checkbox" checked={f.activo} onChange={(e) => setF({ ...f, activo: e.target.checked })} /> Activo (aparece en los formularios)

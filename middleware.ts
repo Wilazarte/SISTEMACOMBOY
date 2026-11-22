@@ -13,7 +13,7 @@ const LOGIN = "/login";
 const esLogin = (ruta: string) => ruta === LOGIN || ruta.startsWith(`${LOGIN}/`) || ruta === RUTA_LOGIN_SUCURSAL;
 
 /** Rutas de módulos cuyo permiso se revisa en el servidor (el resto solo exige sesión). */
-const MODULOS = ["/dashboard", RUTA_SUCURSAL, "/erp", "/gerencia", "/logistica", "/almacen", "/finanzas", "/produccion", "/soporte"];
+const MODULOS = ["/dashboard", RUTA_SUCURSAL, "/erp", "/gerencia", "/logistica", "/almacen", "/finanzas", "/produccion", "/ventas", "/soporte"];
 const enModulo = (ruta: string) => MODULOS.some((m) => ruta === m || ruta.startsWith(`${m}/`));
 
 export async function middleware(req: NextRequest) {
@@ -60,7 +60,7 @@ export async function middleware(req: NextRequest) {
   const sesion: Sesion = { usuario: p.usuario, rol: p.rol as RolAuth, nombre: p.nombre, modulos: p.modulos ?? [], soloLectura: !!p.solo_lectura, moduloAsignado: p.modulo_asignado ?? undefined };
 
   // Perfiles asignados (pedido de Williams, 2026-10-30): quien no es SOPORTE entra solo a su módulo;
-  // /dashboard y cualquier ruta sin permiso lo llevan a su INICIO (/almacen, /finanzas, /logistica, /produccion)
+  // /dashboard y cualquier ruta sin permiso lo llevan a su INICIO (/almacen, /finanzas, /logistica, /produccion, /ventas)
   const asignado = enSecocha ? null : homeAsignado(sesion);
   if (ruta === "/dashboard") return asignado ? ir(asignado) : res;
 

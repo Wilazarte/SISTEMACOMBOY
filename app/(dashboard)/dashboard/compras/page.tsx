@@ -2,9 +2,13 @@
 
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { ProductoInput } from "@/components/productos/ProductoInput";
+import { EtiquetasCategorias, FiltroCategoria, categoriasDeItems, contarCategoriasDocs, docPasaCategoria } from "@/components/productos/Categorias";
+import { useCatalogo } from "@/lib/productos";
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   AlertTriangle,
+  ClipboardList,
+  Download,
   Check,
   Eye,
   FileCheck2,
@@ -30,12 +34,15 @@ import { EstadoRuc } from "@/components/EstadoRuc";
 import { FormGasto } from "@/components/compras/FormGasto";
 import { SelectorCaja } from "@/components/SelectorCaja";
 import { FormBancarizacion, bancarizacionVacia } from "@/components/compras/FormBancarizacion";
-import { OPCIONES_COMPROBANTE, numeroAutomatico, placeholderComprobante } from "@/lib/comprobantes";
+import { OPCIONES_COMPROBANTE, PROVEEDOR_VARIOS_ID, numeroAutomatico, placeholderComprobante, proveedorVarios } from "@/lib/comprobantes";
 import { SelectorOrden } from "@/components/compras/SelectorOrden";
+import { useDJsAutomaticas } from "@/components/compras/useDJsAutomaticas";
 import { PagoCompraForm, pagoCompraDe, pagoCompraVacio, type FormPagoCompra } from "@/components/compras/PagoCompra";
 import { CAJA_POR_DEFECTO } from "@/lib/cajas";
 import {
   IGV,
+  desglosarIgv,
+  totalesLineas,
   COMPROBANTES_GASTO,
   docCompra,
   cuentaOrigenDeCaja,
@@ -45,6 +52,9 @@ import {
   KEYS,
   esContratista,
   esDeclaracionJurada,
+  djDeCompra,
+  djsDeCompras,
+  numeroDJ,
   MAX_ARCHIVO,
   TOPE_DJ,
   abrirArchivo,
@@ -92,7 +102,6 @@ import PlanillaInterna from "@/components/tesoreria/PlanillaTab";
 import { DeclaracionesJuradas } from "@/components/tesoreria/DeclaracionesJuradas";
 import { pdfDeclaracionJurada } from "@/lib/pdf";
 import { EditarReq, permisoEditarReq } from "@/components/compras/EditarReq";
-import TesoreriaLeftDrawer from "@/components/tesoreria/TesoreriaLeftDrawer";
 import QuickActions, { QA_IDS } from "@/components/tesoreria/QuickActions";
 import { BotonNuevo } from "@/components/ui/BotonFiltros";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
@@ -101,7 +110,7 @@ import { FormOrdenServicio, filasOrdenesServicio } from "@/components/compras/Or
 import type { Trabajador } from "@/lib/types";
 import type { Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, OrdenServicio, Proveedor, Requerimiento, Rol, OrdenAGenerar, StockItem, TipoComprobanteCompra } from "@/lib/types";
 
-type Tab = "registrar" | "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias" | "planilla" | "declaraciones";
+type Tab = "nuevos" | "registrar" | "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias" | "planilla" | "declaraciones";
 
 const FORMAS_PAGO: FormaPago[] = ["CONTADO", "CREDITO 15 DIAS", "CREDITO 30 DIAS", "CREDITO 60 DIAS", "ADELANTO 50%"];
 const DIAS_CREDITO: Record<FormaPago, number> = {
@@ -157,7 +166,7 @@ export default function ComprasPage() {
   // Contador de la pestaña Planilla (solo se descarga si el usuario ve planilla)
   const trabajadores = useStore<Trabajador[]>(KEYS.TRABAJADORES, [], vePlanilla);
   const activos = trabajadores.filter((t) => t.activo && !esContratista(t)).length;
-  const tabsPermitidas: Tab[] = [...(veCompras ? (["registrar", "antecedentes", "cotizaciones", "ordenes", "facturas", "declaraciones"] as Tab[]) : []), ...(vePlanilla ? (["planilla"] as Tab[]) : [])];
+  const tabsPermitidas: Tab[] = [...(veCompras ? (["nuevos", "registrar", "antecedentes", "cotizaciones", "ordenes", "facturas", "declaraciones"] as Tab[]) : []), ...(vePlanilla ? (["planilla"] as Tab[]) : [])];
   // Al volver a Tesorería abre la última pestaña usada (salvo que la URL pida otra con ?tab=)
   useEffect(() => {
     try {
@@ -199,18 +208,13 @@ export default function ComprasPage() {
     // Requerimientos por revisar: sección de la barra derecha de notificaciones (layout)
     <div className="w-full space-y-6">
       {/* Planilla (botón propio del dock) muestra solo su título, isla y contenido */}
-      {!enPlanilla && (
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="font-serif tracking-tight text-2xl font-bold leading-tight text-fg lg:text-[28px]">Tesorería / Compras</h1>
-          </div>
-          {!puede(rol, "req.revisar") && (
-            <span className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-plomo-600">Modo lectura para su rol</span>
-          )}
+      {/* El nombre del módulo ya está en la barra superior (Williams 2026-11-16): el título queda solo para lectores de pantalla */}
+      {!enPlanilla && <h1 className="sr-only">Tesorería / Compras</h1>}
+      {!enPlanilla && !puede(rol, "req.revisar") && (
+        <div className="flex justify-end">
+          <span className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-plomo-600">Modo lectura para su rol</span>
         </div>
       )}
-
-      {veCompras && <Notificaciones pendientes={pendientes} rol={rol} />}
 
       {/* Isla de Tesorería sin Planilla: Planilla abre desde su botón del dock y dibuja su propia isla */}
       <Tabs<Tab>
@@ -221,6 +225,7 @@ export default function ComprasPage() {
           // Isla: Registrar gasto · Cotizaciones · Órdenes compra · Facturas · Declaraciones · Antecedentes
           ...(veCompras
             ? [
+                { id: "nuevos" as const, label: "NUEVOS REQ", icon: <ClipboardList size={16} />, count: pendientes.length },
                 { id: "registrar" as const, label: "Registrar gasto", icon: <PackagePlus size={16} /> },
                 { id: "cotizaciones" as const, label: "Cotizaciones", icon: <FileSpreadsheet size={16} />, count: cotizables.filter((r) => r.estado === "ACEPTADO").length },
                 { id: "ordenes" as const, label: "Órdenes OC / OS", icon: <ShoppingBag size={16} />, count: cotisSinOC.length },
@@ -231,13 +236,21 @@ export default function ComprasPage() {
           ...(vePlanilla ? [{ id: "planilla" as const, label: "Planilla", icon: <Users size={16} />, count: activos }] : []),
           ...(veCompras
             ? [
-                { id: "declaraciones" as const, label: "Declaraciones", icon: <FileText size={16} />, count: facturas.filter(esDeclaracionJurada).length },
+                { id: "declaraciones" as const, label: "Declaraciones", icon: <FileText size={16} />, count: facturas.filter(esDeclaracionJurada).length + djsDeCompras(compras).length },
                 { id: "antecedentes" as const, label: "Antecedentes", icon: <History size={16} /> },
               ]
             : []),
         ]}
       />
 
+      {tab === "nuevos" && veCompras && (
+        <NuevosReq
+          pendientes={pendientes}
+          porCotizar={procesados.filter((r) => r.estado === "ACEPTADO" && !cotizaciones.some((c) => c.reqId === r.id))}
+          rol={rol}
+          onCotizar={(id) => ir("cotizaciones", { req: id })}
+        />
+      )}
       {tab === "registrar" && <RegistrarCompra rol={rol} proveedores={proveedores} compras={compras} gastos={facturas.filter((f) => f.esGastoTesoreria)} stock={stock} onGenerarOS={(id) => ir("ordenes", { gasto: id })} />}
       {tab === "antecedentes" && <Antecedentes reqs={procesados} ordenes={ordenes} rol={rol} onCotizar={(id) => ir("cotizaciones", { req: id })} onIr={irTab} />}
       {tab === "cotizaciones" && (
@@ -259,7 +272,7 @@ export default function ComprasPage() {
         />
       )}
       {tab === "facturas" && <Facturas key={pre.oc ?? "f"} rol={rol} ocs={ocsSinFactura} ordenes={ordenes} facturas={facturas} preOc={pre.oc} onIr={irTab} />}
-      {tab === "declaraciones" && veCompras && <DeclaracionesJuradas facturas={facturas} rol={rol} />}
+      {tab === "declaraciones" && veCompras && <DeclaracionesJuradas facturas={facturas} compras={compras} rol={rol} />}
       {tab === "planilla" && vePlanilla && (
         <div>
           <PlanillaInterna />
@@ -271,9 +284,22 @@ export default function ComprasPage() {
 }
 
 // =====================================================================
-// NOTIFICACIONES (cards amarillas)
+// NUEVOS REQ (Tesorería): requerimientos de Almacén por revisar
+// Ver · Descargar · Editar · Aceptar (→ Ingresar cotización) · Observar · Rechazar
+// Antes vivían en la barra derecha de notificaciones, que el ERP v3.0 ya no dibuja.
 // =====================================================================
-function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requerimiento[]; rol: Rol }) {
+function NuevosReq({
+  pendientes: todosPendientes,
+  porCotizar,
+  rol,
+  onCotizar,
+}: {
+  pendientes: Requerimiento[];
+  /** REQ aceptados que aún no tienen cotización: siguiente paso del flujo. */
+  porCotizar: Requerimiento[];
+  rol: Rol;
+  onCotizar: (reqId: string) => void;
+}) {
   // Cada REQ una sola vez (por número), aunque llegue repetido de la caché
   const pendientes = todosPendientes.filter((r, i, arr) => i === arr.findIndex((x) => x.id === r.id || (!!x.numero && x.numero === r.numero)));
   const [rechazo, setRechazo] = useState<Requerimiento | null>(null);
@@ -299,22 +325,20 @@ function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requ
     if (ejecutar(() => void aceptarMultiple(elegidos, rol), plural(elegidos.length, "aceptado"))) setMarcados(new Set());
   };
 
-  if (pendientes.length === 0)
-    return (
-      <TesoreriaLeftDrawer cantidad={0}>
-        <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-300">
-          <Check size={16} /> No hay requerimientos pendientes de revisión.
-        </div>
-      </TesoreriaLeftDrawer>
-    );
+  const puedeCotizar = puede(rol, "coti.crear");
+  const aceptar = (r: Requerimiento) => {
+    if (ejecutar(() => aceptarRequerimiento(r.id, rol), `${r.numero} ACEPTADO`) && puedeCotizar) onCotizar(r.id);
+  };
 
   return (
-    <>
-      <TesoreriaLeftDrawer
-        cantidad={pendientes.length}
-        acciones={
-          habilitado && (
-            <>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader
+          title={`NUEVOS REQ · por revisar (${pendientes.length})`}
+          subtitle="Requerimientos de Almacén. Al aceptar se abre Ingresar cotización con el REQ elegido."
+          action={
+          habilitado && pendientes.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
               <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-white/10 bg-white/10 px-2 py-1 text-xs font-medium text-white">
                 <input
                   type="checkbox"
@@ -330,10 +354,17 @@ function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requ
               <button className={`${BTN_REQ} h-7 border-[#ff1a1a] bg-[#ff1a1a] px-2 font-bold`} disabled={elegidos.length === 0} onClick={() => setRechazoLote(true)}>
                 <X size={13} /> Rechazar{elegidos.length ? ` (${elegidos.length})` : ""}
               </button>
-            </>
+            </div>
           )
         }
-      >
+        />
+        <div className="p-4">
+        {pendientes.length === 0 ? (
+          <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-300">
+            <Check size={16} /> No hay requerimientos pendientes de revisión.
+          </div>
+        ) : (
+        <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
         {pendientes.map((r) => (
           <div key={r.id} className={cn("flex flex-col rounded-lg border bg-[#212a3a] p-3", marcados.has(r.id) ? "border-[#2a7bff]" : "border-amber-500/30")}>
             <div className="flex items-start justify-between">
@@ -352,6 +383,11 @@ function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requ
                 <p className="text-xs text-plomo-600">
                   {fechaPE(r.fecha)} · {r.sede}
                 </p>
+                {r.editadoPor && r.editadoEn && (
+                  <p className="text-[11px] text-amber-500" title="Queda en el historial del REQ y en la auditoría de ediciones">
+                    Editado por {r.editadoPor} · {new Date(r.editadoEn).toLocaleString("es-PE", { dateStyle: "short", timeStyle: "short" })}
+                  </p>
+                )}
                 </div>
               </div>
               <span className="rounded-full bg-[#fbbf24] px-2 py-0.5 text-[11px] font-bold text-black">PENDIENTE</span>
@@ -371,6 +407,9 @@ function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requ
               <button className={`${BTN_REQ} border-[#60a5fa] bg-[#1e3a8a] shadow-[0_0_12px_rgba(30,58,138,0.6)]`} onClick={() => abrirDoc({ tipo: "REQ", id: r.id })}>
                 <Eye size={14} /> Ver
               </button>
+              <button className={`${BTN_REQ} border-[#60a5fa] bg-[#1e3a8a] shadow-[0_0_12px_rgba(30,58,138,0.6)]`} onClick={() => pdfRequerimiento(r)}>
+                <Download size={14} /> Descargar
+              </button>
               {(() => {
                 const p = permisoEditarReq(r, sesion);
                 return (
@@ -381,7 +420,7 @@ function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requ
                   </span>
                 );
               })()}
-              <button className={`${BTN_REQ} border-[#2a7bff] grad-azul shadow-[0_0_14px_rgba(42,123,255,0.6)]`} disabled={!habilitado} onClick={() => ejecutar(() => aceptarRequerimiento(r.id, rol), `${r.numero} ACEPTADO`)}>
+              <button className={`${BTN_REQ} border-[#2a7bff] grad-azul shadow-[0_0_14px_rgba(42,123,255,0.6)]`} disabled={!habilitado} onClick={() => aceptar(r)}>
                 <Check size={14} /> Aceptar
               </button>
               <button className={`${BTN_REQ} border-[#2a7bff] bg-[#212a3a] shadow-[0_0_12px_rgba(42,123,255,0.35)]`} disabled={!habilitado} onClick={() => { setMotivo(""); setObs(r); }}>
@@ -393,7 +432,43 @@ function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requ
             </div>
           </div>
         ))}
-      </TesoreriaLeftDrawer>
+        </div>
+        )}
+        </div>
+      </Card>
+
+      {porCotizar.length > 0 && (
+        <Card>
+          <CardHeader title={`Aceptados · por cotizar (${porCotizar.length})`} subtitle="Siguiente paso: ingresar la cotización del proveedor y luego emitir la OC / OS." />
+          <div className="divide-y divide-plomo-100">
+            {porCotizar.map((r) => (
+              <div key={r.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-fg">
+                    {r.numero} <span className="ml-1 inline-block align-middle"><Badge estado={r.estado} /></span>
+                  </p>
+                  <p className="truncate text-xs text-plomo-500">
+                    {fechaPE(r.fecha)} · {r.sede} · {r.solicitante} · {r.items.length} ítem(s)
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "REQ", id: r.id })} title="Ver e historial">
+                    <Eye size={15} />
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => pdfRequerimiento(r)} title="Descargar PDF">
+                    <Download size={15} />
+                  </Button>
+                  {puedeCotizar && (
+                    <Button size="sm" onClick={() => onCotizar(r.id)}>
+                      <FileSpreadsheet size={15} /> Ingresar cotización
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {editReq && <EditarReq req={editReq} rol={rol} onClose={() => setEditReq(null)} />}
 
@@ -452,7 +527,7 @@ function Notificaciones({ pendientes: todosPendientes, rol }: { pendientes: Requ
           </Button>
         </div>
       </Modal>
-    </>
+    </div>
   );
 }
 
@@ -491,7 +566,8 @@ function RegistrarCompra({
   onGenerarOS: (gastoId: string) => void;
 }) {
   const [modo, setModo] = useState<ModoRegistro>("GASTO");
-  const [proveedorId, setProveedorId] = useState("");
+  // Por defecto VARIOS/SIN DATOS (N° 010101), primera opción de la lista
+  const [proveedorId, setProveedorId] = useState(PROVEEDOR_VARIOS_ID);
   const [nuevoProv, setNuevoProv] = useState<{ razonSocial: string; ruc: string } | null>(null);
   const [fechaTxt, setFechaTxt] = useState(fechaPE(hoy()));
   const [tipo, setTipo] = useState<TipoComprobanteCompra>("FACTURA");
@@ -501,8 +577,12 @@ function RegistrarCompra({
   const [generarOrden, setGenerarOrden] = useState<OrdenAGenerar>("NINGUNA");
   const ordenesServicio = useStore<OrdenServicio[]>(KEYS.ORDENES_SERVICIO, []);
   const gastosConOS = useMemo(() => new Set(ordenesServicio.filter((o) => o.estado !== "ANULADA" && o.gastoId).map((o) => o.gastoId!)), [ordenesServicio]);
+  // Gastos y compras marcados "Sin comprobante": su declaración jurada se genera sola (también los ya registrados)
+  useDJsAutomaticas(rol);
   const [guardandoCompra, setGuardandoCompra] = useState(false);
   const [filas, setFilas] = useState<FilaCompra[]>([filaVacia()]);
+  // Precios con IGV incluido (Williams 2026-11-14). false solo al editar una compra con factura anterior (sin IGV)
+  const [preciosConIgv, setPreciosConIgv] = useState(true);
   const habilitado = puede(rol, "compra.crear");
   const sesion = getSesion();
   // Edición: el mismo formulario de "Registrar compra" con los datos de la compra
@@ -521,21 +601,25 @@ function RegistrarCompra({
     setPago(pagoCompraDe(c));
     setGenerarOrden(c.ordenCompraId ? "OC" : c.ordenServicioId ? "OS" : "NINGUNA");
     setFilas(c.items.map((i) => ({ id: uid(), nombre: i.nombre, unidad: i.unidad, cantidad: i.cantidad, precioUnit: i.precioUnit })));
+    setPreciosConIgv(c.preciosConIgv === true || c.tipoComprobante !== "FACTURA");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const cancelarEdicion = () => {
     setEditando(null);
     setNumero("");
     setFilas([filaVacia()]);
+    setPreciosConIgv(true);
     setPago(pagoCompraVacio());
     setGenerarOrden("NINGUNA");
   };
 
   const fechaISO = parseFechaPE(fechaTxt);
   const fechaError = fechaTxt.length === 10 && !fechaISO ? "Fecha inexistente" : fechaISO > hoy() ? "La fecha no puede ser futura" : undefined;
-  const { subtotal, igv, total } = totalesCompra(tipo, filas);
-  const conIgv = tipo === "BOLETA";
-  const prov = proveedores.find((p) => p.id === proveedorId);
+  const { subtotal, igv, total } = totalesCompra(tipo, filas, preciosConIgv);
+  // Factura y boleta: precio con IGV incluido (salvo una factura anterior que se está editando)
+  const conIgv = tipo === "BOLETA" || (tipo === "FACTURA" && preciosConIgv);
+  const listaProveedores = useMemo(() => [proveedorVarios(), ...proveedores], [proveedores]);
+  const prov = listaProveedores.find((p) => p.id === proveedorId);
   const set = (id: string, campo: keyof FilaCompra, v: string | number) => setFilas((p) => p.map((i) => (i.id === id ? { ...i, [campo]: v } : i)));
   const productosStock = useMemo(() => Array.from(new Set(stock.map((s) => s.nombre))).sort(), [stock]);
 
@@ -560,6 +644,7 @@ function RegistrarCompra({
       pago: { ...resto, ...(pago.estado === "PAGADO" ? { bancarizacion } : {}) },
       generarOrden,
       items: filas,
+      preciosConIgv,
     };
     setGuardandoCompra(true);
     let ordenNumero = "";
@@ -625,17 +710,17 @@ function RegistrarCompra({
             subtitle={
               editando
                 ? "Al guardar se devuelve al almacén lo que ingresó esta compra y entra lo corregido (queda como AJUSTE en el kardex)."
-                : "Factura: precios sin IGV (se suma 18 %). Boleta: precios con IGV incluido. Recibos, DJ, ticket y sin comprobante: sin IGV. Al guardar, los productos ingresan al stock del almacén seleccionado."
+                : "Factura y boleta: escriba los precios CON IGV incluido (el sistema desglosa base e IGV). Recibos, DJ, ticket y sin comprobante: sin IGV. Al guardar, los productos ingresan al stock del almacén seleccionado."
             }
           />
           <div className="grid gap-4 p-5 md:grid-cols-3">
-            <Field label="Proveedor" className="md:col-span-2" hint={prov ? `RUC ${prov.ruc}` : undefined}>
+            <Field label="Proveedor" className="md:col-span-2" hint={prov ? (prov.id === PROVEEDOR_VARIOS_ID ? `Por defecto · N° ${prov.ruc}` : `RUC ${prov.ruc}`) : undefined}>
               <div className="flex gap-2">
                 <Select
                   value={proveedorId}
                   onChange={(e) => setProveedorId(e.target.value)}
-                  placeholder={proveedores.length ? "Seleccione proveedor…" : "Registre un proveedor →"}
-                  options={proveedores.map((p) => ({ value: p.id, label: `${p.razonSocial} · ${p.ruc}` }))}
+                  placeholder="Seleccione proveedor…"
+                  options={listaProveedores.map((p) => ({ value: p.id, label: `${p.razonSocial} · ${p.ruc}` }))}
                 />
                 <Button type="button" variant="secondary" onClick={() => setNuevoProv({ razonSocial: "", ruc: "" })} title="Nuevo proveedor">
                   <Plus size={16} />
@@ -730,7 +815,8 @@ function RegistrarCompra({
               <Plus size={14} /> Agregar producto
             </Button>
           </div>
-          {conIgv && <p className="px-5 pt-3 text-right text-xs text-plomo-500">Boleta: los precios incluyen IGV; la base imponible se obtiene dividiendo el total entre 1.18.</p>}
+          {conIgv && <p className="px-5 pt-3 text-right text-xs text-plomo-500">Los precios incluyen IGV: base imponible = total / 1.18 e IGV = total − base.</p>}
+          {tipo === "FACTURA" && !preciosConIgv && <p className="px-5 pt-3 text-right text-xs text-amber-600">Compra registrada antes del cambio: sus precios están sin IGV (se suma 18 %).</p>}
           <Totales subtotal={subtotal} igv={igv} total={total} />
           <div className="space-y-4 px-5 pb-5">
             {/* OC u OS opcional (una sola): se genera con los productos de esta compra */}
@@ -781,14 +867,14 @@ function RegistrarCompra({
                   <span className="whitespace-nowrap">
                     <span className="font-semibold text-fg">{g.codigo ?? "-"}</span>
                     <button type="button" onClick={() => pdfDeclaracionJurada(g)} className="ml-1.5 text-xs font-semibold text-[#2a7bff] underline" title="Ver PDF de la declaración jurada">
-                      {g.numero}
+                      {numeroDJ(g)}
                     </button>
                   </span>
                 ) : (
                   <span className="whitespace-nowrap font-semibold text-fg">{g.codigo ?? g.numero}</span>
                 ),
                 total: soles(g.total),
-                buscar: `${g.codigo ?? ""} ${g.numero} ${g.ruc} ${g.descripcion ?? ""}`,
+                buscar: `${g.codigo ?? ""} ${g.numero} ${g.djNumero ?? ""} ${g.ruc} ${g.descripcion ?? ""}`,
                 tipoDoc: g.tipoGasto === "PLANILLA" ? "PLANILLA" : "GASTO",
                 estado: g.estadoPago,
                 acciones: (
@@ -822,11 +908,16 @@ function RegistrarCompra({
               ref: (
                 <span className="whitespace-nowrap font-semibold text-fg">
                   {c.numero}
+                  {c.tipoComprobante === "SIN_COMPROBANTE" && c.djNumero && (
+                    <button type="button" onClick={() => pdfDeclaracionJurada(djDeCompra(c))} className="ml-1.5 text-xs font-semibold text-[#2a7bff] underline" title="Ver PDF de la declaración jurada">
+                      {c.djNumero}
+                    </button>
+                  )}
                   {(c.ordenCompraNumero || c.ordenServicioNumero) && <span className="ml-1.5 text-xs font-normal text-plomo-500">{c.ordenCompraNumero ?? c.ordenServicioNumero}</span>}
                 </span>
               ),
               total: soles(c.total),
-              buscar: `${c.numero} ${c.ruc} ${c.sede} ${c.items.map((i) => i.nombre).join(" ")}`,
+              buscar: `${c.numero} ${c.djNumero ?? ""} ${c.ruc} ${c.sede} ${c.items.map((i) => i.nombre).join(" ")}`,
               tipoDoc: "COMPRA",
               ...(c.pago ? { estado: c.pago.estado === "PAGADO" ? "PAGADA" : "POR_PAGAR" } : {}),
               acciones: (
@@ -888,7 +979,7 @@ function RegistrarCompra({
                 </div>
               ))}
             </dl>
-            <Table head={["Producto", "Unidad", "Cantidad", "P. unit.", "Subtotal"]}>
+            <Table head={["Producto", "Unidad", "Cantidad", verCompra.igv > 0 ? (verCompra.tipoComprobante === "BOLETA" || verCompra.preciosConIgv ? "P. unit. (inc. IGV)" : "P. unit. (sin IGV)") : "P. unit.", "Importe"]}>
               {verCompra.items.map((i) => (
                 <tr key={i.id}>
                   <Td>{i.nombre}</Td>
@@ -970,7 +1061,10 @@ function RegistrarCompra({
 // =====================================================================
 function Antecedentes({ reqs, ordenes, rol, onCotizar, onIr }: { reqs: Requerimiento[]; ordenes: OrdenCompra[]; rol: Rol; onCotizar: (id: string) => void; onIr: (tab: string) => void }) {
   // Búsqueda y estado: en el panel "Buscar / Filtrar" de la lista (oculto por defecto)
-  const lista = reqs;
+  const [cat, setCat] = useState("");
+  useCatalogo(); // vuelve a pintar cuando llega el catálogo (categorías de los ítems)
+  const catsReq = new Map(reqs.map((r) => [r.id, categoriasDeItems(r.items)]));
+  const lista = reqs.filter((r) => docPasaCategoria(catsReq.get(r.id) ?? [], cat));
   return (
     <div>
       <QuickActions tab="requerimiento" onIr={onIr} puedeCrear={puede(rol, "req.crear")} />
@@ -981,6 +1075,8 @@ function Antecedentes({ reqs, ordenes, rol, onCotizar, onIr }: { reqs: Requerimi
       />
       <ListaDocs
           tipo="requerimientos"
+          extraActivos={cat ? 1 : 0}
+          filtrosExtra={<FiltroCategoria value={cat} onChange={setCat} conteo={contarCategoriasDocs(Array.from(catsReq.values()))} />}
           filas={lista.map((r): FilaDoc => {
           const oc = ordenes.find((o) => o.reqId === r.id);
           return {
@@ -992,6 +1088,7 @@ function Antecedentes({ reqs, ordenes, rol, onCotizar, onIr }: { reqs: Requerimi
               <span className="font-semibold text-fg">{r.numero}</span>
                 {oc && <span className="ml-1.5 text-xs text-plomo-500">→ {oc.numero}</span>}
                 <span className="ml-2 inline-block align-middle"><Badge estado={r.estado} /></span>
+                <EtiquetasCategorias categorias={catsReq.get(r.id) ?? []} />
             </>
           ),
           total: `${(r.items || []).length} ítem(s)`,
@@ -1012,7 +1109,7 @@ function Antecedentes({ reqs, ordenes, rol, onCotizar, onIr }: { reqs: Requerimi
                 </div>
             </>
           ),
-          buscar: `${r.numero} ${r.sede} ${r.motivo} ${oc?.numero ?? ""}`,
+          buscar: `${r.numero} ${r.sede} ${r.motivo} ${oc?.numero ?? ""} ${(catsReq.get(r.id) ?? []).join(" ")}`,
           tipoDoc: "REQ",
           estado: r.estado,
           };
@@ -1059,8 +1156,8 @@ function Cotizaciones({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reqId]);
 
-  const subtotal = r2(items.reduce((a, i) => a + i.cantidad * (i.precioUnit || 0), 0));
-  const igv = r2(subtotal * IGV);
+  // Precios con IGV incluido: se desglosa base e IGV
+  const { subtotal, igv, total } = totalesLineas(items, true, true);
 
   const guardar = () => {
     const ok = ejecutar(() => crearCotizacion({ reqId, proveedor, ruc, numero, fechaEmision: fecha, items }, rol), "Cotización registrada");
@@ -1132,7 +1229,7 @@ function Cotizaciones({
           </div>
           {items.length > 0 && (
             <>
-              <Table head={["Producto", "Marca", "Cant.", "Und.", "P. Unit. (sin IGV)", "Subtotal"]}>
+              <Table head={["Producto", "Marca", "Cant.", "Und.", "P. Unit. (inc. IGV)", "Importe"]}>
                 {items.map((i, k) => (
                   <tr key={i.itemReqId}>
                     <Td className="font-medium">{i.nombre}</Td>
@@ -1156,7 +1253,8 @@ function Cotizaciones({
                   </tr>
                 ))}
               </Table>
-              <Totales subtotal={subtotal} igv={igv} />
+              <p className="px-5 pt-3 text-right text-xs text-plomo-500">Escriba los precios CON IGV incluido: base imponible = total / 1.18.</p>
+              <Totales subtotal={subtotal} igv={igv} total={total} />
             </>
           )}
           <div className="flex justify-end border-t border-plomo-100 px-5 py-4">
@@ -1224,7 +1322,7 @@ function Totales({ subtotal, igv, total = r2(subtotal + igv) }: { subtotal: numb
     <div className="flex justify-end px-5 py-3">
       <dl className="w-72 space-y-1 text-sm">
         <div className="flex justify-between text-plomo-600">
-          <dt>Subtotal</dt>
+          <dt>{igv > 0 ? "Base imponible" : "Subtotal"}</dt>
           <dd>{soles(subtotal)}</dd>
         </div>
         <div className="flex justify-between text-plomo-600">
@@ -1270,6 +1368,10 @@ function Ordenes({
 }) {
   const [bancarizar, setBancarizar] = useState<OrdenCompra | null>(null);
   const [editar, setEditar] = useState<OrdenCompra | null>(null);
+  // Filtro por categoría de los productos de la OC (las OS son servicios: salen solo sin filtro)
+  const [catOC, setCatOC] = useState("");
+  useCatalogo();
+  const catsOC = new Map(ordenes.map((o) => [o.id, categoriasDeItems(o.items)]));
   const facturasOC = useStore<Factura[]>(KEYS.FACTURAS, []);
   const [banc, setBanc] = useState<Bancarizacion>(bancarizacionVacia);
   const [cotiId, setCotiId] = useState(preCoti ?? "");
@@ -1448,7 +1550,7 @@ function Ordenes({
                 <AlertTriangle size={16} /> Existe una cotización más barata para {coti.reqNumero} ({soles(minimo)}).
               </div>
             )}
-            <Table head={["Producto", "Marca", "Cant.", "Und.", "P. Unit.", "Subtotal"]}>
+            <Table head={["Producto", "Marca", "Cant.", "Und.", coti.preciosConIgv ? "P. Unit. (inc. IGV)" : "P. Unit. (sin IGV)", "Importe"]}>
               {coti.items.map((i) => (
                 <tr key={i.itemReqId}>
                   <Td className="font-medium">{i.nombre}</Td>
@@ -1460,7 +1562,7 @@ function Ordenes({
                 </tr>
               ))}
             </Table>
-            <Totales subtotal={coti.subtotal} igv={coti.igv} />
+            <Totales subtotal={coti.subtotal} igv={coti.igv} total={coti.total} />
           </>
         )}
         <div className="flex justify-end border-t border-plomo-100 px-5 py-4">
@@ -1498,7 +1600,9 @@ function Ordenes({
         />
         <ListaDocs
           tipo="ordenes"
-          filas={[...ordenes.map((o): FilaDoc => {
+          extraActivos={catOC ? 1 : 0}
+          filtrosExtra={<FiltroCategoria value={catOC} onChange={setCatOC} conteo={contarCategoriasDocs(Array.from(catsOC.values()))} />}
+          filas={[...ordenes.filter((o) => docPasaCategoria(catsOC.get(o.id) ?? [], catOC)).map((o): FilaDoc => {
           return {
           id: o.id,
           fecha: o.fecha,
@@ -1508,6 +1612,7 @@ function Ordenes({
               <span className="font-semibold text-fg">{o.numero}</span>
                 <span className="ml-1.5 text-xs text-plomo-500">{o.cotizacionNumero}</span>
                 <span className="ml-2 inline-block align-middle"><Badge estado={o.estado} /></span>
+                <EtiquetasCategorias categorias={catsOC.get(o.id) ?? []} />
             </>
           ),
           total: (
@@ -1555,11 +1660,11 @@ function Ordenes({
                 </div>
             </>
           ),
-          buscar: `${o.numero} ${o.cotizacionNumero} ${o.reqNumero} ${o.ruc} ${o.formaPago}`,
+          buscar: `${o.numero} ${o.cotizacionNumero} ${o.reqNumero} ${o.ruc} ${o.formaPago} ${(catsOC.get(o.id) ?? []).join(" ")}`,
           tipoDoc: "OC",
           estado: o.estado,
           };
-        }), ...filasOrdenesServicio(servicio.ordenes, rol)].sort((a, b) => b.fecha.localeCompare(a.fecha))}
+        }), ...(catOC ? [] : filasOrdenesServicio(servicio.ordenes, rol))].sort((a, b) => b.fecha.localeCompare(a.fecha))}
         />
       </Card>
       )}
@@ -1617,8 +1722,10 @@ function EditarOC({ oc, rol, cotizaciones, onClose }: { oc: OrdenCompra; rol: Ro
   const bloqueo = useBloqueoSerie(oc.numero, "oc");
   const opcionesCoti = cotizaciones.filter((c) => c.id === oc.cotizacionId || c.estado !== "CON_OC");
   const coti = cotizaciones.find((c) => c.id === d.cotizacionId);
-  const subtotal = r2(d.items.reduce((a, i) => a + r2(i.cantidad * i.precioUnit), 0));
-  const igv = r2(subtotal * IGV);
+  // Mismo criterio que editarOrdenCompra: OC / cotización nuevas con IGV incluido; las anteriores sin IGV
+  const cambiaCoti = d.cotizacionId !== oc.cotizacionId;
+  const conIgvIncluido = cambiaCoti ? coti?.preciosConIgv === true : oc.preciosConIgv === true;
+  const { subtotal, igv, total } = totalesLineas(d.items, cambiaCoti || oc.igv > 0, conIgvIncluido);
   const set = <K extends keyof EdicionOC>(k: K, v: EdicionOC[K]) => setD((x) => ({ ...x, [k]: v }));
   const setItem = (n: number, cambio: Partial<ItemPrecio>) => set("items", d.items.map((i, j) => (j === n ? { ...i, ...cambio } : i)));
 
@@ -1678,7 +1785,7 @@ function EditarOC({ oc, rol, cotizaciones, onClose }: { oc: OrdenCompra; rol: Ro
         </Field>
       </div>
 
-      <Table head={["Producto", "Cant.", "Und", "Marca", "P. unit (sin IGV)", "Subtotal", ""]}>
+      <Table head={["Producto", "Cant.", "Und", "Marca", conIgvIncluido ? "P. unit (inc. IGV)" : "P. unit (sin IGV)", "Importe", ""]}>
         {d.items.map((i, n) => (
           <tr key={n}>
             <Td>
@@ -1708,7 +1815,7 @@ function EditarOC({ oc, rol, cotizaciones, onClose }: { oc: OrdenCompra; rol: Ro
       <Button size="sm" variant="secondary" onClick={() => set("items", [...d.items, { itemReqId: uid(), nombre: "", cantidad: 1, unidad: "UND", marca: "", precioUnit: 0, subtotal: 0 }])}>
         <Plus size={14} /> Agregar producto
       </Button>
-      <Totales subtotal={subtotal} igv={igv} />
+      <Totales subtotal={subtotal} igv={igv} total={total} />
 
       <div className="flex justify-end gap-2 border-t border-plomo-100 pt-4">
         <Button variant="secondary" onClick={onClose}>
@@ -1747,7 +1854,8 @@ function Facturas({
   const [numero, setNumero] = useState("");
   const [fecha, setFecha] = useState(hoy());
   const [venc, setVenc] = useState(hoy());
-  const [subtotal, setSubtotal] = useState(0);
+  // Total de la factura CON IGV incluido (Williams 2026-11-14): el sistema desglosa base e IGV
+  const [totalFac, setTotalFac] = useState(0);
   // DJ
   const [dni, setDni] = useState("");
   const [vendedor, setVendedor] = useState("");
@@ -1764,12 +1872,12 @@ function Facturas({
   };
 
   const oc = ocs.find((o) => o.id === ocId);
-  const igv = r2(subtotal * IGV);
-  const difiere = oc && Math.abs(subtotal - oc.subtotal) > 0.01;
+  const { subtotal, igv } = desglosarIgv(totalFac);
+  const difiere = oc && Math.abs(totalFac - oc.total) > 0.01;
 
   useEffect(() => {
     if (oc) {
-      setSubtotal(oc.subtotal);
+      setTotalFac(oc.total);
       setVenc(sumarDias(fecha, diasCredito(oc.formaPago)));
     }
   }, [oc, fecha]);
@@ -1779,7 +1887,7 @@ function Facturas({
     setEnviando(true);
     const ok =
       modo === "FACTURA"
-        ? ejecutar(() => crearFactura({ ocId, numero, fecha, fechaVencimiento: venc, subtotal }, rol), "Factura registrada")
+        ? ejecutar(() => crearFactura({ ocId, numero, fecha, fechaVencimiento: venc, total: totalFac }, rol), "Factura registrada")
         : await ejecutarAsync(
             () => crearDeclaracionJurada({ ocId, fecha, dniVendedor: dni, nombreVendedor: vendedor, motivoSinComprobante: motivoDJ, aprobadoPor: aprobador }, rol),
             "Declaración jurada registrada"
@@ -1847,15 +1955,15 @@ function Facturas({
                   <Input value={oc ? `${oc.proveedor} (${oc.ruc})` : ""} disabled />
                   {oc && <EstadoRuc ruc={oc.ruc} />}
                 </Field>
-                <Field label="Subtotal (base imponible)" hint={difiere ? `⚠ Difiere de la OC (${soles(oc!.subtotal)})` : undefined}>
-                  <Input type="number" step="0.01" value={subtotal || ""} onChange={(e) => setSubtotal(parseFloat(e.target.value) || 0)} className={cn("text-right", difiere && "border-amber-400")} />
+                <Field label="Total con IGV incluido" hint={difiere ? `⚠ Difiere de la OC (${soles(oc!.total)})` : undefined}>
+                  <Input type="number" step="0.01" value={totalFac || ""} onChange={(e) => setTotalFac(parseFloat(e.target.value) || 0)} className={cn("text-right font-bold", difiere && "border-amber-400")} />
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
+                  <Field label="Base imponible">
+                    <Input value={soles(subtotal)} disabled className="text-right" />
+                  </Field>
                   <Field label="IGV 18%">
                     <Input value={soles(igv)} disabled className="text-right" />
-                  </Field>
-                  <Field label="Total">
-                    <Input value={soles(r2(subtotal + igv))} disabled className="text-right font-bold" />
                   </Field>
                 </div>
               </>
@@ -1971,13 +2079,13 @@ function Facturas({
                         title={a.nombre}
                         onClick={() => abrirArchivo(a.dataUrl)}
                       >
-                        <Upload size={14} /> {a.tipo === "GUIA" ? "Guía" : "Adjunto"}
+                        <Upload size={14} /> {a.tipo === "GUIA" ? "Guía" : a.tipo === "COTIZACION" ? "Cotización" : "Adjunto"}
                       </Button>
                     ))}
                   </div>
             </>
           ),
-          buscar: `${f.numero} ${f.ocNumero} ${f.codigo ?? ""} ${f.ruc}`,
+          buscar: `${f.numero} ${f.ocNumero} ${f.codigo ?? ""} ${f.ruc} ${f.cotizacionProveedor ?? ""}`,
           tipoDoc: f.esGastoTesoreria ? "GASTO" : f.tipo === "DECLARACION_JURADA" ? "DJ" : "FACTURA",
           estado: f.estadoPago,
           subFecha: vencida ? <span className="font-semibold text-red-600">venció {fechaPE(f.fechaVencimiento)}</span> : undefined,

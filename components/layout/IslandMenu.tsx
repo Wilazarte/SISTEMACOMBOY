@@ -1,6 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { createElement, type ReactNode } from "react";
+import { iconoPorTexto } from "@/lib/iconosFunciones";
 
 // Local (components/ui importa este archivo: evita la importación circular)
 const cn = (...c: (string | false | null | undefined)[]): string => c.filter(Boolean).join(" ");
@@ -38,7 +39,7 @@ export function IslandMenu({
   className?: string;
 }) {
   return (
-    <div className={cn("mx-4 mt-3 flex gap-1 overflow-x-auto rounded-full border border-white/[0.08] glass-blur px-2 py-1.5", className)}>
+    <div className={cn("mx-4 mt-3 flex flex-wrap gap-1 rounded-2xl border sm:flex-nowrap sm:overflow-x-auto sm:rounded-full border-white/[0.08] glass-blur px-2 py-1.5", className)}>
       {acciones.map((a) => (
         <button
           key={a.label}
@@ -51,7 +52,7 @@ export function IslandMenu({
         </button>
       ))}
       {acciones.length > 0 && items.length > 0 && <span aria-hidden className="mx-1 my-1.5 w-px shrink-0 bg-[#2a3445]" />}
-      <div role="tablist" className="flex gap-1">
+      <div role="tablist" className="flex flex-wrap gap-1 sm:flex-nowrap">
         {items.map((t) => {
           const on = activo === t.id;
           return (
@@ -66,7 +67,8 @@ export function IslandMenu({
                 on ? "grad-azul text-white" : "text-[#a1a1aa] hover:bg-[#212a3a] hover:text-white"
               )}
             >
-              {t.icon}
+              {/* Toda pestaña lleva ícono: el suyo o uno según su nombre (lib/iconosFunciones) */}
+              {t.icon ?? createElement(iconoPorTexto(t.label), { size: 16 })}
               {t.label}
               {t.count !== undefined && t.count > 0 && (
                 <span className={cn("rounded-full px-1.5 text-[11px] font-semibold", on ? "bg-white/20 text-white" : "bg-[#212a3a] text-[#e5e7eb]")}>{t.count}</span>

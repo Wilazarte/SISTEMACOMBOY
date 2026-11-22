@@ -5,6 +5,13 @@
 export const UBICACIONES: Record<string, string> = {
   ALMACEN: "Taller Principal Aqp",
   "ALMACEN AQP": "Taller Principal Aqp",
+  "TALLER PRINCIPAL AQP": "Taller Principal Aqp",
+  "TALLER PRINCIPAL": "Taller Principal Aqp",
+  "PLANTA AREQUIPA": "Taller Principal Aqp",
+  "ADM AQP": "Taller Principal Aqp",
+  "SUCURSAL SECOCHA": "Sucursal Secocha",
+  "SUC SECOCHA": "Sucursal Secocha",
+  SECOCHA: "Sucursal Secocha",
   "OFICINA LIMA": "Oficina Lima",
   LIMA: "Oficina Lima",
 };
@@ -73,6 +80,8 @@ export interface ProductoSaldo {
   unidad: string;
   sede: string;
   cantidad: number;
+  /** Último costo de la columna "Último costo" / "Costo" (Excel exportado del ERP); 0 o vacío = no se toca. */
+  costoUnit?: number;
 }
 
 export interface LineaLog {
@@ -95,13 +104,19 @@ const clave = (s: string) => sinTildes(String(s ?? "")).toLowerCase().replace(/[
  * Detecta la fila de cabecera (Nombre / Ubicación / Ctd), limpia nombres, infiere unidad, convierte la cantidad a entero
  * y une productos repetidos (suma cantidades). Todo queda en el log.
  */
-export function prepararSaldos(filas: unknown[][], sedeDefecto = SEDE_POR_DEFECTO): PlanSaldos {
+export function prepararSaldos(filas: unknown[][], sedeDefecto = SEDE_POR_DEFECTO, op: { enteros?: boolean } = {}): PlanSaldos {
+  const enteros = op.enteros !== false;
   const log: LineaLog[] = [];
-  const iCab = filas.findIndex((f) => f.some((c) => clave(String(c)).startsWith("nombre")) && f.some((c) => ["ctd", "cantidad", "cant", "saldo"].includes(clave(String(c)))));
+  // Cabecera: "Nombre Único | Ubicación | Ctd" o la del Excel exportado del ERP ("Producto | Almacén | Unidad | Cantidad | Último costo")
+  const iCab = filas.findIndex(
+    (f) => f.some((c) => clave(String(c)).startsWith("nombre") || clave(String(c)) === "producto") && f.some((c) => ["ctd", "cantidad", "cant", "saldo"].includes(clave(String(c))))
+  );
   const cab = (iCab >= 0 ? filas[iCab] : ["Nombre Único", "Ubicación", "Ctd"]).map((c) => clave(String(c)));
   const cNom = Math.max(0, cab.findIndex((c) => c.startsWith("nombre") || c === "producto" || c === "descripcion"));
   const cUbi = cab.findIndex((c) => c.startsWith("ubicacion") || c === "sede" || c === "almacen");
   const cCtd = cab.findIndex((c) => ["ctd", "cantidad", "cant", "saldo"].includes(c));
+  const cUnd = cab.findIndex((c) => c === "unidad" || c === "und" || c === "um");
+  const cCosto = cab.findIndex((c) => c.startsWith("ultimocosto") || c === "costo" || c.startsWith("costounit"));
   const datos = filas.slice(iCab + 1);
   const porClave = new Map<string, ProductoSaldo>();
 
@@ -126,11 +141,15 @@ export function prepararSaldos(filas: unknown[][], sedeDefecto = SEDE_POR_DEFECT
       log.push({ fila, nivel: "AVISO", producto: nombre, mensaje: `Cantidad negativa (${cantidad}): se importa 0.` });
       cantidad = 0;
     }
-    if (!Number.isInteger(cantidad)) {
+    if (enteros && !Number.isInteger(cantidad)) {
       log.push({ fila, nivel: "AVISO", producto: nombre, mensaje: `Cantidad ${cantidad} con decimales: se redondea a ${Math.round(cantidad)}.` });
       cantidad = Math.round(cantidad);
     }
-    const unidad = inferirUnidad(nombre, unidadExplicita);
+    const undCol = cUnd >= 0 ? String(f[cUnd] ?? "").trim().toUpperCase() : "";
+    const unidad = undCol || inferirUnidad(nombre, unidadExplicita);
+    const brutoCosto = cCosto >= 0 ? f[cCosto] : "";
+    const costo = typeof brutoCosto === "number" ? brutoCosto : Number(String(brutoCosto ?? "").replace(/S\/|\s/g, "").replace(",", ".") || 0);
+    const costoUnit = Number.isFinite(costo) && costo > 0 ? costo : 0;
     const k = `${sede}|${nombre}|${unidad}`;
     const previo = porClave.get(k);
     if (previo) {
@@ -138,8 +157,8 @@ export function prepararSaldos(filas: unknown[][], sedeDefecto = SEDE_POR_DEFECT
       log.push({ fila, nivel: "AVISO", producto: nombre, mensaje: `Repetido (fila ${previo.fila}): se suman las cantidades -> ${previo.cantidad}.` });
       return;
     }
-    porClave.set(k, { fila, nombre, unidad, sede, cantidad });
-    log.push({ fila, nivel: "OK", producto: nombre, mensaje: `${sede} · ${cantidad} ${unidad}${unidadExplicita ? " (unidad del nombre)" : ""}${cantidad === 0 ? " · sin stock" : ""}` });
+    porClave.set(k, { fila, nombre, unidad, sede, cantidad, ...(costoUnit ? { costoUnit } : {}) });
+    log.push({ fila, nivel: "OK", producto: nombre, mensaje: `${sede} · ${cantidad} ${unidad}${undCol ? "" : unidadExplicita ? " (unidad del nombre)" : ""}${cantidad === 0 ? " · sin stock" : ""}${costoUnit ? ` · costo ${costoUnit}` : ""}` });
   });
 
   const productos = [...porClave.values()];

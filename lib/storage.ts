@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { RealtimeChannel, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { getSesion, rolNegocio } from "./auth";
 import { createClient } from "./supabase/client";
+import { errorCaja, nombreCaja } from "./cajas";
 import type {
   AliasHuellas,
   ArchivoGasto,
@@ -49,7 +50,7 @@ import type {
 } from "./types";
 import { generarCodigo } from "./utils/codigos";
 import { clavesDeModulos } from "./storage.por-modulo";
-import { canonizarItems } from "./productos";
+import { buscarProducto, canonizarItems, catalogoDisponible } from "./productos";
 import { normalizarNombre } from "./productos-modelos";
 import { sedeNormalizada } from "./constantes";
 import { exigirRucSunat } from "./ruc";
@@ -74,6 +75,12 @@ import {
   numeroAutomatico,
   numeroSinComprobante,
   retencionRHE,
+  esProveedorVarios,
+  PROVEEDOR_VARIOS,
+  RUC_VARIOS,
+  PROVEEDOR_VARIOS_ID,
+  errorDocProveedor,
+  proveedorVarios,
 } from "./comprobantes";
 
 export const KEYS = {
@@ -92,9 +99,11 @@ export const KEYS = {
   STOCK: "almacen_stock",
   ASISTENCIA: "planilla_asistencia",
   CLIENTES: "ventas_clientes",
+  CLASIF_CLIENTES: "ventas_clasif_clientes",
   COND_PAGO: "ventas_condiciones_pago",
   NOTAS_PEDIDO: "ventas_notas_pedido",
   COMPROBANTES: "ventas_comprobantes",
+  GUIAS_REMISION: "ventas_guias_remision",
   COBROS: "ventas_cobros",
   ASIENTOS: "ventas_asientos",
   DESPACHOS: "almacen_despachos",
@@ -114,6 +123,7 @@ export const KEYS = {
   CONTABLE_PLAN: "contable_plan_cuentas",
   CONTABLE_CIERRES: "contable_cierres",
   MOV_CAJA: "contable_mov_caja", // movimientos manuales de caja (Estados de cuenta)
+  ACTIVOS: "contable_activos", // registro de activos de la empresa (lib/activos.ts)
   // Sucursal Beta (tabla sucursal, ver supabase/migrations/20261022_sucursal_beta.sql y lib/sucursal.ts)
   SUC_SUCURSALES: "sucursal_sucursales",
   SUC_VENTAS: "sucursal_ventas",
@@ -131,6 +141,53 @@ export type StoreKey = (typeof KEYS)[keyof typeof KEYS];
 const EVENTO = "erp:update";
 
 export const IGV = 0.18;
+
+/**
+ * Precios con IGV incluido (Williams 2026-11-14): en todo el ERP el precio se ingresa CON IGV. Los documentos nuevos
+ * llevan `preciosConIgv: true` y sus líneas guardan el precio con IGV; los anteriores (sin la marca) guardaron el
+ * valor sin IGV y se siguen calculando igual, para no alterar históricos.
+ *
+ * Desglose de un total con IGV: base imponible = total / 1.18, IGV = total − base (siempre cuadra al céntimo).
+ * `afecto = false` (recibo, DJ, ticket, sin comprobante, boleta inafecta): no hay desglose, todo es base.
+ */
+export function desglosarIgv(totalConIgv: number, afecto = true): { subtotal: number; igv: number; total: number } {
+  const total = Math.round((Number(totalConIgv) || 0) * 100) / 100;
+  if (!afecto) return { subtotal: total, igv: 0, total };
+  const subtotal = Math.round((total / (1 + IGV)) * 100) / 100;
+  return { subtotal, igv: Math.round((total - subtotal) * 100) / 100, total };
+}
+
+/**
+ * Totales de líneas (cantidad × precio). `preciosConIgv`: los precios ya incluyen IGV (se desglosa); si no (documentos
+ * anteriores), son valores sin IGV y se suma el 18 %. `afecto = false`: sin IGV.
+ */
+export function totalesLineas(
+  items: { cantidad: number; precioUnit: number }[],
+  afecto: boolean,
+  preciosConIgv: boolean
+): { subtotal: number; igv: number; total: number } {
+  const suma = Math.round(items.reduce((a, i) => a + (Number(i.cantidad) || 0) * (Number(i.precioUnit) || 0), 0) * 100) / 100;
+  if (!afecto || preciosConIgv) return desglosarIgv(suma, afecto);
+  const igv = Math.round(suma * IGV * 100) / 100;
+  return { subtotal: suma, igv, total: Math.round((suma + igv) * 100) / 100 };
+}
+
+/** Valor sin IGV de un precio con IGV (sin redondear: para costos de almacén y líneas de OC/OS). */
+export const sinIgv = (precioConIgv: number): number => (Number(precioConIgv) || 0) / (1 + IGV);
+
+/**
+ * Costo de almacén de una línea: sin IGV cuando hay crédito fiscal (factura / OC afecta con precios con IGV incluido:
+ * se divide entre 1.18, a 4 decimales); si no, el precio tal cual.
+ */
+const costoAlmacen = (precio: number, quitarIgv: boolean): number => (quitarIgv ? Math.round(sinIgv(precio) * 10000) / 10000 : precio);
+
+/** Líneas de OC con su costo de almacén (sin IGV). */
+const itemsCostoOC = <T extends { precioUnit: number }>(oc: Pick<OrdenCompra, "preciosConIgv" | "igv">, items: T[]): T[] =>
+  items.map((i) => ({ ...i, precioUnit: costoAlmacen(i.precioUnit, oc.preciosConIgv === true && oc.igv > 0) }));
+
+/** Líneas de la compra con su costo de almacén: la factura con IGV incluido ingresa sin IGV; la boleta, con IGV (sin crédito fiscal). */
+const itemsCostoCompra = (c: Pick<Compra, "tipoComprobante" | "preciosConIgv" | "items">): ItemCompra[] =>
+  c.items.map((i) => ({ ...i, precioUnit: costoAlmacen(i.precioUnit, c.tipoComprobante === "FACTURA" && c.preciosConIgv === true) }));
 /** Tope para compras con Declaración Jurada (sin comprobante). Ajustable. */
 export const TOPE_DJ = 700;
 
@@ -246,9 +303,11 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.TRABAJADORES]: { tabla: "planilla", tipo: "trabajador", forma: "lista" },
   [KEYS.ASISTENCIA]: { tabla: "planilla", tipo: "asistencia", forma: "lista" },
   [KEYS.CLIENTES]: { tabla: "ventas", tipo: "cliente", forma: "lista" },
+  [KEYS.CLASIF_CLIENTES]: { tabla: "ventas", tipo: "clasificacion_cliente", forma: "lista" },
   [KEYS.COND_PAGO]: { tabla: "condiciones_pago", forma: "condiciones" },
   [KEYS.NOTAS_PEDIDO]: { tabla: "ventas", tipo: "nota_pedido", forma: "lista" },
   [KEYS.COMPROBANTES]: { tabla: "ventas", tipo: "comprobante", forma: "lista" },
+  [KEYS.GUIAS_REMISION]: { tabla: "ventas", tipo: "guia_remision", forma: "lista" },
   [KEYS.COBROS]: { tabla: "ventas", tipo: "cobro", forma: "lista" },
   [KEYS.ASIENTOS]: { tabla: "ventas", tipo: "asiento", forma: "lista" },
   [KEYS.DESPACHOS]: { tabla: "almacen", tipo: "despacho", forma: "lista" },
@@ -266,6 +325,7 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.CONTABLE_PLAN]: { tabla: "contable", tipo: "PLAN_CUENTAS", forma: "lista" },
   [KEYS.CONTABLE_CIERRES]: { tabla: "contable", tipo: "CIERRE_MENSUAL", forma: "lista" },
   [KEYS.MOV_CAJA]: { tabla: "contable", tipo: "MOVIMIENTO_CAJA", forma: "lista" },
+  [KEYS.ACTIVOS]: { tabla: "contable", tipo: "ACTIVO_FIJO", forma: "lista" },
   [KEYS.OBSERVACIONES]: { tabla: "observaciones", forma: "observaciones" },
   [KEYS.SUC_SUCURSALES]: { tabla: "sucursal", tipo: "sucursal", forma: "lista" },
   [KEYS.SUC_VENTAS]: { tabla: "sucursal", tipo: "venta", forma: "lista" },
@@ -304,6 +364,8 @@ let canalSucursal: RealtimeChannel | null = null;
 let carga: Promise<void> | null = null;
 /** Claves ya descargadas del servidor (las del módulo al entrar; el resto, cuando una pantalla las pide). */
 const cargadas = new Set<StoreKey>();
+/** true cuando la clave ya se bajó del servidor (para no decidir con datos a medio cargar). */
+export const claveCargada = (key: StoreKey): boolean => cargadas.has(key);
 const cargando = new Map<StoreKey, Promise<void>>();
 /** Claves que está bajando iniciarDatos: no se piden dos veces. */
 const enCargaInicial = new Set<StoreKey>();
@@ -311,6 +373,74 @@ const enCargaInicial = new Set<StoreKey>();
 const clonar = <T,>(v: T): T => (typeof structuredClone === "function" ? structuredClone(v) : JSON.parse(JSON.stringify(v)));
 const avisar = (key: StoreKey) => window.dispatchEvent(new CustomEvent(EVENTO, { detail: key }));
 const avisarError = (msg: string) => window.dispatchEvent(new CustomEvent("erp:toast", { detail: { msg, tipo: "error" } }));
+
+// ---------------------------------------------------------------------
+// Vista por sede (Secocha con submódulos, 2026-11-16)
+// Las tablas de datos tienen sede_id (20261023_sedes_multisede.sql). Un usuario de Secocha ya recibe solo
+// lo suyo por RLS; el ERP central recibe TODO. Aquí se decide qué ve cada pantalla:
+//   central  : ERP de Arequipa (Planta Principal) -> oculta las filas de las sucursales.
+//   sucursal : app /secocha -> solo las filas de Secocha; lo nuevo se graba con data.sedeId = Secocha.
+// Al guardar, las filas ocultas se conservan (no se borran del servidor).
+// ---------------------------------------------------------------------
+
+export type VistaSede = { modo: "central"; ajenas: string[]; /** Sede de Secocha (dueña del almacén Sucursal Secocha). */ secocha?: string } | { modo: "sucursal"; propia: string };
+const TABLAS_POR_SEDE = new Set<string>(["compras", "almacen", "planilla", "ventas", "contable"]);
+let vistaSede: VistaSede | null = null;
+
+/**
+ * Stock y kardex: el almacén es físico. Arequipa sigue viendo sus DOS almacenes (Taller Principal y Sucursal Secocha)
+ * como siempre; Secocha ve solo el suyo. Las filas del almacén Sucursal Secocha son de la sede Secocha (sede_id).
+ */
+// Activos de la empresa: igual que el almacén, Arequipa ve los de las dos sedes y Secocha solo los suyos (campo sede).
+const COMPARTIDAS_ALMACEN = new Set<string>([KEYS.STOCK, KEYS.KARDEX, KEYS.ACTIVOS]);
+const esAlmacenSecocha = (x: unknown): boolean => /secocha/i.test(String((x as { sede?: unknown } | null)?.sede ?? ""));
+
+/**
+ * Base de proveedores y clientes (Williams 2026-11-17): UNA sola para Arequipa y Secocha. No se filtran por sede:
+ * las dos sedes ven y editan los mismos registros (la base lo permite con 20261203_base_proveedores_clientes.sql;
+ * sin ese SQL Secocha sigue viendo solo los suyos). Cada fila conserva la sede que la registró.
+ */
+const COMPARTIDAS_SEDES = new Set<string>([KEYS.PROVEEDORES, KEYS.CLIENTES, KEYS.CLASIF_CLIENTES]);
+
+const filtraSede = (key: StoreKey): boolean => {
+  const d = DESTINOS[key];
+  if (!vistaSede || d.forma !== "lista" || !TABLAS_POR_SEDE.has(d.tabla) || COMPARTIDAS_SEDES.has(key)) return false;
+  return !(vistaSede.modo === "central" && COMPARTIDAS_ALMACEN.has(key));
+};
+const visibleEnSede = (x: unknown): boolean => {
+  const sede = (x as { sedeId?: string } | null)?.sedeId;
+  if (!vistaSede) return true;
+  if (vistaSede.modo === "sucursal") return sede === vistaSede.propia;
+  return !sede || !vistaSede.ajenas.includes(sede);
+};
+
+/** Fija la sede de las pantallas (la llama lib/sedes al cargar las sedes) y refresca las listas abiertas. */
+export function fijarVistaSede(v: VistaSede | null): void {
+  vistaSede = v;
+  if (typeof window === "undefined") return;
+  (Object.keys(DESTINOS) as StoreKey[]).filter((k) => cache.has(k) && DESTINOS[k].forma === "lista" && TABLAS_POR_SEDE.has(DESTINOS[k].tabla)).forEach(avisar);
+  window.dispatchEvent(new Event("erp:vista-sede"));
+}
+export const getVistaSede = (): VistaSede | null => vistaSede;
+/** Las pantallas trabajan para una sucursal (Secocha): numeración y series propias. */
+export const enSucursal = (): boolean => vistaSede?.modo === "sucursal";
+
+/** Serie de comprobante de la sede: Secocha emite F002 / B002 (y FC02, BC02, FD02, BD02, T002). */
+export function serieSede<S extends string>(serie: S): S {
+  if (!enSucursal()) return serie;
+  const m = serie.match(/^([A-Z]{1,2})(\d)(\d)(\d)$|^([A-Z]{2})(\d{2})$/);
+  if (!m) return serie;
+  if (m[1]) return `${m[1]}${m[2]}${m[3]}2` as S; // F001 -> F002, B001 -> B002, T001 -> T002
+  return `${m[5]}02` as S; // FC01 -> FC02, BD01 -> BD02
+}
+
+/** Número formateado de la sucursal: NP-0001 -> NP-SEC-0001, F001-0001 -> F002-0001, REQ-ALM-001 -> REQ-SEC-001. */
+function marcarSede(texto: string): string {
+  if (!enSucursal()) return texto;
+  const f = texto.match(/^([A-Z]{1,2}\d{3}|[A-Z]{2}\d{2})-(.*)$/);
+  if (f) return `${serieSede(f[1])}-${f[2]}`;
+  return texto.replace(/^([A-Z]+)-(?:ALM-)?/, "$1-SEC-");
+}
 
 /** Fila de public.condiciones_pago <-> CondicionPago. */
 // Acepta tablas creadas a mano: nombre/descripcion, tipo en minúsculas, dias/dias_credito, activo/estado...
@@ -699,7 +829,9 @@ export function leer<T>(key: StoreKey, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   if (!cargadas.has(key)) void cargarClave(key); // de otro módulo: se baja ahora y la pantalla se refresca
   if (!cache.has(key)) return fallback;
-  return clonar(cache.get(key) as T);
+  const v = cache.get(key);
+  if (filtraSede(key) && Array.isArray(v)) return clonar(v.filter(visibleEnSede)) as T;
+  return clonar(v as T);
 }
 
 /**
@@ -717,6 +849,22 @@ export function escribir<T>(key: StoreKey, value: T): void {
   if (sinCargar && d.forma !== "lista") {
     void cargarClave(key);
     throw new ErpError("Cargando datos del servidor. Intente de nuevo en unos segundos.");
+  }
+  if (filtraSede(key) && Array.isArray(value)) {
+    // Lo nuevo de la sucursal lleva su sede; las filas de otras sedes (ocultas en pantalla) se conservan
+    const propia = vistaSede!.modo === "sucursal" ? vistaSede!.propia : "";
+    const visibles = (value as { sedeId?: string }[])
+      .map((x) => (propia && x && !x.sedeId ? { ...x, sedeId: propia } : x))
+      // Secocha solo tiene su almacén: el stock y el kardex que mueve son del almacén Sucursal Secocha
+      .map((x) => (propia && x && COMPARTIDAS_ALMACEN.has(key) && !esAlmacenSecocha(x) ? { ...x, sede: "Sucursal Secocha" } : x));
+    const ids = new Set(visibles.map((x) => String((x as { id?: unknown }).id)));
+    const ocultas = ((cache.get(key) ?? []) as { id: string }[]).filter((x) => !visibleEnSede(x) && !ids.has(String(x.id)));
+    value = [...visibles, ...ocultas] as T;
+  }
+  if (vistaSede?.modo === "central" && vistaSede.secocha && COMPARTIDAS_ALMACEN.has(key) && Array.isArray(value)) {
+    // Arequipa mueve stock al almacén Sucursal Secocha (traslado): esa fila es de la sede Secocha
+    const sec = vistaSede.secocha;
+    value = (value as { sedeId?: string }[]).map((x) => (x && !x.sedeId && esAlmacenSecocha(x) ? { ...x, sedeId: sec } : x)) as T;
   }
   const filas = aFilas(key, value);
   const antes = servidor.get(key) ?? new Map<string, string>();
@@ -839,7 +987,7 @@ function evento(usuario: Rol, accion: string, detalle?: string): EventoHistorial
 export const nuevoEvento = evento;
 
 /** Series con correlativo atómico en Supabase (siguiente_numero). */
-export type Serie = "REQ" | "OC" | "DJ" | "NP" | "F001" | "B001" | "OD" | "BOL" | "GST" | "RCT" | "EQ" | "OP" | `BOL_${number}`;
+export type Serie = "REQ" | "OC" | "DJ" | "NP" | "F001" | "B001" | "F005" | "B005" | "T005" | "OD" | "BOL" | "GST" | "RCT" | "EQ" | "OP" | `BOL_${number}`;
 
 /** Actualiza la caché de contadores sin enviarla: el servidor ya tiene el valor. */
 function fijarContador(serie: Serie, n: number): void {
@@ -856,6 +1004,7 @@ function fijarContador(serie: Serie, n: number): void {
  * dos PCs emitiendo a la vez nunca reciben el mismo número.
  */
 async function siguiente(serie: Serie): Promise<number> {
+  if (vistaSede?.modo === "sucursal") return siguienteSede(serie, vistaSede.propia);
   const { data, error } = await createClient().rpc("siguiente_numero", { serie });
   if (error && offlineActivo() && esErrorDeRed(error)) {
     // Sin señal: número reservado en esta PC cuando había conexión (ver lib/offline/storageOffline.ts)
@@ -875,6 +1024,21 @@ async function siguiente(serie: Serie): Promise<number> {
   return n;
 }
 
+/** Correlativos propios de la sucursal (public.contadores_sede, 20261129_secocha_submodulos.sql). */
+const contadoresSede = new Map<string, number>();
+async function siguienteSede(serie: Serie, sede: string): Promise<number> {
+  const { data, error } = await createClient().rpc("siguiente_numero_sede", { p_serie: serie, p_sede: sede });
+  if (error) {
+    if (error.code === "42501") throw new ErpError(error.message);
+    if (error.code === "PGRST202" || /could not find the function/i.test(error.message))
+      throw new ErpError("Falta la numeración de Secocha en Supabase: ejecute supabase/migrations/20261129_secocha_submodulos.sql.");
+    throw new ErpError(`No se pudo obtener el número: ${error.message}`);
+  }
+  const n = Number(data);
+  contadoresSede.set(serie, Math.max(n, contadoresSede.get(serie) ?? 0));
+  return n;
+}
+
 /** Sube un contador a un mínimo (migración de datos antiguos). Nunca lo baja. */
 export async function asegurarNumeroMinimo(serie: Serie, minimo: number): Promise<void> {
   const { data, error } = await createClient().rpc("asegurar_numero_minimo", { serie, minimo });
@@ -884,6 +1048,7 @@ export async function asegurarNumeroMinimo(serie: Serie, minimo: number): Promis
 
 /** Número probable (referencial): el definitivo lo asigna Supabase al guardar. */
 export function previewNumero(serie: Serie): string {
+  if (enSucursal()) return marcarSede(formatear(serie, (contadoresSede.get(serie) ?? 0) + 1));
   const c = leer<Record<string, number>>(KEYS.CONTADORES, {});
   return formatear(serie, (c[serie] ?? 0) + 1);
 }
@@ -910,7 +1075,7 @@ async function reservarCodigo(tipo: "BOL" | "GST" | "RCT"): Promise<{ codigo: st
     throw e;
   }
   const anio = new Date().getFullYear();
-  return { codigo: generarCodigo(tipo, n, anio), correlativo: n, anio };
+  return { codigo: marcarSede(generarCodigo(tipo, n, anio)), correlativo: n, anio };
 }
 
 /** Boleta de pago emitida: un código por trabajador y periodo (al volver a descargarla se reutiliza). */
@@ -928,20 +1093,40 @@ export interface BoletaEmitida {
 
 export const getBoletas = () => leer<BoletaEmitida[]>(KEYS.BOLETAS, []);
 
-export async function codigoBoleta(periodo: string, trabajadorId: string, nombre: string, totalPagar: number): Promise<string> {
+export async function codigoBoleta(periodoTexto: string, trabajadorId: string, nombre: string, totalPagar: number): Promise<string> {
+  // Misma clave desde la planilla y desde el historial: el historial guarda "SEMANA 14 - ABRIL 2026 · TODOS" (o
+  // "· OBREROS"); sin quitar ese sufijo, al reimprimir desde el historial se reservaba OTRO número (saltos y dos
+  // códigos para la misma boleta).
+  const periodo = periodoBoleta(periodoTexto);
   // "BOL|<periodo>|<N°>": el id "<periodo>|<N°>" es el mismo de la asistencia del trabajador y, si la tabla planilla
   // conserva una clave primaria solo por id (instalaciones antiguas), chocaba: duplicate key … "planilla_pkey".
   const id = `BOL|${periodo}|${trabajadorId}`;
   const anterior = `${periodo}|${trabajadorId}`; // boletas emitidas antes de este cambio
-  const previa = getBoletas().find((b) => b.id === id || (b.id === anterior && b.periodo === periodo && b.trabajadorId === trabajadorId));
+  // También reconoce las emitidas antes con el sufijo del cierre en el periodo (se reutiliza el código más bajo)
+  const previa =
+    getBoletas().find((b) => b.id === id || (b.id === anterior && b.periodo === periodo && b.trabajadorId === trabajadorId)) ??
+    getBoletas()
+      .filter((b) => b.trabajadorId === trabajadorId && periodoBoleta(b.periodo) === periodo)
+      .sort((a, b) => a.anio - b.anio || a.correlativo - b.correlativo)[0];
   if (previa) {
     if (previa.totalPagar !== totalPagar) escribir(KEYS.BOLETAS, getBoletas().map((b) => (b.id === previa.id ? { ...b, totalPagar, nombre } : b)));
     return previa.codigo;
   }
-  const c = await reservarBoletaAnual(periodo);
-  escribir(KEYS.BOLETAS, [...getBoletas(), { id, ...c, periodo, trabajadorId, nombre, totalPagar, fecha: new Date().toISOString() }]);
-  return c.codigo;
+  // Doble clic en "Boleta" o "todas las boletas": una sola reserva por trabajador y periodo (sin saltos)
+  const pendiente = boletasEnCurso.get(id);
+  if (pendiente) return pendiente;
+  const tarea = (async () => {
+    const c = await reservarBoletaAnual(periodo);
+    escribir(KEYS.BOLETAS, [...getBoletas(), { id, ...c, periodo, trabajadorId, nombre, totalPagar, fecha: new Date().toISOString() }]);
+    return c.codigo;
+  })().finally(() => boletasEnCurso.delete(id));
+  boletasEnCurso.set(id, tarea);
+  return tarea;
 }
+const boletasEnCurso = new Map<string, Promise<string>>();
+
+/** Periodo de la boleta sin el grupo del cierre (" · TODOS", " · OBREROS"…), en mayúsculas y sin espacios dobles. */
+export const periodoBoleta = (p: string): string => normalizarPeriodo(p.split(" · ")[0]);
 
 /** Año de la boleta: el del periodo ("SEMANA 14 - ABRIL 2026" -> 2026); sin año, el actual. */
 export function anioDePeriodo(periodo: string): number {
@@ -955,6 +1140,18 @@ export function anioDePeriodo(periodo: string): number {
  * Si aún no se ejecutó supabase/boleta_anual.sql, usa el contador global BOL (como antes) para no bloquear la boleta.
  */
 async function reservarBoletaAnual(periodo: string): Promise<{ codigo: string; correlativo: number; anio: number }> {
+  // Candado contra números repetidos (Williams 2026-11-19: la boleta de Darwin salió con el N° de la anterior).
+  // Si el contador de Supabase quedó atrasado (p. ej. un SQL recreó siguiente_numero sin BOL_AAAA y se usó el
+  // contador global BOL, o al revés), se sigue pidiendo número hasta pasar los códigos ya emitidos.
+  const usados = new Set(getBoletas().map((b) => b.codigo));
+  for (let intentos = 0; intentos < 500; intentos++) {
+    const c = await reservarBoletaAnualUnaVez(periodo);
+    if (!usados.has(c.codigo)) return c;
+  }
+  throw new ErpError("La numeración de boletas está muy atrasada: ejecute supabase/migrations/20261220_boletas_numeracion.sql en Supabase.");
+}
+
+async function reservarBoletaAnualUnaVez(periodo: string): Promise<{ codigo: string; correlativo: number; anio: number }> {
   const anio = anioDePeriodo(periodo);
   let n: number;
   try {
@@ -962,9 +1159,9 @@ async function reservarBoletaAnual(periodo: string): Promise<{ codigo: string; c
   } catch (e) {
     if (!/serie inv/i.test((e as Error).message)) throw e;
     const g = await reservarCodigo("BOL");
-    return { codigo: generarCodigo("BOL", g.correlativo, anio), correlativo: g.correlativo, anio };
+    return { codigo: marcarSede(generarCodigo("BOL", g.correlativo, anio)), correlativo: g.correlativo, anio };
   }
-  return { codigo: generarCodigo("BOL", n, anio), correlativo: n, anio };
+  return { codigo: marcarSede(generarCodigo("BOL", n, anio)), correlativo: n, anio };
 }
 
 /** Código GST del gasto de Tesorería (se asigna una sola vez). */
@@ -990,7 +1187,7 @@ export async function codigoContratista(id: string): Promise<string> {
 
 /** Número formateado reservado en Supabase (para ventas y despachos). */
 export async function siguienteNumero(serie: Serie): Promise<string> {
-  return formatear(serie, await siguiente(serie));
+  return marcarSede(formatear(serie, await siguiente(serie)));
 }
 
 // ---------------------------------------------------------------------
@@ -1083,7 +1280,11 @@ export function editarRequerimiento(
     items,
     editadoPor: usuarioActual(),
     editadoEn: new Date().toISOString(),
-    historial: [...req.historial, evento(rol, "Editado antes de la revisión", `${items.length} producto(s) · Sede ${cambios.sede}`)],
+    // Quién editó con nombre: Tesorería (Lizbeth) también puede editar los REQ de Almacén con permiso individual
+    historial: [
+      ...req.historial,
+      evento(rol, rol === "TESORERIA" ? "Editado por Tesorería antes de la revisión" : "Editado antes de la revisión", `${items.length} producto(s) · Sede ${cambios.sede} · por ${nombreActual()}`),
+    ],
   };
   escribir(KEYS.REQS_PENDIENTES, lista.map((r) => (r.id === id ? editado : r)));
 }
@@ -1210,19 +1411,20 @@ export function crearCotizacion(
     throw new ErpError("Esa cotización ya fue registrada para este proveedor.");
   if (data.items.some((i) => !(i.precioUnit > 0))) throw new ErpError("Ingrese precio unitario > 0 en todos los productos.");
 
+  // Precios con IGV incluido: el total es la suma de las líneas y se desglosa base e IGV
   const items = data.items.map((i) => ({ ...i, subtotal: r2(i.cantidad * i.precioUnit) }));
-  const subtotal = r2(items.reduce((a, i) => a + i.subtotal, 0));
-  const igv = r2(subtotal * IGV);
+  const { subtotal, igv, total } = totalesLineas(items, true, true);
   const coti: Cotizacion = {
     ...data,
     numero: data.numero.trim(),
     proveedor: data.proveedor.trim().toUpperCase(),
     items,
+    preciosConIgv: true,
     id: uid(),
     reqNumero: req.numero,
     subtotal,
     igv,
-    total: r2(subtotal + igv),
+    total,
     estado: "REGISTRADA",
     historial: [evento(rol, "Cotización registrada", `${data.proveedor} · ${req.numero}`)],
   };
@@ -1249,6 +1451,9 @@ export const CUENTAS_ORIGEN_PAGO: Record<CuentaOrigenPago, string> = {
   caja_general: "CAJA GENERAL",
   caja_chica: "CAJA CHICA",
   fondo_reserva: "FONDO DE RESERVA",
+  prestamo: "PRÉSTAMO",
+  credito: "CRÉDITO",
+  otros: "OTROS",
 };
 
 /** Bucket privado de Storage y carpeta de los bauchers (equivale a /uploads/tesoreria/vouchers/). */
@@ -1261,8 +1466,10 @@ export function validarVoucher(file: File): void {
   if (file.size > MAX_VOUCHER) throw new ErpError(`El baucher pesa ${(file.size / 1048576).toFixed(1)} MB. Máximo 5 MB.`);
 }
 
-function validarPagoOC(data: Partial<Pick<OrdenCompra, "cuentaOrigenPago" | "voucherMonto">>): void {
+function validarPagoOC(data: Partial<Pick<OrdenCompra, "cuentaOrigenPago" | "voucherMonto" | "caja">>): void {
   if (!data.cuentaOrigenPago || !(data.cuentaOrigenPago in CUENTAS_ORIGEN_PAGO)) throw new ErpError("Seleccione de qué cuenta se realiza el pago.");
+  const errCaja = data.caja !== undefined ? errorCaja(data.caja) : null;
+  if (errCaja) throw new ErpError(errCaja);
   if (data.voucherMonto !== undefined && !(data.voucherMonto >= 0)) throw new ErpError("El monto del baucher no puede ser negativo.");
 }
 
@@ -1439,11 +1646,12 @@ export async function editarOrdenCompra(id: string, d: EdicionOC, rol: Rol): Pro
   }
 
   const items = filas.map((i) => ({ ...i, nombre: i.nombre.trim(), subtotal: r2(i.cantidad * i.precioUnit) }));
-  const subtotal = r2(items.reduce((a, i) => a + i.subtotal, 0));
-  const igv = r2(subtotal * IGV);
+  // Mismo criterio de precios que la OC (o que la nueva cotización): las nuevas, con IGV incluido; las anteriores, sin IGV (+18 %)
+  const preciosConIgv = coti ? coti.preciosConIgv === true : actual.preciosConIgv === true;
+  const { subtotal, igv, total } = totalesLineas(items, coti ? true : actual.igv > 0, preciosConIgv);
   const cambios = [
     d.fecha !== actual.fecha && `fecha ${actual.fecha} → ${d.fecha}`,
-    r2(subtotal + igv) !== actual.total && `total ${actual.total.toFixed(2)} → ${r2(subtotal + igv).toFixed(2)}`,
+    total !== actual.total && `total ${actual.total.toFixed(2)} → ${total.toFixed(2)}`,
     coti && `cotización ${actual.cotizacionNumero} → ${coti.numero}`,
   ].filter(Boolean);
   const oc: OrdenCompra & { fecha_emision: string } = {
@@ -1458,9 +1666,10 @@ export async function editarOrdenCompra(id: string, d: EdicionOC, rol: Rol): Pro
     lugarEntrega: d.lugarEntrega,
     ...(coti ? { cotizacionId: coti.id, cotizacionNumero: coti.numero, reqId: coti.reqId, reqNumero: coti.reqNumero } : {}),
     items,
+    preciosConIgv,
     subtotal,
     igv,
-    total: r2(subtotal + igv),
+    total,
     historial: [...actual.historial, evento(rol, "Orden de compra editada", cambios.join(" · ") || "Datos actualizados")],
   };
   escribir(KEYS.ORDENES, getOrdenes().map((o) => (o.id === id ? oc : o)));
@@ -1508,6 +1717,7 @@ export async function crearOrdenCompra(
     proveedor: coti.proveedor,
     ruc: coti.ruc,
     items: coti.items,
+    preciosConIgv: coti.preciosConIgv === true,
     subtotal: coti.subtotal,
     igv: coti.igv,
     total: coti.total,
@@ -1560,7 +1770,8 @@ function validarBancarizacion(b: Bancarizacion): Bancarizacion {
   if (!TIPOS_BANCARIZACION.includes(b.tipo)) throw new ErpError("Seleccione el tipo de bancarización.");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(b.fecha)) throw new ErpError("Indique la fecha de pago.");
   if (b.fecha > hoy()) throw new ErpError("La fecha de pago no puede ser futura.");
-  if (!b.caja?.trim()) throw new ErpError("Seleccione de qué cuenta se realiza el pago.");
+  const errCaja = errorCaja(b.caja);
+  if (errCaja) throw new ErpError(errCaja);
   return { tipo: b.tipo, fecha: b.fecha, caja: b.caja.trim(), ...(b.nroOperacion?.trim() ? { nroOperacion: b.nroOperacion.trim().toUpperCase() } : {}) };
 }
 
@@ -1610,7 +1821,7 @@ const pagoDesdeOC = (oc: OrdenCompra): Partial<Factura> =>
   oc.bancarizacion ? { estadoPago: "PAGADA", caja: oc.bancarizacion.caja, bancarizacion: oc.bancarizacion } : {};
 
 export function crearFactura(
-  data: Pick<Factura, "numero" | "fecha" | "fechaVencimiento" | "ocId" | "subtotal">,
+  data: Pick<Factura, "numero" | "fecha" | "fechaVencimiento" | "ocId" | "total">,
   rol: Rol
 ): Factura {
   const oc = getOrdenes().find((o) => o.id === data.ocId);
@@ -1620,16 +1831,16 @@ export function crearFactura(
   const num = data.numero.trim().toUpperCase();
   if (!/^[EF][A-Z0-9]{3}-\d{1,8}$/.test(num)) throw new ErpError("Formato de factura inválido. Ej: F001-00001234 / E001-123");
   if (getFacturas().some((f) => f.numero === num && f.ruc === oc.ruc)) throw new ErpError("Factura duplicada para este proveedor.");
-  if (!(data.subtotal > 0)) throw new ErpError("El subtotal debe ser mayor a 0.");
-  const subtotal = r2(data.subtotal);
-  const igv = r2(subtotal * IGV);
+  // El total se ingresa con IGV incluido: base = total / 1.18, IGV = total − base
+  if (!(data.total > 0)) throw new ErpError("El total de la factura debe ser mayor a 0.");
+  const { subtotal, igv, total } = desglosarIgv(data.total);
   const fac: Factura = {
     ...data,
     tipo: "FACTURA",
     numero: num,
     subtotal,
     igv,
-    total: r2(subtotal + igv),
+    total,
     ocNumero: oc.numero,
     reqId: oc.reqId,
     reqNumero: oc.reqNumero,
@@ -1685,15 +1896,31 @@ export async function crearDeclaracionJurada(
   return dj;
 }
 
-/** Origen de la OC según la caja elegida: "Caja Chica…" -> caja chica, "Fondo de Reserva" -> fondo de reserva, el resto -> caja general. */
-export const cuentaOrigenDeCaja = (caja: string): CuentaOrigenPago => (/chica/i.test(caja) ? "caja_chica" : /reserva/i.test(caja) ? "fondo_reserva" : "caja_general");
+/** Origen de la OC según la fuente elegida (Caja General, Caja Chica, Fondo de Reserva, Préstamo, Crédito, Otros). */
+export const cuentaOrigenDeCaja = (caja: string): CuentaOrigenPago => {
+  switch (nombreCaja(caja)) {
+    case "CAJA CHICA":
+      return "caja_chica";
+    case "FONDO DE RESERVA":
+      return "fondo_reserva";
+    case "PRÉSTAMO":
+      return "prestamo";
+    case "CRÉDITO":
+      return "credito";
+    case "OTROS":
+      return "otros";
+    default:
+      return /chica/i.test(caja) ? "caja_chica" : /reserva/i.test(caja) ? "fondo_reserva" : "caja_general";
+  }
+};
 
 /**
  * Marcar PAGADA pide la caja de la que salió el dinero y, si el total pasa S/ 2,000 o el proveedor tiene RUC,
  * la bancarización. Revertir a POR PAGAR la quita.
  */
 export function marcarPago(id: string, pagada: boolean, rol: Rol, caja?: string, bancarizacion?: Bancarizacion): void {
-  if (pagada && !caja?.trim()) throw new ErpError("Seleccione de qué caja sale el pago.");
+  const errCaja = pagada ? errorCaja(caja) : null;
+  if (errCaja) throw new ErpError(errCaja);
   const fac = getFacturas().find((f) => f.id === id);
   const b = pagada && bancarizacion ? validarBancarizacion({ ...bancarizacion, caja: caja ?? "" }) : undefined;
   if (pagada && fac && !b && requiereBancarizacion(fac.netoPagar ?? fac.total, fac.ruc))
@@ -1771,7 +1998,7 @@ export function darVistoBueno(ocId: string, vb: Omit<VistoBueno, "fecha">, rol: 
     historial: [...o.historial, evento(rol, "Visto bueno de ingreso a almacén", `${vb.recibidoPor} · stock de ${sede}`)],
   }));
   const guia = getGuias().find((g) => g.ocId === ocId);
-  ingresarStock(sede, oc.items, { tipo: "INGRESO", documento: [oc.numero, guia?.facturaNumero ?? "", guia ? `GR ${guia.numero}` : ""].filter(Boolean).join(" · ") });
+  ingresarStock(sede, itemsCostoOC(oc, oc.items), { tipo: "INGRESO", documento: [oc.numero, guia?.facturaNumero ?? "", guia ? `GR ${guia.numero}` : ""].filter(Boolean).join(" · ") });
   escribir(
     KEYS.GUIAS,
     getGuias().map((g) =>
@@ -1818,15 +2045,19 @@ export const TIPOS_SUELDO: Record<TipoSueldo, { label: string; divisor: number }
   POR_CONTRATO: { label: "Por contrato", divisor: 30 }, // contratistas: no entran a la planilla del periodo
 };
 
-/** Frecuencia de pago de la ficha: los registros sin dato se pagan por semana (como hasta ahora). */
-export const frecuenciaPagoDe = (t: Pick<Trabajador, "frecuenciaPago">): FrecuenciaPago => (t.frecuenciaPago === "MENSUAL" ? "MENSUAL" : "SEMANAL");
+/**
+ * Frecuencia de pago = la del tipo de sueldo (regla Williams 2026-11-19): sueldo MENSUAL se paga en la planilla
+ * del mes; diario, semanal, quincenal y por hora, en la planilla de la semana. Ya no se elige aparte en la ficha,
+ * así no se contradicen (antes un sueldo diario podía quedar con pago mensual).
+ */
+export const frecuenciaPagoDe = (t: Pick<Trabajador, "tipoSueldo">): FrecuenciaPago => (t.tipoSueldo === "MENSUAL" ? "MENSUAL" : "SEMANAL");
 
 /** Planilla MENSUAL (frecuencia de pago mensual): el mes son 27 días (sueldo diario = mensual / 27). */
 export const DIAS_PERIODO_MENSUAL = 27;
 
-/** Divisor del sueldo diario: sueldo mensual con pago mensual = 27 días; el resto, el de su tipo de sueldo (mensual con pago semanal = 26). */
-export const divisorSueldo = (t: Pick<Trabajador, "tipoSueldo" | "frecuenciaPago">): number =>
-  t.tipoSueldo === "MENSUAL" && frecuenciaPagoDe(t) === "MENSUAL" ? DIAS_PERIODO_MENSUAL : (TIPOS_SUELDO[t.tipoSueldo] ?? TIPOS_SUELDO.DIARIO).divisor;
+/** Divisor del sueldo diario: sueldo mensual (pago mensual) = 27 días; el resto, el de su tipo de sueldo. */
+export const divisorSueldo = (t: Pick<Trabajador, "tipoSueldo">): number =>
+  frecuenciaPagoDe(t) === "MENSUAL" ? DIAS_PERIODO_MENSUAL : (TIPOS_SUELDO[t.tipoSueldo] ?? TIPOS_SUELDO.DIARIO).divisor;
 
 export const AFP_OPTIONS: Record<TipoAfp, { label: string; porc: number }> = {
   AFP_INTEGRA: { label: "AFP Integra", porc: 10 },
@@ -1867,6 +2098,7 @@ function normalizarTrabajador(t: Partial<Trabajador>): Trabajador {
     fechaIngreso: typeof t.fechaIngreso === "string" && FECHA_RE.test(t.fechaIngreso) ? t.fechaIngreso : "",
     sueldo: Number.isFinite(sueldo) && sueldo >= 0 ? sueldo : base.sueldo,
     tipoSueldo,
+    frecuenciaPago: tipoSueldo === "MENSUAL" ? "MENSUAL" : "SEMANAL", // siempre igual al tipo de sueldo
     afpTipo,
     afpPorcentaje: Number.isFinite(afpPorcentaje) && afpPorcentaje >= 0 ? afpPorcentaje : AFP_OPTIONS[afpTipo].porc,
     activo: t.activo !== false,
@@ -1913,7 +2145,6 @@ function fichaOpcional(t: Partial<Trabajador>): Partial<Trabajador> {
   if (typeof t.fechaBaja === "string" && FECHA_RE.test(t.fechaBaja)) r.fechaBaja = t.fechaBaja;
   if (t.estadoCivil && ESTADOS_CIVILES.includes(t.estadoCivil)) r.estadoCivil = t.estadoCivil;
   if (t.esContratista === true) r.esContratista = true;
-  if (t.frecuenciaPago === "MENSUAL" || t.frecuenciaPago === "SEMANAL") r.frecuenciaPago = t.frecuenciaPago;
   if (t.bancoNombre && (t.bancoTipoCuenta === "Ahorros" || t.bancoTipoCuenta === "Corriente")) r.bancoTipoCuenta = t.bancoTipoCuenta;
   if (typeof t.ruc === "string" && /^\d{11}$/.test(t.ruc.trim())) r.ruc = t.ruc.trim();
   if (t.tipoServicio && t.tipoServicio in SERVICIOS_CONTRATISTA) r.tipoServicio = t.tipoServicio;
@@ -2265,6 +2496,11 @@ export const getValesProduccion = () => leer<ValeProduccion[]>(KEYS.VALES_PRODUC
 export type RefKardex = { tipo: TipoKardex; documento: string; chasis?: string; motivo?: string };
 
 const usuarioActual = () => getSesion()?.usuario ?? "sistema";
+/** Nombre real del usuario (para el historial): nombre completo, si no el nombre, si no el usuario. */
+const nombreActual = () => {
+  const s = getSesion();
+  return s?.nombreCompleto || s?.nombre || s?.usuario || "sistema";
+};
 
 function anotarKardex(movs: Omit<MovimientoKardex, "id" | "fecha" | "usuario">[]): void {
   if (!movs.length) return;
@@ -2334,6 +2570,113 @@ export function importarSaldosStock(productos: { nombre: string; unidad: string;
   return { nuevos, actualizados };
 }
 
+/** Qué haría "Reemplazar todo el stock" con un Excel (vista previa, no escribe nada). */
+export interface PlanReemplazo {
+  /** Productos del Excel que quedan con su cantidad (existentes o nuevos). */
+  aplicar: { nombre: string; unidad: string; sede: string; cantidad: number; costoUnit?: number; existente?: StockItem; antes: number }[];
+  /** Registros de stock que no están en el Excel: quedan en 0. */
+  aCero: StockItem[];
+  /** Productos del Excel que no están en el catálogo maestro: no se importan. */
+  omitidos: string[];
+  /** Filas del Excel de otro almacén (cuando se reemplaza un solo almacén). */
+  fueraDeAlcance: number;
+  nuevos: number;
+  cambian: number;
+}
+
+/**
+ * Plan para reemplazar el stock por el de un Excel (Williams, 2026-11-17). alcance = almacén a reemplazar ("" = todos).
+ * El mismo producto en el mismo almacén se reconoce por nombre (sin importar la unidad, que toma la del Excel).
+ */
+export function planReemplazoStock(productos: { nombre: string; unidad: string; sede: string; cantidad: number; costoUnit?: number }[], alcance = ""): PlanReemplazo {
+  const enAlcance = (sede: string) => !alcance || sedeNormalizada(sede) === sedeNormalizada(alcance);
+  const stock = getStock().filter((s) => enAlcance(s.sede));
+  const usados = new Set<string>();
+  const omitidos: string[] = [];
+  const aplicar: PlanReemplazo["aplicar"] = [];
+  let fueraDeAlcance = 0;
+  // Si el Excel trae el mismo producto dos veces en un almacén (otra unidad), se suman
+  const porClave = new Map<string, PlanReemplazo["aplicar"][number]>();
+  for (const p of productos) {
+    if (!enAlcance(p.sede)) {
+      fueraDeAlcance++;
+      continue;
+    }
+    const oficial = buscarProducto(p.nombre);
+    if (catalogoDisponible() && !oficial) {
+      omitidos.push(p.nombre);
+      continue;
+    }
+    const nombre = oficial?.nombre_normalizado ?? normalizarNombre(p.nombre);
+    const sede = sedeNormalizada(p.sede);
+    const k = `${sede}|${normalizarNombre(nombre)}`;
+    const previo = porClave.get(k);
+    if (previo) {
+      previo.cantidad = r2(previo.cantidad + p.cantidad);
+      continue;
+    }
+    const candidatos = stock.filter((s) => !usados.has(s.id) && sedeNormalizada(s.sede) === sede && normalizarNombre(s.nombre) === normalizarNombre(nombre));
+    const existente = candidatos.find((s) => s.unidad === p.unidad) ?? [...candidatos].sort((a, b) => b.cantidad - a.cantidad)[0];
+    if (existente) usados.add(existente.id);
+    const fila = { nombre, unidad: p.unidad, sede, cantidad: r2(Math.max(0, p.cantidad)), ...(p.costoUnit ? { costoUnit: p.costoUnit } : {}), existente, antes: existente?.cantidad ?? 0 };
+    porClave.set(k, fila);
+    aplicar.push(fila);
+  }
+  const aCero = stock.filter((s) => !usados.has(s.id) && s.cantidad !== 0);
+  return {
+    aplicar,
+    aCero,
+    omitidos,
+    fueraDeAlcance,
+    nuevos: aplicar.filter((a) => !a.existente).length,
+    cambian: aplicar.filter((a) => a.existente && (a.antes !== a.cantidad || a.existente.unidad !== a.unidad)).length,
+  };
+}
+
+/**
+ * Reemplaza el stock por el del Excel: cada producto queda con la cantidad del archivo, los que no están quedan en 0
+ * (el registro y su kardex se conservan) y cada diferencia queda en el kardex como AJUSTE. El costo se toma del Excel si trae uno.
+ */
+export function reemplazarStock(plan: PlanReemplazo, documento: string): { cambiados: number; nuevos: number; enCero: number } {
+  if (!plan.aplicar.length) throw new ErpError("El Excel no tiene productos para este almacén.");
+  const ahora = new Date().toISOString();
+  const stock = getStock();
+  const porId = new Map(stock.map((s) => [s.id, s]));
+  const movs: Omit<MovimientoKardex, "id" | "fecha" | "usuario">[] = [];
+  const motivo = `Reemplazo de stock desde Excel por ${usuarioActual()}`;
+  let cambiados = 0;
+  let nuevos = 0;
+  for (const a of plan.aplicar) {
+    const e = a.existente ? porId.get(a.existente.id) : undefined;
+    if (e) {
+      const antes = e.cantidad;
+      if (antes === a.cantidad && e.unidad === a.unidad && !(a.costoUnit && a.costoUnit !== e.costoUnit)) continue;
+      e.cantidad = a.cantidad;
+      e.unidad = a.unidad;
+      e.sede = a.sede;
+      if (a.costoUnit) e.costoUnit = a.costoUnit;
+      e.actualizado = ahora;
+      cambiados++;
+      if (antes !== a.cantidad) movs.push({ sede: e.sede, stock_id: e.id, producto: e.nombre, unidad: e.unidad, tipo_movimiento: "AJUSTE", documento, motivo, cantidad: r2(a.cantidad - antes), saldo: e.cantidad });
+    } else {
+      const n: StockItem = { id: uid(), sede: a.sede, nombre: a.nombre, unidad: a.unidad, cantidad: a.cantidad, costoUnit: a.costoUnit ?? 0, actualizado: ahora };
+      stock.push(n);
+      nuevos++;
+      movs.push({ sede: n.sede, stock_id: n.id, producto: n.nombre, unidad: n.unidad, tipo_movimiento: "AJUSTE", documento, motivo, cantidad: n.cantidad, saldo: n.cantidad });
+    }
+  }
+  for (const z of plan.aCero) {
+    const e = porId.get(z.id);
+    if (!e || e.cantidad === 0) continue;
+    movs.push({ sede: e.sede, stock_id: e.id, producto: e.nombre, unidad: e.unidad, tipo_movimiento: "AJUSTE", documento, motivo: `${motivo} (no está en el Excel)`, cantidad: -e.cantidad, saldo: 0 });
+    e.cantidad = 0;
+    e.actualizado = ahora;
+  }
+  escribir(KEYS.STOCK, stock);
+  anotarKardex(movs);
+  return { cambiados, nuevos, enCero: plan.aCero.length };
+}
+
 /** Cantidad disponible de un producto en una sede. */
 export function stockDisponible(sede: string, nombre: string, unidad: string): number {
   const k = claveStock(sede, nombre, unidad);
@@ -2389,7 +2732,8 @@ export function registrarIngresoAlmacen(d: { sede: string; ocId?: string; lote?:
     const enStock = stock.find((s) => claveStock(s.sede, s.nombre, s.unidad) === claveStock(d.sede, nombre, i.unidad));
     const deOC = oc?.items.find((x) => normalizarNombre(x.nombre) === nombre || (!!i.productoId && x.productoId === i.productoId));
     // Costo: el de la OC; si no, el último del stock
-    return { nombre, unidad: i.unidad, cantidad: i.cantidad, precioUnit: i.costoUnit ?? deOC?.precioUnit ?? enStock?.costoUnit ?? 0 };
+    const costoOC = oc && deOC ? itemsCostoOC(oc, [deOC])[0].precioUnit : undefined;
+    return { nombre, unidad: i.unidad, cantidad: i.cantidad, precioUnit: i.costoUnit ?? costoOC ?? enStock?.costoUnit ?? 0 };
   });
   const lote = d.lote?.trim().toUpperCase();
   const documento = [oc?.numero, lote ? `Lote ${lote}` : ""].filter(Boolean).join(" · ") || "Ingreso a almacén";
@@ -2415,8 +2759,8 @@ export function transferirStock(nombre: string, unidad: string, cantidad: number
 }
 
 /**
- * Totales de una compra. FACTURA: precios sin IGV (se suma 18 %).
- * BOLETA: precios con IGV incluido (el total es la suma de filas y se desglosa la base).
+ * Totales de una compra (ver totalesCompra): factura y boleta con precios con IGV incluido (el total es la suma
+ * de filas y se desglosa la base); las facturas anteriores, sin IGV (se suma 18 %).
  */
 // ---------------------------------------------------------------------
 // GASTOS / SERVICIOS DE TESORERÍA (sin requerimiento, OC ni ingreso a stock)
@@ -2471,6 +2815,8 @@ export interface DatosGasto {
   retencion?: boolean;
   /** Recibo de servicios públicos: N° de suministro. */
   suministro?: string;
+  /** N° de la cotización emitida por el proveedor. Vacío: se genera COT-PROV-0001-2026 al guardar. */
+  cotizacion?: string;
 }
 
 /** Detracción y neto a pagar: ej. agencia S/ 100 con 4 % -> detracción S/ 4, neto S/ 96. */
@@ -2486,6 +2832,8 @@ const DJ_AUTO = "DJ-AUTO";
 
 /** Siguiente N° de declaración jurada de gasto: correlativo atómico en Supabase (tabla correlativos, next_correlativo). */
 async function siguienteDJ(): Promise<string> {
+  // Secocha: DJ-SEC-001 (numeración propia de la sede)
+  if (vistaSede?.modo === "sucursal") return `DJ-SEC-${String(await siguienteSede("DJ", vistaSede.propia)).padStart(3, "0")}`;
   const { data, error } = await createClient().rpc("next_correlativo", { t: "DJ" });
   if (error) {
     if (error.code === "42501") throw new ErpError("Su usuario no puede emitir declaraciones juradas.");
@@ -2496,17 +2844,148 @@ async function siguienteDJ(): Promise<string> {
   return `DJ-${data}`;
 }
 
-/** Declaraciones juradas de gasto: gastos de Tesorería con comprobante DJ (las de la OC también son DJ). */
-export const esDeclaracionJurada = (f: Factura): boolean => (f.esGastoTesoreria && f.comprobanteGasto === "DJ") || f.tipo === "DECLARACION_JURADA";
+/**
+ * DJ automática (Williams 2026-11-13): solo la lleva el gasto marcado "Sin comprobante". Si se registró factura, boleta,
+ * recibo u otro comprobante, no hay DJ (una DJ vieja guardada en un gasto con comprobante se ignora).
+ */
+export const tieneDJAutomatica = (f: Factura): boolean => !!f.djNumero && f.comprobanteGasto === "SIN_COMPROBANTE";
+
+/** Declaraciones juradas de gasto: comprobante DJ (las de la OC también son DJ) o DJ automática de un gasto sin comprobante. */
+export const esDeclaracionJurada = (f: Factura): boolean => (f.esGastoTesoreria && f.comprobanteGasto === "DJ") || f.tipo === "DECLARACION_JURADA" || tieneDJAutomatica(f);
+
+/** N° de la declaración jurada del documento (DJ-0042): el comprobante mismo o la DJ automática de sustento. */
+export const numeroDJ = (f: Factura): string => (tieneDJAutomatica(f) ? f.djNumero! : f.numero);
+
+/** true: la DJ es la automática de sustento (gasto marcado "Sin comprobante"). */
+export const esDJAutomatica = tieneDJAutomatica;
+
+/**
+ * Gasto de Tesorería que debe llevar DJ automática (Williams 2026-11-13): marcado "Sin comprobante", que no sea planilla
+ * y sin DJ asignada todavía. Con factura, boleta u otro comprobante no se genera DJ.
+ */
+export const requiereDJAutomatica = (f: Factura): boolean =>
+  !!f.esGastoTesoreria && f.tipoGasto !== "PLANILLA" && f.comprobanteGasto === "SIN_COMPROBANTE" && !f.djNumero;
+
+/** Compra con ingreso a stock marcada "Sin comprobante" que aún no tiene su DJ automática. */
+export const requiereDJCompra = (c: Compra): boolean => c.tipoComprobante === "SIN_COMPROBANTE" && !c.djNumero;
+
+/**
+ * DJ de una compra con ingreso a stock vista como gasto, para listarla en Declaraciones y armar su PDF con el mismo
+ * formato. No se guarda: la DJ vive en la compra (djNumero / djEstado).
+ */
+export function djDeCompra(c: Compra): Factura {
+  return {
+    id: c.id,
+    tipo: "FACTURA",
+    numero: c.numero,
+    fecha: c.fecha,
+    fechaVencimiento: c.pago?.fechaVencimiento ?? c.fecha,
+    ocId: c.ordenCompraId ?? "",
+    ocNumero: c.ordenCompraNumero ?? "",
+    reqId: "",
+    reqNumero: "",
+    proveedor: c.proveedor,
+    ruc: c.ruc,
+    subtotal: c.subtotal,
+    igv: c.igv,
+    total: c.total,
+    estadoPago: c.pago && c.pago.estado !== "PAGADO" ? "POR_PAGAR" : "PAGADA",
+    caja: c.caja,
+    aprobadoPor: c.aprobadoPor,
+    historial: c.historial,
+    descripcion: `Compra con ingreso a ${c.sede}: ${c.items.map((i) => `${i.cantidad} ${i.unidad} ${i.nombre}`).join(", ")}`,
+    comprobanteGasto: "SIN_COMPROBANTE",
+    djNumero: c.djNumero,
+    djEstado: c.djEstado,
+    compraDirecta: true,
+  };
+}
+
+/** DJ de las compras con ingreso a stock (solo las que ya tienen su N°). */
+export const djsDeCompras = (compras: Compra[]): Factura[] => compras.filter((c) => c.tipoComprobante === "SIN_COMPROBANTE" && c.djNumero).map(djDeCompra);
+
+/** Pone la DJ automática a una compra "Sin comprobante" (al registrarla o al editarla). Si falla, se genera luego. */
+async function ponerDJCompra(c: Compra, rol: Rol): Promise<void> {
+  if (!requiereDJCompra(c)) return;
+  try {
+    c.djNumero = await siguienteDJ();
+    c.djEstado = "PENDIENTE";
+    c.historial = [...c.historial, evento(rol, "Declaración jurada generada", `${c.djNumero} (compra sin comprobante)`)];
+  } catch {
+    /* se genera luego al abrir Registro de gastos (generarDJsPendientes) */
+  }
+}
+
+/**
+ * Genera la DJ automática (correlativo DJ-0001 del servidor) de los gastos y compras con ingreso a stock ya
+ * registrados que la necesitan. Uno por uno, releyendo el registro antes de escribir para no numerar dos veces.
+ * Devuelve cuántas generó.
+ */
+export async function generarDJsPendientes(rol: Rol): Promise<number> {
+  if (!claveCargada(KEYS.FACTURAS) || !claveCargada(KEYS.COMPRAS)) return 0;
+  let n = 0;
+  const compras = getCompras()
+    .filter(requiereDJCompra)
+    .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.numero.localeCompare(b.numero));
+  for (const p of compras) {
+    if (!requiereDJCompra(getCompras().find((x) => x.id === p.id) ?? { ...p, djNumero: "x" })) continue;
+    const numero = await siguienteDJ();
+    const lista = getCompras();
+    const c = lista.find((x) => x.id === p.id);
+    if (!c || c.djNumero) continue;
+    const nueva: Compra = {
+      ...c,
+      djNumero: numero,
+      djEstado: c.djEstado ?? "PENDIENTE",
+      historial: [...c.historial, evento(rol, "Declaración jurada generada", `${numero} (compra sin comprobante)`)],
+    };
+    escribir(KEYS.COMPRAS, lista.map((x) => (x.id === c.id ? nueva : x)));
+    n++;
+  }
+  const pendientes = getFacturas()
+    .filter((f) => requiereDJAutomatica(f))
+    .sort((a, b) => a.fecha.localeCompare(b.fecha) || (a.codigo ?? a.numero).localeCompare(b.codigo ?? b.numero));
+  for (const p of pendientes) {
+    if (!requiereDJAutomatica(getFacturas().find((x) => x.id === p.id) ?? { ...p, djNumero: "x" })) continue;
+    const numero = await siguienteDJ();
+    const lista = getFacturas();
+    const f = lista.find((x) => x.id === p.id);
+    if (!f || f.djNumero) continue;
+    const nueva: Factura = {
+      ...f,
+      djNumero: numero,
+      djEstado: f.djEstado ?? "PENDIENTE",
+      historial: [...f.historial, evento(rol, "Declaración jurada generada", `${numero} (gasto sin comprobante)`)],
+    };
+    escribir(KEYS.FACTURAS, lista.map((x) => (x.id === f.id ? nueva : x)));
+    n++;
+  }
+  return n;
+}
 
 /** PENDIENTE -> ENVIADA (a Gerencia) -> APROBADA (creador / Gerencia). Deja rastro en el historial. */
 export function cambiarEstadoDJ(id: string, estado: "ENVIADA" | "APROBADA", rol: Rol): Factura {
   const lista = getFacturas();
   const f = lista.find((x) => x.id === id);
+  // DJ de una compra con ingreso a stock: el estado se guarda en la compra
+  const compra = f ? undefined : getCompras().find((x) => x.id === id && x.tipoComprobante === "SIN_COMPROBANTE" && x.djNumero);
+  if (compra) {
+    const actual = compra.djEstado ?? "PENDIENTE";
+    if (estado === "ENVIADA" && actual !== "PENDIENTE") throw new ErpError(`La ${compra.djNumero} ya fue ${actual === "APROBADA" ? "aprobada" : "enviada"}.`);
+    if (estado === "APROBADA" && actual === "APROBADA") throw new ErpError(`La ${compra.djNumero} ya está aprobada.`);
+    const nueva: Compra = {
+      ...compra,
+      djEstado: estado,
+      ...(estado === "APROBADA" ? { aprobadoPor: usuarioActual() } : {}),
+      historial: [...compra.historial, evento(rol, estado === "ENVIADA" ? "Declaración jurada enviada a aprobar" : "Declaración jurada aprobada")],
+    };
+    escribir(KEYS.COMPRAS, getCompras().map((x) => (x.id === id ? nueva : x)));
+    return djDeCompra(nueva);
+  }
   if (!f || !esDeclaracionJurada(f)) throw new ErpError("Declaración jurada no encontrada.");
   const actual = f.djEstado ?? "PENDIENTE";
-  if (estado === "ENVIADA" && actual !== "PENDIENTE") throw new ErpError(`La ${f.numero} ya fue ${actual === "APROBADA" ? "aprobada" : "enviada"}.`);
-  if (estado === "APROBADA" && actual === "APROBADA") throw new ErpError(`La ${f.numero} ya está aprobada.`);
+  if (estado === "ENVIADA" && actual !== "PENDIENTE") throw new ErpError(`La ${numeroDJ(f)} ya fue ${actual === "APROBADA" ? "aprobada" : "enviada"}.`);
+  if (estado === "APROBADA" && actual === "APROBADA") throw new ErpError(`La ${numeroDJ(f)} ya está aprobada.`);
   const nueva: Factura = {
     ...f,
     djEstado: estado,
@@ -2548,8 +3027,8 @@ export function eliminarMovimientoCaja(id: string): void {
 export type ServicioOSGasto = { descripcion: string; cantidad: number; unidad: string; precioUnit: number };
 
 /**
- * OS del gasto con servicios en texto libre: sin catálogo ni kardex. Con una sola línea toma el importe del gasto
- * (base sin IGV si es factura); con varias, su total debe coincidir con el importe.
+ * OS del gasto con servicios en texto libre: sin catálogo ni kardex. Precios con IGV incluido si es factura (como el
+ * importe). Con una sola línea toma el importe del gasto; con varias, su total debe coincidir con el importe.
  */
 async function osDeGasto(f: Factura, d: DatosGasto, servicios: ServicioOSGasto[], rol: Rol): Promise<OrdenServicio> {
   const lineas = servicios
@@ -2560,7 +3039,7 @@ async function osDeGasto(f: Factura, d: DatosGasto, servicios: ServicioOSGasto[]
   const una = lineas.length === 1;
   if (!una && lineas.some((s) => !(s.precioUnit > 0))) throw new ErpError("Cada servicio de la OS necesita precio mayor a 0.");
   const items: ItemPrecio[] = lineas.map((s) => {
-    const subtotal = una ? f.subtotal : r2(s.cantidad * s.precioUnit);
+    const subtotal = una ? f.total : r2(s.cantidad * s.precioUnit);
     return {
       itemReqId: uid(),
       nombre: s.descripcion,
@@ -2571,14 +3050,13 @@ async function osDeGasto(f: Factura, d: DatosGasto, servicios: ServicioOSGasto[]
       subtotal,
     };
   });
-  const subtotal = una ? f.subtotal : r2(items.reduce((a, i) => a + i.subtotal, 0));
-  const igv = una ? f.igv : d.comprobante === "FACTURA" ? r2(subtotal * IGV) : 0;
-  const total = r2(subtotal + igv);
+  const afecto = f.igv > 0;
+  const { subtotal, igv, total } = una ? { subtotal: f.subtotal, igv: f.igv, total: f.total } : totalesLineas(items, afecto, true);
   if (Math.abs(total - f.total) > 0.05)
-    throw new ErpError(`El total de la OS (${soles(total)}) no coincide con el importe del gasto (${soles(f.total)}). Revise cantidades y precios${igv ? " (sin IGV)" : ""}.`);
+    throw new ErpError(`El total de la OS (${soles(total)}) no coincide con el importe del gasto (${soles(f.total)}). Revise cantidades y precios${afecto ? " (con IGV incluido)" : ""}.`);
   // El N° se reserva cuando todo ya validó
   const os = osDirecta(
-    { fecha: d.fecha, proveedor: f.proveedor, ruc: f.ruc, concepto: d.descripcion.trim(), origen: "GASTO", gastoId: f.id, gastoNumero: f.numero, items, subtotal, igv, total },
+    { fecha: d.fecha, proveedor: f.proveedor, ruc: f.ruc, concepto: d.descripcion.trim(), origen: "GASTO", gastoId: f.id, gastoNumero: f.numero, items, preciosConIgv: afecto, subtotal, igv, total },
     await reservarNumeroOS(),
     rol,
     `${COMPROBANTES_GASTO[d.comprobante]} ${f.numero}`
@@ -2602,7 +3080,7 @@ export async function registrarGastoCompleto(
   /** `items`: OC del gasto (productos del catálogo). `servicios`: OS del gasto (texto libre). Solo una de las dos. */
   opc: { items?: ItemOCGasto[]; servicios?: ServicioOSGasto[]; bancarizacion?: Bancarizacion },
   rol: Rol
-): Promise<{ gasto: Factura; oc?: OrdenCompra; os?: OrdenServicio }> {
+): Promise<{ gasto: Factura; oc?: OrdenCompra; os?: OrdenServicio; avisoCotizacion?: string }> {
   // Declaración jurada: el N° lo pone el servidor (DJ-0001, DJ-0002…) al final, cuando todo lo demás ya validó
   const esDJ = d.comprobante === "DJ";
   const f = prepararGasto(esDJ ? { ...d, numero: DJ_AUTO } : d.comprobante === "SIN_COMPROBANTE" ? { ...d, numero: numeroSinComprobante() } : d, rol);
@@ -2625,12 +3103,11 @@ export async function registrarGastoCompleto(
       precioUnit: r2(i.precioUnit),
       subtotal: r2(i.cantidad * i.precioUnit),
     }));
-    // Mismo criterio que el gasto: la factura lleva IGV aparte; boleta / recibo / DJ no
-    const subtotal = r2(items.reduce((a, i) => a + i.subtotal, 0));
-    const igv = d.comprobante === "FACTURA" ? r2(subtotal * IGV) : 0;
-    const total = r2(subtotal + igv);
+    // Mismo criterio que el gasto: precios con IGV incluido; la factura desglosa el IGV, boleta / recibo / DJ no
+    const afecto = f.igv > 0;
+    const { subtotal, igv, total } = totalesLineas(items, afecto, true);
     if (Math.abs(total - f.total) > 0.05)
-      throw new ErpError(`El total de la OC (${soles(total)}) no coincide con el importe del gasto (${soles(f.total)}). Revise cantidades y precios${igv ? " (sin IGV)" : ""}.`);
+      throw new ErpError(`El total de la OC (${soles(total)}) no coincide con el importe del gasto (${soles(f.total)}). Revise cantidades y precios${afecto ? " (con IGV incluido)" : ""}.`);
     const numero = formatear("OC", await siguiente("OC"));
     oc = {
       id: uid(),
@@ -2646,6 +3123,7 @@ export async function registrarGastoCompleto(
       tiempoEntrega: "Inmediato",
       lugarEntrega: "-",
       items,
+      preciosConIgv: afecto,
       subtotal,
       igv,
       total,
@@ -2676,10 +3154,74 @@ export async function registrarGastoCompleto(
     f.bancarizacion = b;
     f.historial = [...f.historial, evento(rol, "Marcada como PAGADA", textoBancarizacion(b))];
   }
+  // Cotización del proveedor: sin N° del proveedor, el sistema reserva COT-PROV-0001-2026 (al final, cuando todo validó).
+  // Si la numeración aún no está en Supabase, el gasto se guarda igual y el código se asigna después (al abrir su PDF).
+  let avisoCotizacion: string | undefined;
+  if (!f.cotizacionProveedor) {
+    try {
+      f.cotizacionProveedor = await reservarCotizacionProveedor();
+      f.cotizacionAuto = true;
+    } catch (e) {
+      avisoCotizacion = (e as Error).message;
+    }
+  }
+  if (f.cotizacionProveedor) {
+    const texto = `Cotización ${f.cotizacionProveedor}${f.cotizacionAuto ? " (generada: el proveedor no entregó cotización)" : " del proveedor"}`;
+    f.historial = [...f.historial, evento(rol, "Cotización registrada", texto)];
+  }
+  // Gasto marcado "Sin comprobante": se le genera su declaración jurada de sustento (DJ-0042). Con factura, boleta u
+  // otro comprobante no. Si la numeración falla, el gasto se guarda igual y la DJ se genera después al abrir el
+  // Registro de gastos (generarDJsPendientes).
+  if (requiereDJAutomatica(f)) {
+    try {
+      f.djNumero = await siguienteDJ();
+      f.djEstado = "PENDIENTE";
+      f.historial = [...f.historial, evento(rol, "Declaración jurada generada", `${f.djNumero} (gasto sin comprobante)`)];
+    } catch {
+      /* se genera luego */
+    }
+  }
   if (oc) escribir(KEYS.ORDENES, [oc, ...getOrdenes()]);
   if (os) escribir(KEYS.ORDENES_SERVICIO, [os, ...getOrdenesServicio()]);
   escribir(KEYS.FACTURAS, [f, ...getFacturas()]);
-  return { gasto: f, oc, os };
+  return { gasto: f, oc, os, avisoCotizacion };
+}
+
+/**
+ * Reserva el siguiente código de cotización interna del año en Supabase (atómico): COT-PROV-0001-2026.
+ * Se usa cuando el proveedor no entregó cotización (supabase/migrations/20261118_cotizacion_proveedor_gasto.sql).
+ */
+async function reservarCotizacionProveedor(): Promise<string> {
+  if (vistaSede?.modo === "sucursal") {
+    const anio = Number(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric" }).format(new Date()));
+    const n = await siguienteSede(`COTPROV_${anio}` as Serie, vistaSede.propia);
+    return `COT-PROV-SEC-${String(n).padStart(4, "0")}-${anio}`;
+  }
+  const { data, error } = await createClient().rpc("siguiente_numero_cot_prov");
+  if (error) {
+    if (error.code === "42501") throw new ErpError(error.message);
+    if (error.code === "PGRST202" || /could not find the function/i.test(error.message))
+      throw new ErpError("Falta la numeración de cotizaciones en Supabase: ejecute supabase/migrations/20261118_cotizacion_proveedor_gasto.sql.");
+    throw new ErpError(`No se pudo generar el código de cotización: ${error.message}`);
+  }
+  const anio = Number(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric" }).format(new Date()));
+  return `COT-PROV-${String(Number(data)).padStart(4, "0")}-${anio}`;
+}
+
+/** Gasto antiguo o guardado sin código de cotización: le asigna COT-PROV-xxxx-AAAA una sola vez. */
+export async function cotizacionGasto(facturaId: string): Promise<Factura> {
+  const f = getFacturas().find((x) => x.id === facturaId);
+  if (!f) throw new ErpError("Gasto no encontrado.");
+  if (f.cotizacionProveedor || !f.esGastoTesoreria || f.tipoGasto === "PLANILLA") return f;
+  const cotizacionProveedor = await reservarCotizacionProveedor();
+  const nuevo: Factura = {
+    ...f,
+    cotizacionProveedor,
+    cotizacionAuto: true,
+    historial: [...f.historial, evento("TESORERIA", "Cotización registrada", `Cotización ${cotizacionProveedor} (generada: el proveedor no entregó cotización)`)],
+  };
+  escribir(KEYS.FACTURAS, getFacturas().map((x) => (x.id === facturaId ? nuevo : x)));
+  return nuevo;
 }
 
 /** Valida el gasto y arma la fila de Facturas (sin guardar). */
@@ -2698,15 +3240,25 @@ function prepararGasto(d: DatosGasto, rol: Rol): Factura {
   const proveedor = d.proveedor.trim().toUpperCase();
   if (!proveedor) throw new ErpError(d.comprobante === "DJ" ? "Indique el nombre de quien declara." : "Indique el proveedor o agencia.");
   const ruc = d.ruc.trim();
-  if (ruc && !/^\d{8}$/.test(ruc) && !/^\d{11}$/.test(ruc)) throw new ErpError("RUC (11 dígitos) o DNI (8 dígitos) inválido.");
-  if (d.comprobante === "FACTURA" && ruc.length !== 11) throw new ErpError("La factura requiere el RUC del proveedor.");
+  // 010101: documento ficticio de VARIOS/SIN DATOS, solo con ese proveedor
+  if (ruc === RUC_VARIOS && !esProveedorVarios(proveedor)) throw new ErpError(`El N° ${RUC_VARIOS} es solo para el proveedor ${PROVEEDOR_VARIOS}.`);
+  if (ruc && ruc !== RUC_VARIOS && !/^\d{8}$/.test(ruc) && !/^\d{11}$/.test(ruc)) throw new ErpError("RUC (11 dígitos) o DNI (8 dígitos) inválido.");
+  // VARIOS/SIN DATOS (010101) se acepta con cualquier comprobante salvo DJ / RHE, también con factura
+  if (d.comprobante === "FACTURA" && ruc.length !== 11 && !(esProveedorVarios(proveedor) && ruc === RUC_VARIOS))
+    throw new ErpError("La factura requiere el RUC del proveedor.");
+  if (esProveedorVarios(proveedor) && ruc && ruc !== RUC_VARIOS)
+    throw new ErpError(`Con RUC el gasto va a nombre de la razón social de SUNAT, no de ${PROVEEDOR_VARIOS}. Valide el RUC y se completa solo.`);
+  if (esProveedorVarios(proveedor) && (d.comprobante === "DJ" || d.comprobante === "RXH"))
+    throw new ErpError(d.comprobante === "DJ" ? "Indique el nombre de quien declara." : "Indique la persona que emite el recibo por honorarios.");
   if (d.comprobante === "RXH" && !ruc) throw new ErpError("El recibo por honorarios requiere el RUC (10…) o DNI de la persona.");
   if (d.comprobante === "DJ" && !/^\d{8}$/.test(ruc)) throw new ErpError("La declaración jurada solo lleva el DNI (8 dígitos) de quien declara.");
   if (d.comprobante === "DJ" && total > TOPE_DJ_MOVILIDAD_DIA)
     throw new ErpError(`La declaración jurada de movilidad tiene un tope de ${soles(TOPE_DJ_MOVILIDAD_DIA)} por día (SUNAT). Registre un día por declaración.`);
   if (ruc.length === 11 && !rucValido(ruc)) throw new ErpError("RUC inválido (dígito verificador).");
   exigirRucSunat(ruc, "del proveedor");
-  if (getFacturas().some((f) => f.numero === numero && (ruc ? f.ruc === ruc : f.proveedor === proveedor)) || (ruc && getCompras().some((c) => c.numero === numero && c.ruc === ruc)))
+  // Con VARIOS/SIN DATOS (010101) ni el nombre ni el documento distinguen a nadie: no se busca duplicado.
+  const generico = esProveedorVarios(proveedor);
+  if (!generico && (getFacturas().some((f) => f.numero === numero && (ruc ? f.ruc === ruc : f.proveedor === proveedor)) || (ruc && getCompras().some((c) => c.numero === numero && c.ruc === ruc))))
     throw new ErpError(`El comprobante ${numero} de ${proveedor} ya fue registrado.`);
   if (d.detraccion && !(d.detraccionPorc > 0 && d.detraccionPorc <= 100)) throw new ErpError("Indique el % de detracción.");
   if (d.archivos.some((a) => a.dataUrl.length > MAX_ARCHIVO * 1.4)) throw new ErpError("Cada archivo debe pesar como máximo 1.5 MB.");
@@ -2718,6 +3270,9 @@ function prepararGasto(d: DatosGasto, rol: Rol): Factura {
   const retencion = d.comprobante === "RXH" ? retencionRHE(total, d.retencion ?? true) : 0;
   const neto = r2(netoDetraccion - retencion);
   const suministro = d.comprobante === "SERVICIO_PUBLICO" ? d.suministro?.trim().toUpperCase() : undefined;
+  const cotizacion = (d.cotizacion ?? "").trim().toUpperCase();
+  if (cotizacion.length > 40) throw new ErpError("El N° de cotización del proveedor es demasiado largo (máx. 40 caracteres).");
+  if (/^COT-PROV-/.test(cotizacion)) throw new ErpError("COT-PROV-… es el código que genera el sistema. Deje el campo vacío para generarlo.");
   const f: Factura = {
     id: uid(),
     tipo: d.comprobante === "DJ" ? "DECLARACION_JURADA" : "FACTURA",
@@ -2742,6 +3297,7 @@ function prepararGasto(d: DatosGasto, rol: Rol): Factura {
     ...(d.detraccion ? { detraccionPorc: d.detraccionPorc, detraccionMonto: monto } : {}),
     ...(retencion ? { retencionPorc: PORC_RETENCION_RHE, retencionMonto: retencion } : {}),
     ...(suministro ? { suministro } : {}),
+    ...(cotizacion ? { cotizacionProveedor: cotizacion, cotizacionAuto: false } : {}),
     netoPagar: neto,
     ...(d.archivos.length ? { archivos: d.archivos } : {}),
     creadoPor: usuarioActual(),
@@ -2750,7 +3306,7 @@ function prepararGasto(d: DatosGasto, rol: Rol): Factura {
 }
 
 /** Campos que se pueden corregir en un gasto POR PAGAR (el tipo de comprobante y la OC no cambian). */
-export type EdicionGasto = Pick<Factura, "numero" | "fecha" | "proveedor" | "ruc" | "descripcion"> & { tipoGasto: TipoGasto; importe: number };
+export type EdicionGasto = Pick<Factura, "numero" | "fecha" | "proveedor" | "ruc" | "descripcion"> & { tipoGasto: TipoGasto; importe: number; cotizacion?: string };
 
 /**
  * Quién puede editar un gasto: solo gastos de Tesorería POR PAGAR (no los egresos de planilla),
@@ -2781,11 +3337,14 @@ export function editarGasto(id: string, c: EdicionGasto, rol: Rol): Factura {
   const proveedor = c.proveedor.trim().toUpperCase();
   if (!proveedor) throw new ErpError("Indique el proveedor o agencia.");
   const ruc = c.ruc.trim();
-  if (ruc && !/^\d{8}$/.test(ruc) && !/^\d{11}$/.test(ruc)) throw new ErpError("RUC (11 dígitos) o DNI (8 dígitos) inválido.");
-  if (comp === "FACTURA" && ruc.length !== 11) throw new ErpError("La factura requiere el RUC del proveedor.");
+  // 010101: documento ficticio de VARIOS/SIN DATOS, solo con ese proveedor
+  if (ruc === RUC_VARIOS && !esProveedorVarios(proveedor)) throw new ErpError(`El N° ${RUC_VARIOS} es solo para el proveedor ${PROVEEDOR_VARIOS}.`);
+  if (ruc && ruc !== RUC_VARIOS && !/^\d{8}$/.test(ruc) && !/^\d{11}$/.test(ruc)) throw new ErpError("RUC (11 dígitos) o DNI (8 dígitos) inválido.");
+  if (comp === "FACTURA" && ruc.length !== 11 && !(esProveedorVarios(proveedor) && ruc === RUC_VARIOS))
+    throw new ErpError("La factura requiere el RUC del proveedor.");
   if (ruc.length === 11 && !rucValido(ruc)) throw new ErpError("RUC inválido (dígito verificador).");
   exigirRucSunat(ruc, "del proveedor");
-  if (lista.some((x) => x.id !== id && x.numero === numero && (ruc ? x.ruc === ruc : x.proveedor === proveedor)))
+  if (!esProveedorVarios(proveedor) && lista.some((x) => x.id !== id && x.numero === numero && (ruc ? x.ruc === ruc : x.proveedor === proveedor)))
     throw new ErpError(`El comprobante ${numero} de ${proveedor} ya fue registrado.`);
   const total = f.ocId ? f.total : r2(Number(c.importe));
   if (!(total > 0)) throw new ErpError("El importe total debe ser mayor a 0.");
@@ -2795,7 +3354,18 @@ export function editarGasto(id: string, c: EdicionGasto, rol: Rol): Factura {
   // RHE: la retención sigue la decisión del registro (si se quitó con un importe > S/ 1,500, sigue sin retención)
   const retencion = comp === "RXH" ? retencionRHE(total, f.retencionPorc !== undefined || f.total <= TOPE_RETENCION_RHE) : 0;
   const neto = r2(netoDetraccion - retencion);
-  const cambios = [numero !== f.numero && `N° ${f.numero} → ${numero}`, total !== f.total && `importe ${soles(f.total)} → ${soles(total)}`].filter(Boolean).join(" · ");
+  // Cotización: si llega la del proveedor, reemplaza al código generado; vacío conserva el actual
+  const cot = (c.cotizacion ?? "").trim().toUpperCase();
+  if (cot.length > 40) throw new ErpError("El N° de cotización del proveedor es demasiado largo (máx. 40 caracteres).");
+  if (cot && /^COT-PROV-/.test(cot) && cot !== f.cotizacionProveedor) throw new ErpError("COT-PROV-… es el código que genera el sistema; no se escribe a mano.");
+  const cambiaCot = !!cot && cot !== f.cotizacionProveedor;
+  const cambios = [
+    numero !== f.numero && `N° ${f.numero} → ${numero}`,
+    total !== f.total && `importe ${soles(f.total)} → ${soles(total)}`,
+    cambiaCot && `cotización ${f.cotizacionProveedor ?? "-"} → ${cot}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const editado: Factura = {
     ...f,
     numero,
@@ -2812,6 +3382,7 @@ export function editarGasto(id: string, c: EdicionGasto, rol: Rol): Factura {
     retencionPorc: retencion ? PORC_RETENCION_RHE : undefined,
     retencionMonto: retencion || undefined,
     netoPagar: neto,
+    ...(cambiaCot ? { cotizacionProveedor: cot, cotizacionAuto: false } : {}),
     editadoPor: usuarioActual(),
     editadoEn: new Date().toISOString(),
     historial: [...f.historial, evento(rol, "Gasto editado", cambios || undefined)],
@@ -2862,10 +3433,13 @@ export function registrarEgresoPlanilla(
   return f;
 }
 
-/** IGV de la compra: factura = precios sin IGV (+18 %); boleta = IGV incluido; recibos, DJ, ticket y sin comprobante = sin IGV. */
-export function totalesCompra(tipo: Compra["tipoComprobante"], items: { cantidad: number; precioUnit: number }[]) {
+/**
+ * IGV de la compra. Factura y boleta: precios con IGV incluido (se desglosa base = total / 1.18). Recibos, DJ, ticket y
+ * sin comprobante: sin IGV. Compras con factura anteriores (`preciosConIgv = false`): precios sin IGV (+18 %).
+ */
+export function totalesCompra(tipo: Compra["tipoComprobante"], items: { cantidad: number; precioUnit: number }[], preciosConIgv = true) {
   const suma = r2(items.reduce((a, i) => a + r2((i.cantidad || 0) * (i.precioUnit || 0)), 0));
-  if (tipo === "BOLETA") {
+  if (tipo === "BOLETA" || (tipo === "FACTURA" && preciosConIgv)) {
     const subtotal = r2(suma / (1 + IGV));
     return { subtotal, igv: r2(suma - subtotal), total: suma };
   }
@@ -2876,7 +3450,7 @@ export function totalesCompra(tipo: Compra["tipoComprobante"], items: { cantidad
 
 /** Registra la compra y suma las cantidades al stock de la sede. Valida todo antes de escribir. */
 export type DatosCompra = Pick<Compra, "fecha" | "proveedorId" | "tipoComprobante" | "numero" | "sede"> &
-  Partial<Pick<Compra, "caja" | "pago">> & { items: Omit<ItemCompra, "subtotal">[]; /** "Generar Orden de Compra OC / de Servicio OS" */ generarOrden?: OrdenAGenerar };
+  Partial<Pick<Compra, "caja" | "pago" | "preciosConIgv">> & { items: Omit<ItemCompra, "subtotal">[]; /** "Generar Orden de Compra OC / de Servicio OS" */ generarOrden?: OrdenAGenerar };
 
 export const docCompra = (c: Pick<Compra, "tipoComprobante" | "numero">) => `${COMPROBANTES[c.tipoComprobante] ?? "Factura"} ${c.numero}`;
 
@@ -2926,6 +3500,8 @@ function ocDeCompra(c: Compra, numero: string, rol: Rol, previa?: OrdenCompra): 
     almacenIngreso: c.sede,
     lugarEntrega: c.sede,
     items,
+    // Mismos precios que la compra: con IGV incluido (factura nueva o boleta)
+    preciosConIgv: c.tipoComprobante === "BOLETA" || (c.tipoComprobante === "FACTURA" && c.preciosConIgv === true),
     subtotal: c.subtotal,
     igv: c.igv,
     total: c.total,
@@ -2940,11 +3516,12 @@ function ocDeCompra(c: Compra, numero: string, rol: Rol, previa?: OrdenCompra): 
 }
 
 /**
- * OS de una compra con ingreso a stock: nace APROBADA con los mismos productos. Líneas sin IGV (la boleta trae el
- * IGV dentro: se separa); los totales son los de la compra. `previa`: la OS ya vinculada (al editar).
+ * OS de una compra con ingreso a stock: nace APROBADA con los mismos productos y precios que la compra (con IGV
+ * incluido si la compra lo tiene); los totales son los de la compra. `previa`: la OS ya vinculada (al editar).
  */
 function osDeCompra(c: Compra, numero: string, rol: Rol, previa?: OrdenServicio): OrdenServicio {
-  const base = c.tipoComprobante === "BOLETA" ? 1 + IGV : 1;
+  // Líneas con IGV incluido (como la compra) cuando hay IGV; las compras con factura anteriores, sin IGV
+  const conIgvIncluido = c.igv > 0 && (c.tipoComprobante === "BOLETA" || c.preciosConIgv === true);
   const items: ItemPrecio[] = (c.items as (ItemCompra & { productoId?: string; sku?: string })[]).map((i) => ({
     itemReqId: i.id,
     nombre: i.nombre,
@@ -2952,8 +3529,8 @@ function osDeCompra(c: Compra, numero: string, rol: Rol, previa?: OrdenServicio)
     cantidad: i.cantidad,
     unidad: i.unidad || "UND",
     marca: "",
-    precioUnit: r2(i.precioUnit / base),
-    subtotal: r2(i.subtotal / base),
+    precioUnit: i.precioUnit,
+    subtotal: i.subtotal,
   }));
   const datos = {
     fecha: c.fecha,
@@ -2964,6 +3541,7 @@ function osDeCompra(c: Compra, numero: string, rol: Rol, previa?: OrdenServicio)
     compraId: c.id,
     compraNumero: c.numero,
     items,
+    preciosConIgv: conIgvIncluido,
     subtotal: c.subtotal,
     igv: c.igv,
     total: c.total,
@@ -3028,10 +3606,11 @@ export async function registrarCompra(data: DatosCompra, rol: Rol): Promise<{ co
   const compra: Compra = { ...prepararCompra(data), id: uid(), creadoPor: usuarioActual(), historial: [] };
   compra.numero = (await numeroCompraAuto(compra.tipoComprobante)) ?? compra.numero;
   const orden = await prepararOrdenCompra(data.generarOrden, rol);
-  ingresarStock(compra.sede, compra.items, { tipo: "INGRESO", documento: docCompra(compra) });
+  ingresarStock(compra.sede, itemsCostoCompra(compra), { tipo: "INGRESO", documento: docCompra(compra) });
   const { oc, os } = orden.armar(compra);
   const n = oc?.numero ?? os?.numero;
   compra.historial = [evento(rol, "Compra registrada", `${compra.numero} · ${compra.proveedor} · ingreso a ${compra.sede} · ${textoPagoCompra(compra)}${n ? ` · ${n}` : ""}`)];
+  await ponerDJCompra(compra, rol);
   escribir(KEYS.COMPRAS, [compra, ...getCompras()]);
   return { compra, oc, os };
 }
@@ -3050,9 +3629,10 @@ export async function editarCompra(id: string, data: DatosCompra, rol: Rol): Pro
   const orden = await prepararOrdenCompra(data.generarOrden, rol, vieja);
   const doc = `Edición ${docCompra(vieja).toLowerCase()}`;
   descontarStock(vieja.sede, vieja.items, { tipo: "AJUSTE", documento: doc, motivo: "Se revierte el ingreso para corregir la compra" });
-  ingresarStock(nueva.sede, nueva.items, { tipo: "INGRESO", documento: `${docCompra(nueva)} (corregida)` });
+  ingresarStock(nueva.sede, itemsCostoCompra(nueva), { tipo: "INGRESO", documento: `${docCompra(nueva)} (corregida)` });
   const editada = marcarEditado({ ...vieja, ...nueva }, rol, "Compra editada", `${vieja.numero} · ${soles(vieja.total)} → ${nueva.numero} · ${soles(nueva.total)} · ${textoPagoCompra(nueva)}`);
   const { oc, os } = orden.armar(editada);
+  await ponerDJCompra(editada, rol);
   escribir(KEYS.COMPRAS, lista.map((c) => (c.id === id ? editada : c)));
   return { compra: editada, oc, os };
 }
@@ -3088,7 +3668,9 @@ export function marcarEditado<T extends { historial: EventoHistorial[] }>(doc: T
 
 /** Valida y arma la compra (sin id ni historial). `excluirId`: la propia compra al editar (no cuenta como duplicada). */
 function prepararCompra(data: DatosCompra, excluirId?: string): Omit<Compra, "id" | "historial"> {
-  const prov = getProveedores().find((p) => p.id === data.proveedorId);
+  // VARIOS/SIN DATOS (010101): proveedor genérico fijo, no está en la tabla de proveedores
+  const generico = data.proveedorId === PROVEEDOR_VARIOS_ID;
+  const prov = generico ? proveedorVarios() : getProveedores().find((p) => p.id === data.proveedorId);
   if (!prov) throw new ErpError("Seleccione el proveedor.");
   exigirRucSunat(prov.ruc, `de ${prov.razonSocial}`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data.fecha)) throw new ErpError("Fecha de compra inválida. Use DD/MM/AAAA.");
@@ -3103,7 +3685,7 @@ function prepararCompra(data: DatosCompra, excluirId?: string): Omit<Compra, "id
   const re = NUM_COMPROBANTE[data.tipoComprobante];
   if (!auto && (!numero || (re && !re.test(numero))))
     throw new ErpError(`N° de ${COMPROBANTES[data.tipoComprobante].toLowerCase()} inválido.${re ? ` Ej: ${data.tipoComprobante === "FACTURA" ? "F001-00001234" : "B001-00000456"}` : ""}`);
-  if (!auto && (getCompras().some((c) => c.id !== excluirId && c.numero === numero && c.ruc === prov.ruc) || getFacturas().some((f) => f.numero === numero && f.ruc === prov.ruc)))
+  if (!auto && !generico && (getCompras().some((c) => c.id !== excluirId && c.numero === numero && c.ruc === prov.ruc) || getFacturas().some((f) => f.numero === numero && f.ruc === prov.ruc)))
     throw new ErpError(`El comprobante ${numero} de ${prov.razonSocial} ya fue registrado.`);
 
   const filas = data.items.filter((i) => i.nombre.trim());
@@ -3116,9 +3698,12 @@ function prepararCompra(data: DatosCompra, excluirId?: string): Omit<Compra, "id
     ...i,
     subtotal: r2(i.cantidad * i.precioUnit),
   }));
-  const { subtotal, igv, total } = totalesCompra(data.tipoComprobante, items);
+  // Precios con IGV incluido (por defecto); false solo al editar una compra con factura anterior (precios sin IGV)
+  const preciosConIgv = data.preciosConIgv !== false;
+  const { subtotal, igv, total } = totalesCompra(data.tipoComprobante, items, preciosConIgv);
   return {
     fecha: data.fecha,
+    preciosConIgv,
     proveedorId: prov.id,
     proveedor: prov.razonSocial,
     ruc: prov.ruc,
@@ -3162,6 +3747,11 @@ export const getOrdenesServicio = () => leer<OrdenServicio[]>(KEYS.ORDENES_SERVI
 
 /** Reserva el siguiente N° de OS del año en Supabase (atómico): OS-001-2026. */
 async function reservarNumeroOS(): Promise<string> {
+  if (vistaSede?.modo === "sucursal") {
+    const anio = Number(new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric" }).format(new Date()));
+    const n = await siguienteSede(`OS_${anio}` as Serie, vistaSede.propia);
+    return `OS-SEC-${String(n).padStart(3, "0")}-${anio}`;
+  }
   const { data, error } = await createClient().rpc("siguiente_numero_os");
   if (error) {
     if (error.code === "42501") throw new ErpError(error.message);
@@ -3178,18 +3768,20 @@ export type DatosOrdenServicio = Pick<
   "fecha" | "proveedor" | "ruc" | "concepto" | "formaPago" | "lugarServicio" | "plazo" | "origen" | "reqId" | "reqNumero" | "gastoId" | "gastoNumero" | "observacion"
 > & { items: Omit<ItemServicio, "subtotal">[]; conIgv: boolean };
 
-/** Subtotal, IGV y total de las líneas (precios SIN IGV; `conIgv = false` para recibos por honorarios, etc.). */
+/**
+ * Subtotal, IGV y total de las líneas. Precios CON IGV incluido (se desglosa base = total / 1.18);
+ * `conIgv = false` para recibos por honorarios, etc. (precio final, sin IGV).
+ */
 export function totalesOS(items: Pick<ItemServicio, "cantidad" | "precioUnit">[], conIgv = true): { subtotal: number; igv: number; total: number } {
-  const subtotal = r2(items.reduce((a, i) => a + (i.cantidad || 0) * (i.precioUnit || 0), 0));
-  const igv = conIgv ? r2(subtotal * IGV) : 0;
-  return { subtotal, igv, total: r2(subtotal + igv) };
+  return totalesLineas(items, conIgv, true);
 }
 
 /** Emite la OS (Tesorería / Creador). El adjunto es opcional y va a Storage (tesoreria/ordenes_servicio/…). */
 export async function emitirOrdenServicio(data: DatosOrdenServicio, adjunto: File | null, rol: Rol): Promise<OrdenServicio> {
   if (!puede(rol, "oc.crear")) throw new ErpError("Solo Tesorería puede emitir órdenes de servicio.");
   if (!data.proveedor.trim()) throw new ErpError("Ingrese el proveedor.");
-  if (data.ruc.trim() && !/^\d{8}$|^\d{11}$/.test(data.ruc.trim())) throw new ErpError("El RUC debe tener 11 dígitos (o DNI de 8).");
+  const errDoc = errorDocProveedor(data.proveedor, data.ruc);
+  if (errDoc) throw new ErpError(errDoc);
   exigirRucSunat(data.ruc, "del proveedor");
   if (!data.concepto.trim()) throw new ErpError("Ingrese el concepto del servicio.");
   const items: ItemServicio[] = data.items
@@ -3215,6 +3807,7 @@ export async function emitirOrdenServicio(data: DatosOrdenServicio, adjunto: Fil
     ruc: data.ruc.trim(),
     concepto: data.concepto.trim(),
     items,
+    preciosConIgv: true,
     subtotal,
     igv,
     total,
@@ -3235,11 +3828,11 @@ export async function emitirOrdenServicio(data: DatosOrdenServicio, adjunto: Fil
 
 /**
  * OS emitida junto con un gasto o una compra de "Registrar gasto": el registro ya trae su comprobante, así que
- * nace APROBADA (no pasa por la aprobación de Gerencia). Líneas con precio sin IGV.
+ * nace APROBADA (no pasa por la aprobación de Gerencia). Líneas con el criterio de precios de `preciosConIgv`.
  */
 function osDirecta(
   d: Pick<OrdenServicio, "fecha" | "proveedor" | "ruc" | "concepto" | "origen" | "gastoId" | "gastoNumero" | "compraId" | "compraNumero" | "subtotal" | "igv" | "total"> &
-    Partial<Pick<OrdenServicio, "formaPago" | "lugarServicio">> & { items: ItemPrecio[] },
+    Partial<Pick<OrdenServicio, "formaPago" | "lugarServicio" | "preciosConIgv">> & { items: ItemPrecio[] },
   numero: string,
   rol: Rol,
   documento: string
@@ -3313,6 +3906,8 @@ export const PERMISOS: Record<Rol, { label: string; puede: string[] }> = {
     ],
   },
   CONTADOR: { label: "Contador (lectura)", puede: [] },
+  // Módulo Ventas (2026-11-16): notas de pedido, comprobantes, clientes y cobranza; no compra ni paga
+  VENTAS: { label: "Ventas", puede: ["venta.gestionar", "venta.cobrar"] },
 };
 
 export const puede = (rol: Rol, permiso: string): boolean => PERMISOS[rol].puede.includes(permiso);

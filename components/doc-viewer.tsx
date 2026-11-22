@@ -103,6 +103,7 @@ function resolver(ref: DocRef): Resuelto | null {
           ...(f.detraccionMonto ? ([["Detracción", `${f.detraccionPorc}% · ${soles(f.detraccionMonto)}`]] as [string, string][]) : []),
           ...(f.retencionMonto ? ([["Retención 4ta cat.", `${f.retencionPorc}% · ${soles(f.retencionMonto)}`]] as [string, string][]) : []),
           ...(f.suministro ? ([["N° de suministro", f.suministro]] as [string, string][]) : []),
+          ...(f.cotizacionProveedor ? ([["Cotización", `${f.cotizacionProveedor}${f.cotizacionAuto ? " (interna: sin cotización del proveedor)" : " (del proveedor)"}`]] as [string, string][]) : []),
           ["Neto a pagar", soles(f.netoPagar ?? f.total)],
         ],
         historial: f.historial,

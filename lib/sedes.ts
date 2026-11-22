@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "./supabase/client";
+import { fijarVistaSede } from "./storage";
 
 export interface Sede {
   id: string;
@@ -37,8 +38,14 @@ let estado: EstadoSedes = { listo: false, error: "", sedes: [], asignada: null, 
 
 const avisar = () => window.dispatchEvent(new Event(EVENTO));
 
-/** Lee las sedes visibles y la sede del usuario (una vez por sesión). */
-export async function cargarSedes(): Promise<void> {
+/**
+ * Lee las sedes visibles y la sede del usuario (una vez por sesión).
+ * `vista`: qué datos muestran las pantallas (lib/storage fijarVistaSede):
+ *   "sucursal" -> app /secocha: solo lo de Secocha (ventas, tesorería, almacén de la sucursal).
+ *   "central"  -> ERP de Arequipa: oculta lo de las sucursales.
+ * Sin `vista` (bandejas de Secocha dentro del ERP) no cambia la vista actual.
+ */
+export async function cargarSedes(vista?: "sucursal" | "central"): Promise<void> {
   const sb = createClient();
   const {
     data: { user },
@@ -60,10 +67,41 @@ export async function cargarSedes(): Promise<void> {
   // Usuario de sede: la suya. ERP central (Taller, Tesorería): Secocha, la única sucursal
   const actualId = asignada?.sedeId ?? sedeSucursal(sedes)?.id ?? "";
   estado = { listo: true, error: "", sedes, asignada, actualId };
+  // ERP: un usuario de Secocha (o SOPORTE que eligió Secocha) trabaja el ERP completo en modo Secocha
+  const erpEnSucursal = vista === "central" && !!actualId && (!!asignada || (sedeElegida() === "sucursal" && !!sedeSucursal(sedes)));
+  if ((vista === "sucursal" || erpEnSucursal) && actualId) fijarVistaSede({ modo: "sucursal", propia: actualId });
+  else if (vista === "central" && !asignada && sedeCentral(sedes))
+    fijarVistaSede({ modo: "central", ajenas: sedes.filter((x) => x.id !== sedeCentral(sedes)!.id).map((x) => x.id), secocha: sedeSucursal(sedes)?.id });
   avisar();
 }
 
+/**
+ * SOPORTE (ERP central) elige con qué sede trabaja el ERP: Arequipa ("central") o Secocha ("sucursal").
+ * Se recuerda en este navegador. Los usuarios de Secocha siempre trabajan en Secocha.
+ */
+const CLAVE_SEDE_ERP = "erp_sede_trabajo";
+export function sedeElegida(): "central" | "sucursal" {
+  try {
+    return window.localStorage.getItem(CLAVE_SEDE_ERP) === "sucursal" ? "sucursal" : "central";
+  } catch {
+    return "central";
+  }
+}
+export async function elegirSedeErp(v: "central" | "sucursal"): Promise<void> {
+  try {
+    window.localStorage.setItem(CLAVE_SEDE_ERP, v);
+  } catch {
+    /* almacenamiento bloqueado */
+  }
+  await cargarSedes("central");
+}
+
+/** Arequipa (Planta Principal): tipo PLANTA_PRINCIPAL o es_central. */
+export const sedeCentral = (sedes: Sede[]): Sede | undefined =>
+  sedes.find((s) => s.tipo?.toUpperCase() === "PLANTA_PRINCIPAL") ?? sedes.find((s) => s.es_central);
+
 export function olvidarSedes(): void {
+  fijarVistaSede(null);
   estado = { listo: false, error: "", sedes: [], asignada: null, actualId: "" };
   avisar();
 }
@@ -72,6 +110,9 @@ export function olvidarSedes(): void {
 export const sedeSucursal = (sedes: Sede[]): Sede | undefined =>
   sedes.find((s) => s.tipo?.toUpperCase() === "SUCURSAL") ?? sedes.find((s) => !s.es_central && s.tipo?.toUpperCase() !== "PLANTA_PRINCIPAL");
 
+/** Usuario asignado a una sede (usuarios_sedes): jefe de Secocha o usuario de un submódulo de Secocha. */
+export const esUsuarioDeSede = (): boolean => !!estado.asignada;
+export const getSedes = (): Sede[] => estado.sedes;
 export const sedeActualId = (): string => estado.actualId;
 export const getSedeActual = (): Sede | undefined => estado.sedes.find((s) => s.id === estado.actualId);
 

@@ -42,8 +42,10 @@ export function CommandPalette({
   }, [abierto]);
 
   const items = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    const propios = comandos.filter((c) => !t || `${c.label} ${c.detalle ?? ""} ${c.claves ?? ""} ${c.grupo}`.toLowerCase().includes(t));
+    // Sin tildes ni mayúsculas: "guia" encuentra "Guías de Remisión"
+    const plano = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    const t = plano(q.trim());
+    const propios = comandos.filter((c) => !t || plano(`${c.label} ${c.detalle ?? ""} ${c.claves ?? ""} ${c.grupo}`).includes(t));
     return [...propios, ...(t.length >= 2 ? documentos(q) : [])];
   }, [q, comandos, documentos]);
   const actual = Math.min(sel, Math.max(0, items.length - 1));

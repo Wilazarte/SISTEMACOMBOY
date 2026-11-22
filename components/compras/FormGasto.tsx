@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { EstadoRuc } from "@/components/EstadoRuc";
+import { rucSunat } from "@/lib/ruc";
 import { FileUp, Paperclip, Plus, Receipt, Trash2, X } from "lucide-react";
 import { FormBancarizacion, bancarizacionVacia } from "@/components/compras/FormBancarizacion";
 import { UNIDADES } from "@/lib/empresa";
@@ -18,7 +19,7 @@ import {
   fechaPE,
   hoy,
   parseFechaPE,
-  IGV,
+  desglosarIgv,
   TOPE_BANCARIZACION,
   r2,
   registrarGastoCompleto,
@@ -37,6 +38,10 @@ import {
   PORC_RETENCION_RHE,
   TOPE_DJ_MOVILIDAD_DIA,
   TOPE_RETENCION_RHE,
+  PROVEEDOR_VARIOS,
+  RUC_VARIOS,
+  admiteProveedorVarios,
+  esProveedorVarios,
   numeroAutomatico,
   placeholderComprobante,
   retencionRHE,
@@ -57,13 +62,15 @@ const vacio = (): Omit<DatosGasto, "fecha"> => ({
   importe: 0,
   comprobante: "FACTURA",
   numero: "",
-  proveedor: "",
-  ruc: "",
+  // Por defecto VARIOS/SIN DATOS con N° 010101 (editable); al validar un RUC se reemplaza por la razón social de SUNAT
+  proveedor: PROVEEDOR_VARIOS,
+  ruc: RUC_VARIOS,
   detraccion: false,
   detraccionPorc: DETRACCION_SUGERIDA.TRANSPORTE,
   archivos: [],
   retencion: true,
   suministro: "",
+  cotizacion: "",
 });
 
 /**
@@ -90,6 +97,9 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
   const [fechaTxt, setFechaTxt] = useState(fechaPE(hoy()));
   const refFactura = useRef<HTMLInputElement>(null);
   const refGuia = useRef<HTMLInputElement>(null);
+  const refCotizacion = useRef<HTMLInputElement>(null);
+  // Sin cotización del proveedor: el sistema genera COT-PROV-0001-2026 al guardar
+  const [sinCotizacion, setSinCotizacion] = useState(false);
   const set = <K extends keyof typeof d>(k: K, v: (typeof d)[K]) => setD((x) => ({ ...x, [k]: v }));
   const fechaISO = parseFechaPE(fechaTxt);
   const fechaError = fechaTxt.length === 10 && !fechaISO ? "Fecha inexistente" : fechaISO > hoy() ? "La fecha no puede ser futura" : undefined;
@@ -99,7 +109,9 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
   const neto = r2(netoDetraccion - retencion);
   const rucMal = d.ruc.length === 11 && !rucValido(d.ruc);
   const subOC = r2(filas.reduce((a, f) => a + (f.cantidad || 0) * (f.precioUnit || 0), 0));
-  const totalOC = d.comprobante === "FACTURA" ? r2(subOC * (1 + IGV)) : subOC;
+  // Precios de la OC con IGV incluido: su total es la suma de las líneas (la factura desglosa base e IGV)
+  const totalOC = subOC;
+  const igvOC = d.comprobante === "FACTURA" ? desglosarIgv(subOC).igv : 0;
   const bancObligatoria = requiereBancarizacion(d.importe || 0, d.ruc);
   const setFila = (id: string, cambios: Partial<FilaOC>) => setFilas((p) => p.map((f) => (f.id === id ? { ...f, ...cambios } : f)));
   const elegirProducto = (id: string, nombre: string) => {
@@ -112,7 +124,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
     if (!/^(application\/pdf|image\/(png|jpe?g|webp))$/.test(file.type)) return toast("Adjunte un PDF o una imagen (JPG / PNG).", "error");
     if (file.size > MAX_ARCHIVO) return toast(`El archivo pesa ${(file.size / 1048576).toFixed(1)} MB. Máximo 1.5 MB.`, "error");
     // dataUrl guarda la referencia: "sb:tesoreria/..." (Storage) o el base64 si Storage lo rechaza
-    subirBaucher(file, tipo === "GUIA" ? "gasto-guia" : "gasto-factura")
+    subirBaucher(file, tipo === "GUIA" ? "gasto-guia" : tipo === "COTIZACION" ? "gasto-cotizacion" : "gasto-factura")
       .then(({ ref }) => setD((x) => ({ ...x, archivos: [...x.archivos.filter((a) => a.tipo !== tipo), { tipo, nombre: file.name, mime: file.type, dataUrl: ref }] })))
       .catch((e) => toast((e as Error).message, "error"));
   };
@@ -121,10 +133,15 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
     setGuardando(true);
     let id = "";
     let dj: Factura | undefined;
+    let cot = "";
+    let auto = false;
+    let aviso = "";
     const ok = await ejecutarAsync(
       async () => {
+        if (!sinCotizacion && !d.cotizacion?.trim())
+          throw new Error('Ingrese el N° de la cotización del proveedor o marque "El proveedor no entregó cotización".');
         const r = await registrarGastoCompleto(
-          { ...d, fecha: fechaISO },
+          { ...d, cotizacion: sinCotizacion ? "" : d.cotizacion, archivos: sinCotizacion ? d.archivos.filter((a) => a.tipo !== "COTIZACION") : d.archivos, fecha: fechaISO },
           {
             items: orden === "OC" ? filas : undefined,
             servicios: orden === "OS" ? lineasServicio(servicios, d.descripcion, d.importe, d.comprobante === "FACTURA") : undefined,
@@ -133,6 +150,9 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
           rol
         );
         id = r.gasto.id;
+        cot = r.gasto.cotizacionProveedor ?? "";
+        auto = !!r.gasto.cotizacionAuto;
+        aviso = r.avisoCotizacion ?? "";
         if (r.gasto.comprobanteGasto === "DJ") dj = r.gasto;
         return r;
       },
@@ -145,7 +165,10 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
       toast(`Declaración jurada ${dj.numero} registrada`);
       pdfDeclaracionJurada(dj);
     }
+    if (auto && cot) toast(`Cotización generada: ${cot}`);
+    if (aviso) toast(`Gasto registrado sin código de cotización: ${aviso}`, "error");
     setD(vacio());
+    setSinCotizacion(false);
     setOrden("NINGUNA");
     setFilas([filaOC()]);
     setServicios([servicioVacio()]);
@@ -208,7 +231,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
             ) : (
             <div className="mt-3 space-y-3">
               <p className="text-xs text-plomo-500">
-                La OC se emite a nombre del proveedor de abajo. Busque los productos en el almacén o escríbalos; precios {d.comprobante === "FACTURA" ? "sin IGV" : "finales"}.
+                La OC se emite a nombre del proveedor de abajo. Busque los productos en el almacén o escríbalos; precios {d.comprobante === "FACTURA" ? "CON IGV incluido" : "finales"}.
               </p>
               <datalist id="productos-oc-gasto">
                 {productos.map((p) => (
@@ -224,8 +247,8 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
                       <th className="px-2 py-2 text-left">Producto</th>
                       <th className="w-24 px-2 py-2 text-left">Cantidad</th>
                       <th className="w-28 px-2 py-2 text-left">Unidad</th>
-                      <th className="w-32 px-2 py-2 text-left">Precio unit.</th>
-                      <th className="w-28 px-2 py-2 text-right">Subtotal</th>
+                      <th className="w-32 px-2 py-2 text-left">{d.comprobante === "FACTURA" ? "P. unit. inc. IGV" : "Precio unit."}</th>
+                      <th className="w-28 px-2 py-2 text-right">Importe</th>
                       <th className="w-10" />
                     </tr>
                   </thead>
@@ -266,7 +289,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
                 </Button>
                 <p className={cn("text-sm", Math.abs(totalOC - (d.importe || 0)) > 0.05 ? "text-red-600" : "text-emerald-700")}>
                   Total OC <b>{soles(totalOC)}</b>
-                  {d.comprobante === "FACTURA" ? ` (${soles(subOC)} + IGV)` : ""} · debe coincidir con el importe {soles(d.importe || 0)}
+                  {d.comprobante === "FACTURA" ? ` (incluye IGV ${soles(igvOC)})` : ""} · debe coincidir con el importe {soles(d.importe || 0)}
                 </p>
               </div>
             </div>
@@ -276,7 +299,17 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
         <Field label="Tipo de comprobante *">
           <Select
             value={d.comprobante}
-            onChange={(e) => set("comprobante", e.target.value as ComprobanteGasto)}
+            onChange={(e) => {
+              const comprobante = e.target.value as ComprobanteGasto;
+              setD((x) => ({
+                ...x,
+                comprobante,
+                // DJ / RHE llevan el nombre de una persona: el genérico se quita; al volver, se repone si quedó vacío
+                ...(!admiteProveedorVarios(comprobante)
+                  ? esProveedorVarios(x.proveedor) ? { proveedor: "", ruc: x.ruc === RUC_VARIOS ? "" : x.ruc } : {}
+                  : !x.proveedor.trim() && !x.ruc ? { proveedor: PROVEEDOR_VARIOS, ruc: RUC_VARIOS } : {}),
+              }));
+            }}
             options={OPCIONES_COMPROBANTE}
           />
           {esRHE && <span className="mt-1 block text-xs text-plomo-500">Persona natural con RUC 10 - 4ta categoría</span>}
@@ -301,10 +334,19 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
         )}
         <Field label={d.comprobante === "DJ" ? "Nombre de quien declara *" : esRHE ? "Persona que emite el RHE *" : "Proveedor / agencia *"} className="md:col-span-2">
           <Input value={d.proveedor} list="proveedores-gasto" onChange={(e) => {
-            const p = proveedores.find((x) => x.razonSocial === e.target.value.toUpperCase());
-            setD((x) => ({ ...x, proveedor: e.target.value, ruc: p?.ruc ?? x.ruc }));
-          }} placeholder="Razón social o nombre" />
+            const v = e.target.value;
+            const p = proveedores.find((x) => x.razonSocial === v.toUpperCase());
+            // VARIOS/SIN DATOS pone 010101; al cambiar a otro proveedor, el 010101 se limpia
+            const ruc = esProveedorVarios(v) ? RUC_VARIOS : p?.ruc ?? "";
+            setD((x) => ({ ...x, proveedor: v, ruc: esProveedorVarios(v) || p ? ruc : x.ruc === RUC_VARIOS ? "" : x.ruc }));
+          }} onFocus={(e) => esProveedorVarios(d.proveedor) && e.target.select()} placeholder="Razón social o nombre" />
+          {esProveedorVarios(d.proveedor) && (
+            <span className="mt-1 block text-xs text-plomo-500">
+              Por defecto (N° {RUC_VARIOS}). Escriba encima o elija otro de la lista; si escribe un RUC real, se pone la razón social de SUNAT.
+            </span>
+          )}
           <datalist id="proveedores-gasto">
+            <option value={PROVEEDOR_VARIOS}>{RUC_VARIOS}</option>
             {proveedores.map((p) => (
               <option key={p.id} value={p.razonSocial}>
                 {p.ruc}
@@ -319,12 +361,56 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
           <Input
             value={d.ruc}
             maxLength={d.comprobante === "DJ" ? 8 : 11}
+            onFocus={(e) => d.ruc === RUC_VARIOS && e.target.select()}
             inputMode="numeric"
-            onChange={(e) => set("ruc", e.target.value.replace(/\D/g, ""))}
+            onChange={(e) => {
+              const ruc = e.target.value.replace(/\D/g, "");
+              // RUC ya validado en el sistema: reemplaza PROVEEDORES VARIOS por su razón social
+              const sunat = ruc.length === 11 ? rucSunat(ruc) : undefined;
+              setD((x) => ({ ...x, ruc, proveedor: sunat && esProveedorVarios(x.proveedor) ? sunat.razon_social : x.proveedor }));
+            }}
             className={cn(d.ruc.length === 11 && (rucMal ? "border-red-400" : "border-emerald-400"))}
           />
-          <EstadoRuc ruc={d.ruc} onValidado={(r) => setD((x) => (x.proveedor.trim() ? x : { ...x, proveedor: r.razon_social }))} />
+          <EstadoRuc ruc={d.ruc} onValidado={(r) => setD((x) => (x.proveedor.trim() && !esProveedorVarios(x.proveedor) ? x : { ...x, proveedor: r.razon_social }))} />
         </Field>
+
+        {/* Cotización emitida por el proveedor (o código interno si no la entregó) */}
+        <div className="rounded-xl border border-plomo-200 p-4 md:col-span-3">
+          <p className="text-sm font-semibold text-fg">Cotización del proveedor</p>
+          <div className="mt-3 grid gap-4 md:grid-cols-3">
+            <Field label={sinCotizacion ? "Código de cotización" : "N° de cotización del proveedor *"} hint={sinCotizacion ? "Se genera solo al guardar (correlativo del año)" : "Tal como figura en la cotización"}>
+              <Input
+                value={sinCotizacion ? "" : d.cotizacion ?? ""}
+                disabled={sinCotizacion}
+                maxLength={40}
+                onChange={(e) => set("cotizacion", e.target.value.toUpperCase())}
+                placeholder={sinCotizacion ? "COT-PROV-0001-2026" : "Ej: COT-2026-0154"}
+              />
+            </Field>
+            <label className="flex cursor-pointer items-center gap-2 self-center text-sm text-fg md:col-span-2">
+              <input type="checkbox" checked={sinCotizacion} onChange={(e) => setSinCotizacion(e.target.checked)} className="h-4 w-4 accent-corp" />
+              El proveedor no entregó cotización: generar código automático
+            </label>
+          </div>
+          {!sinCotizacion && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+              <input ref={refCotizacion} type="file" accept="application/pdf,image/*" className="hidden" onChange={(e) => adjuntar("COTIZACION", e.target.files?.[0])} />
+              {archivo("COTIZACION") ? (
+                <span className="inline-flex items-center gap-2 rounded-lg border border-dashed border-plomo-200 px-3 py-2">
+                  <Paperclip size={14} className="text-emerald-600" /> <span className="max-w-[220px] truncate font-medium">{archivo("COTIZACION")?.nombre}</span>
+                  <button type="button" onClick={() => setD((x) => ({ ...x, archivos: x.archivos.filter((y) => y.tipo !== "COTIZACION") }))} className="text-red-500" aria-label="Quitar cotización">
+                    <X size={14} />
+                  </button>
+                </span>
+              ) : (
+                <button type="button" onClick={() => refCotizacion.current?.click()} className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-plomo-200 px-3 py-2 text-plomo-600 hover:text-fg">
+                  <FileUp size={14} /> Adjuntar cotización (opcional)
+                </button>
+              )}
+              <span className="text-xs text-slate-400">PDF o imagen · máx. 1.5 MB</span>
+            </div>
+          )}
+        </div>
 
         {/* Retención de 4ta categoría (RHE por más de S/ 1,500) */}
         {esRHE && (

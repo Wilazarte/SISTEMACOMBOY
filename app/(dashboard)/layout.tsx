@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, CloudUpload, Eye, Loader2, Search, ShieldAlert } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, CloudUpload, Eye, Loader2, MapPin, Search, ShieldAlert } from "lucide-react";
 import { EV_PESTANA, Kbd, Toaster, toast, type PestanaActiva } from "@/components/ui";
+import { VisorPDF } from "@/components/VisorPDF";
 import { DocViewerHost, abrirDoc, type DocRef } from "@/components/doc-viewer";
 import { ObservacionesGerencia } from "@/components/ObservacionesGerencia";
 import { Campana } from "@/components/shell/Campana";
@@ -13,18 +14,19 @@ import { useIr } from "@/components/shell/ir";
 import { accionesDe, hrefSub, moduloDe, navDe } from "@/components/shell/nav";
 import { ModuloContenido, ModuloLayout, SEDE_PLANTA_PRINCIPAL } from "@/components/layout/ModuloLayout";
 import { PiePestana } from "@/components/inicio/ModoPestana";
+import { BarraAccesos } from "@/components/inicio/BarraAccesos";
 import { NavegacionERP, type MigaERP } from "@/components/NavegacionERP";
 import { DatalistCatalogo } from "@/components/productos/ProductoInput";
 import { detenerCatalogo, iniciarCatalogo } from "@/lib/productos";
-import { olvidarSedes } from "@/lib/sedes";
+import { cargarSedes, elegirSedeErp, esUsuarioDeSede, getSedeActual, olvidarSedes, useSedes } from "@/lib/sedes";
 import { RUTA_GERENCIA, RUTA_SUCURSAL, inicioDe, soloSecocha, logout, puedeVer, useSesion, veTesoreria } from "@/lib/auth";
-import { RUTA_NO_AUTORIZADO, homeAsignado, homePlantaDe, isAdmin } from "@/lib/permisosPlanta";
-import { RUTA_INICIO, TITULO_INICIO, buscarAccion, esModuloInicio, type ModuloInicio } from "@/lib/inicioModulos";
+import { RUTA_NO_AUTORIZADO, esAdminSede, homeAsignado, homePlantaDe, isAdmin } from "@/lib/permisosPlanta";
+import { RUTA_INICIO, TITULO_INICIO, buscarAccion, esModuloInicio, esRutaProduccion, type ModuloInicio } from "@/lib/inicioModulos";
 import { registrarNavegador } from "@/lib/navegacion";
 import { contarDatosLocales, subirDatosLocales } from "@/lib/migracion";
 import { useNotificaciones } from "@/lib/notificaciones";
 import { limpiarPrefs, usePrefs } from "@/lib/preferencias";
-import { KEYS, detenerDatos, getCotizaciones, getFacturas, getGuias, getOrdenes, getPendientes, getProcesados, useDatos, useStore } from "@/lib/storage";
+import { KEYS, detenerDatos, enSucursal, getCotizaciones, getFacturas, getGuias, getOrdenes, getPendientes, getProcesados, useDatos, useStore } from "@/lib/storage";
 import type { OrdenDespacho } from "@/lib/types";
 import { avisoOD, getDespachos, odsNuevas } from "@/lib/ventas";
 
@@ -60,7 +62,9 @@ const NOMBRE_MODULO: [string, string][] = [
   ["/almacen", "ALMACEN"],
   ["/finanzas", "FINANZAS"],
   ["/produccion", "PRODUCCION"],
+  ["/ventas", "VENTAS"],
   ["/erp", "EXPEDIENTES"],
+  ["/documentos", "GESTION DOCUMENTARIA"],
   ["/no-autorizado", "NO AUTORIZADO"],
 ];
 
@@ -115,6 +119,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     // Usuario solo de Secocha (modulos = ["/secocha"]): no usa el ERP
     if (soloSecocha(sesion)) router.replace(RUTA_SUCURSAL);
   }, [listo, sesion, router]);
+
+  // Sede del ERP: Arequipa (oculta lo de Secocha) o, para los usuarios de Secocha y SOPORTE que la elige,
+  // el MISMO ERP en modo Secocha (solo datos y numeración de Secocha). lib/sedes cargarSedes + lib/storage fijarVistaSede
+  const usaErp = !!sesion && !soloSecocha(sesion);
+  const sedes = useSedes();
+  useEffect(() => {
+    if (usaErp) void cargarSedes("central");
+  }, [usaErp]);
+  const modoSecocha = sedes.listo && enSucursal();
 
   // RBAC de la planta: la home de otro perfil (ej. Almacén entrando a /finanzas) va a /no-autorizado.
   // GERENCIA (visor) entra siempre por /gerencia.
@@ -219,7 +232,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     router.replace("/login");
   };
 
-  if (!listo || !sesion || (!datos.listo && !datos.error))
+  // Se espera la sede: un usuario de Secocha no debe numerar ni grabar antes de quedar en modo Secocha
+  if (!listo || !sesion || (!datos.listo && !datos.error) || (usaErp && !sedes.listo))
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-canvas text-plomo-500">
         <span className="flex h-11 w-11 animate-pulse items-center justify-center rounded-xl bg-corp text-sm font-bold text-white shadow-rojo">CV</span>
@@ -264,7 +278,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
   };
 
-  const permitido = path === "/dashboard/compras" ? veTesoreria(sesion) : puedeVer(sesion, path);
+  // Secocha solo vende: sin Producción ni OP / expedientes 26W (Williams 2026-11-17)
+  const permitido = modoSecocha && esRutaProduccion(path) ? false : path === "/dashboard/compras" ? veTesoreria(sesion) : puedeVer(sesion, path);
   const actual = moduloDe(path);
   const modulo = actual && actual.href !== "/dashboard" ? actual.href : undefined;
   const enPlanilla = path.startsWith("/dashboard/planilla") || (path === "/dashboard/compras" && tabActiva?.id === "planilla");
@@ -291,15 +306,39 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   return (
     <ModuloLayout
-      moduleName={nombreModulo}
+      moduleName={modoSecocha ? `${nombreModulo} · SECOCHA` : nombreModulo}
       sinMapa={esInicio}
-      sede={SEDE_PLANTA_PRINCIPAL}
+      // Barra azul de accesos rápidos a la derecha: deja su espacio en PC
+      mainClassName={moduloNav ? "lg:pr-24" : ""}
+      sede={modoSecocha ? `Sucursal ${getSedeActual()?.nombre ?? "Secocha"}` : SEDE_PLANTA_PRINCIPAL}
       // El logo vuelve al INICIO del módulo actual
       inicio={pestanaAccion ? RUTA_INICIO[pestanaAccion.modulo] : (homePlantaDe(path) ?? inicioDe(sesion))}
       sesion={sesion}
       onSalir={salir}
       extra={
         <>
+          {/* Sede de trabajo: fija para los usuarios de Secocha; SOPORTE cambia entre Arequipa y Secocha */}
+          {isAdmin(sesion) && !esAdminSede(sesion) && !esUsuarioDeSede() && sedes.sedes.length > 1 ? (
+            <button
+              onClick={() => void elegirSedeErp(modoSecocha ? "central" : "sucursal")}
+              className={
+                "tip flex h-9 items-center gap-2 rounded-lg border px-2.5 text-[12px] font-semibold transition " +
+                (modoSecocha ? "border-amber-400/60 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25" : "border-white/[0.08] glass-card text-[#d4d4d8] hover-cian hover:text-white")
+              }
+              data-tip={modoSecocha ? "Volver al ERP de Arequipa" : "Trabajar el ERP en modo Secocha"}
+              aria-label={modoSecocha ? "Cambiar a sede Arequipa" : "Cambiar a sede Secocha"}
+            >
+              <ArrowLeftRight size={14} />
+              <span className="hidden sm:inline">{modoSecocha ? "Sede Secocha" : "Sede Arequipa"}</span>
+            </button>
+          ) : (
+            modoSecocha && (
+              <span className="flex h-9 items-center gap-1.5 rounded-lg border border-amber-400/60 bg-amber-500/15 px-2.5 text-[12px] font-semibold text-amber-200">
+                <MapPin size={14} />
+                <span className="hidden sm:inline">Sede Secocha</span>
+              </span>
+            )
+          )}
           <button
             onClick={() => setPaleta(true)}
             className="flex h-9 items-center gap-2.5 rounded-lg border border-white/[0.08] glass-card px-2.5 text-[13px] text-[#d4d4d8] transition hover-cian hover:text-white 2xl:w-72"
@@ -332,10 +371,23 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           {/* ERP v3.0: sin dock, sin barra lateral ni botón de acciones; la navegación son los botones del INICIO.
               Avisos: la campana del encabezado. En la pestaña de una acción, el pie Cancelar / Guardar y Cerrar. */}
           {pestanaAccion && <PiePestana modulo={pestanaAccion.modulo} />}
+          {/* Barra azul de accesos rápidos (Williams 2026-11-16): derecha, en todas las pantallas del módulo */}
+          {moduloNav && sesion.modulos.length > 0 && (
+            <BarraAccesos
+              sesion={sesion}
+              modulo={moduloNav}
+              esInicio={esInicio}
+              accionActiva={new URLSearchParams(busqueda).get("accion") ?? path.split("/")[2] ?? null}
+              avisos={notifs.filter((n) => !(prefs.notifVistas ?? []).includes(n.clave)).length}
+              onBuscar={() => setPaleta(true)}
+              onSalir={salir}
+            />
+          )}
           <CommandPalette abierto={paleta} onCerrar={() => setPaleta(false)} comandos={comandos} documentos={documentos} />
           <DocViewerHost />
           <DatalistCatalogo />
           <Toaster />
+          <VisorPDF />
         </>
       }
     >

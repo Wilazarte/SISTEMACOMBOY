@@ -6,9 +6,9 @@ import { Button, Field, Input, Select, cn } from "@/components/ui";
 import { EstadoRuc } from "@/components/EstadoRuc";
 import { UNIDADES } from "@/lib/empresa";
 import { KEYS, cargarCondicionesPago, r2, soles, useStore } from "@/lib/storage";
-import { DETALLE_LUGAR, LARGO_DOC, LUGARES_ENTREGA, lugarConDireccion, calcularLinea, lineaVacia, totalesVenta, validarDocumento } from "@/lib/ventas";
+import { clasificacionesCliente, DETALLE_LUGAR, LARGO_DOC, LUGARES_ENTREGA, lugarConDireccion, calcularLinea, lineaVacia, totalesVenta, validarDocumento } from "@/lib/ventas";
 import { normalizarEquipo, sedeEquipo, type EquipoTerminado } from "@/lib/equipos";
-import type { Cliente, CondicionPago, DatosDespacho, LugarEntrega, LineaVenta, StockItem, TipoDocCliente } from "@/lib/types";
+import type { ClasificacionCliente, Cliente, CondicionPago, DatosDespacho, LugarEntrega, LineaVenta, StockItem, TipoDocCliente } from "@/lib/types";
 import { ProductoInput } from "@/components/productos/ProductoInput";
 
 /** Datos de Ventas sincronizados con Supabase (tiempo real). */
@@ -51,7 +51,18 @@ export function AvisoCondiciones({ carga, activas }: { carga: ReturnType<typeof 
 }
 
 // ---------------------------------------------------------------- Líneas
-export function LineasEditor({ items, onChange, stock }: { items: LineaVenta[]; onChange: (l: LineaVenta[]) => void; stock: StockItem[] }) {
+export function LineasEditor({
+  items,
+  onChange,
+  stock,
+  preciosConIgv = true,
+}: {
+  items: LineaVenta[];
+  onChange: (l: LineaVenta[]) => void;
+  stock: StockItem[];
+  /** Precios con IGV incluido (por defecto). false: documento anterior con precios sin IGV. */
+  preciosConIgv?: boolean;
+}) {
   // Productos de Almacén (nombre + unidad), sin repetir por sede
   const productos = useMemo(() => {
     const m = new Map<string, { nombre: string; unidad: string; cantidad: number }>();
@@ -89,7 +100,7 @@ export function LineasEditor({ items, onChange, stock }: { items: LineaVenta[]; 
               <th className="w-20 px-2 py-2 text-left">Alto m</th>
               <th className="w-20 px-2 py-2 text-left">Cant. *</th>
               <th className="w-16 px-2 py-2 text-right">m²</th>
-              <th className="w-28 px-2 py-2 text-left">Precio *</th>
+              <th className="w-28 px-2 py-2 text-left">{preciosConIgv ? "Precio inc. IGV *" : "Precio sin IGV *"}</th>
               <th className="w-28 px-2 py-2 text-right">Total</th>
               <th className="w-8" />
             </tr>
@@ -146,19 +157,22 @@ export function LineasEditor({ items, onChange, stock }: { items: LineaVenta[]; 
         <Button size="sm" variant="secondary" onClick={() => onChange([...items, lineaVacia()])}>
           <Plus size={14} /> Agregar línea
         </Button>
-        <p className="text-xs text-plomo-500">Con medidas: m² = ancho × alto × cantidad y precio por m². Sin medidas (ej. instalación): precio por unidad.</p>
+        <p className="text-xs text-plomo-500">
+          Con medidas: m² = ancho × alto × cantidad y precio por m². Sin medidas (ej. instalación): precio por unidad.{" "}
+          {preciosConIgv ? "Escriba el precio CON IGV incluido: el sistema desglosa base imponible e IGV." : "Documento anterior: precios sin IGV."}
+        </p>
       </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------- Totales
-export function TotalesVenta({ items, conIgv, descuento }: { items: LineaVenta[]; conIgv: boolean; descuento: number }) {
-  const t = totalesVenta(items, conIgv, descuento);
+export function TotalesVenta({ items, conIgv, descuento, preciosConIgv = true }: { items: LineaVenta[]; conIgv: boolean; descuento: number; preciosConIgv?: boolean }) {
+  const t = totalesVenta(items, conIgv, descuento, preciosConIgv);
   return (
     <dl className="ml-auto w-72 space-y-1 text-sm">
       <div className="flex justify-between text-plomo-600">
-        <dt>Subtotal</dt>
+        <dt>{preciosConIgv && conIgv ? "Suma (inc. IGV)" : "Subtotal"}</dt>
         <dd>{soles(t.bruto)}</dd>
       </div>
       {t.descuento > 0 && (
@@ -242,6 +256,9 @@ export function FormCliente({
 }) {
   const set = <K extends keyof Cliente>(k: K, v: Cliente[K]) => onChange({ ...form, [k]: v });
   const errDoc = form.numDoc ? validarDocumento(form.tipoDoc, form.numDoc.trim().toUpperCase()) : null;
+  const clasificaciones = clasificacionesCliente(useStore<ClasificacionCliente[]>(KEYS.CLASIF_CLIENTES, []));
+  // Un cliente con una clasificación que ya no está en la lista la conserva hasta que se cambie
+  const opcionesClasif = form.clasificacion && !clasificaciones.includes(form.clasificacion) ? [...clasificaciones, form.clasificacion] : clasificaciones;
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       <Field label="Tipo doc. *">
@@ -270,8 +287,14 @@ export function FormCliente({
       <Field label="Dirección fiscal" className="sm:col-span-2">
         <Input value={form.direccionFiscal} onChange={(e) => set("direccionFiscal", e.target.value)} />
       </Field>
-      <Field label="Teléfono">
-        <Input value={form.telefono} onChange={(e) => set("telefono", e.target.value)} />
+      <Field label="Labor minera" hint="Mina, unidad o labor donde opera el cliente">
+        <Input value={form.laborMinera ?? ""} onChange={(e) => set("laborMinera", e.target.value)} />
+      </Field>
+      <Field label="Clasificación">
+        <Select value={form.clasificacion ?? ""} onChange={(e) => set("clasificacion", e.target.value)} placeholder="(sin clasificar)" options={opcionesClasif.map((c) => ({ value: c, label: c }))} />
+      </Field>
+      <Field label="Número de contacto">
+        <Input value={form.telefono} onChange={(e) => set("telefono", e.target.value)} inputMode="tel" />
       </Field>
       <Field label="Email">
         <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />

@@ -2,7 +2,7 @@
 // ERP COMBOY VID — Tipos del módulo de Compras
 // =====================================================================
 
-export type Rol = "ALMACEN" | "TESORERIA" | "GERENCIA" | "CONTADOR";
+export type Rol = "ALMACEN" | "TESORERIA" | "GERENCIA" | "CONTADOR" | "VENTAS";
 
 export type EstadoReq =
   | "PENDIENTE"
@@ -83,7 +83,7 @@ export interface ItemPrecio {
   cantidad: number;
   unidad: string;
   marca: string;
-  precioUnit: number; // valor unitario SIN IGV
+  precioUnit: number; // valor unitario: CON IGV si el documento tiene preciosConIgv; si no (anteriores), SIN IGV
   subtotal: number;
   /** Producto del catálogo maestro (productos_maestro.id) y su SKU. */
   productoId?: string;
@@ -98,6 +98,8 @@ export interface Cotizacion {
   reqNumero: string;
   proveedor: string;
   ruc: string;
+  /** Precios de las líneas con IGV incluido (Williams 2026-11-14). Los anteriores no lo tienen: valores sin IGV. */
+  preciosConIgv?: boolean;
   items: ItemPrecio[];
   subtotal: number;
   igv: number;
@@ -149,6 +151,8 @@ export interface OrdenCompra {
   lugarEntrega: string;
   /** Almacén donde ingresa la mercadería (repuestos) al dar el V°B°. */
   almacenIngreso?: string;
+  /** Precios de las líneas con IGV incluido (Williams 2026-11-14). Los anteriores no lo tienen: valores sin IGV. */
+  preciosConIgv?: boolean;
   items: ItemPrecio[];
   subtotal: number;
   igv: number;
@@ -186,7 +190,7 @@ export interface ItemServicio {
   descripcion: string;
   cantidad: number;
   unidad: string;
-  precioUnit: number; // valor unitario SIN IGV
+  precioUnit: number; // valor unitario: CON IGV si la OS tiene preciosConIgv; si no (anteriores), SIN IGV
   subtotal: number;
   /** Si la línea es un producto del catálogo maestro. */
   productoId?: string;
@@ -202,6 +206,8 @@ export interface OrdenServicio {
   proveedor: string;
   ruc: string;
   concepto: string;
+  /** Precios de las líneas con IGV incluido (Williams 2026-11-14). Los anteriores no lo tienen: valores sin IGV. */
+  preciosConIgv?: boolean;
   items: ItemServicio[];
   subtotal: number;
   igv: number;
@@ -230,7 +236,7 @@ export interface OrdenServicio {
 }
 
 /** Cuenta de la que sale el pago de una OC (se guarda como enum). */
-export type CuentaOrigenPago = "caja_general" | "caja_chica" | "fondo_reserva";
+export type CuentaOrigenPago = "caja_general" | "caja_chica" | "fondo_reserva" | "prestamo" | "credito" | "otros";
 
 export type TipoComprobante = "FACTURA" | "DECLARACION_JURADA";
 
@@ -272,9 +278,20 @@ export interface Factura {
   retencionMonto?: number;
   /** Recibo de servicios públicos: N° de suministro. */
   suministro?: string;
+  /** Cotización emitida por el proveedor (su N°) o, si no la entregó, código interno COT-PROV-0001-2026. */
+  cotizacionProveedor?: string;
+  /** true: el N° lo generó el sistema porque no había cotización del proveedor. */
+  cotizacionAuto?: boolean;
   archivos?: ArchivoGasto[];
+  /**
+   * DJ automática de sustento (Williams 2026-11-13): solo el gasto marcado "Sin comprobante" lleva su declaración
+   * jurada (DJ-0042); con factura / boleta / otro comprobante no. En los gastos con comprobante DJ el N° es `numero`.
+   */
+  djNumero?: string;
   /** Declaración jurada de gasto: PENDIENTE (recién emitida), ENVIADA (a Gerencia), APROBADA. */
   djEstado?: "PENDIENTE" | "ENVIADA" | "APROBADA";
+  /** Solo en la vista de Declaraciones: la DJ es de una compra con ingreso a stock (compras_directas), no de un gasto. */
+  compraDirecta?: boolean;
   /** Usuario que registró el gasto (perfiles.usuario). Los antiguos no lo tienen. */
   creadoPor?: string;
   editadoPor?: string;
@@ -308,7 +325,7 @@ export type ComprobanteGasto =
   | "SIN_COMPROBANTE"
   | "RECIBO";
 export interface ArchivoGasto {
-  tipo: "FACTURA" | "GUIA";
+  tipo: "FACTURA" | "GUIA" | "COTIZACION";
   nombre: string;
   mime: string;
   dataUrl: string;
@@ -472,10 +489,34 @@ export interface ConcesionContratista {
 // Compras directas y stock de almacén
 // =====================================================================
 
+/** Opción de compra del proveedor para un producto: 1 = primera opción, 2 = segunda, 3 = tercera. */
+export type OpcionProveedor = 1 | 2 | 3;
+
+export interface ProductoProveedor {
+  nombre: string;
+  opcion: OpcionProveedor;
+}
+
+/**
+ * Proveedor (documento tipo 'proveedor' de public.compras). Base ÚNICA para Arequipa y Secocha.
+ * Los proveedores creados desde "Registrar compra" solo tienen RUC y razón social; el resto se completa
+ * en Logística > Base de proveedores.
+ */
 export interface Proveedor {
   id: string;
   razonSocial: string;
   ruc: string;
+  asesorVentas?: string;
+  /** Teléfono / celular de contacto. */
+  contacto?: string;
+  correo?: string;
+  direccion?: string;
+  /** Productos que vende, cada uno con su número de opción. */
+  productos?: ProductoProveedor[];
+  estado?: "ACTIVO" | "INACTIVO";
+  creadoEn?: string;
+  /** Sede que lo registró (solo informativo: la base es compartida). */
+  sedeId?: string;
 }
 
 /** Mismos tipos que el gasto sin stock (lib/comprobantes.ts). */
@@ -486,7 +527,7 @@ export interface ItemCompra {
   nombre: string;
   unidad: string;
   cantidad: number;
-  precioUnit: number; // FACTURA: sin IGV · BOLETA: con IGV incluido
+  precioUnit: number; // con IGV incluido (preciosConIgv) · compras anteriores: FACTURA sin IGV, BOLETA con IGV
   subtotal: number; // cantidad × precioUnit (mismo criterio que precioUnit)
 }
 
@@ -521,6 +562,12 @@ export interface Compra {
   /** OS generada al registrar la compra ("Generar Orden de Servicio OS"); una compra lleva OC u OS, no las dos. */
   ordenServicioId?: string;
   ordenServicioNumero?: string;
+  /** DJ automática (Williams 2026-11-13): compra marcada "Sin comprobante" lleva su declaración jurada (DJ-0042). */
+  djNumero?: string;
+  djEstado?: "PENDIENTE" | "ENVIADA" | "APROBADA";
+  aprobadoPor?: string;
+  /** Precios de las líneas con IGV incluido (Williams 2026-11-14). Los anteriores no lo tienen: valores sin IGV. */
+  preciosConIgv?: boolean;
   items: ItemCompra[];
   subtotal: number;
   igv: number;
@@ -624,6 +671,19 @@ export interface Cliente {
   lineaCredito: number; // S/ (0 = sin línea)
   estado: "ACTIVO" | "INACTIVO";
   created_at: string;
+  /** Labor minera / unidad donde opera el cliente. */
+  laborMinera?: string;
+  /** Clasificación comercial (lista editable: A1, VIP, DISTRIBUIDOR, NORMAL, NUEVO…). */
+  clasificacion?: string;
+  /** Sede que lo registró (solo informativo: la base es compartida). */
+  sedeId?: string;
+}
+
+/** Clasificación de clientes (documento tipo 'clasificacion_cliente' de public.ventas). */
+export interface ClasificacionCliente {
+  id: string;
+  nombre: string;
+  orden: number;
 }
 
 /** CONTADO (efectivo, transferencia, Yape...), CREDITO (pide días y calcula el vencimiento), PERSONALIZADO (días y detalle libres). */
@@ -653,8 +713,8 @@ export interface LineaVenta {
   alto: number; // metros
   m2: number; // ancho × alto × cantidad (0 si no tiene medidas)
   cantidad: number;
-  precio: number; // por m² si tiene medidas, si no por unidad (sin IGV)
-  total: number; // sin IGV
+  precio: number; // por m² si tiene medidas, si no por unidad. Con IGV si el documento tiene preciosConIgv; si no, sin IGV
+  total: number; // cantidad × precio (mismo criterio que precio)
 }
 
 /** PENDIENTE_COSTEO: NP creada al aceptar un requerimiento / derivación de Secocha; Ventas pone los costos y pasa a PENDIENTE. */
@@ -706,7 +766,9 @@ export interface NotaPedido {
   vendedor: string; // usuario logueado
   items: LineaVenta[];
   conIgv: boolean;
-  descuento: number; // S/ sobre el subtotal
+  /** Precios de las líneas con IGV incluido (Williams 2026-11-14). Las NP anteriores no lo tienen: precios sin IGV. */
+  preciosConIgv?: boolean;
+  descuento: number; // S/ sobre el subtotal (sobre el total con IGV si preciosConIgv)
   subtotal: number;
   igv: number;
   total: number;
@@ -743,7 +805,71 @@ export interface ComprobanteExterno {
 }
 
 export type TipoComprobanteVenta = "FACTURA" | "BOLETA" | "NOTA_CREDITO" | "NOTA_DEBITO";
+/** NO_ENVIADO (aún no se manda) · ENVIADO (en el PSE, esperando a SUNAT) · ACEPTADO / OBSERVADO (válido) · RECHAZADO · EXCEPCION (no recibido, reenviar) · ANULADO (baja aceptada). */
+export type EstadoSunat = "NO_ENVIADO" | "ENVIADO" | "ACEPTADO" | "OBSERVADO" | "RECHAZADO" | "EXCEPCION" | "ANULADO";
 export type FormaPagoVenta = "CONTADO" | "CREDITO" | "CREDITO_CUOTAS";
+
+/** Datos de la respuesta del PSE (Nubefact): número con el que se registró y enlaces del PDF / XML / CDR. */
+export interface DatosSunatPse {
+  hash: string;
+  codigo: string;
+  descripcion: string;
+  entorno: "beta" | "produccion";
+  fecha: string;
+  numero?: string;
+  enlacePdf?: string;
+  enlaceXml?: string;
+  enlaceCdr?: string;
+}
+
+/** Línea de la guía: qué se traslada (sin precios). */
+export interface ItemGuia {
+  id: string;
+  /** Código del producto (SKU del catálogo). Si va vacío, el envío usa 001, 002… (SUNAT no lo acepta en blanco). */
+  codigo?: string;
+  descripcion: string;
+  unidad: string;
+  cantidad: number;
+}
+
+/** Guía de Remisión Remitente electrónica (Ventas, serie T005). */
+export interface GuiaRemision {
+  id: string;
+  serie: string; // T005 (Secocha: T002)
+  numero: string; // T005-0001
+  fecha: string; // emisión AAAA-MM-DD
+  fechaTraslado: string; // inicio del traslado AAAA-MM-DD
+  clienteId: string;
+  cliente: string; // destinatario
+  clienteDoc: string; // "RUC 20123456789" / "DNI 12345678"
+  /** Comprobante de venta relacionado (opcional). */
+  comprobanteId?: string;
+  comprobanteNumero?: string;
+  /** Catálogo 20: 01 venta, 02 compra, 04 traslado entre establecimientos, 13 otros, 14 venta sujeta a confirmación. */
+  motivoTraslado: string;
+  /** Catálogo 18: 01 transporte público (empresa transportista), 02 transporte privado (vehículo propio). */
+  modalidad: "01" | "02";
+  transportistaRuc: string;
+  transportistaNombre: string;
+  placa: string;
+  conductorDni: string;
+  conductorNombres: string;
+  conductorApellidos: string;
+  conductorLicencia: string;
+  partidaUbigeo: string;
+  partidaDireccion: string;
+  llegadaUbigeo: string;
+  llegadaDireccion: string;
+  pesoKg: number;
+  bultos: number;
+  items: ItemGuia[];
+  observaciones: string;
+  estado: "EMITIDA" | "ANULADA";
+  estadoSunat: EstadoSunat;
+  sunat?: DatosSunatPse;
+  vendedor: string;
+  historial: EventoHistorial[];
+}
 
 export interface Cuota {
   n: number;
@@ -767,6 +893,8 @@ export interface ComprobanteVenta {
   npNumero?: string;
   items: LineaVenta[];
   conIgv: boolean;
+  /** Precios de las líneas con IGV incluido (Williams 2026-11-14). Los anteriores no lo tienen: precios sin IGV. */
+  preciosConIgv?: boolean;
   descuento: number;
   base: number;
   igv: number;
@@ -780,7 +908,25 @@ export interface ComprobanteVenta {
   cuotas: Cuota[];
   saldo: number; // por cobrar
   estado: "BORRADOR" | "EMITIDO" | "ANULADO";
-  estadoSunat: "NO_ENVIADO";
+  /** Estado en SUNAT (la fuente de verdad es la tabla sunat_cpe; aquí queda una copia para PDF y filtros). */
+  estadoSunat: EstadoSunat;
+  /** Datos de la respuesta de SUNAT: hash de la firma (representación impresa / QR) y CDR. */
+  sunat?: {
+    hash: string;
+    codigo: string;
+    descripcion: string;
+    entorno: "beta" | "produccion";
+    fecha: string;
+    /** Emitido vía Nubefact (emitir-comprobante): número con el que se registró y enlaces del PSE. */
+    numero?: string;
+    enlacePdf?: string;
+    enlaceXml?: string;
+    enlaceCdr?: string;
+  };
+  /** Notas de crédito / débito: comprobante que modifican y motivo (catálogos SUNAT 09 / 10). */
+  ref?: { id: string; tipo: "FACTURA" | "BOLETA"; numero: string; fecha: string };
+  motivoCodigo?: string;
+  motivoDescripcion?: string;
   lugarEntrega: string;
   odId?: string;
   odNumero?: string;
@@ -803,6 +949,11 @@ export interface CobroVenta {
   medio: "CAJA" | "BANCO";
   cuenta: string; // Caja General · Interbank Soles / Caja Chica (efectivo) / Fondo de Reserva (efectivo); antiguos: Caja principal, BCP…
   referencia: string; // N° operación
+  /** Observación libre del cobro (opcional). */
+  observacion?: string;
+  /** Última corrección hecha por SOPORTE (editar cobro con PIN). */
+  editadoPor?: string;
+  editadoEn?: string;
   usuario: string;
   created_at: string;
 }

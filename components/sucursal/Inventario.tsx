@@ -8,8 +8,10 @@ import { BotonFiltros, BotonNuevo } from "@/components/ui/BotonFiltros";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { UNIDADES } from "@/lib/empresa";
 import { ProductoInput } from "@/components/productos/ProductoInput";
+import { EtiquetaCategoria, FiltroCategoria, contarCategorias, pasaCategoria } from "@/components/productos/Categorias";
+import { categoriaDe, useCatalogo } from "@/lib/productos";
 import { fechaPE, r2, soles } from "@/lib/storage";
-import { bajoMinimo, eliminarCliente, eliminarStock, guardarCliente, guardarStock, operaSucursal, resumenCliente, solicitarReposicion, valorizado, type ClienteSuc, type StockLocal, type VentaSucursal } from "@/lib/sucursal";
+import { bajoMinimo, eliminarCliente, eliminarStock, guardarCliente, guardarStock, operaAlmacenSede, operaSucursal, resumenCliente, solicitarReposicion, valorizado, type ClienteSuc, type StockLocal, type VentaSucursal } from "@/lib/sucursal";
 import { Acciones, EstadoSuc, Indicador } from "./comun";
 
 const contiene = (t: string, q: string) => t.toLowerCase().includes(q.trim().toLowerCase());
@@ -19,14 +21,21 @@ const contiene = (t: string, q: string) => t.toLowerCase().includes(q.trim().toL
 // =====================================================================
 export function StockLocalTab({ stock }: { stock: StockLocal[] }) {
   const { showForm, setShowForm, showFiltros, setShowFiltros } = useTogglePanel();
-  const opera = operaSucursal();
+  const opera = operaAlmacenSede();
   const [editar, setEditar] = useState<StockLocal | null>(null);
   const [q, setQ] = useState("");
   const [soloBajos, setSoloBajos] = useState(false);
+  const [cat, setCat] = useState("");
+  const { productos: catalogo } = useCatalogo();
+  const conteoCat = useMemo(() => contarCategorias(stock.map((s) => categoriaDe(s.producto))), [stock, catalogo]); // eslint-disable-line react-hooks/exhaustive-deps
   const bajos = stock.filter(bajoMinimo);
   const lista = useMemo(
-    () => stock.filter((s) => (!q || contiene(`${s.producto} ${s.codigo ?? ""}`, q)) && (!soloBajos || bajoMinimo(s))).sort((a, b) => Number(bajoMinimo(b)) - Number(bajoMinimo(a)) || a.producto.localeCompare(b.producto, "es")),
-    [stock, q, soloBajos]
+    () =>
+      stock
+        .filter((s) => (!q || contiene(`${s.producto} ${s.codigo ?? ""} ${categoriaDe(s.producto)}`, q)) && (!soloBajos || bajoMinimo(s)) && pasaCategoria(categoriaDe(s.producto), cat))
+        .sort((a, b) => Number(bajoMinimo(b)) - Number(bajoMinimo(a)) || a.producto.localeCompare(b.producto, "es")),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [stock, q, soloBajos, cat, catalogo]
   );
 
   return (
@@ -69,7 +78,7 @@ export function StockLocalTab({ stock }: { stock: StockLocal[] }) {
           }
         />
         <div className="flex flex-wrap items-center gap-2 border-b border-plomo-100 px-4 py-2">
-          <BotonFiltros abierto={showFiltros} onClick={() => setShowFiltros(!showFiltros)} activos={[q, soloBajos].filter(Boolean).length} />
+          <BotonFiltros abierto={showFiltros} onClick={() => setShowFiltros(!showFiltros)} activos={[q, soloBajos, cat].filter(Boolean).length} />
           {showFiltros && (
             <>
               <label className="relative min-w-[220px] flex-1">
@@ -79,6 +88,7 @@ export function StockLocalTab({ stock }: { stock: StockLocal[] }) {
               <label className="flex items-center gap-1.5 text-xs text-fg-2">
                 <input type="checkbox" checked={soloBajos} onChange={(e) => setSoloBajos(e.target.checked)} /> Solo bajo el mínimo
               </label>
+              <FiltroCategoria value={cat} onChange={setCat} conteo={conteoCat} />
             </>
           )}
         </div>
@@ -89,7 +99,10 @@ export function StockLocalTab({ stock }: { stock: StockLocal[] }) {
               <tr key={s.id} className={cn(bajo && "bg-red-500/10")}>
                 <Td className="max-w-[320px]">
                   <span className="block truncate font-medium text-fg">{s.producto}</span>
-                  {s.codigo && <span className="text-[11px] text-plomo-500">{s.codigo}</span>}
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {s.codigo && <span className="text-[11px] text-plomo-500">{s.codigo}</span>}
+                    <EtiquetaCategoria nombre={categoriaDe(s.producto)} />
+                  </span>
                 </Td>
                 <Td className={cn("text-right font-semibold", bajo && "text-rojo")}>
                   {s.stock} {s.unidad}

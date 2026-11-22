@@ -8,5 +8,6 @@ node_modules
 # Backups con datos personales (DNIs, sueldos): no se suben
 supabase/backups/*.csv
 
-# Compilados de las apps de escritorio
+# Supabase CLI y salidas de compilación
+supabase/.temp/
 dist/

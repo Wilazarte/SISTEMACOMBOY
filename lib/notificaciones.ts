@@ -9,6 +9,7 @@
 import { useMemo } from "react";
 import { RUTA_SUCURSAL, puedeVer, type Sesion } from "./auth";
 import { getEquipos } from "./equipos";
+import { mantenimientosPendientes, normalizarActivo, type Activo } from "./activos";
 import { KEYS, fechaPE, hoy, soles, useStore } from "./storage";
 import type { Factura, OrdenDespacho, Requerimiento, StockItem } from "./types";
 import { esAdminProductos, useCatalogo } from "./productos";
@@ -16,9 +17,9 @@ import type { CierreCaja, Derivacion, ReqSucursal, StockLocal, Traslado, VentaSu
 import { avisoOD, odsNuevas } from "./ventas";
 import { avisosExpedientes, useExpedientes } from "./expedientes";
 import { perfilPlanta } from "./permisosPlanta";
-import { useNotifFlujo } from "./notificacionesFlujo";
+import { reqsConAviso, useNotifFlujo } from "./notificacionesFlujo";
 
-export type TipoNotif = "despacho" | "requerimiento" | "factura" | "qc" | "stock" | "sucursal" | "producto" | "expediente";
+export type TipoNotif = "despacho" | "requerimiento" | "factura" | "qc" | "stock" | "sucursal" | "producto" | "expediente" | "activo";
 
 export interface Notificacion {
   /** Identifica el aviso para marcarlo como visto; cambia si cambia su contenido. */
@@ -62,6 +63,8 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
   const stockSuc = useStore<StockLocal[]>(KEYS.SUC_STOCK, [], opera);
   const cierres = useStore<CierreCaja[]>(KEYS.SUC_CIERRES, [], veSuc && ["creador", "tesoreria"].includes(rol));
   const { solicitudes } = useCatalogo();
+  // Activos de la empresa (Finanzas › Contabilidad): mantenimientos vencidos o por vencer
+  const activos = useStore<Activo[]>(KEYS.ACTIVOS, [], ve("/dashboard/contable"));
   // Expedientes 26W: cada área recibe solo el aviso de su fase (Gerencia no opera)
   const perfil = perfilPlanta(sesion);
   const exp = useExpedientes(!!perfil && perfil !== "gerencia");
@@ -104,9 +107,10 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
     }
 
     if (ve("/dashboard/compras")) {
-      // Requerimientos de Almacén por revisar
-      for (const r of reqs.filter((x) => x.origen !== "SUCURSAL"))
-        out.push({ clave: `req:${r.id}`, tipo: "requerimiento", titulo: `${r.numero} espera revisión`, detalle: `${r.sede} · ${r.solicitante}`, modulo: "Tesorería / Compras", href: "/dashboard/compras?tab=cotizaciones", prioridad: 2 });
+      // Requerimientos de Almacén por revisar (los que ya avisó la base, SQL 20261117, no se repiten)
+      const conAviso = reqsConAviso(flujo.items);
+      for (const r of reqs.filter((x) => x.origen !== "SUCURSAL" && !conAviso.has(x.id)))
+        out.push({ clave: `req:${r.id}`, tipo: "requerimiento", titulo: `${r.numero} de Almacén por revisar`, detalle: `${r.sede} · ${r.solicitante} · ${r.items.length} producto(s)`, modulo: "Almacén → Tesorería", href: "/dashboard/compras?tab=nuevos", prioridad: 2 });
       // Facturas por pagar que vencen en los próximos días
       for (const f of facturas) {
         if (f.estadoPago !== "POR_PAGAR" || !f.fechaVencimiento) continue;
@@ -181,8 +185,21 @@ export function useNotificaciones(sesion: Sesion | null): Notificacion[] {
 
     out.push(...avisosExpedientes(perfil, exp).filter((a) => !flujo.disponible || a.clave.includes(":vencido:")));
 
+    // Mantenimiento de activos: un aviso por activo (la clave cambia cuando se reprograma)
+    if (ve("/dashboard/contable"))
+      for (const { activo: a, estado, dias } of mantenimientosPendientes(activos.map(normalizarActivo)))
+        out.push({
+          clave: `act:${a.id}:${a.proximoMantenimiento}`,
+          tipo: "activo",
+          titulo: `Mantenimiento de ${a.codigo} ${estado === "VENCIDO" ? `vencido hace ${-dias} día(s)` : dias === 0 ? "toca hoy" : `en ${dias} día(s)`}`,
+          detalle: `${a.nombre} · ${a.sede}${a.responsable ? ` · ${a.responsable}` : ""}`,
+          modulo: "Finanzas · Activos",
+          href: "/dashboard/contable?tab=activos",
+          prioridad: estado === "VENCIDO" ? 2 : 4,
+        });
+
     return out.sort((a, b) => a.prioridad - b.prioridad);
     // equiposRaw: getEquipos() lee la misma caché; se usa para recalcular cuando cambia
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sesion, ods, reqs, facturas, stock, equiposRaw, derivaciones, reqsSec, traslados, ventasSuc, stockSuc, cierres, solicitudes, exp, perfil, flujo.disponible]);
+  }, [sesion, ods, reqs, facturas, stock, equiposRaw, derivaciones, reqsSec, traslados, ventasSuc, stockSuc, cierres, solicitudes, activos, exp, perfil, flujo.disponible, flujo.items]);
 }

@@ -65,6 +65,7 @@ export function ListaDocs({
   extra,
   filtrosExtra,
   extraActivos = 0,
+  onFiltradas,
 }: {
   filas: FilaDoc[];
   tipo: TipoLista;
@@ -76,6 +77,8 @@ export function ListaDocs({
   filtrosExtra?: ReactNode;
   /** Cuántos de esos filtros propios están activos (para el contador del botón). */
   extraActivos?: number;
+  /** Avisa qué filas (ids) quedan tras el buscador y filtros del panel (para exportar lo que se ve). */
+  onFiltradas?: (ids: string[], buscar: string) => void;
 }) {
   // Filtros ocultos por defecto: al entrar solo se ve la tabla
   const { showFiltros, setShowFiltros } = useTogglePanel();
@@ -107,6 +110,11 @@ export function ListaDocs({
       );
     });
   }, [filas, q, desde, hasta, contraparte, tipoDoc, estado]);
+
+  useEffect(() => {
+    onFiltradas?.(filtradas.map((f) => f.id), q.trim());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtradas]);
 
   const paginas = filtradas.length <= PAGE1 ? 1 : 1 + Math.ceil((filtradas.length - PAGE1) / PAGEN);
   useEffect(() => setPagina(1), [q, desde, hasta, contraparte, tipoDoc, estado]);

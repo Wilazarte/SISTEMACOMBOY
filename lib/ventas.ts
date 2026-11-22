@@ -9,6 +9,7 @@
 import {
   ErpError,
   IGV,
+  desglosarIgv,
   KEYS,
   descontarStock,
   escribir,
@@ -21,16 +22,19 @@ import {
   nuevoEvento,
   r2,
   rucValido,
+  serieSede,
   siguienteNumero,
   sumarDias,
   uid,
 } from "./storage";
 import { exigirRucSunat } from "./ruc";
+import { esSoporte, getSesion } from "./auth";
 import { disponibleEquipo, equipoDeLinea, marcarEquiposVendidos, sedeEquipo } from "./equipos";
 import { getDerivaciones, getReqsSuc, getSucursal, marcarAceptadoVentas, type ProductoTraslado, type Traslado } from "./sucursal";
 import { asientoAjusteVenta, asientoDe, asientoNotaPedido, esAsientoContable, revertirAsiento, revertirAsientoId } from "./contable";
 import type {
   AsientoContable,
+  ClasificacionCliente,
   Cliente,
   CobroVenta,
   ComprobanteExterno,
@@ -55,6 +59,37 @@ import type {
 } from "./types";
 
 export const getClientes = () => leer<Cliente[]>(KEYS.CLIENTES, []);
+
+// ---------------------------------------------------------------------
+// Clasificación de clientes (lista editable, compartida por Arequipa y Secocha)
+// ---------------------------------------------------------------------
+
+/** Clasificaciones iniciales: valen mientras nadie haya guardado la lista propia. */
+export const CLASIFICACIONES_DEFECTO = ["A1", "VIP", "DISTRIBUIDOR", "NORMAL", "NUEVO"];
+
+/** Nombres de clasificación en orden. Recibe la lista guardada (useStore) o la lee de la caché. */
+export function clasificacionesCliente(guardadas: ClasificacionCliente[] = leer<ClasificacionCliente[]>(KEYS.CLASIF_CLIENTES, [])): string[] {
+  if (guardadas.length === 0) return [...CLASIFICACIONES_DEFECTO];
+  return [...guardadas].sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre)).map((c) => c.nombre);
+}
+
+/** Guarda la lista completa de clasificaciones (en el orden recibido). Una en uso por clientes no se puede quitar. */
+export function guardarClasificaciones(nombres: string[]): void {
+  const limpias: string[] = [];
+  for (const n of nombres) {
+    const nombre = n.trim().replace(/\s+/g, " ").toUpperCase();
+    if (nombre && !limpias.includes(nombre)) limpias.push(nombre);
+  }
+  if (limpias.length === 0) throw new ErpError("Deje al menos una clasificación.");
+  if (limpias.some((n) => n.length > 30)) throw new ErpError("Cada clasificación admite hasta 30 caracteres.");
+  const enUso = Array.from(new Set(getClientes().map((c) => c.clasificacion).filter((c): c is string => !!c && !limpias.includes(c))));
+  if (enUso.length) throw new ErpError(`Hay clientes con la clasificación ${enUso.join(", ")}: cámbielos antes de quitarla.`);
+  const previas = leer<ClasificacionCliente[]>(KEYS.CLASIF_CLIENTES, []);
+  escribir(
+    KEYS.CLASIF_CLIENTES,
+    limpias.map((nombre, i) => ({ id: previas.find((p) => p.nombre === nombre)?.id ?? uid(), nombre, orden: i + 1 })),
+  );
+}
 export const getCondicionesPago = () => leer<CondicionPago[]>(KEYS.COND_PAGO, []);
 export const getNotasPedido = () => leer<NotaPedido[]>(KEYS.NOTAS_PEDIDO, []);
 export const getComprobantes = () => leer<ComprobanteVenta[]>(KEYS.COMPROBANTES, []);
@@ -92,10 +127,19 @@ export const lineaVacia = (): LineaVenta => ({
   total: 0,
 });
 
-/** Subtotal (con descuento), IGV 18 % opcional y total. Precios sin IGV. */
-export function totalesVenta(items: LineaVenta[], conIgv: boolean, descuento: number) {
+/**
+ * Subtotal (con descuento), IGV 18 % opcional y total.
+ * `preciosConIgv` (por defecto, Williams 2026-11-14): los precios se ingresan CON IGV; el descuento se resta del total
+ * y se desglosa base = total / 1.18, IGV = total − base. Sin IGV (`conIgv = false`) el precio es final, sin desglose.
+ * Documentos anteriores (`preciosConIgv = false`): precios sin IGV y se suma el 18 %.
+ */
+export function totalesVenta(items: LineaVenta[], conIgv: boolean, descuento: number, preciosConIgv = true) {
   const bruto = r2(items.reduce((a, l) => a + calcularLinea(l).total, 0));
   const desc = Math.min(Math.max(0, Number(descuento) || 0), bruto);
+  if (preciosConIgv) {
+    const t = desglosarIgv(bruto - desc, conIgv);
+    return { bruto, descuento: desc, base: t.subtotal, igv: t.igv, total: t.total };
+  }
   const base = r2(bruto - desc);
   const igv = conIgv ? r2(base * IGV) : 0;
   return { bruto, descuento: desc, base, igv, total: r2(base + igv) };
@@ -127,6 +171,8 @@ export const clienteVacio = (): Cliente => ({
   lineaCredito: 0,
   estado: "ACTIVO",
   created_at: "",
+  laborMinera: "",
+  clasificacion: "NUEVO",
 });
 
 export function guardarCliente(data: Cliente): Cliente {
@@ -147,6 +193,8 @@ export function guardarCliente(data: Cliente): Cliente {
     direccionFiscal: data.direccionFiscal.trim(),
     direccionesEntrega: data.direccionesEntrega.map((d) => d.trim()).filter(Boolean),
     email: data.email.trim(),
+    laborMinera: (data.laborMinera ?? "").trim().toUpperCase(),
+    clasificacion: (data.clasificacion ?? "").trim().toUpperCase(),
     lineaCredito: r2(Number(data.lineaCredito) || 0),
     created_at: data.created_at || new Date().toISOString(),
   };
@@ -190,6 +238,8 @@ export function importarClientes(filas: Record<string, unknown>[]): { creados: n
       telefono: v(f, "Telefono", "Teléfono") || previo?.telefono || "",
       email: v(f, "Email", "Correo") || previo?.email || "",
       contacto: v(f, "Contacto") || previo?.contacto || "",
+      laborMinera: v(f, "Labor Minera", "Labor minera", "Labor").toUpperCase() || previo?.laborMinera || "",
+      clasificacion: v(f, "Clasificacion", "Clasificación").toUpperCase() || previo?.clasificacion || "NUEVO",
       lineaCredito: Number(v(f, "Linea Credito", "Línea Crédito", "Linea de Credito")) || previo?.lineaCredito || 0,
       created_at: previo?.created_at ?? new Date().toISOString(),
     };
@@ -284,7 +334,7 @@ export type DatosNP = Pick<
   NotaPedido,
   "fecha" | "clienteId" | "condPagoId" | "validezDias" | "fechaEntrega" | "lugarObra" | "items" | "conIgv" | "descuento" | "observaciones"
 > &
-  Partial<Pick<NotaPedido, "diasCredito" | "condPagoDetalle">>;
+  Partial<Pick<NotaPedido, "diasCredito" | "condPagoDetalle" | "preciosConIgv">>;
 
 function prepararLineas(items: LineaVenta[]): LineaVenta[] {
   const lineas = items.map(calcularLinea).filter((l) => l.descripcion.trim() || l.productoNombre.trim());
@@ -351,10 +401,12 @@ function armarNP(data: DatosNP): Omit<NotaPedido, "id" | "numero" | "vendedor" |
   const plazo = plazoNP(cond, data.fecha, data.diasCredito, data.condPagoDetalle);
   if (!(data.validezDias > 0)) throw new ErpError("La validez de la oferta debe ser mayor a 0 días.");
   const items = prepararLineas(data.items);
-  const t = totalesVenta(items, data.conIgv, data.descuento);
+  const preciosConIgv = data.preciosConIgv !== false;
+  const t = totalesVenta(items, data.conIgv, data.descuento, preciosConIgv);
   if (!(t.total > 0)) throw new ErpError("El total debe ser mayor a 0.");
   return {
     ...data,
+    preciosConIgv,
     cliente: cliente.razonSocial,
     clienteDoc: `${cliente.tipoDoc} ${cliente.numDoc}`,
     condPagoNombre: cond.nombre,
@@ -608,7 +660,7 @@ export function guardarCostosNP(id: string, precios: Record<string, number>, rol
     const sinPrecio = n.items.filter((l) => !((Number(precios[l.id]) || 0) > 0));
     if (sinPrecio.length > 0) throw new ErpError(`Ponga el precio unitario de: ${sinPrecio.map((l) => l.descripcion || l.productoNombre).join(", ")}.`);
     const items = n.items.map((l) => calcularLinea({ ...l, ancho: 0, alto: 0, precio: r2(Number(precios[l.id])) }));
-    const t = totalesVenta(items, n.conIgv, n.descuento);
+    const t = totalesVenta(items, n.conIgv, n.descuento, n.preciosConIgv === true);
     const costos: CostosNP = {
       req_id: n.origenId ?? "",
       np_id: n.numero,
@@ -687,7 +739,7 @@ export async function clonarNP(id: string, vendedor: string, rol: Rol): Promise<
   const o = getNotasPedido().find((n) => n.id === id);
   if (!o) throw new ErpError("Nota de pedido no encontrada.");
   return crearNotaPedido(
-    { ...o, fecha: hoy(), items: o.items.map((l) => ({ ...l, id: uid() })) },
+    { ...o, fecha: hoy(), preciosConIgv: o.preciosConIgv === true, items: o.items.map((l) => ({ ...l, id: uid() })) },
     vendedor,
     rol
   );
@@ -697,7 +749,7 @@ export async function clonarNP(id: string, vendedor: string, rol: Rol): Promise<
 // Comprobantes (Factura / Boleta) -> asiento + Orden de Despacho + cobro / CxC
 // ---------------------------------------------------------------------
 
-export const SERIE: Record<"FACTURA" | "BOLETA", "F001" | "B001"> = { FACTURA: "F001", BOLETA: "B001" };
+export const SERIE: Record<"FACTURA" | "BOLETA", "F005" | "B005"> = { FACTURA: "F005", BOLETA: "B005" }; // las viejas F001 / B001 quedan como están
 
 export interface DatosComprobante {
   tipo: "FACTURA" | "BOLETA";
@@ -706,6 +758,8 @@ export interface DatosComprobante {
   npId?: string;
   items: LineaVenta[];
   conIgv: boolean;
+  /** Precios de las líneas con IGV incluido (por defecto). false solo al editar un borrador anterior. */
+  preciosConIgv?: boolean;
   descuento: number;
   formaPago: FormaPagoVenta;
   condPagoId: string;
@@ -861,7 +915,8 @@ function armarComprobante(data: DatosComprobante, existente?: ComprobanteVenta):
   if (np && np.estado !== "APROBADA" && np.comprobanteId !== existente?.id) throw new ErpError(`La ${np.numero} está ${np.estado}: solo se facturan notas APROBADAS.`);
   const items = prepararLineas(data.items);
   const conIgv = data.tipo === "FACTURA" ? true : data.conIgv; // factura: siempre gravada
-  const t = totalesVenta(items, conIgv, data.descuento);
+  const preciosConIgv = data.preciosConIgv !== false;
+  const t = totalesVenta(items, conIgv, data.descuento, preciosConIgv);
   if (!(t.total > 0)) throw new ErpError("El total debe ser mayor a 0.");
 
   const credito = data.formaPago !== "CONTADO";
@@ -878,7 +933,7 @@ function armarComprobante(data: DatosComprobante, existente?: ComprobanteVenta):
     ...(existente ?? ({} as ComprobanteVenta)),
     id: existente?.id ?? uid(),
     tipo: data.tipo,
-    serie: SERIE[data.tipo],
+    serie: serieSede(SERIE[data.tipo]), // Secocha: F002 / B002
     numero: existente?.numero ?? "",
     fecha: data.fecha,
     clienteId: cliente.id,
@@ -889,6 +944,7 @@ function armarComprobante(data: DatosComprobante, existente?: ComprobanteVenta):
     npNumero: np?.numero,
     items,
     conIgv,
+    preciosConIgv,
     descuento: t.descuento,
     base: t.base,
     igv: t.igv,
@@ -980,7 +1036,7 @@ function lineaDespacho(l: LineaVenta): LineaDespacho {
 }
 
 /**
- * Guardar y emitir: 1) número F001/B001, 2) asiento contable, 3) Orden de Despacho PENDIENTE en Almacén,
+ * Guardar y emitir: 1) número F005/B005, 2) asiento contable, 3) Orden de Despacho PENDIENTE en Almacén,
  * 4) CONTADO -> cobrado; CRÉDITO -> queda en Cuentas por Cobrar (con la inicial cobrada si hay).
  */
 export async function emitirComprobante(
@@ -993,6 +1049,10 @@ export async function emitirComprobante(
   const existente = borradorId ? getComprobantes().find((c) => c.id === borradorId) : undefined;
   if (existente && existente.estado !== "BORRADOR") throw new ErpError("Este comprobante ya fue emitido.");
   const c = armarComprobante(data, existente);
+  // SUNAT: fecha de emisión no futura y dentro del plazo máximo de envío (3 días calendario)
+  if (c.fecha > hoy()) throw new ErpError("La fecha de emisión no puede ser posterior a hoy.");
+  if (c.fecha < sumarDias(hoy(), -3))
+    throw new ErpError("La fecha de emisión supera el plazo de envío a SUNAT (3 días calendario): emita con la fecha de hoy.");
   // Si viene de una NP aprobada, su Orden de Despacho ya existe: solo se vincula
   const np = c.npId ? getNotasPedido().find((n) => n.id === c.npId) : undefined;
   const odNP = np ? odDeNP(np) : undefined;
@@ -1082,12 +1142,28 @@ export async function emitirComprobante(
   return c;
 }
 
-export function anularComprobante(id: string, motivo: string, rol: Rol): void {
+/**
+ * `porSunat`: la anulación ya la aceptó SUNAT (comunicación de baja o nota de crédito por anulación / devolución
+ * total). Un comprobante ACEPTADO por SUNAT no se puede anular solo en el ERP: sigue vigente para SUNAT.
+ */
+export function anularComprobante(id: string, motivo: string, rol: Rol, opciones: { porSunat?: boolean } = {}): void {
   if (!motivo.trim()) throw new ErpError("Indique el motivo de la anulación.");
   const lista = getComprobantes();
   const c = lista.find((x) => x.id === id);
   if (!c) throw new ErpError("Comprobante no encontrado.");
   if (c.estado === "ANULADO") throw new ErpError("Ya está anulado.");
+  if (!opciones.porSunat && (c.estadoSunat === "ACEPTADO" || c.estadoSunat === "OBSERVADO"))
+    throw new ErpError(
+      `${c.numero} ya fue aceptado por SUNAT: anúlelo con "Baja" (anulación ante SUNAT) o con una nota de crédito (motivo 01).`
+    );
+  // Recibido por el PSE y en espera de SUNAT: no se puede anular solo en el ERP (quedaría vigente ante SUNAT)
+  if (!opciones.porSunat && c.estadoSunat === "ENVIADO")
+    throw new ErpError(`${c.numero} ya se envió a SUNAT y espera respuesta: use Consultar y, si es aceptado, anúlelo con "Baja" o nota de crédito.`);
+  // Las notas de crédito / débito no tienen asiento ni orden de despacho propios
+  if (c.tipo === "NOTA_CREDITO" || c.tipo === "NOTA_DEBITO") {
+    escribir(KEYS.COMPROBANTES, lista.map((x) => (x.id === id ? { ...c, estado: "ANULADO" as const, historial: [...c.historial, nuevoEvento(rol, "Anulado", motivo.trim())] } : x)));
+    return;
+  }
   const od = c.odId ? getDespachos().find((o) => o.id === c.odId) : undefined;
   if (od && od.despachos.length > 0) throw new ErpError(`La ${od.numero} ya tiene despachos: no se puede anular el comprobante.`);
   const emitido = c.estado === "EMITIDO";
@@ -1219,6 +1295,31 @@ export function filasCxC(notas: NotaPedido[], comprobantes: ComprobanteVenta[]):
   return [...deNP, ...deComp];
 }
 
+/**
+ * Datos de la "nota de pedido actualizada" de una fila de Cuentas por cobrar: la NP (o el comprobante directo),
+ * sus cobros a cuenta (de la NP y del comprobante que la facturó), lo pagado y el saldo.
+ */
+export function ventaActualizada(
+  fila: FilaCxC,
+  notas: NotaPedido[],
+  comprobantes: ComprobanteVenta[],
+  cobros: CobroVenta[]
+): { np?: NotaPedido; comprobante?: ComprobanteVenta; pagos: CobroVenta[]; total: number; pagado: number; saldo: number; vencimiento: string } {
+  const comprobante = fila.origen === "COMPROBANTE" ? comprobantes.find((c) => c.id === fila.id) : undefined;
+  const npId = fila.origen === "NP" ? fila.id : comprobante?.npId;
+  const np = npId ? notas.find((n) => n.id === npId) : undefined;
+  const pagos = cobros.filter((c) => (np && c.npId === np.id) || (comprobante && c.comprobanteId === comprobante.id));
+  return {
+    np,
+    comprobante,
+    pagos,
+    total: fila.total,
+    pagado: r2(fila.total - fila.saldo),
+    saldo: fila.saldo,
+    vencimiento: fila.vencimiento,
+  };
+}
+
 export type AgruparDeuda = "cliente" | "vendedor" | "mes" | "equipo";
 
 export interface GrupoDeuda {
@@ -1264,7 +1365,7 @@ export function reporteDeuda(filas: FilaCxC[], por: AgruparDeuda): GrupoDeuda[] 
 /** Cobro a cuenta de una NP aprobada: DEBE Caja/Banco / HABER 1212 (la venta ya se registró al aprobar). */
 export function registrarCobroNP(
   npId: string,
-  datos: { monto: number; medio: CobroVenta["medio"]; cuenta: string; referencia: string; fecha: string },
+  datos: { monto: number; medio: CobroVenta["medio"]; cuenta: string; referencia: string; fecha: string; observacion?: string },
   usuario: string,
   rol: Rol
 ): void {
@@ -1291,6 +1392,7 @@ export function registrarCobroNP(
     medio: datos.medio,
     cuenta,
     referencia: datos.referencia.trim(),
+    ...(datos.observacion?.trim() ? { observacion: datos.observacion.trim() } : {}),
     usuario,
     created_at: new Date().toISOString(),
   };
@@ -1379,7 +1481,7 @@ export function registrarComprobanteExterno(
 
 export function registrarCobro(
   comprobanteId: string,
-  datos: { monto: number; medio: CobroVenta["medio"]; cuenta: string; referencia: string; fecha: string },
+  datos: { monto: number; medio: CobroVenta["medio"]; cuenta: string; referencia: string; fecha: string; observacion?: string },
   usuario: string,
   rol: Rol
 ): void {
@@ -1402,12 +1504,129 @@ export function registrarCobro(
     medio: datos.medio,
     cuenta: datos.cuenta.trim(),
     referencia: datos.referencia.trim(),
+    ...(datos.observacion?.trim() ? { observacion: datos.observacion.trim() } : {}),
     usuario,
     created_at: new Date().toISOString(),
   };
   escribir(KEYS.COMPROBANTES, lista.map((x) => (x.id === c.id ? nuevo : x)));
   escribir(KEYS.COBROS, [cobro, ...getCobros()]);
   escribir(KEYS.ASIENTOS, [asientoCobro(c, monto, datos.medio, datos.cuenta.trim()), ...getAsientos()]);
+}
+
+// ---------------------------------------------------------------------
+// Corrección de cobros (solo SOPORTE, con PIN)
+// ---------------------------------------------------------------------
+
+/** PIN que pide Cuentas por cobrar para editar o eliminar un cobro (Williams 2026-11-16). */
+const PIN_EDITAR_COBRO = "012810";
+
+export type DatosCobroEditado = { monto: number; medio: CobroVenta["medio"]; cuenta: string; referencia: string; fecha: string; observacion?: string };
+
+function exigirSoporteYPin(pin: string): string {
+  const sesion = getSesion();
+  if (!esSoporte(sesion)) throw new ErpError("Solo SOPORTE puede editar o eliminar cobros.");
+  if (pin.trim() !== PIN_EDITAR_COBRO) throw new ErpError("PIN de validación incorrecto.");
+  return sesion?.usuario ?? "soporte";
+}
+
+/** Asiento del cobro (DEBE Caja/Banco · HABER 1212) o su reversa (signo -1). */
+function asientoCobroManual(cobro: CobroVenta, glosa: string, signo: 1 | -1): AsientoContable {
+  const caja = { cuenta: cobro.medio === "CAJA" ? "1011" : "1041", nombre: cobro.medio === "CAJA" ? "Caja" : `Cuenta corriente ${cobro.cuenta}` };
+  const cxc = { cuenta: "1212", nombre: "Emitidas en cartera (cuentas por cobrar)" };
+  const m = cobro.monto;
+  return {
+    id: uid(),
+    fecha: hoy(),
+    glosa,
+    comprobanteId: cobro.npId || cobro.comprobanteId,
+    lineas:
+      signo === 1
+        ? [{ ...caja, debe: m, haber: 0 }, { ...cxc, debe: 0, haber: m }]
+        : [{ ...cxc, debe: m, haber: 0 }, { ...caja, debe: 0, haber: m }],
+  };
+}
+
+/**
+ * Aplica la diferencia de un cobro corregido (delta = nuevo - anterior) a la NP y/o al comprobante:
+ * NP.cobrado sube con el delta y el saldo del comprobante baja. Valida que el saldo no quede negativo.
+ */
+function aplicarDeltaCobro(cobro: CobroVenta, delta: number, evento: string, detalle: string, rolEv: Rol): void {
+  const comps = getComprobantes();
+  let compId = cobro.comprobanteId;
+  if (cobro.npId) {
+    const np = getNotasPedido().find((n) => n.id === cobro.npId);
+    if (!np) throw new ErpError("No se encontró la nota de pedido del cobro.");
+    const cobrado = r2((np.cobrado ?? 0) + delta);
+    if (cobrado < -0.001) throw new ErpError("El cobro corregido deja lo cobrado de la NP en negativo.");
+    if (cobrado > np.total + 0.001) throw new ErpError(`El monto supera el total de la ${np.numero} (S/ ${np.total.toFixed(2)}).`);
+    actualizarNP(np.id, (n) => ({ ...n, cobrado: Math.max(0, cobrado), historial: [...n.historial, nuevoEvento(rolEv, evento, detalle)] }));
+    // NP ya facturada en el ERP: el saldo vive en el comprobante
+    compId = np.comprobanteId && comps.some((c) => c.id === np.comprobanteId && c.estado === "EMITIDO") ? np.comprobanteId : "";
+  }
+  if (compId) {
+    const c = comps.find((x) => x.id === compId);
+    if (!c) throw new ErpError("No se encontró el comprobante del cobro.");
+    const saldo = r2(c.saldo - delta);
+    if (saldo < -0.001) throw new ErpError(`El monto supera el saldo del ${c.numero} (S/ ${(c.saldo + Math.max(0, -delta)).toFixed(2)} disponible).`);
+    if (saldo > c.total + 0.001) throw new ErpError(`El saldo del ${c.numero} superaría su total.`);
+    escribir(
+      KEYS.COMPROBANTES,
+      comps.map((x) => (x.id === c.id ? { ...x, saldo: Math.max(0, saldo), historial: [...x.historial, nuevoEvento(rolEv, evento, detalle)] } : x))
+    );
+  }
+}
+
+/** SOPORTE + PIN: corrige monto, fecha, caja/banco, N° de operación u observación de un cobro (con asiento de corrección). */
+export function editarCobro(cobroId: string, datos: DatosCobroEditado, pin: string, rol: Rol): void {
+  const usuario = exigirSoporteYPin(pin);
+  const lista = getCobros();
+  const viejo = lista.find((c) => c.id === cobroId);
+  if (!viejo) throw new ErpError("Cobro no encontrado.");
+  const monto = r2(Number(datos.monto) || 0);
+  if (!(monto > 0)) throw new ErpError("El monto debe ser mayor a 0. Para quitarlo use Eliminar.");
+  if (!datos.cuenta.trim()) throw new ErpError("Indique la caja o banco.");
+  if (!datos.fecha) throw new ErpError("Indique la fecha.");
+  const nuevo: CobroVenta = {
+    ...viejo,
+    monto,
+    fecha: datos.fecha,
+    medio: datos.medio,
+    cuenta: datos.cuenta.trim(),
+    referencia: datos.referencia.trim(),
+    observacion: datos.observacion?.trim() || undefined,
+    editadoPor: usuario,
+    editadoEn: new Date().toISOString(),
+  };
+  const doc = viejo.npNumero || viejo.comprobanteNumero;
+  const cambios = [
+    viejo.monto !== monto && `monto S/ ${viejo.monto.toFixed(2)} → S/ ${monto.toFixed(2)}`,
+    viejo.fecha !== nuevo.fecha && `fecha ${viejo.fecha} → ${nuevo.fecha}`,
+    viejo.cuenta !== nuevo.cuenta && `caja ${viejo.cuenta} → ${nuevo.cuenta}`,
+    viejo.referencia !== nuevo.referencia && `ref. ${viejo.referencia || "-"} → ${nuevo.referencia || "-"}`,
+    (viejo.observacion ?? "") !== (nuevo.observacion ?? "") && "observación",
+  ].filter(Boolean) as string[];
+  if (!cambios.length) throw new ErpError("No hay cambios que guardar.");
+  aplicarDeltaCobro(viejo, r2(monto - viejo.monto), "Cobro corregido (SOPORTE)", cambios.join(" · "), rol);
+  escribir(KEYS.COBROS, lista.map((c) => (c.id === cobroId ? nuevo : c)));
+  // Asiento: si cambió el monto o la caja/banco, se revierte el anterior y se registra el corregido
+  if (viejo.monto !== monto || viejo.cuenta !== nuevo.cuenta || viejo.medio !== nuevo.medio)
+    escribir(KEYS.ASIENTOS, [
+      asientoCobroManual(nuevo, `Cobro corregido ${doc} · ${nuevo.cliente} · ${nuevo.cuenta}`, 1),
+      asientoCobroManual(viejo, `Reversa cobro ${doc} (corrección) · ${viejo.cliente} · ${viejo.cuenta}`, -1),
+      ...getAsientos(),
+    ]);
+}
+
+/** SOPORTE + PIN: elimina un cobro; el monto vuelve al saldo de la NP / comprobante y se revierte su asiento. */
+export function eliminarCobro(cobroId: string, pin: string, rol: Rol): void {
+  exigirSoporteYPin(pin);
+  const lista = getCobros();
+  const c = lista.find((x) => x.id === cobroId);
+  if (!c) throw new ErpError("Cobro no encontrado.");
+  const doc = c.npNumero || c.comprobanteNumero;
+  aplicarDeltaCobro(c, -c.monto, "Cobro eliminado (SOPORTE)", `S/ ${c.monto.toFixed(2)} · ${c.fecha} · ref. ${c.referencia || "-"}`, rol);
+  escribir(KEYS.COBROS, lista.filter((x) => x.id !== cobroId));
+  escribir(KEYS.ASIENTOS, [asientoCobroManual(c, `Reversa cobro eliminado ${doc} · ${c.cliente} · ${c.cuenta}`, -1), ...getAsientos()]);
 }
 
 // ---------------------------------------------------------------------
@@ -1584,3 +1803,6 @@ export const tipoLabel: Record<TipoComprobanteVenta, string> = {
   NOTA_CREDITO: "Nota de crédito",
   NOTA_DEBITO: "Nota de débito",
 };
+
+/** Factura o boleta vigente (para KPIs de ventas). Las notas de crédito / débito no suman como venta. */
+export const esVentaEmitida = (c: Pick<ComprobanteVenta, "estado" | "tipo">) => c.estado === "EMITIDO" && (c.tipo === "FACTURA" || c.tipo === "BOLETA");

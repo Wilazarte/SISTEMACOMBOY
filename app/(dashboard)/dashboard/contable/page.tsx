@@ -2,7 +2,8 @@
 
 import { Fragment, useMemo, useState } from "react";
 import { EstadosCuenta } from "@/components/contable/EstadosCuenta";
-import { BookOpen, FilePlus2, History, Search, ChevronDown, ChevronRight, FileBarChart2, Landmark, Lock, LockOpen, Scale, Sparkles, Wallet } from "lucide-react";
+import { ActivosEmpresa } from "@/components/contable/ActivosEmpresa";
+import { BookOpen, Laptop, FilePlus2, History, Search, ChevronDown, ChevronRight, FileBarChart2, Landmark, Lock, LockOpen, Scale, Sparkles, Wallet } from "lucide-react";
 import { Button, Card, CardHeader, Empty, Field, Select, Table, Tabs, Td, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import {
@@ -24,7 +25,7 @@ import { generarAsientosAutomaticos } from "@/lib/contable-auto";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { KEYS, fechaPE, soles, tablaDisponible, useRol, useStore } from "@/lib/storage";
 
-type Tab = "diario" | "mayor" | "balance" | "eeff" | "estados";
+type Tab = "diario" | "mayor" | "balance" | "eeff" | "estados" | "activos";
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"];
 
@@ -82,8 +83,13 @@ export default function ContablePage() {
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-serif tracking-tight text-2xl font-semibold leading-tight text-fg lg:text-[28px]">Contable</h1>
-          <p className="mt-1 text-[13px] text-plomo-600">Libro Diario, Mayor, Balance de comprobación y Estados Financieros · asientos automáticos desde Ventas, Compras y Planilla</p>
+          {/* El nombre del módulo ya está en la barra superior (Williams 2026-11-16): solo para lectores de pantalla */}
+          <h1 className="sr-only">Contable</h1>
+          <p className="mt-1 text-[13px] text-plomo-600">
+            {tab === "activos"
+              ? "Registro de activos de la empresa: responsable, ficha de entrega, mantenimiento, depreciación y baja"
+              : "Libro Diario, Mayor, Balance de comprobación y Estados Financieros · asientos automáticos desde Ventas, Compras y Planilla"}
+          </p>
         </div>
         {generando && (
           <span className="inline-flex items-center gap-1.5 text-[13px] text-slate-400">
@@ -98,7 +104,8 @@ export default function ContablePage() {
         </div>
       )}
 
-      <div className={cn("grid gap-3 rounded-xl border border-plomo-200 bg-surface p-4 shadow-card", showFiltros && "sm:grid-cols-[160px_200px_1fr]")}>
+      {/* Periodo contable: no aplica al registro de activos (tiene sus propios totales y filtros) */}
+      <div className={cn("grid gap-3 rounded-xl border border-plomo-200 bg-surface p-4 shadow-card", showFiltros && "sm:grid-cols-[160px_200px_1fr]", tab === "activos" && "hidden")}>
         {showFiltros && (
           <>
         <Field label="Año">
@@ -141,9 +148,11 @@ export default function ContablePage() {
           { id: "balance", label: "Balance", icon: <Scale size={16} /> },
           { id: "eeff", label: "EEFF", icon: <FileBarChart2 size={16} /> },
           { id: "estados", label: "Estados de cuenta", icon: <Wallet size={16} /> },
+          { id: "activos", label: "Activos", icon: <Laptop size={16} /> },
         ]}
       />
 
+      {tab === "activos" && <ActivosEmpresa />}
       {tab === "estados" && <EstadosCuenta anio={filtro.anio} mes={filtro.mes} onVerDiario={() => setTab("diario")} />}
       {tab === "diario" && <LibroDiario asientos={delPeriodo} titulo={nombrePeriodo} />}
       {tab === "mayor" && <Mayor asientos={delPeriodo} titulo={nombrePeriodo} />}

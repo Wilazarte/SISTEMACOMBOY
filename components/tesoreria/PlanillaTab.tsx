@@ -174,7 +174,11 @@ function calcular(t: Trabajador, liq: LiquidacionPeriodo, asistenciaExterna?: As
     ? { ...resumirAsistencia(fechas), ...(porHora ? { horas: horasReales(fechas) } : {}) }
     : { dias: registro?.dias ?? 0, horas: registro?.horas ?? (porHora ? 0 : (registro?.dias ?? 0) * liq.horasJornada), tardanzas: registro?.tardanzas ?? 0 };
   // S/ por hora (cualquier modo): básico = S/ hora × horas reales del reloj (sin jornada); extra solo manual
-  const r = porHora ? liquidarPorHora(t.sueldo, reloj.horas, liq.ajustes[t.id]) : liquidar(t.sueldo, divisorSueldo(t), reloj, liq, liq.ajustes[t.id]);
+  // Se paga según el TIPO DE SUELDO (Williams 2026-11-19): por hora solo el sueldo "Por hora"; diario / semanal /
+  // quincenal / mensual siempre por DÍAS aunque el periodo esté en modo HORAS (antes: 54 h × S/ 7.75 en vez de 6 días × S/ 62).
+  const cfg = liq.modo === "HORAS" ? { ...liq, modo: "DIAS" as const } : liq;
+  const r = porHora ? liquidarPorHora(t.sueldo, reloj.horas, liq.ajustes[t.id]) : liquidar(t.sueldo, divisorSueldo(t), reloj, cfg, liq.ajustes[t.id]);
+  // AFP / ONP: % sobre lo que se paga por los días (u horas) laborados, nunca sobre el sueldo completo del mes
   const descuentoAfp = r2(r.bruto * ((t.afpPorcentaje || 0) / 100));
   const neto = r2(r.bruto - descuentoAfp);
   return {
@@ -538,7 +542,8 @@ export default function PlanillaTab() {
     <div className="w-full space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-serif tracking-tight text-2xl font-semibold leading-tight text-fg lg:text-[28px]">Planilla</h1>
+          {/* El nombre del módulo ya está en la barra superior (Williams 2026-11-16): solo para lectores de pantalla */}
+          <h1 className="sr-only">Planilla</h1>
           <p className="mt-1 text-[13px] text-plomo-600">Trabajadores, liquidación del periodo, historial y contratistas</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -1041,7 +1046,7 @@ export default function PlanillaTab() {
                     <Td className="text-right">{t.liq.montoExtra ? soles(t.liq.montoExtra) : <span className="text-slate-400">-</span>}</Td>
                     <Td className="text-right text-red-600">
                       - {soles(t.descuentoAfp)}
-                      <p className="text-[10px] text-plomo-500">{t.afpPorcentaje}%</p>
+                      <p className="text-[10px] text-plomo-500" title="Sobre el sueldo pagado por los días laborados">{t.afpPorcentaje}% de {soles(t.bruto)}</p>
                     </Td>
                     <Td className="text-right">
                       <button
@@ -1175,7 +1180,7 @@ export default function PlanillaTab() {
                   )}
                   <tr className="border-t text-red-600">
                     <td className="p-2">
-                      Desc. {afpLabel(boletaSel)} {boletaSel.afpPorcentaje}%
+                      Desc. {afpLabel(boletaSel)} {boletaSel.afpPorcentaje}% de {soles(boletaSel.bruto)} (sueldo pagado por {boletaSel.tipoSueldo === "POR_HORA" ? `${horasTxt(boletaSel.horas)} h` : `${boletaSel.dias} días`})
                     </td>
                     <td className="p-2 text-right">- {soles(boletaSel.descuentoAfp)}</td>
                   </tr>

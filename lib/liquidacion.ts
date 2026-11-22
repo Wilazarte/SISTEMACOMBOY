@@ -7,7 +7,7 @@ import type { AjusteLiquidacion, LiquidacionPeriodo, ModoLiquidacion } from "./t
 
 export const MODOS_LIQUIDACION: Record<ModoLiquidacion, { label: string; ayuda: string }> = {
   DIAS: { label: "Días", ayuda: "Básico = sueldo diario × días trabajados" },
-  HORAS: { label: "Horas", ayuda: "Básico = sueldo por hora × horas trabajadas" },
+  HORAS: { label: "Horas", ayuda: "Solo el sueldo Por hora se paga por horas; diario, semanal y mensual se pagan por días" },
   DIAS_HORAS: { label: "Días + horas extra", ayuda: "Básico = sueldo diario × días; extra = sueldo por hora × horas extra" },
 };
 

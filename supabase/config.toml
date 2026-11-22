@@ -1,0 +1,7 @@
+# Configuración mínima del Supabase CLI (proyecto vinculado: supabase/.temp/project-ref).
+# Los valores no indicados usan los de por defecto del CLI.
+project_id = "wfhoczkoixmobxbwrfva"
+
+[functions.emitir-comprobante]
+# El gateway exige un JWT válido; la función además verifica la sesión y el rol del usuario.
+verify_jwt = true

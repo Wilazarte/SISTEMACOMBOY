@@ -53,6 +53,7 @@ export const NAV: ItemNav[] = [
     subs: [
       { label: "Notas de pedido", tab: "notas" },
       { label: "Comprobantes", tab: "comprobantes" },
+      { label: "Guías de Remisión", tab: "guias" },
       { label: "Despachos", tab: "despachos" },
       { label: "Catálogo de Productos", tab: "productos" },
       { label: "Clientes", tab: "clientes" },

@@ -6,13 +6,13 @@ import { Badge, Button, Field, Input, Modal, Select, Textarea, cn, ejecutar, toa
 import { SEDES } from "@/lib/empresa";
 import { historialPagosTrabajador, type PagoTrabajador } from "@/lib/historial";
 import { AFP_OPTIONS, BANCOS, ESTADOS_CIVILES, TIPOS_SUELDO, cambiarEstadoTrabajador, divisorSueldo, edad, eliminarTrabajador, fechaPE, frecuenciaPagoDe, guardarTrabajador, hoy, soles } from "@/lib/storage";
-import type { EstadoCivil, FrecuenciaPago, TipoAfp, TipoSueldo, Trabajador } from "@/lib/types";
+import type { EstadoCivil, TipoAfp, TipoSueldo, Trabajador } from "@/lib/types";
 
-const OPC_SUELDO = (Object.keys(TIPOS_SUELDO) as TipoSueldo[]).map((k) => ({ value: k, label: TIPOS_SUELDO[k].label.toUpperCase() }));
-const OPC_FRECUENCIA: { value: FrecuenciaPago; label: string }[] = [
-  { value: "SEMANAL", label: "SEMANAL (planilla de la semana)" },
-  { value: "MENSUAL", label: "MENSUAL (planilla del mes)" },
-];
+// Cada tipo de sueldo dice con qué frecuencia se paga (una sola elección, no se contradicen)
+const OPC_SUELDO = (Object.keys(TIPOS_SUELDO) as TipoSueldo[]).map((k) => ({
+  value: k,
+  label: `${TIPOS_SUELDO[k].label.toUpperCase()} · ${k === "POR_CONTRATO" ? "sin planilla" : `pago ${frecuenciaPagoDe({ tipoSueldo: k }).toLowerCase()}`}`,
+}));
 const OPC_AFP = (Object.keys(AFP_OPTIONS) as TipoAfp[]).map((k) => ({ value: k, label: AFP_OPTIONS[k].label }));
 
 function Seccion({ icono, titulo, children }: { icono: ReactNode; titulo: string; children: ReactNode }) {
@@ -117,22 +117,19 @@ export function FichaTrabajador({
             <Field label="Cargo">
               <Input value={f.cargo} onChange={(e) => set("cargo", e.target.value)} />
             </Field>
-            <Field label="Tipo de sueldo *">
+            <Field
+              label="Tipo de sueldo y frecuencia de pago *"
+              hint={frecuenciaPagoDe(f) === "MENSUAL" ? "Pago MENSUAL: planilla MENSUAL - <mes>; el reloj se importa por mes" : "Pago SEMANAL: planilla de la semana"}
+            >
               <Select
                 value={f.tipoSueldo}
+                // La frecuencia de pago es la misma que el tipo de sueldo (mensual = planilla del mes; el resto, semanal)
                 onChange={(e) => {
                   const tipoSueldo = e.target.value as TipoSueldo;
-                  // Sueldo mensual: por defecto se paga en la planilla del mes (se puede volver a semanal)
-                  setF((x) => ({ ...x, tipoSueldo, ...(tipoSueldo === "MENSUAL" && !x.frecuenciaPago ? { frecuenciaPago: "MENSUAL" as const } : {}) }));
+                  setF((x) => ({ ...x, tipoSueldo, frecuenciaPago: frecuenciaPagoDe({ tipoSueldo }) }));
                 }}
                 options={OPC_SUELDO}
               />
-            </Field>
-            <Field
-              label="Frecuencia de pago *"
-              hint={frecuenciaPagoDe(f) === "MENSUAL" ? "Se paga en la planilla MENSUAL - <mes>; el reloj se importa por mes" : "Se paga en la planilla de la semana"}
-            >
-              <Select value={frecuenciaPagoDe(f)} onChange={(e) => set("frecuenciaPago", e.target.value as FrecuenciaPago)} options={OPC_FRECUENCIA} />
             </Field>
             <Field label={`Sueldo ${sueldo.label.toLowerCase()} (S/) *`} hint={`Diario: ${soles(f.sueldo / divisorSueldo(f))}${divisorSueldo(f) === 27 ? " (mes de 27 días)" : ""}`}>
               <Input type="number" min={0} step="0.01" value={f.sueldo || ""} onChange={(e) => set("sueldo", parseFloat(e.target.value) || 0)} />

@@ -11,13 +11,19 @@ import { useEffect, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { createClient } from "./supabase/client";
 import { ProductoError, UMBRAL_SUGERENCIA, normalizarNombre, similitud, type AliasProducto, type ProductoMaestro, type SolicitudProducto } from "./productos-modelos";
+import { CATEGORIAS_BASE, categoriaOficial, sugerirCategoria, type CategoriaProducto } from "./categorias-productos";
 
 export * from "./productos-modelos";
+export * from "./categorias-productos";
 
 interface Estado {
   productos: ProductoMaestro[];
   alias: AliasProducto[];
   solicitudes: SolicitudProducto[];
+  /** Lista de categorías (tabla productos_categorias); sin la migración 20261203, la lista base. */
+  categorias: CategoriaProducto[];
+  /** La tabla productos_categorias existe (se puede editar la lista). */
+  categoriasEnBD: boolean;
   /** Ya se consultó Supabase. */
   listo: boolean;
   /** Las tablas existen (se corrió la migración). Si no, nada se bloquea. */
@@ -25,7 +31,8 @@ interface Estado {
 }
 
 const EVENTO = "erp:catalogo";
-let estado: Estado = { productos: [], alias: [], solicitudes: [], listo: false, disponible: false };
+const VACIO: Estado = { productos: [], alias: [], solicitudes: [], categorias: CATEGORIAS_BASE, categoriasEnBD: false, listo: false, disponible: false };
+let estado: Estado = VACIO;
 let porNombre = new Map<string, ProductoMaestro>();
 let canal: RealtimeChannel | null = null;
 let carga: Promise<void> | null = null;
@@ -69,17 +76,21 @@ function leerSolicitud(r: SolicitudProducto & { nombre_solicitado?: string | nul
 }
 
 async function leerCatalogo(): Promise<void> {
-  const [p, a, s] = await Promise.all([
+  const [p, a, s, c] = await Promise.all([
     todas<ProductoMaestro>("productos_maestro", "nombre_normalizado"),
     todas<AliasProducto>("productos_alias", "alias_normalizado"),
     todas<SolicitudProducto>("productos_solicitudes", "created_at"),
+    todas<CategoriaProducto>("productos_categorias", "orden"),
   ]);
-  if (faltaTabla(p.error)) return fijar({ productos: [], alias: [], solicitudes: [], listo: true, disponible: false });
+  // Sin la tabla de categorías (falta correr 20261203_categorias_productos.sql) se usa la lista base
+  const cats = !c.error && c.data.length ? c.data.map((x) => ({ ...x, palabras: x.palabras ?? [] })) : CATEGORIAS_BASE;
+  const catsEnBD = !c.error;
+  if (faltaTabla(p.error)) return fijar({ ...VACIO, categorias: cats, categoriasEnBD: catsEnBD, listo: true });
   if (p.error) {
     console.warn("Catálogo de productos:", p.error.message);
     return fijar({ ...estado, listo: true });
   }
-  fijar({ productos: p.data, alias: a.data, solicitudes: [...s.data].reverse().map(leerSolicitud), listo: true, disponible: true });
+  fijar({ productos: p.data, alias: a.data, solicitudes: [...s.data].reverse().map(leerSolicitud), categorias: cats, categoriasEnBD: catsEnBD, listo: true, disponible: true });
 }
 
 /** Al iniciar sesión: descarga el catálogo y escucha los cambios de las otras PCs. */
@@ -90,7 +101,7 @@ export function iniciarCatalogo(): Promise<void> {
       if (espera) clearTimeout(espera);
       espera = setTimeout(() => void leerCatalogo(), 400);
     };
-    canal = ["productos_maestro", "productos_alias", "productos_solicitudes"]
+    canal = ["productos_maestro", "productos_alias", "productos_solicitudes", "productos_categorias"]
       .reduce((c, t) => c.on("postgres_changes", { event: "*", schema: "public", table: t }, recargar), createClient().channel("erp-productos"))
       .subscribe();
   });
@@ -101,7 +112,7 @@ export async function detenerCatalogo(): Promise<void> {
   if (canal) await createClient().removeChannel(canal);
   canal = null;
   carga = null;
-  estado = { productos: [], alias: [], solicitudes: [], listo: false, disponible: false };
+  estado = VACIO;
   porNombre = new Map();
 }
 
@@ -118,7 +129,16 @@ export function useCatalogo(): Estado {
 }
 
 /** Producto oficial de un nombre (exacto, normalizado o alias). */
+/** ¿Se cargó el catálogo maestro? (sin él no se puede validar nombres). */
+export const catalogoDisponible = (): boolean => estado.disponible;
+
 export const buscarProducto = (nombre: string): ProductoMaestro | undefined => porNombre.get(normalizarNombre(nombre));
+
+/** Categoría del producto del catálogo con ese nombre (stock, REQ, Secocha…); "" si no tiene. */
+export const categoriaDe = (nombre: string): string => porNombre.get(normalizarNombre(nombre))?.categoria?.trim() || "";
+
+/** Categoría sugerida por el nombre con la lista vigente (palabras clave). */
+export const sugerirCategoriaVigente = (nombre: string): string | null => sugerirCategoria(nombre, estado.categorias);
 
 /** Productos parecidos (para "¿Quisiste decir…?"). */
 export function sugerencias(nombre: string, n = 3, umbral = UMBRAL_SUGERENCIA): { p: ProductoMaestro; sim: number }[] {
@@ -270,4 +290,56 @@ export async function unificarProductos(origenId: string, destinoId: string): Pr
   if (error) throw new ProductoError(error.message);
   await leerCatalogo();
   return data as { destino: string; origen: string; filas_stock: number };
+}
+
+// ---------------------------------------------------------------------
+// Categorías (solo administrador: creador / admin)
+// ---------------------------------------------------------------------
+
+const FALTA_CATEGORIAS = "Falta la lista de categorías en Supabase: ejecute supabase/migrations/20261203_categorias_productos.sql.";
+
+function errorCategoria(e: { code?: string; message?: string }): ProductoError {
+  if (faltaTabla(e)) return new ProductoError(FALTA_CATEGORIAS);
+  if (e.code === "42501") return new ProductoError("Solo el administrador cambia las categorías.");
+  if (e.code === "23505") return new ProductoError("Ya existe una categoría con ese nombre.");
+  return new ProductoError(e.message ?? "No se pudo guardar.");
+}
+
+/** Crea o edita una categoría. Al renombrarla, la base pasa sus productos al nombre nuevo. */
+export async function guardarCategoria(d: Pick<CategoriaProducto, "nombre" | "descripcion" | "palabras" | "orden" | "activo"> & { id?: string }): Promise<void> {
+  const nombre = d.nombre.trim().replace(/\s+/g, " ");
+  if (!nombre) throw new ProductoError("Ingrese el nombre de la categoría.");
+  const otra = estado.categorias.find((c) => c.id !== d.id && categoriaOficial(nombre, [c]));
+  if (otra) throw new ProductoError(`Ya existe la categoría ${otra.nombre}.`);
+  const fila = { nombre, descripcion: d.descripcion?.trim() || null, palabras: d.palabras.map((p) => p.trim().toUpperCase()).filter(Boolean), orden: d.orden, activo: d.activo };
+  const sb = createClient();
+  const { error } = d.id ? await sb.from("productos_categorias").update(fila).eq("id", d.id) : await sb.from("productos_categorias").insert(fila);
+  if (error) throw errorCategoria(error);
+  await leerCatalogo();
+}
+
+/** Asigna la categoría a varios productos a la vez ("" = quitarla). No toca stock ni nombres. */
+export async function asignarCategoria(ids: string[], categoria: string): Promise<number> {
+  if (!ids.length) return 0;
+  const sb = createClient();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { error } = await sb.from("productos_maestro").update({ categoria: categoria || null }).in("id", ids.slice(i, i + 200));
+    if (error) throw new ProductoError(error.code === "42501" ? "Solo el administrador edita el catálogo." : error.message);
+  }
+  await leerCatalogo();
+  return ids.length;
+}
+
+/** Aplica la categoría sugerida a cada producto (por nombre). Devuelve cuántos cambió. */
+export async function aplicarSugerencias(pares: { id: string; categoria: string }[]): Promise<number> {
+  const porCat = new Map<string, string[]>();
+  pares.forEach((p) => porCat.set(p.categoria, [...(porCat.get(p.categoria) ?? []), p.id]));
+  const sb = createClient();
+  for (const [cat, ids] of Array.from(porCat.entries()))
+    for (let i = 0; i < ids.length; i += 200) {
+      const { error } = await sb.from("productos_maestro").update({ categoria: cat }).in("id", ids.slice(i, i + 200));
+      if (error) throw new ProductoError(error.code === "42501" ? "Solo el administrador edita el catálogo." : error.message);
+    }
+  await leerCatalogo();
+  return pares.length;
 }
