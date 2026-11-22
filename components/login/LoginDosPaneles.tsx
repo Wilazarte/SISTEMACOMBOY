@@ -43,12 +43,12 @@ import { CLAVE_SELECCION, ENCARGADOS_LOGIN } from "@/components/modulos-login";
 import { homeAsignado } from "@/lib/permisosPlanta";
 import { olvidarSedes } from "@/lib/sedes";
 import { validarEntradaSecocha } from "@/lib/loginSecocha";
-import { guardarCredencial, leerCredencial, olvidarCredencial, recordarDisponible } from "@/lib/credencialesEscritorio";
+import { guardarCredencial, leerCredencial, moduloRecordado, olvidarCredencial, recordarDisponible } from "@/lib/recordarCredenciales";
 
 /**
  * Inicio de sesión en dos paneles (Williams, 2026-11-17): a la izquierda los módulos y Sucursal Secocha;
  * a la derecha el encargado del módulo elegido (solo lectura), usuario y contraseña.
- * En la app de PC aparece "Recordar contraseña" (cifrada por Windows, ver lib/credencialesEscritorio.ts).
+ * "Recordar contraseña" en web, app de PC, Tauri y APK: siempre cifrada en el equipo (ver lib/recordarCredenciales.ts).
  */
 type Opcion = { id: ModuloLogin; titulo: string; icon: LucideIcon; etiqueta?: string };
 
@@ -88,12 +88,20 @@ export default function LoginDosPaneles({ inicial = "", siguiente = null }: { in
 
   useEffect(() => setActivo(inicial), [inicial]);
 
-  // App de PC: ¿hay almacén seguro para recordar la contraseña?
+  // ¿Este equipo puede guardar la contraseña cifrada? Si hay un módulo recordado, queda elegido.
   useEffect(() => {
-    recordarDisponible().then(setPuedeRecordar);
+    recordarDisponible().then((ok) => {
+      setPuedeRecordar(ok);
+      if (!ok || inicial) return;
+      const m = moduloRecordado();
+      if (TODAS.some((o) => o.id === m)) {
+        setActivo(m as ModuloLogin);
+        setPlegado(true);
+      }
+    });
   }, []);
 
-  // Al elegir módulo: rellena con lo guardado en este equipo (solo app de PC)
+  // Al elegir módulo: rellena usuario y contraseña guardados en este equipo
   useEffect(() => {
     let vigente = true;
     setPass("");
@@ -351,11 +359,11 @@ export default function LoginDosPaneles({ inicial = "", siguiente = null }: { in
                   </span>
                 </label>
 
-                {/* Solo en la app de PC */}
+                {/* Web, PC, Tauri y APK (oculto si el equipo no permite cifrar, p. ej. sin HTTPS) */}
                 {puedeRecordar && (
                   <label className="flex cursor-pointer select-none items-center gap-2.5 text-sm text-white/80">
                     <input type="checkbox" checked={recordar} onChange={(e) => setRecordar(e.target.checked)} className="h-4 w-4 accent-[#00c8ff] focus-visible:outline-[#00f2fe]" />
-                    Recordar contraseña en este equipo
+                    Recordar usuario y contraseña en este equipo
                   </label>
                 )}
               </div>
