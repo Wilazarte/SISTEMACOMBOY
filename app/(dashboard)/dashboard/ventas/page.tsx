@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, ClipboardList, Inbox, Contact, FilePlus2, History, Package, Receipt, ScrollText, Search, Settings2, Truck, Wallet } from "lucide-react";
+import { AlertTriangle, BadgeDollarSign, ClipboardList, Inbox, Contact, FilePlus2, History, Package, Receipt, ScrollText, Search, Settings2, Truck, Wallet } from "lucide-react";
 import { abrirBuscadorDePagina } from "@/components/layout/IslandMenu";
 import { CatalogoProductos } from "@/components/productos/CatalogoProductos";
+import { PreciosVenta } from "@/components/productos/PreciosVenta";
 import { Button, Tabs } from "@/components/ui";
 import { KEYS, enSucursal, useStore } from "@/lib/storage";
 import { estadoOD, filasCxC, npsSinDespacho } from "@/lib/ventas";
@@ -17,7 +18,7 @@ import { Clientes, CondicionesPago } from "./maestros";
 import { NotasPedido } from "./notas";
 import { RequerimientosSecocha, useSecocha } from "./secocha";
 
-type Tab = "secocha" | "notas" | "comprobantes" | "guias" | "despachos" | "productos" | "condiciones" | "clientes" | "cobrar";
+type Tab = "secocha" | "notas" | "comprobantes" | "guias" | "despachos" | "productos" | "precios" | "condiciones" | "clientes" | "cobrar";
 
 /**
  * VENTAS — Nota de Pedido -> Aprobada (cuenta por cobrar) -> Factura/Boleta -> Orden de Despacho (Almacén) -> Cobro.
@@ -103,6 +104,7 @@ export default function VentasPage() {
             count: despachos.filter((o) => estadoOD(o) === "PENDIENTE" || estadoOD(o) === "PEDIDO_ALISTADO").length,
           },
           { id: "productos", label: "Catálogo de Productos", icon: <Package size={16} /> },
+          { id: "precios", label: "Precios de venta", icon: <BadgeDollarSign size={16} /> },
           { id: "condiciones", label: "Configuración", icon: <Settings2 size={16} /> },
           { id: "clientes", label: "Clientes", icon: <Contact size={16} /> },
           { id: "cobrar", label: "Cuentas por cobrar", icon: <Wallet size={16} />, count: vencidos },
@@ -137,6 +139,7 @@ export default function VentasPage() {
         </>
       )}
       {tab === "productos" && <CatalogoProductos />}
+      {tab === "precios" && <PreciosVenta />}
       {tab === "condiciones" && <CondicionesPago />}
       {tab === "clientes" && <Clientes />}
       {tab === "cobrar" && <CuentasPorCobrar />}
