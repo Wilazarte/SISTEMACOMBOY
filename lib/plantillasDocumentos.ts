@@ -77,6 +77,11 @@ const rellenar = (t: string, v: Record<string, string>): string => t.replace(/\{
  */
 export function sedeOrigenReq(r: Requerimiento): string {
   if (r.origen === "SUCURSAL") return r.sede;
+  // REQ emitido en Secocha (REQ-SEC-001): la sede es Secocha, con el área elegida y el destino
+  if (/^REQ-SEC-/.test(r.numero ?? "")) {
+    const area = r.sede && !/secocha/i.test(r.sede) ? ` · ${r.sede}` : "";
+    return `Sucursal Secocha${area}${r.destino ? ` → ${r.destino}` : ""}`;
+  }
   return r.sede && r.sede !== SEDE_PLANTA_PRINCIPAL ? `${SEDE_PLANTA_PRINCIPAL} · ${r.sede}` : SEDE_PLANTA_PRINCIPAL;
 }
 

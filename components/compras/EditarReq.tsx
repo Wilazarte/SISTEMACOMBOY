@@ -6,7 +6,7 @@ import { Button, Field, Input, Modal, Select, Textarea, ejecutar } from "@/compo
 import type { Sesion } from "@/lib/auth";
 import { PERMISO_EDITAR_REQ_ALMACEN, tienePermiso } from "@/lib/permisos";
 import { getSesion } from "@/lib/auth";
-import { SEDES, UNIDADES } from "@/lib/empresa";
+import { SEDES_REQ, UNIDADES } from "@/lib/empresa";
 import { editarRequerimiento, reenviarRequerimiento, uid } from "@/lib/storage";
 import type { ItemReq, Requerimiento, Rol } from "@/lib/types";
 import { ProductoInput } from "@/components/productos/ProductoInput";
@@ -138,7 +138,7 @@ export function EditarReq({ req, rol, onClose }: { req: Requerimiento; rol: Rol;
       )}
       <div className="mb-4 grid gap-3 md:grid-cols-3">
         <Field label="Sede *">
-          <Select value={sede} onChange={(e) => setSede(e.target.value)} options={SEDES.map((s) => ({ value: s, label: s }))} />
+          <Select value={sede} onChange={(e) => setSede(e.target.value)} options={Array.from(new Set([...SEDES_REQ, sede].filter(Boolean))).map((s) => ({ value: s, label: s }))} />
         </Field>
         <Field label="Solicitante *">
           <Input value={solicitante} onChange={(e) => setSolicitante(e.target.value)} />

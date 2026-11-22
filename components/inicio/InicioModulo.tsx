@@ -7,7 +7,7 @@ import { recargarExpedientes, useExpedientes } from "@/lib/expedientes";
 import { SALA_MODULO, TITULO_INICIO, accionesPermitidas, type ModuloInicio } from "@/lib/inicioModulos";
 import { irA } from "@/lib/navegacion";
 import { urlSala } from "@/lib/presencia";
-import { recargarDatos, type StoreKey, KEYS } from "@/lib/storage";
+import { enSucursal, recargarDatos, type StoreKey, KEYS } from "@/lib/storage";
 import { AccesosModulos, type ModuloPlanta } from "@/components/logistica/planta";
 import { permisosPlanta } from "@/lib/permisosPlanta";
 import { estiloSeccion } from "@/lib/seccionColor";
@@ -76,7 +76,7 @@ export function InicioModulo({ modulo }: { modulo: ModuloInicio }) {
       <header className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/[0.08] glass-card glass-blur px-5 py-4">
         <div>
           <h1 className="text-3xl font-bold uppercase leading-tight lg:text-4xl">
-            INICIO {TITULO_INICIO[modulo]}
+            INICIO {enSucursal() && modulo === "finanzas" ? "ADM SECOCHA" : TITULO_INICIO[modulo]}
             {docValido && <span className="texto-azul ml-3 align-middle text-2xl lg:text-3xl">{docValido}</span>}
           </h1>
           <p className="text-[13px] text-[#9CA3AF]">Resumen del módulo: tareas pendientes y gráficos. Los accesos rápidos están en la barra azul de la derecha.</p>

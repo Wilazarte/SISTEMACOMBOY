@@ -17,6 +17,8 @@ export const EMPRESA = {
 };
 
 export const SEDES = ["Adm Aqp", "Taller Principal Aqp", "Sucursal Secocha", "Area Comercial", "Gerencia", "Oficina Lima"];
+/** Sedes de los requerimientos (Williams 2026-11-22): sin Oficina Lima; iguales en Arequipa y Secocha. */
+export const SEDES_REQ = SEDES.filter((s) => !/lima/i.test(s));
 
 /** Almacenes físicos: solo hay dos (ingreso de compras, equipos terminados de Producción, despacho). */
 export const ALMACENES = ["Taller Principal Aqp", "Sucursal Secocha"];

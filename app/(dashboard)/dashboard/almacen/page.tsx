@@ -4,7 +4,7 @@ import { BotonNuevo } from "@/components/ui/BotonFiltros";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useCallback, useEffect, useState } from "react";
-import { Boxes, CheckCircle2, Factory, Truck, ClipboardList, Eye, FilePlus2, FileText, MessageSquareWarning, PackageCheck, Pencil, Plus, Trash2 } from "lucide-react";
+import { Boxes, CheckCircle2, Factory, Truck, ClipboardList, Eye, FilePlus2, Inbox, Ban, Send, FileText, MessageSquareWarning, PackageCheck, Pencil, Plus, Trash2 } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
 import { EditarReq, permisoEditarReq } from "@/components/compras/EditarReq";
@@ -12,11 +12,18 @@ import { ProductoInput } from "@/components/productos/ProductoInput";
 import { RequerimientoForm } from "@/components/requerimientos/RequerimientoForm";
 import { SEDE_PLANTA_PRINCIPAL } from "@/components/layout/ModuloLayout";
 import { getSesion } from "@/lib/auth";
-import { SEDES, SEDES_STOCK, UNIDADES } from "@/lib/empresa";
+import { SEDES_REQ, SEDES_STOCK, UNIDADES } from "@/lib/empresa";
 import { sedeNormalizada } from "@/lib/constantes";
 import {
+  DESTINO_ADM_SECOCHA,
+  DESTINO_ALMACEN_AQP,
   KEYS,
+  crearReqAlmacenAqp,
+  anularReqSecocha,
   crearRequerimiento,
+  enSucursal,
+  responderReqSecocha,
+  type AccionReqAqp,
   darVistoBueno,
   observarIngreso,
   puede,
@@ -34,7 +41,7 @@ import { EquiposTerminados } from "@/components/almacen/EquiposTerminados";
 import { StockAlmacen } from "@/components/almacen/StockAlmacen";
 import { estadoOD } from "@/lib/ventas";
 
-type Tab = "nuevo" | "lista" | "ingresos" | "equipos" | "stock" | "despacho";
+type Tab = "nuevo" | "lista" | "secocha" | "ingresos" | "equipos" | "stock" | "despacho";
 
 
 export default function AlmacenPage() {
@@ -46,18 +53,25 @@ export default function AlmacenPage() {
   const guias = useStore<Guia[]>(KEYS.GUIAS, []);
   const stock = useStore<StockItem[]>(KEYS.STOCK, []);
   const despachos = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, []);
+  // REQ de Secocha al Almacén de Arequipa (Williams 2026-11-22): Arequipa los atiende; Secocha ve los suyos en su lista
+  const reqsSecocha = useStore<Requerimiento[]>(KEYS.REQS_SECOCHA_AQP, []);
+  const secocha = enSucursal();
+  const porAtenderSecocha = reqsSecocha.filter((r) => r.estado === "PENDIENTE" || r.estado === "ACEPTADO").length;
   // Al entrar solo se ve la lista: el formulario se abre con "Nuevo requerimiento" en la isla
   const [tab, setTab] = useState<Tab>("lista");
 
   // Campana "nueva orden de despacho": /dashboard/almacen?tab=despacho (o evento si ya está en la página)
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("tab") === "despacho") setTab("despacho");
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t === "despacho") setTab("despacho");
+    if (t === "secocha") setTab("secocha");
     const ir = () => setTab("despacho");
     window.addEventListener("erp:ir-despacho", ir);
     return () => window.removeEventListener("erp:ir-despacho", ir);
   }, []);
 
- const todos = [...pendientes, ...procesados].sort((a, b) => (b.numero || "").localeCompare(a.numero || ""));
+ // Secocha: sus REQ a ADM Secocha y al Almacén de Arequipa en una sola lista
+ const todos = [...pendientes, ...procesados, ...(secocha ? reqsSecocha : [])].sort((a, b) => (b.numero || "").localeCompare(a.numero || ""));
   const porVB = ordenes.filter((o) => o.estado === "EN_GUIA" && !guias.some((g) => g.ocId === o.id && g.estado === "OBSERVADA"));
   const observados = procesados.filter((r) => r.estado === "OBSERVADO").length;
 
@@ -71,7 +85,7 @@ export default function AlmacenPage() {
 
       {observados > 0 && (
         <button onClick={() => setTab("lista")} className="flex w-full items-center gap-3 rounded-xl border border-orange-300 bg-orange-50 px-5 py-3 text-left text-sm text-orange-800">
-          <MessageSquareWarning size={18} /> Tiene {observados} requerimiento(s) OBSERVADO(s) por Tesorería. Corríjalos y reenvíe.
+          <MessageSquareWarning size={18} /> Tiene {observados} requerimiento(s) OBSERVADO(s) por {secocha ? "ADM Secocha" : "Tesorería"}. Corríjalos y reenvíe.
         </button>
       )}
 
@@ -81,6 +95,8 @@ export default function AlmacenPage() {
         tabs={[
           { id: "nuevo", label: "Nuevo requerimiento", icon: <FilePlus2 size={16} /> },
           { id: "lista", label: "Requerimientos emitidos", icon: <ClipboardList size={16} />, count: observados },
+          // Arequipa recibe los REQ que Secocha le envía (en Secocha esos REQ se ven en "Requerimientos emitidos")
+          ...(secocha ? [] : [{ id: "secocha" as const, label: "REQ de Secocha", icon: <Inbox size={16} />, count: porAtenderSecocha }]),
           { id: "ingresos", label: "Ingresos", icon: <PackageCheck size={16} />, count: porVB.length },
           { id: "equipos", label: "Equipos de producción", icon: <Factory size={16} /> },
           { id: "stock", label: "Stock", icon: <Boxes size={16} /> },
@@ -95,6 +111,7 @@ export default function AlmacenPage() {
 
       {tab === "nuevo" && <NuevoReq rol={rol} onCreado={() => setTab("lista")} onCancelar={() => setTab("lista")} />}
       {tab === "lista" && <ListaReq reqs={todos} rol={rol} />}
+      {tab === "secocha" && !secocha && <ReqsDeSecocha reqs={reqsSecocha} rol={rol} />}
       {tab === "ingresos" && (
         <div className="space-y-6">
           <RegistrarIngreso rol={rol} stock={stock} ordenes={ordenes} />
@@ -111,13 +128,49 @@ export default function AlmacenPage() {
 // =====================================================================
 // NUEVO REQUERIMIENTO
 // =====================================================================
-/** Áreas de la Planta Principal que emiten requerimientos (Secocha emite los suyos desde su módulo). */
-const AREAS_PLANTA = SEDES.filter((s) => !/secocha/i.test(s));
+/** Áreas de la Planta Principal que emiten requerimientos (sin Oficina Lima, Williams 2026-11-22). */
+const AREAS_PLANTA = SEDES_REQ.filter((s) => !/secocha/i.test(s));
+/** Secocha: las mismas áreas que Arequipa, con Sucursal Secocha primero. */
+const AREAS_SECOCHA = ["Sucursal Secocha", ...AREAS_PLANTA];
 
 function NuevoReq({ rol, onCreado, onCancelar }: { rol: Rol; onCreado: () => void; onCancelar: () => void }) {
   const contadores = useStore<Record<string, number>>(KEYS.CONTADORES, {});
   if (!puede(rol, "req.crear"))
     return <Empty icon={<FilePlus2 size={28} />} text="Su rol no puede emitir requerimientos. Cambie a ALMACÉN o GERENCIA." />;
+  if (enSucursal())
+    return (
+      <RequerimientoForm
+        sedeOrigen="Sucursal Secocha"
+        areas={AREAS_SECOCHA}
+        sedeInicial="Sucursal Secocha"
+        destino={DESTINO_ADM_SECOCHA}
+        numeroProbable="REQ-SEC-…"
+        modulo="Secocha · Almacén · Requerimiento"
+        textoEnviar={`Emitir y notificar a ${DESTINO_ADM_SECOCHA}`}
+        mensajeOk={`Requerimiento enviado a ${DESTINO_ADM_SECOCHA}`}
+        conTipo
+        destinos={[
+          {
+            value: DESTINO_ADM_SECOCHA,
+            label: "ADM Secocha (compra / servicio)",
+            textoEnviar: "Emitir y notificar a ADM Secocha",
+            mensajeOk: "Requerimiento enviado a ADM Secocha",
+            hint: "ADM Secocha lo cotiza y compra (Orden de Compra) o lo atiende con una Orden de Servicio.",
+          },
+          {
+            value: DESTINO_ALMACEN_AQP,
+            label: "Almacén de Arequipa (Taller Principal)",
+            textoEnviar: "Emitir y notificar al Almacén de Arequipa",
+            mensajeOk: "Requerimiento enviado al Almacén de Arequipa",
+            soloBienes: true,
+            hint: "El Almacén de Arequipa lo recibe con aviso y lo atiende con su stock (traslado a Secocha).",
+          },
+        ]}
+        onEnviar={(d) => (d.destino === DESTINO_ALMACEN_AQP ? crearReqAlmacenAqp(d, rol) : crearRequerimiento(d, rol))}
+        onCreado={onCreado}
+        onCancelar={onCancelar}
+      />
+    );
   return (
     <RequerimientoForm
       sedeOrigen={SEDE_PLANTA_PRINCIPAL}
@@ -132,6 +185,115 @@ function NuevoReq({ rol, onCreado, onCancelar }: { rol: Rol; onCreado: () => voi
       onCreado={onCreado}
       onCancelar={onCancelar}
     />
+  );
+}
+
+// =====================================================================
+// REQ DE SECOCHA (Arequipa los recibe y atiende con su stock)
+// =====================================================================
+const esReqAqp = (r: Requerimiento) => r.destino === DESTINO_ALMACEN_AQP;
+
+function ReqsDeSecocha({ reqs, rol }: { reqs: Requerimiento[]; rol: Rol }) {
+  const [accion, setAccion] = useState<{ req: Requerimiento; tipo: AccionReqAqp } | null>(null);
+  const [nota, setNota] = useState("");
+  const lista = [...reqs].sort((a, b) => Number(a.estado === "FINALIZADO") - Number(b.estado === "FINALIZADO") || (b.numero || "").localeCompare(a.numero || ""));
+  const abrir = (req: Requerimiento, tipo: AccionReqAqp) => {
+    setNota("");
+    if (tipo === "ACEPTAR") ejecutar(() => responderReqSecocha(req.id, "ACEPTAR", "", rol), `${req.numero} aceptado: Secocha ya lo ve en atención`);
+    else setAccion({ req, tipo });
+  };
+  const confirmar = () => {
+    if (!accion) return;
+    const ok = ejecutar(
+      () => responderReqSecocha(accion.req.id, accion.tipo, nota, rol),
+      accion.tipo === "OBSERVAR" ? `${accion.req.numero} observado: Secocha lo corrige` : `${accion.req.numero} atendido`
+    );
+    if (ok) setAccion(null);
+  };
+  return (
+    <>
+      <Card>
+        <CardHeader
+          title="Requerimientos de Secocha"
+          subtitle={`${reqs.filter((r) => r.estado === "PENDIENTE").length} por revisar · ${reqs.filter((r) => r.estado === "ACEPTADO").length} en atención · Secocha › Almacén los envía al Almacén de Arequipa`}
+        />
+        <ListaDocs
+          tipo="requerimientos"
+          filas={lista.map(
+            (r): FilaDoc => ({
+              id: r.id,
+              fecha: r.fecha,
+              contraparte: `${r.solicitante} · ${r.sede}`,
+              ref: (
+                <>
+                  <span className="font-semibold text-fg">{r.numero}</span>
+                  <span className="ml-2 inline-block align-middle">
+                    <Badge estado={r.estado} />
+                  </span>
+                  <p className="mt-1 max-w-[360px] whitespace-normal text-xs text-plomo-600">{r.motivo}</p>
+                  {r.observacion && <p className="mt-1 max-w-[360px] whitespace-normal text-xs text-orange-700">{r.observacion}</p>}
+                </>
+              ),
+              total: `${(r.items || []).length} ítem(s)`,
+              acciones: (
+                <div className="flex flex-wrap gap-1">
+                  <Button size="sm" variant="ghost" onClick={() => pdfRequerimiento(r)} title="PDF">
+                    <FileText size={15} />
+                  </Button>
+                  {r.estado === "PENDIENTE" && (
+                    <Button size="sm" onClick={() => abrir(r, "ACEPTAR")} title="Aceptar: Secocha lo ve en atención">
+                      <CheckCircle2 size={14} /> Aceptar
+                    </Button>
+                  )}
+                  {(r.estado === "PENDIENTE" || r.estado === "ACEPTADO") && (
+                    <>
+                      <Button size="sm" variant="warning" onClick={() => abrir(r, "OBSERVAR")} title="Devolver a Secocha con una observación">
+                        <MessageSquareWarning size={14} /> Observar
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => abrir(r, "ATENDER")} title="Marcar como atendido (enviado a Secocha)">
+                        <Truck size={14} /> Atendido
+                      </Button>
+                    </>
+                  )}
+                </div>
+              ),
+              buscar: `${r.numero} ${r.sede} ${r.motivo} ${r.items.map((i) => i.nombre).join(" ")}`,
+              tipoDoc: "REQ",
+              estado: r.estado,
+              claseFila: r.estado === "PENDIENTE" ? "bg-amber-50/60" : undefined,
+            })
+          )}
+        />
+      </Card>
+      {accion && (
+        <Modal open onClose={() => setAccion(null)} title={`${accion.tipo === "OBSERVAR" ? "Observar" : "Atender"} ${accion.req.numero}`}>
+          <div className="space-y-4">
+            <ul className="rounded-lg bg-plomo-50 p-3 text-sm">
+              {accion.req.items.map((i, k) => (
+                <li key={k}>
+                  {i.cantidad} {i.unidad} · {i.nombre}
+                </li>
+              ))}
+            </ul>
+            <Field label={accion.tipo === "OBSERVAR" ? "Motivo de la observación *" : "Cómo se atendió *"}>
+              <Textarea
+                value={nota}
+                onChange={(e) => setNota(e.target.value)}
+                placeholder={accion.tipo === "OBSERVAR" ? "Ej: Indicar la medida del rodamiento" : "Ej: Enviado con guía T006-000123 / OD-0045 el 22/11"}
+              />
+            </Field>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setAccion(null)}>
+                Cancelar
+              </Button>
+              <Button variant={accion.tipo === "OBSERVAR" ? "warning" : "primary"} onClick={confirmar}>
+                {accion.tipo === "OBSERVAR" ? <MessageSquareWarning size={15} /> : <Send size={15} />} {accion.tipo === "OBSERVAR" ? "Observar" : "Marcar atendido"}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </>
   );
 }
 
@@ -175,14 +337,14 @@ function ListaReq({ reqs, rol }: { reqs: Requerimiento[]; rol: Rol }) {
       <Card>
         <CardHeader
           title="Requerimientos emitidos"
-          subtitle="Los requerimientos rechazados por Tesorería se eliminan del sistema."
+          subtitle={enSucursal() ? "Cada REQ indica a dónde se envió: ADM Secocha o Almacén de Arequipa. Los rechazados por ADM Secocha se eliminan." : "Los requerimientos rechazados por Tesorería se eliminan del sistema."}
         />
         <ListaDocs
           tipo="requerimientos"
           extraActivos={[sede, estado].filter(Boolean).length}
           filtrosExtra={
             <>
-              <Select value={sede} onChange={(e) => setSede(e.target.value)} placeholder="Todas las sedes" options={SEDES.map((s) => ({ value: s, label: s }))} className="w-44" />
+              <Select value={sede} onChange={(e) => setSede(e.target.value)} placeholder="Todas las sedes" options={SEDES_REQ.map((s) => ({ value: s, label: s }))} className="w-44" />
               <Select value={estado} onChange={(e) => setEstado(e.target.value)} placeholder="Todos los estados" options={ESTADOS.map((s) => ({ value: s, label: s }))} className="w-40" />
             </>
           }
@@ -195,20 +357,40 @@ function ListaReq({ reqs, rol }: { reqs: Requerimiento[]; rol: Rol }) {
             <>
               <span className="font-semibold text-fg">{r.numero}</span>
                 <span className="ml-2 inline-block align-middle"><Badge estado={r.estado} /></span>
-                {r.observacion && r.estado === "OBSERVADO" && <p className="mt-1 max-w-[320px] whitespace-normal text-xs text-orange-700">{r.observacion}</p>}
+                {r.destino && (
+                  <p className={cn("mt-1 text-[11px] font-semibold", esReqAqp(r) ? "text-azul-700" : "text-plomo-500")}>→ {esReqAqp(r) ? "Almacén de Arequipa" : r.destino}</p>
+                )}
+                {r.observacion && (r.estado === "OBSERVADO" || (esReqAqp(r) && r.estado === "FINALIZADO")) && (
+                  <p className={cn("mt-1 max-w-[320px] whitespace-normal text-xs", r.estado === "OBSERVADO" ? "text-orange-700" : "text-emerald-700")}>{r.observacion}</p>
+                )}
             </>
           ),
           total: `${(r.items || []).length} ítem(s)`,
           acciones: (
             <>
               <div className="flex gap-1">
-                  <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "REQ", id: r.id })} title="Ver e historial">
-                    <Eye size={15} />
-                  </Button>
+                  {!esReqAqp(r) && (
+                    <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "REQ", id: r.id })} title="Ver e historial">
+                      <Eye size={15} />
+                    </Button>
+                  )}
                   <Button size="sm" variant="ghost" onClick={() => pdfRequerimiento(r)} title="PDF">
                     <FileText size={15} />
                   </Button>
-                  <BotonEditarReq req={r} onEditar={() => setEditando(r)} />
+                  {esReqAqp(r) ? (
+                    (r.estado === "PENDIENTE" || r.estado === "OBSERVADO") && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        title="Anular (Arequipa aún no lo atiende); emita uno nuevo si hace falta"
+                        onClick={() => confirm(`¿Anular ${r.numero}?`) && ejecutar(() => anularReqSecocha(r.id), `${r.numero} anulado`)}
+                      >
+                        <Ban size={14} />
+                      </Button>
+                    )
+                  ) : (
+                    <BotonEditarReq req={r} onEditar={() => setEditando(r)} />
+                  )}
                 </div>
             </>
           ),

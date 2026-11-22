@@ -82,7 +82,7 @@ const agrupar = (acciones: AccionInicio[]): [string, AccionInicio[]][] => {
 };
 
 /**
- * Secocha (Williams 2026-11-17): la barra derecha es el menú. Un ícono por módulo (Ventas, Logística, Tesorería,
+ * Secocha (Williams 2026-11-17): la barra derecha es el menú. Un ícono por módulo (Ventas, Logística, ADM Secocha,
  * Planilla, Almacén, Producción, Dashboard); al tocarlo se abren sus funciones con los grupos como subtítulos.
  */
 function seccionesSecocha(sesion: Sesion): Seccion[] {
@@ -91,7 +91,8 @@ function seccionesSecocha(sesion: Sesion): Seccion[] {
   const lista: Seccion[] = [
     { id: "ventas", label: "Ventas", icono: Receipt, modulo: "ventas", grupos: de("ventas") },
     { id: "logistica", label: "Logística", icono: Truck, modulo: "logistica", grupos: de("logistica") },
-    { id: "tesoreria", label: "Tesorería", icono: Landmark, modulo: "finanzas", grupos: finanzas.filter(([g]) => g !== "Planilla") },
+    // En Secocha la Tesorería se llama ADM Secocha (Williams 2026-11-22)
+    { id: "tesoreria", label: "ADM Secocha", icono: Landmark, modulo: "finanzas", grupos: finanzas.filter(([g]) => g !== "Planilla") },
     { id: "planilla", label: "Planilla", icono: Users, modulo: "finanzas", grupos: finanzas.filter(([g]) => g === "Planilla") },
     { id: "almacen", label: "Almacén", icono: Boxes, modulo: "almacen", grupos: de("almacen") },
   ];
