@@ -59,7 +59,7 @@ const mascara = (v: string) => {
 };
 
 /** Campos que el escaneo (OCR) no pudo leer o que no cuadran: se pintan en amarillo hasta que el usuario los toque. */
-type CampoOcr = "fecha" | "importe" | "comprobante" | "numero" | "proveedor" | "ruc";
+type CampoOcr = "fecha" | "importe" | "descripcion" | "comprobante" | "numero" | "proveedor" | "ruc";
 const AMARILLO = "!border-amber-400 !bg-amber-50 !text-amber-950 ring-2 ring-amber-200";
 
 const vacio = (): Omit<DatosGasto, "fecha"> => ({
@@ -119,6 +119,20 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
     if (!datos.total || datos.igvCuadra === false) falta.add("importe");
     if (!datos.comprobante) falta.add("comprobante");
     if (!datos.numero) falta.add("numero");
+    // Detalle: la descripción del gasto lista cada artículo con su costo; si las líneas no suman el total, a revisar
+    const items = datos.items ?? [];
+    if (!items.length || datos.itemsConIgv === undefined) falta.add("descripcion");
+    const descripcion = items
+      .map((i) => `${i.cantidad} ${i.unidad} ${i.descripcion} x ${soles(i.precioUnit)} = ${soles(i.importe)}`)
+      .join("; ")
+      .concat(items.length && datos.itemsConIgv === false ? " (valores sin IGV)" : "")
+      .slice(0, 1000);
+    if (items.length) {
+      // OC / OS del gasto: líneas ya cargadas con precio CON IGV incluido (si el comprobante las trae sin IGV, se suma)
+      const factor = datos.itemsConIgv === false && (datos.comprobante ?? d.comprobante) === "FACTURA" ? 1.18 : 1;
+      setFilas(items.map((i) => ({ ...filaOC(), nombre: i.descripcion, unidad: i.unidad, cantidad: i.cantidad, precioUnit: r2(i.precioUnit * factor) })));
+      setServicios(items.map((i) => ({ ...servicioVacio(), descripcion: i.descripcion, descTocada: true, cantidad: i.cantidad, unidad: i.unidad, precioUnit: r2(i.precioUnit * factor) })));
+    }
     // RUC leído: la razón social la pone el padrón SUNAT (rucSunat) o la consulta Decolecta de EstadoRuc al validar
     const sunat = datos.ruc ? rucSunat(datos.ruc) : undefined;
     if (!datos.ruc) falta.add("ruc").add("proveedor");
@@ -128,6 +142,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
       ...(datos.comprobante ? { comprobante: datos.comprobante } : {}),
       ...(datos.numero ? { numero: datos.numero } : {}),
       ...(datos.total ? { importe: datos.total } : {}),
+      ...(descripcion ? { descripcion } : {}),
       ...(datos.ruc ? { ruc: datos.ruc, proveedor: sunat ? sunat.razon_social : esProveedorVarios(x.proveedor) ? "" : x.proveedor } : {}),
       archivos: archivo ? [...x.archivos.filter((a) => a.tipo !== "FACTURA"), archivo] : x.archivos,
     }));
@@ -275,7 +290,15 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
           />
         </Field>
         <Field label="Descripción del gasto *" className="md:col-span-3">
-          <Textarea value={d.descripcion} onChange={(e) => set("descripcion", e.target.value)} placeholder="Ej: Servicio de transporte Arequipa - Lima" />
+          <Textarea
+            value={d.descripcion}
+            onChange={(e) => {
+              set("descripcion", e.target.value);
+              revisado("descripcion");
+            }}
+            placeholder="Ej: Servicio de transporte Arequipa - Lima"
+            className={ocr("descripcion")}
+          />
         </Field>
 
         {/* Orden de compra u orden de servicio opcional (una sola) */}

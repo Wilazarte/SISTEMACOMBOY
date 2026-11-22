@@ -9,6 +9,18 @@
 export const RUC_EMPRESA_OCR = "20613238566";
 const TASA_IGV = 0.18;
 
+/** Una línea de detalle del comprobante (artículo o servicio). */
+export interface ItemLeido {
+  cantidad: number;
+  /** Unidad de la lista del ERP (UNIDADES de lib/empresa.ts): NIU → UND, KGM → KG… */
+  unidad: string;
+  descripcion: string;
+  /** Precio / valor unitario tal como figura en el comprobante. */
+  precioUnit: number;
+  /** Importe de la línea tal como figura. */
+  importe: number;
+}
+
 export interface FacturaLeida {
   /** RUC del emisor (11 dígitos, dígito verificador correcto, distinto del RUC de la empresa). */
   ruc?: string;
@@ -23,6 +35,13 @@ export interface FacturaLeida {
   igv?: number;
   /** Base imponible (op. gravada / subtotal) si figura. */
   subtotal?: number;
+  /** Detalle: cantidad, descripción, precio unitario e importe de cada artículo. */
+  items?: ItemLeido[];
+  /**
+   * true: los importes de las líneas suman el total (precios con IGV incluido); false: suman la base (op. gravada),
+   * hay que sumarles el IGV; undefined: no se pudo saber.
+   */
+  itemsConIgv?: boolean;
   /** true: el IGV leído es el 18 % del total (dentro de S/ 0.05); false: no cuadra; undefined: falta uno de los dos. */
   igvCuadra?: boolean;
 }
@@ -160,7 +179,8 @@ function buscarTotales(lineas: string[]): Pick<FacturaLeida, "total" | "igv" | "
     // Etiqueta en una línea y monto en la siguiente (pasa con tablas de 2 columnas)
     const monto = montos.length ? montos[montos.length - 1] : montosDeLinea(lineas[i + 1] ?? "").at(-1);
     if (monto === undefined) return;
-    if (/(^|[^A-Z0-9])[I1L|]\.?\s*G\.?\s*V\b/.test(l) && !/TOTAL\s+(A\s+PAGAR|VENTA)/.test(l)) {
+    // "I.G.V. 18%" (el OCR a veces lo lee "1.6.7. 18%": basta el 18 % con monto)
+    if ((/(^|[^A-Z0-9])[I1L|]\.?\s*[G6]\.?\s*[VY]\b/.test(l) || /(^|\D)18\s*%/.test(l)) && !/(TOTAL\s+(A\s+PAGAR|VENTA)|IMPORTE\s+TOTAL)/.test(l)) {
       igv ??= monto;
       return;
     }
@@ -174,6 +194,127 @@ function buscarTotales(lineas: string[]): Pick<FacturaLeida, "total" | "igv" | "
     }
   });
   return { total: totalFuerte ?? total, igv, subtotal };
+}
+
+/** Unidades del comprobante (catálogo SUNAT y abreviaturas) → lista del ERP. */
+const UNIDAD_ERP: Record<string, string> = {
+  UND: "UND", UNID: "UND", UNIDAD: "UND", UNIDADES: "UND", UN: "UND", U: "UND", NIU: "UND", ZZ: "UND", UNI: "UND",
+  PZA: "PZA", PZ: "PZA", PIEZA: "PZA", KG: "KG", KGM: "KG", KGS: "KG", KILO: "KG", M: "M", MT: "M", MTR: "M", MTS: "M",
+  M2: "M2", MTK: "M2", M3: "M3", MTQ: "M3", GLN: "GLN", GL: "GLN", GALON: "GLN", LT: "LT", LTR: "LT", L: "LT", LTS: "LT",
+  CAJA: "CAJA", CJA: "CAJA", BX: "CAJA", PAR: "PAR", PR: "PAR", JGO: "JGO", JUEGO: "JGO", SET: "JGO", ROLLO: "ROLLO", RLL: "ROLLO",
+  BOLSA: "BOLSA", BG: "BOLSA", BLS: "BOLSA",
+};
+
+/** Número de una celda (cantidad o monto): 1,234.56 · 1.234,56 · 12.5 · 3 */
+function numeroCelda(tok: string): number | undefined {
+  const t = limpiarDigitos(tok.replace(/^S\/\.?/i, ""));
+  if (!/^\d[\d.,]*$/.test(t)) return undefined;
+  const m = leerMonto(t);
+  if (m !== undefined) return m;
+  const n = Number(t.replace(",", "."));
+  return Number.isFinite(n) ? n : undefined;
+}
+
+const cuadra = (a: number, b: number, c: number) => Math.abs(a * b - c) <= Math.max(0.05, c * 0.01);
+
+/** Fin del detalle: subtotales, IGV, total, "SON: …". */
+const FIN_DETALLE = /(SUB\s*-?\s*TOTAL|OP(\.|ERACION)?\s*GRAVADA|VALOR\s+(DE\s+)?VENTA|\bTOTAL\b|(^|[^A-Z0-9])[I1L|]\.?\s*[G6]\.?\s*[VY]\b|(^|\D)18\s*%|^SON\s*:|IMPORTE\s+EN\s+LETRAS)/;
+/** Líneas de cabecera que no son artículos. */
+const NO_ITEM = /(R\.?\s*U\.?\s*C|FECHA|SE[NÑ]OR|CLIENTE|DIRECCI|TELEF|CORREO|EMAIL|VENDEDOR|CAJERO|TICKET|FACTURA|BOLETA|MONEDA|GUIA|ORDEN|PEDIDO|CONDICI)/;
+
+/** Una línea de detalle: [código] cantidad [unidad] descripción [cantidad] p.unit importe. */
+function leerItem(linea: string): ItemLeido | undefined {
+  const tokens = linea.replace(/[^\wÁÉÍÓÚÑáéíóúñ.,/%()\-]+$/g, "").split(/\s+/).filter(Boolean);
+  // Montos al final de la línea (hasta 3: cantidad, p. unit, importe)
+  const nums: number[] = [];
+  const crudos: string[] = [];
+  while (tokens.length && nums.length < 3) {
+    const n = numeroCelda(tokens[tokens.length - 1]);
+    if (n === undefined) break;
+    nums.unshift(n);
+    crudos.unshift(tokens.pop()!);
+  }
+  // Tres números que no son cantidad × precio = importe: el primero es parte de la descripción ("MIG 1.0 12.50 125.00")
+  if (nums.length === 3 && !cuadra(nums[0], nums[1], nums[2])) {
+    nums.shift();
+    tokens.push(crudos.shift()!);
+  }
+  const ultimo = linea.trim().split(/\s+/).filter((t) => numeroCelda(t) !== undefined).pop() ?? "";
+  if (!nums.length || !/[.,]\d{2}$/.test(ultimo)) return undefined; // el importe lleva 2 decimales
+  // Cantidad y unidad al inicio (puede haber un código de producto antes)
+  let cantidad: number | undefined;
+  let unidad = "UND";
+  const cab = [...tokens];
+  for (let i = 0; i < Math.min(2, cab.length - 1); i++) {
+    const n = numeroCelda(cab[i]);
+    if (n !== undefined && n > 0 && n < 100000 && !/^0\d/.test(cab[i])) {
+      cantidad = n;
+      cab.splice(0, i + 1);
+      break;
+    }
+  }
+  const u = sinTildes(cab[0] ?? "").toUpperCase().replace(/\.$/, "");
+  if (cab.length > 1 && UNIDAD_ERP[u]) {
+    unidad = UNIDAD_ERP[u];
+    cab.shift();
+  }
+  const descripcion = cab.join(" ").replace(/^[-–—:|]+\s*/, "").trim();
+  if ((descripcion.match(/[A-Za-zÁÉÍÓÚÑáéíóúñ]/g) ?? []).length < 3 || FIN_DETALLE.test(sinTildes(descripcion).toUpperCase())) return undefined;
+  let precioUnit: number;
+  let importe: number;
+  if (nums.length === 3 && cuadra(nums[0], nums[1], nums[2])) {
+    [cantidad, precioUnit, importe] = nums;
+  } else if (nums.length >= 2) {
+    [precioUnit, importe] = nums.slice(-2);
+    if (cantidad === undefined || !cuadra(cantidad, precioUnit, importe)) {
+      const c = precioUnit > 0 ? importe / precioUnit : 0;
+      cantidad = c > 0 && Math.abs(c - Math.round(c * 100) / 100) < 0.01 ? r2(c) : cantidad ?? 1;
+    }
+  } else {
+    importe = nums[0];
+    cantidad ??= 1;
+    precioUnit = r2(importe / cantidad);
+  }
+  if (!(importe > 0)) return undefined;
+  return { cantidad: cantidad ?? 1, unidad, descripcion: descripcion.toUpperCase(), precioUnit, importe };
+}
+
+/**
+ * Detalle del comprobante: desde la cabecera "CANT / DESCRIPCIÓN" hasta el primer subtotal / total.
+ * El texto puede traer dos lecturas del OCR seguidas: se prueba cada cabecera y vale la primera que dé artículos.
+ */
+function buscarItems(lineas: string[]): ItemLeido[] {
+  const may = lineas.map((l) => sinTildes(l).toUpperCase());
+  const cabeceras = may.flatMap((l, i) => (/DESCRIPCI|CANT\b|CANT\.|DETALLE|CONCEPTO/.test(l) && !FIN_DETALLE.test(l) ? [i] : []));
+  for (const ini of cabeceras.length ? cabeceras : [-1]) {
+    const items: ItemLeido[] = [];
+    for (let i = ini + 1; i < lineas.length; i++) {
+      if (FIN_DETALLE.test(may[i])) {
+        if (items.length || ini >= 0) break;
+        continue;
+      }
+      if (NO_ITEM.test(may[i])) continue;
+      const it = leerItem(lineas[i]);
+      if (it) items.push(it);
+    }
+    if (items.length) return items;
+  }
+  return [];
+}
+
+/** Palabras del OCR con su recuadro → texto por renglones (une las celdas de una tabla con bordes en una línea). */
+export function renglonesDePalabras(palabras: { text: string; bbox: { x0: number; y0: number; x1: number; y1: number } }[]): string {
+  const ps = palabras.filter((w) => w.text.trim()).map((w) => ({ t: w.text.trim(), x: w.bbox.x0, y: (w.bbox.y0 + w.bbox.y1) / 2, h: Math.max(1, w.bbox.y1 - w.bbox.y0) }));
+  ps.sort((a, b) => a.y - b.y);
+  const filas: { y: number; h: number; ps: typeof ps }[] = [];
+  for (const p of ps) {
+    const f = filas[filas.length - 1];
+    if (f && Math.abs(p.y - f.y) <= Math.max(f.h, p.h) * 0.6) {
+      f.ps.push(p);
+      f.y = (f.y * (f.ps.length - 1) + p.y) / f.ps.length;
+    } else filas.push({ y: p.y, h: p.h, ps: [p] });
+  }
+  return filas.map((f) => f.ps.sort((a, b) => a.x - b.x).map((p) => p.t).join(" ")).join("\n");
 }
 
 /** Lee el texto de una factura / boleta. `hoyISO` (AAAA-MM-DD, hora de Lima) descarta fechas futuras. */
@@ -193,6 +334,14 @@ export function parseFactura(texto: string, hoyISO = new Date().toISOString().sl
   if (r.total !== undefined && r.igv !== undefined) {
     const esperado = r2(r.total - r.total / (1 + TASA_IGV));
     r.igvCuadra = Math.abs(esperado - r.igv) <= 0.05;
+  }
+  const items = buscarItems(lineas);
+  if (items.length) {
+    r.items = items;
+    const suma = r2(items.reduce((a, i) => a + i.importe, 0));
+    const cerca = (x?: number) => x !== undefined && Math.abs(suma - x) <= Math.max(0.1, x * 0.005);
+    r.itemsConIgv = cerca(r.total) ? true : cerca(r.subtotal) ? false : r.comprobante === "BOLETA" ? true : undefined;
+    if (r.total === undefined && r.itemsConIgv !== false && r.comprobante === "BOLETA") r.total = suma;
   }
   // Una boleta no desglosa IGV: no se marca descuadre
   if (r.comprobante === "BOLETA" && r.igv === undefined) r.igvCuadra = undefined;

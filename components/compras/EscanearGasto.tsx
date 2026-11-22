@@ -3,8 +3,8 @@
 import { useRef, useState } from "react";
 import { Camera, FileUp, ScanLine, X } from "lucide-react";
 import { Button, cn, toast } from "@/components/ui";
-import { MAX_ARCHIVO, hoy, subirComprobanteGasto } from "@/lib/storage";
-import { parseFactura, type FacturaLeida } from "@/lib/parseFactura";
+import { MAX_ARCHIVO, hoy, soles, subirComprobanteGasto } from "@/lib/storage";
+import { parseFactura, renglonesDePalabras, type FacturaLeida, type ItemLeido } from "@/lib/parseFactura";
 import type { ArchivoGasto } from "@/lib/types";
 
 /** Lado mayor de la imagen que se lee y se guarda: nítida para el OCR y liviana para Storage. */
@@ -85,10 +85,10 @@ async function leerPdf(file: File): Promise<{ texto: string; lienzo?: HTMLCanvas
   }
 }
 
-/** Le falta algún dato principal a lo leído (RUC, fecha, serie-número o total). */
+/** Le falta algún dato principal a lo leído (RUC, fecha, serie-número, total o artículos). */
 const incompleta = (texto: string) => {
   const d = parseFactura(texto, hoy());
-  return !d.ruc || !d.fecha || !d.numero || !d.total;
+  return !d.ruc || !d.fecha || !d.numero || !d.total || !d.items?.length;
 };
 
 /**
@@ -107,8 +107,10 @@ async function ocr(imagen: HTMLCanvasElement, progreso: (p: number, pasada: 1 | 
     if (!incompleta(primera)) return primera;
     pasada = 2;
     await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
-    const segunda = (await worker.recognize(imagen)).data.text;
-    return `${primera}\n${segunda}`;
+    // Palabras con su posición, rearmadas por renglón: así las celdas de la tabla de artículos quedan en una línea
+    const { data } = await worker.recognize(imagen, {}, { text: true, blocks: true });
+    const palabras = (data.blocks ?? []).flatMap((b) => b.paragraphs.flatMap((p) => p.lines.flatMap((l) => l.words)));
+    return `${primera}\n${palabras.length ? renglonesDePalabras(palabras) : data.text}`;
   } finally {
     void worker.terminate();
   }
@@ -128,7 +130,7 @@ export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => v
     setProgreso(p);
     setPasada(n);
   };
-  const [ultimo, setUltimo] = useState<{ nombre: string; detectados: string[]; faltan: string[]; igvMal: boolean } | null>(null);
+  const [ultimo, setUltimo] = useState<{ nombre: string; detectados: string[]; faltan: string[]; igvMal: boolean; items: ItemLeido[]; conIgv?: boolean } | null>(null);
   const ocupado = estado !== "";
 
   const escanear = async (file?: File) => {
@@ -172,10 +174,11 @@ export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => v
         ["numero", "serie-número"],
         ["total", "total"],
         ["igv", "IGV"],
+        ["items", "artículos"],
       ];
       const detectados = etiquetas.filter(([k]) => datos[k] !== undefined).map(([, l]) => l);
       const faltan = etiquetas.filter(([k]) => datos[k] === undefined && !(k === "igv" && datos.comprobante === "BOLETA")).map(([, l]) => l);
-      setUltimo({ nombre, detectados, faltan, igvMal: datos.igvCuadra === false });
+      setUltimo({ nombre, detectados, faltan, igvMal: datos.igvCuadra === false, items: datos.items ?? [], conIgv: datos.itemsConIgv });
       onLeido({ datos, archivo, texto });
       toast(detectados.length ? `Comprobante leído: revise los campos en amarillo y dé Guardar.` : "No se reconocieron datos: complete el formulario a mano.", detectados.length ? "ok" : "error");
     } catch (e) {
@@ -202,7 +205,7 @@ export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => v
         </Button>
       </div>
       <p className="mt-1 text-xs text-plomo-500">
-        Lee RUC, fecha, serie-número (F001-1234), total e IGV y rellena el formulario. No guarda: revise y dé Registrar gasto.
+        Lee RUC, fecha, serie-número (F001-1234), artículos (cantidad, descripción, precio), total e IGV y rellena el formulario. No guarda: revise y dé Registrar gasto.
       </p>
       {ocupado && (
         <div className="mt-3">
@@ -224,6 +227,41 @@ export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => v
           <button type="button" onClick={() => setUltimo(null)} aria-label="Cerrar aviso" className="opacity-60 hover:opacity-100">
             <X size={14} />
           </button>
+        </div>
+      )}
+      {ultimo && !ocupado && ultimo.items.length > 0 && (
+        <div className="mt-3 overflow-x-auto rounded-lg border border-plomo-200 bg-surface">
+          <table className="w-full min-w-[520px] text-xs">
+            <thead className="bg-plomo-100 text-[10px] font-semibold uppercase tracking-wide text-plomo-600">
+              <tr>
+                <th className="px-2 py-1.5 text-right">Cant.</th>
+                <th className="px-2 py-1.5 text-left">Und.</th>
+                <th className="px-2 py-1.5 text-left">Descripción leída</th>
+                <th className="px-2 py-1.5 text-right">P. unit.</th>
+                <th className="px-2 py-1.5 text-right">Importe</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-plomo-100">
+              {ultimo.items.map((i, k) => (
+                <tr key={k}>
+                  <td className="px-2 py-1 text-right">{i.cantidad}</td>
+                  <td className="px-2 py-1">{i.unidad}</td>
+                  <td className="px-2 py-1">{i.descripcion}</td>
+                  <td className="px-2 py-1 text-right">{soles(i.precioUnit)}</td>
+                  <td className="px-2 py-1 text-right font-semibold">{soles(i.importe)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-plomo-200">
+                <td colSpan={4} className="px-2 py-1.5 text-right text-plomo-600">
+                  Suma de artículos{ultimo.conIgv === true ? " (con IGV, cuadra con el total)" : ultimo.conIgv === false ? " (sin IGV, cuadra con la op. gravada)" : " (no cuadra con el total: revise)"}
+                </td>
+                <td className={cn("px-2 py-1.5 text-right font-bold", ultimo.conIgv === undefined && "text-amber-700")}>{soles(ultimo.items.reduce((a, i) => a + i.importe, 0))}</td>
+              </tr>
+            </tfoot>
+          </table>
+          <p className="px-2 py-1.5 text-[11px] text-plomo-500">Los artículos van a la descripción del gasto y quedan cargados si elige Generar OC u OS (precios con IGV incluido).</p>
         </div>
       )}
     </div>
