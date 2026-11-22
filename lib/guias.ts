@@ -1,7 +1,7 @@
 "use client";
 
 // =====================================================================
-// Guías de Remisión Remitente electrónicas (Ventas, serie T005; Secocha T002).
+// Guías de Remisión Remitente electrónicas (Ventas, serie T006; Secocha T002).
 // Se emiten en el ERP con su correlativo y se envían a SUNAT vía Nubefact con el Edge Function
 // emitir-comprobante ({ guia }). Nubefact procesa la guía de forma asíncrona: al enviar queda
 // "SUNAT en proceso" y con Consultar se trae el estado y los enlaces PDF / XML / CDR.
@@ -11,7 +11,7 @@ import { createClient } from "./supabase/client";
 import { ErpError, KEYS, escribir, hoy, leer, nuevoEvento, puede, serieSede, siguienteNumero, uid } from "./storage";
 import type { DatosSunatPse, EstadoSunat, GuiaRemision, ItemGuia, Rol } from "./types";
 
-export const SERIE_GUIA = "T005" as const;
+export const SERIE_GUIA = "T006" as const;
 
 /** Catálogo 20 (motivos de traslado) que emite el ERP. */
 export const MOTIVOS_TRASLADO: { codigo: string; label: string }[] = [
@@ -64,7 +64,7 @@ export function validarGuia(d: DatosGuia): void {
   if (items.some((l) => !(l.cantidad > 0))) throw new ErpError("Cada producto debe tener cantidad mayor a 0.");
 }
 
-/** Crea y emite la guía (correlativo T005). Queda "SUNAT pendiente" hasta enviarla. */
+/** Crea y emite la guía (correlativo T006). Queda "SUNAT pendiente" hasta enviarla. */
 export async function crearGuia(d: DatosGuia, vendedor: string, rol: Rol): Promise<GuiaRemision> {
   if (!puede(rol, "venta.gestionar")) throw new ErpError("Su usuario no puede emitir guías de remisión.");
   validarGuia(d);
@@ -73,7 +73,7 @@ export async function crearGuia(d: DatosGuia, vendedor: string, rol: Rol): Promi
     numero = await siguienteNumero(SERIE_GUIA);
   } catch (e) {
     const m = (e as Error).message ?? "";
-    if (/serie inv[aá]lida/i.test(m)) throw new ErpError("Falta habilitar la serie T005: corra la migración 20261219_serie_t005_guias.sql en Supabase.");
+    if (/serie inv[aá]lida/i.test(m)) throw new ErpError("Falta habilitar la serie T006: corra la migración 20261223_series_006.sql en Supabase.");
     throw e;
   }
   const g: GuiaRemision = {

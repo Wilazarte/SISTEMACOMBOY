@@ -60,8 +60,8 @@ const COLUMNAS =
 
 /** Series de notas: la nota lleva la letra del comprobante que modifica (F… factura, B… boleta). */
 export const SERIE_NOTA = {
-  NOTA_CREDITO: { FACTURA: "FC05", BOLETA: "BC05" },
-  NOTA_DEBITO: { FACTURA: "FD05", BOLETA: "BD05" },
+  NOTA_CREDITO: { FACTURA: "FC06", BOLETA: "BC06" },
+  NOTA_DEBITO: { FACTURA: "FD06", BOLETA: "BD06" },
 } as const;
 
 /** Catálogo 09 (notas de crédito) y 10 (notas de débito): los motivos que emite el ERP. */
