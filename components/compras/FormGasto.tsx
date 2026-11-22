@@ -91,6 +91,20 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
   const [filas, setFilas] = useState<FilaOC[]>([filaOC()]);
   // OS: servicios en texto libre (sin catálogo)
   const [servicios, setServicios] = useState<FilaServicio[]>([servicioVacio()]);
+  // Artículos del último escaneo: se jalan a la OC / OS cuando el gestor la elige
+  const [escaneo, setEscaneo] = useState<{ oc: FilaOC[]; os: FilaServicio[] } | null>(null);
+  const ocVacia = (fs: FilaOC[]) => fs.every((f) => !f.nombre.trim() && !f.precioUnit);
+  const osVacia = (fs: FilaServicio[]) => fs.every((f) => !f.descripcion.trim() && !f.precioUnit);
+  /** OC u OS según elija el gestor: si sus líneas están vacías, se llenan con lo escaneado (o el gasto en una línea). */
+  const elegirOrden = (o: OrdenAGenerar) => {
+    setOrden(o);
+    if (o === "OC" && ocVacia(filas)) {
+      if (escaneo?.oc.length) setFilas(escaneo.oc);
+      else if ((d.importe || 0) > 0 && d.descripcion.trim())
+        setFilas([{ ...filaOC(), nombre: d.descripcion.trim().toUpperCase().slice(0, 200), cantidad: 1, precioUnit: r2(d.importe) }]);
+    }
+    if (o === "OS" && osVacia(servicios) && escaneo?.os.length) setServicios(escaneo.os);
+  };
   // Bancarización: con ella el gasto queda PAGADO ("Registrar y pagar")
   const [pagar, setPagar] = useState(false);
   const [banc, setBanc] = useState<Bancarizacion>(bancarizacionVacia);
@@ -112,6 +126,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
   const revisado = (...c: CampoOcr[]) => setRevisar((r) => (c.some((k) => r.has(k)) ? new Set([...r].filter((k) => !c.includes(k))) : r));
   const ocr = (c: CampoOcr) => (revisar.has(c) ? AMARILLO : undefined);
   /** Rellena el formulario con lo leído; no guarda (el usuario revisa y da Registrar gasto). */
+  const descripcionActual = () => d.descripcion.trim();
   const aplicarEscaneo = ({ datos, archivo }: ResultadoEscaneo) => {
     const falta = new Set<CampoOcr>();
     if (datos.fecha) setFechaTxt(fechaPE(datos.fecha));
@@ -130,8 +145,16 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
     if (items.length) {
       // OC / OS del gasto: líneas ya cargadas con precio CON IGV incluido (si el comprobante las trae sin IGV, se suma)
       const factor = datos.itemsConIgv === false && (datos.comprobante ?? d.comprobante) === "FACTURA" ? 1.18 : 1;
-      setFilas(items.map((i) => ({ ...filaOC(), nombre: i.descripcion, unidad: i.unidad, cantidad: i.cantidad, precioUnit: r2(i.precioUnit * factor) })));
-      setServicios(items.map((i) => ({ ...servicioVacio(), descripcion: i.descripcion, descTocada: true, cantidad: i.cantidad, unidad: i.unidad, precioUnit: r2(i.precioUnit * factor) })));
+      const oc = items.map((i) => ({ ...filaOC(), nombre: i.descripcion, unidad: i.unidad, cantidad: i.cantidad, precioUnit: r2(i.precioUnit * factor) }));
+      const os = items.map((i) => ({ ...servicioVacio(), descripcion: i.descripcion, descTocada: true, cantidad: i.cantidad, unidad: i.unidad, precioUnit: r2(i.precioUnit * factor) }));
+      setEscaneo({ oc, os });
+      setFilas(oc);
+      setServicios(os);
+    } else {
+      setEscaneo(null);
+      // Sin artículos leídos: la OC ya elegida toma el gasto en una línea (descripción e importe leídos)
+      if (orden === "OC" && ocVacia(filas) && datos.total && descripcionActual())
+        setFilas([{ ...filaOC(), nombre: descripcionActual().toUpperCase().slice(0, 200), cantidad: 1, precioUnit: r2(datos.total) }]);
     }
     // RUC leído: la razón social la pone el padrón SUNAT (rucSunat) o la consulta Decolecta de EstadoRuc al validar
     const sunat = datos.ruc ? rucSunat(datos.ruc) : undefined;
@@ -218,6 +241,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
     setRevisar(new Set());
     setSinCotizacion(false);
     setOrden("NINGUNA");
+    setEscaneo(null);
     setFilas([filaOC()]);
     setServicios([servicioVacio()]);
     setPagar(false);
@@ -303,7 +327,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
 
         {/* Orden de compra u orden de servicio opcional (una sola) */}
         <div className="md:col-span-3">
-          <SelectorOrden value={orden} onChange={setOrden} nota="Opcional. La OS nace APROBADA con correlativo OS-001-2026.">
+          <SelectorOrden value={orden} onChange={elegirOrden} nota="Opcional. La OS nace APROBADA con correlativo OS-001-2026.">
             {orden === "OS" ? (
               <ServiciosOS filas={servicios} onChange={setServicios} descripcionGasto={d.descripcion} importe={d.importe} conIgv={d.comprobante === "FACTURA"} />
             ) : (
