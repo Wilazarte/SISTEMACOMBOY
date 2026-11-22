@@ -33,6 +33,7 @@ import {
 import type { ArchivoGasto, Factura, Bancarizacion, ComprobanteGasto, OrdenAGenerar, Proveedor, Rol, StockItem, TipoGasto } from "@/lib/types";
 import { ProductoInput } from "@/components/productos/ProductoInput";
 import { SelectorOrden } from "@/components/compras/SelectorOrden";
+import { EscanearGasto, type ResultadoEscaneo } from "@/components/compras/EscanearGasto";
 import { ServiciosOS, lineasServicio, servicioVacio, type FilaServicio } from "@/components/compras/ServiciosOS";
 import {
   OPCIONES_COMPROBANTE,
@@ -56,6 +57,10 @@ const mascara = (v: string) => {
   const d = v.replace(/\D/g, "").slice(0, 8);
   return d.length > 4 ? `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}` : d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d;
 };
+
+/** Campos que el escaneo (OCR) no pudo leer o que no cuadran: se pintan en amarillo hasta que el usuario los toque. */
+type CampoOcr = "fecha" | "importe" | "comprobante" | "numero" | "proveedor" | "ruc";
+const AMARILLO = "!border-amber-400 !bg-amber-50 !text-amber-950 ring-2 ring-amber-200";
 
 const vacio = (): Omit<DatosGasto, "fecha"> => ({
   tipoGasto: "TRANSPORTE",
@@ -102,6 +107,32 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
   // Sin cotización del proveedor: el sistema genera COT-PROV-0001-2026 al guardar
   const [sinCotizacion, setSinCotizacion] = useState(false);
   const set = <K extends keyof typeof d>(k: K, v: (typeof d)[K]) => setD((x) => ({ ...x, [k]: v }));
+  // Escanear factura: campos a revisar (amarillo). Se quitan al editar el campo.
+  const [revisar, setRevisar] = useState<Set<CampoOcr>>(() => new Set());
+  const revisado = (...c: CampoOcr[]) => setRevisar((r) => (c.some((k) => r.has(k)) ? new Set([...r].filter((k) => !c.includes(k))) : r));
+  const ocr = (c: CampoOcr) => (revisar.has(c) ? AMARILLO : undefined);
+  /** Rellena el formulario con lo leído; no guarda (el usuario revisa y da Registrar gasto). */
+  const aplicarEscaneo = ({ datos, archivo }: ResultadoEscaneo) => {
+    const falta = new Set<CampoOcr>();
+    if (datos.fecha) setFechaTxt(fechaPE(datos.fecha));
+    else falta.add("fecha");
+    if (!datos.total || datos.igvCuadra === false) falta.add("importe");
+    if (!datos.comprobante) falta.add("comprobante");
+    if (!datos.numero) falta.add("numero");
+    // RUC leído: la razón social la pone el padrón SUNAT (rucSunat) o la consulta Decolecta de EstadoRuc al validar
+    const sunat = datos.ruc ? rucSunat(datos.ruc) : undefined;
+    if (!datos.ruc) falta.add("ruc").add("proveedor");
+    else if (!sunat) falta.add("proveedor");
+    setD((x) => ({
+      ...x,
+      ...(datos.comprobante ? { comprobante: datos.comprobante } : {}),
+      ...(datos.numero ? { numero: datos.numero } : {}),
+      ...(datos.total ? { importe: datos.total } : {}),
+      ...(datos.ruc ? { ruc: datos.ruc, proveedor: sunat ? sunat.razon_social : esProveedorVarios(x.proveedor) ? "" : x.proveedor } : {}),
+      archivos: archivo ? [...x.archivos.filter((a) => a.tipo !== "FACTURA"), archivo] : x.archivos,
+    }));
+    setRevisar(falta);
+  };
   const fechaISO = parseFechaPE(fechaTxt);
   const fechaError = fechaTxt.length === 10 && !fechaISO ? "Fecha inexistente" : fechaISO > hoy() ? "La fecha no puede ser futura" : undefined;
   const { monto, neto: netoDetraccion } = calcularDetraccion(d.importe, d.detraccion, d.detraccionPorc);
@@ -169,6 +200,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
     if (auto && cot) toast(`Cotización generada: ${cot}`);
     if (aviso) toast(`Gasto registrado sin código de cotización: ${aviso}`, "error");
     setD(vacio());
+    setRevisar(new Set());
     setSinCotizacion(false);
     setOrden("NINGUNA");
     setFilas([filaOC()]);
@@ -191,6 +223,9 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
     <Card>
       <CardHeader title="Gasto / servicio sin stock" subtitle="Tesorería: no ingresa a almacén. Al guardar va directo a la pestaña Facturas como POR PAGAR." />
       <div className="grid gap-4 p-5 md:grid-cols-3">
+        <div className="md:col-span-3">
+          <EscanearGasto onLeido={aplicarEscaneo} />
+        </div>
         <Field label="Tipo de gasto *">
           <Select
             value={d.tipoGasto}
@@ -204,7 +239,16 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
           {d.tipoGasto === "SERV_PROFESIONALES" && <span className="mt-1 block text-xs text-plomo-500">Persona natural con RUC 10 - 4ta categoría</span>}
         </Field>
         <Field label="Fecha de gasto *" hint={fechaError ? `⚠ ${fechaError}` : "DD/MM/AAAA"}>
-          <Input value={fechaTxt} inputMode="numeric" maxLength={10} onChange={(e) => setFechaTxt(mascara(e.target.value))} className={cn(fechaError && "border-red-400")} />
+          <Input
+            value={fechaTxt}
+            inputMode="numeric"
+            maxLength={10}
+            onChange={(e) => {
+              setFechaTxt(mascara(e.target.value));
+              revisado("fecha");
+            }}
+            className={cn(ocr("fecha"), fechaError && "border-red-400")}
+          />
         </Field>
         <Field
           label="Importe total (S/) *"
@@ -218,7 +262,17 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
                   : undefined
           }
         >
-          <Input type="number" min={0} step="0.01" value={d.importe || ""} onChange={(e) => set("importe", parseFloat(e.target.value) || 0)} className="text-lg font-semibold" />
+          <Input
+            type="number"
+            min={0}
+            step="0.01"
+            value={d.importe || ""}
+            onChange={(e) => {
+              set("importe", parseFloat(e.target.value) || 0);
+              revisado("importe");
+            }}
+            className={cn("text-lg font-semibold", ocr("importe"))}
+          />
         </Field>
         <Field label="Descripción del gasto *" className="md:col-span-3">
           <Textarea value={d.descripcion} onChange={(e) => set("descripcion", e.target.value)} placeholder="Ej: Servicio de transporte Arequipa - Lima" />
@@ -302,6 +356,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
             value={d.comprobante}
             onChange={(e) => {
               const comprobante = e.target.value as ComprobanteGasto;
+              revisado("comprobante");
               setD((x) => ({
                 ...x,
                 comprobante,
@@ -312,6 +367,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
               }));
             }}
             options={OPCIONES_COMPROBANTE}
+            className={ocr("comprobante")}
           />
           {esRHE && <span className="mt-1 block text-xs text-plomo-500">Persona natural con RUC 10 - 4ta categoría</span>}
         </Field>
@@ -322,8 +378,12 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
           <Input
             value={numeroAutomatico(d.comprobante) ? "" : d.numero}
             disabled={numeroAutomatico(d.comprobante)}
-            onChange={(e) => set("numero", e.target.value.toUpperCase())}
+            onChange={(e) => {
+              set("numero", e.target.value.toUpperCase());
+              revisado("numero");
+            }}
             placeholder={placeholderComprobante(d.comprobante)}
+            className={ocr("numero")}
           />
         </Field>
         {d.comprobante === "SERVICIO_PUBLICO" ? (
@@ -336,11 +396,12 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
         <Field label={d.comprobante === "DJ" ? "Nombre de quien declara *" : esRHE ? "Persona que emite el RHE *" : "Proveedor / agencia *"} className="md:col-span-2">
           <Input value={d.proveedor} list="proveedores-gasto" onChange={(e) => {
             const v = e.target.value;
+            revisado("proveedor");
             const p = proveedores.find((x) => x.razonSocial === v.toUpperCase());
             // VARIOS/SIN DATOS pone 010101; al cambiar a otro proveedor, el 010101 se limpia
             const ruc = esProveedorVarios(v) ? RUC_VARIOS : p?.ruc ?? "";
             setD((x) => ({ ...x, proveedor: v, ruc: esProveedorVarios(v) || p ? ruc : x.ruc === RUC_VARIOS ? "" : x.ruc }));
-          }} onFocus={(e) => esProveedorVarios(d.proveedor) && e.target.select()} placeholder="Razón social o nombre" />
+          }} onFocus={(e) => esProveedorVarios(d.proveedor) && e.target.select()} placeholder="Razón social o nombre" className={ocr("proveedor")} />
           {esProveedorVarios(d.proveedor) && (
             <span className="mt-1 block text-xs text-plomo-500">
               Por defecto (N° {RUC_VARIOS}). Escriba encima o elija otro de la lista; si escribe un RUC real, se pone la razón social de SUNAT.
@@ -366,15 +427,19 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
             inputMode="numeric"
             onChange={(e) => {
               const ruc = e.target.value.replace(/\D/g, "");
+              revisado("ruc");
               // RUC ya validado en el sistema: reemplaza PROVEEDORES VARIOS por su razón social
               const sunat = ruc.length === 11 ? rucSunat(ruc) : undefined;
               setD((x) => ({ ...x, ruc, proveedor: sunat ? sunat.razon_social : x.proveedor }));
             }}
-            className={cn(d.ruc.length === 11 && (rucMal ? "border-red-400" : "border-emerald-400"))}
+            className={cn(ocr("ruc"), d.ruc.length === 11 && (rucMal ? "border-red-400" : "border-emerald-400"))}
           />
           <EstadoRuc
             ruc={d.ruc}
-            onValidado={(r) => setD((x) => ({ ...x, proveedor: r.razon_social }))}
+            onValidado={(r) => {
+              setD((x) => ({ ...x, proveedor: r.razon_social }));
+              revisado("proveedor");
+            }}
             onDni={(r) => setD((x) => ({ ...x, proveedor: nombreDesdeDni(r) }))}
           />
         </Field>

@@ -1571,8 +1571,11 @@ async function subirVoucher(file: File): Promise<string> {
 // El campo del documento guarda "sb:tesoreria/<ruta>"; los antiguos siguen siendo "data:..." y se muestran igual.
 // ---------------------------------------------------------------------
 const PREFIJO_SB = `sb:${BUCKET_TESORERIA}/`;
+/** Comprobantes de gasto escaneados con OCR (Registrar gasto › Escanear factura): "sb:gastos-comprobantes/<ruta>". */
+export const BUCKET_GASTOS_COMPROBANTES = "gastos-comprobantes";
+const PREFIJO_SB_GASTOS = `sb:${BUCKET_GASTOS_COMPROBANTES}/`;
 const EXT_ARCHIVO: Record<string, string> = { ...TIPOS_VOUCHER, "image/webp": "webp" };
-export const esArchivoStorage = (ref?: string): boolean => !!ref && ref.startsWith(PREFIJO_SB);
+export const esArchivoStorage = (ref?: string): boolean => !!ref && (ref.startsWith(PREFIJO_SB) || ref.startsWith(PREFIJO_SB_GASTOS));
 
 const leerComoDataUrl = (archivo: Blob): Promise<string> =>
   new Promise((ok, mal) => {
@@ -1611,7 +1614,7 @@ export async function urlArchivo(ref: string): Promise<string> {
   if (!esArchivoStorage(ref)) return ref;
   const guardada = urlsFirmadas.get(ref);
   if (guardada && guardada.vence > Date.now()) return guardada.url;
-  const url = await urlVoucher(ref.slice(PREFIJO_SB.length));
+  const url = ref.startsWith(PREFIJO_SB_GASTOS) ? await urlComprobanteGasto(ref.slice(PREFIJO_SB_GASTOS.length)) : await urlVoucher(ref.slice(PREFIJO_SB.length));
   urlsFirmadas.set(ref, { url, vence: Date.now() + 240_000 });
   return url;
 }
@@ -1646,6 +1649,30 @@ export function abrirArchivo(ref: string): void {
       w.close();
       avisarError((e as Error).message);
     });
+}
+
+async function urlComprobanteGasto(ruta: string): Promise<string> {
+  const { data, error } = await createClient().storage.from(BUCKET_GASTOS_COMPROBANTES).createSignedUrl(ruta, 300);
+  if (error || !data) throw new ErpError(`No se pudo abrir el comprobante: ${error?.message ?? "sin respuesta"}`);
+  return data.signedUrl;
+}
+
+/**
+ * Sube la imagen o PDF de un comprobante escaneado al bucket privado gastos-comprobantes como
+ * <AAAA-MM>/<id>.<ext> y devuelve la referencia para ArchivoGasto.dataUrl.
+ * Si el bucket aún no existe (falta correr supabase/migrations/20261227_bucket_gastos_comprobantes.sql) o su rol no
+ * puede subir, se guarda como cualquier adjunto de gasto (subirBaucher → tesoreria o base64): no se pierde.
+ */
+export async function subirComprobanteGasto(archivo: Blob): Promise<{ ref: string; enBucket: boolean }> {
+  const ext = EXT_ARCHIVO[archivo.type];
+  if (ext && archivo.size <= MAX_VOUCHER) {
+    const ruta = `${hoy().slice(0, 7)}/${uid()}.${ext}`;
+    const { error } = await createClient().storage.from(BUCKET_GASTOS_COMPROBANTES).upload(ruta, archivo, { contentType: archivo.type, upsert: false });
+    if (!error) return { ref: PREFIJO_SB_GASTOS + ruta, enBucket: true };
+    console.warn(`subirComprobanteGasto: ${BUCKET_GASTOS_COMPROBANTES} rechazó ${ruta} (${error.message}); se usa el adjunto de siempre`);
+  }
+  const { ref } = await subirBaucher(archivo, "gasto-factura");
+  return { ref, enBucket: false };
 }
 
 /** URL temporal (5 min) para ver un baucher privado. */
