@@ -366,6 +366,8 @@ table, .tabular { font-variant-numeric: tabular-nums; }
 .tema-planta .seccion-titulo {
   color: color-mix(in srgb, rgb(var(--sec)) 55%, #ffffff);
 }
+/* Títulos con ícono propio (INICIO, Williams 2026-11-22): sin el rombo de color, el ícono ya marca la sección */
+.seccion-titulo.con-icono::before { display: none !important; }
 .tema-planta .seccion-titulo::before {
   content: "";
   width: 8px;
@@ -821,6 +823,8 @@ table, .tabular { font-variant-numeric: tabular-nums; }
 /* texto blanco que sí va sobre color */
 .tema-login :is(main, [role="dialog"]) :is(.bg-\[\#2a7bff\], .bg-\[\#0066ff\], .bg-\[\#3b82f6\], .bg-\[\#1e3a8a\], .bg-\[\#FF6D00\], .bg-\[\#E30613\], .bg-\[\#ff2a5f\], .bg-\[\#ff1a1a\], .bg-\[\#c4001c\], .bg-\[\#d50000\]) :is(.text-white, .text-fg),
 .tema-login :is(main, [role="dialog"]) :is(.bg-\[\#2a7bff\], .bg-\[\#0066ff\], .bg-\[\#3b82f6\], .bg-\[\#1e3a8a\], .bg-\[\#FF6D00\], .bg-\[\#E30613\], .bg-\[\#ff2a5f\], .bg-\[\#ff1a1a\], .bg-\[\#c4001c\], .bg-\[\#d50000\]).text-white { color: #fff; }
+/* Botones con la paleta COMBOY (acero #294D61, vino #800021): texto e ícono en blanco (Gerencia: Costos, Gestión Documentaria) */
+.tema-login :is(main, [role="dialog"]) :is(.bg-\[\#294D61\], .bg-\[\#800021\]).text-white { color: #fff; }
 
 /* Enlaces y selección de texto */
 .tema-login ::selection { background: rgba(41, 77, 97, 0.28); }

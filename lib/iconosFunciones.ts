@@ -63,6 +63,14 @@ import {
   Warehouse,
   Wrench,
   FileLock2,
+  AlertTriangle,
+  Coins,
+  PackageMinus,
+  PackageX,
+  Percent,
+  Timer,
+  TrendingUp,
+  Video,
   type LucideIcon,
 } from "lucide-react";
 
@@ -210,3 +218,48 @@ export function iconoPorTexto(texto: string): LucideIcon {
 
 /** Ícono de una acción de la barra de accesos: por slug y, si es nueva y aún no está en la lista, por su nombre. */
 export const iconoAccion = (slug: string, label = ""): LucideIcon => ICONO_ACCION[slug] ?? iconoPorTexto(label || slug);
+
+/**
+ * Íconos de los botones del INICIO de cada módulo, Secocha y Gerencia (Williams 2026-11-22: "agrega íconos según su
+ * título a cada botón"): KPIs, tareas pendientes y gráficos. Reglas propias del INICIO (sin tildes, minúsculas) que se
+ * revisan antes de las de las pestañas; si ninguna coincide se usa iconoPorTexto.
+ */
+const POR_TEXTO_INICIO: [RegExp, LucideIcon][] = [
+  [/igv|impuesto/, Percent],
+  [/v°b°|visto bueno/, ClipboardCheck],
+  [/req .*revisar/, Inbox],
+  [/mantenim/, Wrench],
+  [/cobr/, CircleDollarSign],
+  [/factura/, ReceiptText],
+  [/pagar/, Banknote],
+  [/caja|saldo/, Wallet],
+  [/gasto/, Wallet],
+  [/ventas contra compras/, Scale],
+  [/venta/, TrendingUp],
+  [/cliente/, Contact],
+  [/aprobar|bancariz/, Landmark],
+  [/traslado/, ArrowLeftRight],
+  [/camino|transito|agencia|envio/, Truck],
+  [/compra/, ShoppingCart],
+  [/ingresos y despachos/, ArrowLeftRight],
+  [/despach|por salir/, PackageCheck],
+  [/sin stock/, PackageX],
+  [/escasez|critico/, PackageMinus],
+  [/valoriz/, Coins],
+  [/ingreso/, PackageOpen],
+  [/tiempo|lenta/, Timer],
+  [/qc|calidad/, ShieldCheck],
+  [/expediente|lote/, FolderKanban],
+  [/\bot\b|\bop\b|fabric|produccion/, Factory],
+  [/equipo|pt disponible|terminad|entregar/, PackageCheck],
+  [/pedido/, FileText],
+  [/stock/, Boxes],
+  [/videollamada/, Video],
+  [/vencid|alerta/, AlertTriangle],
+];
+
+/** Ícono de un botón del INICIO (KPI, tarea pendiente, gráfico) por su título. Nunca queda sin ícono. */
+export function iconoInicio(texto: string): LucideIcon {
+  const t = normalizar(texto);
+  return POR_TEXTO_INICIO.find(([re]) => re.test(t))?.[1] ?? iconoPorTexto(texto);
+}
