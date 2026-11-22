@@ -6,6 +6,7 @@ import {
   Activity,
   ArrowLeftRight,
   BadgeCheck,
+  BadgeDollarSign,
   Banknote,
   BarChart3,
   BookOpen,
@@ -109,6 +110,7 @@ const ICONO_ACCION: Record<string, LucideIcon> = {
   "equipos-produccion": Cog,
   stock: Boxes,
   "catalogo-productos": Tags,
+  "precios-venta": BadgeDollarSign,
   "ordenes-despacho": PackageCheck,
   // Planilla
   planilla: CalendarDays,

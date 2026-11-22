@@ -10,6 +10,7 @@ import { clasificacionesCliente, DETALLE_LUGAR, LARGO_DOC, LUGARES_ENTREGA, luga
 import { normalizarEquipo, sedeEquipo, type EquipoTerminado } from "@/lib/equipos";
 import type { ClasificacionCliente, Cliente, CondicionPago, DatosDespacho, LugarEntrega, LineaVenta, StockItem, TipoDocCliente } from "@/lib/types";
 import { ProductoInput } from "@/components/productos/ProductoInput";
+import { precioEquipo, precioGuardado, usePreciosVenta, type PrecioVenta } from "@/lib/preciosVenta";
 
 /** Datos de Ventas sincronizados con Supabase (tiempo real). */
 export function useVentas() {
@@ -77,13 +78,31 @@ export function LineasEditor({
   // Equipos terminados DISPONIBLES (se venden por código de chasis)
   const equipos = useStore<EquipoTerminado[]>(KEYS.EQUIPOS, []).map(normalizarEquipo).filter((e) => e.estado === "DISPONIBLE" && e.codigo_chasis);
 
+  // Base de precios de venta (Ventas › Precios de venta): se propone al elegir el producto o equipo
+  const { precios } = usePreciosVenta();
+  const precioDe = (pv: PrecioVenta | undefined): number => (pv ? (preciosConIgv ? pv.precio : pv.precio_sin_igv) : 0);
+  const precioDeLinea = (l: LineaVenta): PrecioVenta | undefined => {
+    const eq = equipos.find((e) => e.codigo_chasis === l.productoNombre.trim().toUpperCase());
+    return eq ? precioEquipo(precios, eq.tipo_equipo, eq.modelo) : l.productoNombre.trim() ? precioGuardado(precios, "PRODUCTO", l.productoNombre) : undefined;
+  };
+
   const set = (id: string, cambios: Partial<LineaVenta>) => onChange(items.map((l) => (l.id === id ? calcularLinea({ ...l, ...cambios }) : l)));
   const elegirProducto = (id: string, nombre: string) => {
-    const eq = equipos.find((e) => e.codigo_chasis === nombre.trim().toUpperCase());
-    if (eq) return set(id, { productoNombre: eq.codigo_chasis, unidad: "UND", cantidad: 1, descripcion: `${eq.tipo_equipo} ${eq.modelo} · chasis ${eq.codigo_chasis} · motor ${eq.marca_motor} ${eq.serie_motor}` });
-    const p = productos.find((x) => x.nombre === nombre.trim().toUpperCase());
     const actual = items.find((l) => l.id === id);
-    set(id, p ? { productoNombre: p.nombre, unidad: p.unidad, descripcion: actual?.descripcion || p.nombre } : { productoNombre: nombre });
+    // El precio guardado solo se pone si la línea aún no tiene precio (no pisa lo que ya se escribió)
+    const conPrecio = (pv: PrecioVenta | undefined): Partial<LineaVenta> => (pv && !(Number(actual?.precio) > 0) ? { precio: precioDe(pv) } : {});
+    const eq = equipos.find((e) => e.codigo_chasis === nombre.trim().toUpperCase());
+    if (eq)
+      return set(id, {
+        productoNombre: eq.codigo_chasis,
+        unidad: "UND",
+        cantidad: 1,
+        descripcion: `${eq.tipo_equipo} ${eq.modelo} · chasis ${eq.codigo_chasis} · motor ${eq.marca_motor} ${eq.serie_motor}`,
+        ...conPrecio(precioEquipo(precios, eq.tipo_equipo, eq.modelo)),
+      });
+    const p = productos.find((x) => x.nombre === nombre.trim().toUpperCase());
+    const pv = nombre.trim() ? precioGuardado(precios, "PRODUCTO", nombre) : undefined;
+    set(id, p ? { productoNombre: p.nombre, unidad: p.unidad, descripcion: actual?.descripcion || p.nombre, ...conPrecio(pv) } : { productoNombre: nombre, ...conPrecio(pv) });
   };
 
   return (
@@ -133,6 +152,16 @@ export function LineasEditor({
                 <td className="px-2 py-1.5 text-right text-plomo-600">{l.m2 > 0 ? l.m2.toFixed(2) : "-"}</td>
                 <td className="px-2 py-1.5">
                   <Input type="number" min={0} step="0.01" value={l.precio || ""} onChange={(e) => set(l.id, { precio: parseFloat(e.target.value) || 0 })} className="text-right" title={l.m2 > 0 ? "Precio por m²" : "Precio por unidad"} aria-label="precio" />
+                  {(() => {
+                    const pv = precioDeLinea(l);
+                    const lista = precioDe(pv);
+                    if (!pv || !(lista > 0) || Math.abs(lista - l.precio) < 0.005) return null;
+                    return (
+                      <button type="button" onClick={() => set(l.id, { precio: lista })} className="mt-0.5 block w-full text-right text-[10px] font-semibold text-blue-700 hover:underline" title="Usar el precio guardado en Precios de venta">
+                        Precio lista {soles(lista)}
+                      </button>
+                    );
+                  })()}
                 </td>
                 <td className="px-2 py-1.5 text-right font-medium">{soles(l.total)}</td>
                 <td className="px-2 py-1.5">

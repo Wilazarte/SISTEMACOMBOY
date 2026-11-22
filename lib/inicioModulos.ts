@@ -162,6 +162,7 @@ export const ACCIONES_INICIO: Record<Exclude<ModuloInicio, "soporte">, AccionIni
 
     { slug: "clientes", label: "Clientes", grupo: "Clientes y productos", destino: `${V}?tab=clientes` },
     { slug: "catalogo-productos", label: "Catálogo de Productos", grupo: "Clientes y productos", destino: `${V}?tab=productos` },
+    { slug: "precios-venta", label: "Precios de venta", grupo: "Clientes y productos", destino: `${V}?tab=precios` },
     { slug: "solicitudes-productos", label: "Solicitudes de productos", grupo: "Clientes y productos", destino: `${V}?tab=productos&sub=solicitudes` },
     { slug: "categorias-productos", label: "Categorías de productos", grupo: "Clientes y productos", destino: `${V}?tab=productos&sub=categorias` },
 
