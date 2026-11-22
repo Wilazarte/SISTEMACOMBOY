@@ -29,7 +29,8 @@ const CORS = {
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
 /** Roles que emiten comprobantes de venta (mismos que escriben en public.ventas, más el perfil Ventas). */
-const ROLES = ["creador", "soporte", "tesoreria", "logistica", "ventas"];
+// sucursal: administrador de una sede (Secocha), solo comprobantes de su sede
+const ROLES = ["creador", "soporte", "tesoreria", "logistica", "ventas", "sucursal"];
 
 let certCache: Certificado | undefined;
 function certificado(): Certificado {
@@ -348,6 +349,12 @@ Deno.serve(async (req) => {
     return json({ error: "Cuerpo inválido." }, 400);
   }
   const usuario = String(perfil?.usuario ?? u.user.email ?? u.user.id);
+  // Usuario de sede (Secocha): solo comprobantes que su sesión puede leer (la política sede_isolation filtra por sede)
+  const { data: deSede } = await admin.from("usuarios_sedes").select("sede_id").eq("user_id", u.user.id).maybeSingle();
+  if (deSede && body.id) {
+    const { data: propio } = await usuarioCli.from("ventas").select("id").eq("tipo", "comprobante").eq("id", body.id).maybeSingle();
+    if (!propio) return json({ error: "El comprobante no es de su sede." }, 403);
+  }
   try {
     switch (body.accion) {
       case "config":
