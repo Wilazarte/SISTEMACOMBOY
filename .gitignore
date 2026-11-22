@@ -1,9 +1,13 @@
-﻿node_modules/
-.next/
-.vercel/
-.env
-.env.local
+node_modules
+.next
+*.tsbuildinfo
+.vercel
+.env*
+!.env.example
+
+# Backups con datos personales (DNIs, sueldos): no se suben
+supabase/backups/*.csv
+
+# Supabase CLI y salidas de compilación
 supabase/.temp/
 dist/
-build/
-tsconfig.tsbuildinfo
