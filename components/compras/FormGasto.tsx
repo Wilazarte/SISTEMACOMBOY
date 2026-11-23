@@ -179,6 +179,11 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
   /** Rellena el formulario con lo leído; no guarda (el usuario revisa y da Registrar gasto). */
   const descripcionActual = () => d.descripcion.trim();
   const aplicarEscaneo = ({ datos, archivo }: ResultadoEscaneo) => {
+    // Guía de remisión: solo se adjunta al gasto (no cambia importe ni comprobante)
+    if (datos.tipoElectronico === "GUIA") {
+      if (archivo) setD((x) => ({ ...x, archivos: [...x.archivos.filter((a) => a.tipo !== "GUIA"), archivo] }));
+      return;
+    }
     const falta = new Set<CampoOcr>();
     if (datos.fecha) setFechaTxt(fechaPE(datos.fecha));
     else falta.add("fecha");
@@ -218,6 +223,8 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
     setD((x) => ({
       ...x,
       ...(datos.comprobante ? { comprobante: datos.comprobante } : {}),
+      // Recibo por honorarios: servicio profesional de 4ta categoría (como al elegirlo a mano)
+      ...(datos.comprobante === "RXH" ? { tipoGasto: "SERV_PROFESIONALES" as const, detraccionPorc: DETRACCION_SUGERIDA.SERV_PROFESIONALES } : {}),
       ...(datos.numero ? { numero: datos.numero } : {}),
       ...(datos.total
         ? usd

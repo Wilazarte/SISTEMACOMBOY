@@ -4,11 +4,27 @@ import { useRef, useState } from "react";
 import { Camera, FileUp, ScanLine, X } from "lucide-react";
 import { Button, cn, toast } from "@/components/ui";
 import { MAX_ARCHIVO, hoy, soles, subirComprobanteGasto } from "@/lib/storage";
-import { parseFactura, renglonesDePalabras, type FacturaLeida, type ItemLeido } from "@/lib/parseFactura";
+import { NOMBRE_ELECTRONICO, parseFactura, renglonesDePalabras, type FacturaLeida, type ItemLeido } from "@/lib/parseFactura";
 import type { ArchivoGasto } from "@/lib/types";
 
 /** Monto en soles o, si el comprobante es en dólares, en US$. */
 const dinero = (n: number, usd: boolean) => (usd ? `US$ ${n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : soles(n));
+
+/** Resultado del último escaneo, para el aviso bajo el botón. */
+type Ultimo = {
+  nombre: string;
+  tipoNombre?: string;
+  detectados: string[];
+  faltan: string[];
+  igvMal: boolean;
+  items: ItemLeido[];
+  conIgv?: boolean;
+  usd: boolean;
+  /** No se cargó al formulario (no es electrónico, o es nota de crédito / débito). */
+  rechazo?: string;
+  guia?: boolean;
+};
+const vacioUltimo = (nombre: string): Ultimo => ({ nombre, detectados: [], faltan: [], igvMal: false, items: [], usd: false });
 
 /** Lado mayor de la imagen que se lee y se guarda: nítida para el OCR y liviana para Storage. */
 const LADO_MAX = 2200;
@@ -133,7 +149,7 @@ export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => v
     setProgreso(p);
     setPasada(n);
   };
-  const [ultimo, setUltimo] = useState<{ nombre: string; detectados: string[]; faltan: string[]; igvMal: boolean; items: ItemLeido[]; conIgv?: boolean; usd: boolean } | null>(null);
+  const [ultimo, setUltimo] = useState<Ultimo | null>(null);
   const ocupado = estado !== "";
 
   const escanear = async (file?: File) => {
@@ -162,15 +178,37 @@ export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => v
         setEstado("leyendo");
         texto = await ocr(lienzo, avance);
       }
+      const datos = parseFactura(texto, hoy());
+      const tipo = datos.tipoElectronico;
+      // Solo comprobantes electrónicos SUNAT: lo demás (tickets, notas internas, fotos sueltas) no se escanea
+      if (!tipo) {
+        setUltimo({ ...vacioUltimo(nombre), rechazo: `No se reconoce como comprobante electrónico. Solo se escanean: ${Object.values(NOMBRE_ELECTRONICO).join(", ")}.` });
+        return toast("No es un comprobante electrónico: regístrelo a mano.", "error");
+      }
+      // Nota de crédito / débito: modifica otro comprobante, no es un gasto nuevo
+      if (tipo === "NOTA_CREDITO" || tipo === "NOTA_DEBITO") {
+        setUltimo({
+          ...vacioUltimo(nombre),
+          tipoNombre: NOMBRE_ELECTRONICO[tipo],
+          rechazo: `${NOMBRE_ELECTRONICO[tipo]} ${datos.numero ?? ""}${datos.referencia ? ` que modifica ${datos.referencia}` : ""}${datos.total ? ` por ${dinero(datos.total, datos.moneda === "USD")}` : ""}: no es un gasto nuevo. Corrija el gasto del comprobante original en Facturas.`,
+        });
+        return toast(`${NOMBRE_ELECTRONICO[tipo]}: no se registra como gasto nuevo.`, "error");
+      }
       setEstado("subiendo");
+      const esGuia = tipo === "GUIA";
       let archivo: ArchivoGasto | undefined;
       try {
         const { ref } = await subirComprobanteGasto(guardar);
-        archivo = { tipo: "FACTURA", nombre, mime: guardar.type, dataUrl: ref };
+        archivo = { tipo: esGuia ? "GUIA" : "FACTURA", nombre, mime: guardar.type, dataUrl: ref };
       } catch (e) {
-        toast(`Se leyó el comprobante pero no se pudo adjuntar la imagen: ${(e as Error).message}. Adjúntela abajo.`, "error");
+        toast(`Se leyó el comprobante pero no se pudo adjuntar: ${(e as Error).message}. Adjúntelo abajo.`, "error");
       }
-      const datos = parseFactura(texto, hoy());
+      // Guía de remisión: sustenta el traslado; solo se adjunta (el importe sale de la factura)
+      if (esGuia) {
+        setUltimo({ ...vacioUltimo(nombre), tipoNombre: NOMBRE_ELECTRONICO.GUIA, detectados: [datos.numero ?? "guía"], guia: true });
+        onLeido({ datos: { tipoElectronico: "GUIA" }, archivo, texto });
+        return toast(`Guía de remisión ${datos.numero ?? ""} adjuntada al gasto.`);
+      }
       const etiquetas: [keyof FacturaLeida, string][] = [
         ["ruc", "RUC"],
         ["fecha", "fecha"],
@@ -179,11 +217,13 @@ export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => v
         ["igv", "IGV"],
         ["items", "artículos"],
       ];
+      // Boleta y recibo por honorarios no desglosan IGV
+      const sinIgv = datos.comprobante === "BOLETA" || datos.comprobante === "RXH";
       const detectados = etiquetas.filter(([k]) => datos[k] !== undefined).map(([, l]) => l);
-      const faltan = etiquetas.filter(([k]) => datos[k] === undefined && !(k === "igv" && datos.comprobante === "BOLETA")).map(([, l]) => l);
-      setUltimo({ nombre, detectados, faltan, igvMal: datos.igvCuadra === false, items: datos.items ?? [], conIgv: datos.itemsConIgv, usd: datos.moneda === "USD" });
+      const faltan = etiquetas.filter(([k]) => datos[k] === undefined && !(k === "igv" && sinIgv)).map(([, l]) => l);
+      setUltimo({ nombre, tipoNombre: NOMBRE_ELECTRONICO[tipo], detectados, faltan, igvMal: datos.igvCuadra === false, items: datos.items ?? [], conIgv: datos.itemsConIgv, usd: datos.moneda === "USD" });
       onLeido({ datos, archivo, texto });
-      toast(detectados.length ? `Comprobante leído: revise los campos en amarillo y dé Guardar.` : "No se reconocieron datos: complete el formulario a mano.", detectados.length ? "ok" : "error");
+      toast(detectados.length ? `${NOMBRE_ELECTRONICO[tipo]} leída: revise los campos en amarillo y dé Guardar.` : "No se reconocieron datos: complete el formulario a mano.", detectados.length ? "ok" : "error");
     } catch (e) {
       toast(`No se pudo leer el comprobante: ${(e as Error).message}`, "error");
     } finally {
@@ -197,7 +237,7 @@ export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => v
     <div className="rounded-xl border border-dashed border-corp/40 bg-corp/5 p-4">
       <div className="flex flex-wrap items-center gap-2">
         <ScanLine size={18} className="text-corp" />
-        <span className="mr-auto text-sm font-semibold text-fg">Escanear factura</span>
+        <span className="mr-auto text-sm font-semibold text-fg">Escanear comprobante electrónico</span>
         <input ref={refCamara} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => escanear(e.target.files?.[0])} />
         <input ref={refArchivo} type="file" accept="image/png,image/jpeg,image/webp,application/pdf" className="hidden" onChange={(e) => escanear(e.target.files?.[0])} />
         <Button type="button" size="sm" onClick={() => refCamara.current?.click()} disabled={ocupado} className="md:hidden">
@@ -208,7 +248,7 @@ export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => v
         </Button>
       </div>
       <p className="mt-1 text-xs text-plomo-500">
-        Lee RUC, fecha, serie-número (F001-1234), artículos (cantidad, descripción, precio), total e IGV y rellena el formulario. No guarda: revise y dé Registrar gasto.
+        Factura, boleta, recibo por honorarios, liquidación de compra y guía de remisión electrónicos (las notas de crédito / débito se reconocen pero no se registran como gasto). Lee RUC, fecha, serie-número, artículos, total e IGV y rellena el formulario. No guarda: revise y dé Registrar gasto.
       </p>
       {ocupado && (
         <div className="mt-3">
@@ -221,9 +261,17 @@ export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => v
         </div>
       )}
       {ultimo && !ocupado && (
-        <div className={cn("mt-3 flex items-start gap-2 rounded-lg px-3 py-2 text-xs", ultimo.faltan.length || ultimo.igvMal || ultimo.usd ? "bg-amber-50 text-amber-900" : "bg-emerald-50 text-emerald-800")}>
+        <div className={cn("mt-3 flex items-start gap-2 rounded-lg px-3 py-2 text-xs", ultimo.rechazo ? "bg-red-50 text-red-800" : ultimo.faltan.length || ultimo.igvMal || ultimo.usd ? "bg-amber-50 text-amber-900" : "bg-emerald-50 text-emerald-800")}>
           <div className="mr-auto">
-            <b>{ultimo.nombre}</b> · detectado: {ultimo.detectados.join(", ") || "nada"}
+            <b>{ultimo.nombre}</b>
+            {ultimo.tipoNombre && <> · <b>{ultimo.tipoNombre}</b></>}
+            {ultimo.rechazo ? (
+              <span className="mt-1 block font-semibold">{ultimo.rechazo}</span>
+            ) : ultimo.guia ? (
+              <> · {ultimo.detectados.join(", ")} · adjuntada como guía de remisión del gasto</>
+            ) : (
+              <> · detectado: {ultimo.detectados.join(", ") || "nada"}</>
+            )}
             {ultimo.faltan.length > 0 && <> · <b>revisar:</b> {ultimo.faltan.join(", ")}</>}
             {ultimo.igvMal && <> · <b>el IGV leído no es el 18 % del total: revise el importe</b></>}
             {ultimo.usd && (

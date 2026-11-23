@@ -29,7 +29,11 @@ export interface FacturaLeida {
   /** Serie-número tal como lo pide el formulario: F001-1234. */
   numero?: string;
   /** FACTURA (serie F… / E…) o BOLETA (serie B…). */
-  comprobante?: "FACTURA" | "BOLETA";
+  comprobante?: "FACTURA" | "BOLETA" | "RXH" | "LIQUIDACION_COMPRA";
+  /** Comprobante electrónico reconocido; undefined: no es un comprobante electrónico (no se escanea). */
+  tipoElectronico?: TipoElectronico;
+  /** Nota de crédito / débito: comprobante que modifica (F001-1234). */
+  referencia?: string;
   /** Importe total del comprobante (con IGV incluido). */
   total?: number;
   igv?: number;
@@ -156,16 +160,49 @@ function buscarFecha(lineas: string[], hoyISO: string): string | undefined {
 }
 
 /** Serie-número: F001-00001234, FOO1 - 1234, E001 N° 56, B002-789 → "F001-1234". */
-function buscarNumero(texto: string): { numero: string; comprobante: "FACTURA" | "BOLETA" } | undefined {
-  const re = /\b([FBE][0-9OoIl|A-Z]{3})\s*(?:[-–—~_]|N[°ºo.]?)\s*([0-9OoIl|]{1,8})\b/g;
+/** Todas las series-número del texto en orden (F001-1234, B002-5, E001-77, T001-9, EG01-3, V001-8…). */
+function seriesDelTexto(texto: string): string[] {
+  const re = /\b([FBETV][0-9OoIl|A-Z]{3})\s*(?:[-–—~_]|N[°ºo.]?)\s*([0-9OoIl|]{1,8})\b/g;
+  const out: string[] = [];
   for (const m of texto.matchAll(re)) {
     // En la serie, después de la letra, el OCR suele leer 0 como O (FOO1)
     const serie = m[1][0] + m[1].slice(1).toUpperCase().replace(/O/g, "0").replace(/[IL|]/g, "1");
-    if (!/^[FBE][A-Z0-9]{3}$/.test(serie) || !/\d/.test(serie.slice(1))) continue;
+    if (!/^[FBETV][A-Z0-9]{3}$/.test(serie) || !/\d/.test(serie.slice(1))) continue;
     const correl = limpiarDigitos(m[2]);
     if (!/^\d{1,8}$/.test(correl) || !Number(correl)) continue;
-    return { numero: `${serie}-${Number(correl)}`, comprobante: serie[0] === "B" ? "BOLETA" : "FACTURA" };
+    const n = `${serie}-${Number(correl)}`;
+    if (!out.includes(n)) out.push(n);
   }
+  return out;
+}
+
+/** Comprobantes electrónicos que se escanean (SUNAT). */
+export type TipoElectronico = "FACTURA" | "BOLETA" | "RHE" | "LIQUIDACION" | "GUIA" | "NOTA_CREDITO" | "NOTA_DEBITO";
+
+export const NOMBRE_ELECTRONICO: Record<TipoElectronico, string> = {
+  FACTURA: "Factura electrónica",
+  BOLETA: "Boleta de venta electrónica",
+  RHE: "Recibo por honorarios electrónico",
+  LIQUIDACION: "Liquidación de compra electrónica",
+  GUIA: "Guía de remisión electrónica",
+  NOTA_CREDITO: "Nota de crédito electrónica",
+  NOTA_DEBITO: "Nota de débito electrónica",
+};
+
+/** Tipo de comprobante electrónico por su título (o, si no se lee, por la letra de la serie). */
+function tipoElectronico(t: string, serie?: string): TipoElectronico | undefined {
+  if (/NOTA\s+DE\s+CREDITO/.test(t)) return "NOTA_CREDITO";
+  if (/NOTA\s+DE\s+DEBITO/.test(t)) return "NOTA_DEBITO";
+  if (/GUIA\s+(DE\s+)?REMISION/.test(t)) return "GUIA";
+  if (/RECIBO\s+POR\s+HONORARIOS|HONORARIOS\s+ELECTRONICO/.test(t)) return "RHE";
+  if (/LIQUIDACION\s+DE\s+COMPRA/.test(t)) return "LIQUIDACION";
+  if (/BOLETA\s+(DE\s+VENTA|ELECTRONICA)/.test(t)) return "BOLETA";
+  if (/FACTURA/.test(t)) return "FACTURA";
+  // Sin título legible: la serie electrónica lo dice (F… factura, B… boleta, T… / EG… / V… guía)
+  const s = serie ?? "";
+  if (/^F/.test(s)) return "FACTURA";
+  if (/^B/.test(s)) return "BOLETA";
+  if (/^(T|EG|V)/.test(s)) return "GUIA";
   return undefined;
 }
 
@@ -222,7 +259,7 @@ const cuadra = (a: number, b: number, c: number) => Math.abs(a * b - c) <= Math.
 /** Fin del detalle: subtotales, IGV, total, "SON: …". */
 const FIN_DETALLE = /(SUB\s*-?\s*TOTAL|OP(\.|ERACION)?\s*GRAVADA|VALOR\s+(DE\s+)?VENTA|\bTOTAL\b|(^|[^A-Z0-9])[I1L|]\.?\s*[G6]\.?\s*[VY]\b|(^|\D)18\s*%|^SON\s*:|IMPORTE\s+EN\s+LETRAS)/;
 /** Líneas de cabecera que no son artículos. */
-const NO_ITEM = /(R\.?\s*U\.?\s*C|FECHA|SE[NÑ]OR|CLIENTE|DIRECCI|TELEF|CORREO|EMAIL|VENDEDOR|CAJERO|TICKET|FACTURA|BOLETA|MONEDA|GUIA|ORDEN|PEDIDO|CONDICI)/;
+const NO_ITEM = /(R\.?\s*U\.?\s*C|FECHA|SE[NÑ]OR|CLIENTE|DIRECCI|TELEF|CORREO|EMAIL|VENDEDOR|CAJERO|TICKET|FACTURA|BOLETA|MONEDA|GUIA|ORDEN|PEDIDO|CONDICI|RETENC|PERCEPC|DETRACC|REDONDEO|ANTICIPO|DESCUENTO|NETO\s+(RECIBIDO|A\s+PAGAR))/;
 
 /** Una línea de detalle: [código] cantidad [unidad] descripción [cantidad] p.unit importe. */
 /** Columnas numéricas de la tabla de detalle, a la derecha de la descripción (según la cabecera). */
@@ -376,8 +413,20 @@ export function parseFactura(texto: string, hoyISO = new Date().toISOString().sl
   const r: FacturaLeida = {};
   r.ruc = buscarRuc(texto);
   r.fecha = buscarFecha(lineas, hoyISO);
-  const num = buscarNumero(texto);
-  if (num) Object.assign(r, num);
+  const t0 = sinTildes(texto).toUpperCase();
+  const series = seriesDelTexto(texto);
+  const tipo = tipoElectronico(t0, series[0]);
+  // Electrónico: lo dice el título ("… ELECTRÓNICA", "representación impresa") o lleva serie electrónica
+  const electronico = /ELECTRONIC|REPRESENTACION\s+IMPRESA|SUNAT/.test(t0) || series.length > 0;
+  if (tipo && electronico) {
+    r.tipoElectronico = tipo;
+    // N° propio: la primera serie que corresponde al tipo (en una NC, la de la factura que modifica va después)
+    const propia = series.find((n) => (tipo === "GUIA" ? /^(T|EG|V)/.test(n) : tipo === "BOLETA" ? /^B/.test(n) : tipo === "RHE" || tipo === "LIQUIDACION" ? /^E/.test(n) : /^[FBE]/.test(n))) ?? series[0];
+    if (propia) r.numero = propia;
+    if (tipo === "NOTA_CREDITO" || tipo === "NOTA_DEBITO") r.referencia = series.find((n) => n !== propia);
+    const comp = { FACTURA: "FACTURA", BOLETA: "BOLETA", RHE: "RXH", LIQUIDACION: "LIQUIDACION_COMPRA" } as const;
+    if (tipo in comp) r.comprobante = comp[tipo as keyof typeof comp];
+  }
   const { total, igv, subtotal } = buscarTotales(lineas);
   r.igv = igv;
   r.subtotal = subtotal;
@@ -390,7 +439,12 @@ export function parseFactura(texto: string, hoyISO = new Date().toISOString().sl
   }
   const t = sinTildes(texto).toUpperCase();
   r.moneda = /DOLAR|US\s*\$|\bUSD\b/.test(t) || (/\$\s*\d/.test(t) && !/S\/\s*\d|\bSOLES\b/.test(t)) ? "USD" : "PEN";
-  const items = buscarItems(lineas);
+  let items = buscarItems(lineas);
+  // Recibo por honorarios: un solo servicio, "Por concepto de: …" por el total (no lleva IGV)
+  if (r.tipoElectronico === "RHE" && r.total) {
+    const concepto = /POR\s+CONCEPTO\s+DE\s*:?\s*(.+)/i.exec(sinTildes(texto))?.[1]?.trim();
+    if (concepto) items = [{ cantidad: 1, unidad: "UND", descripcion: concepto.toUpperCase().slice(0, 250), precioUnit: r.total, importe: r.total }];
+  }
   if (items.length) {
     r.items = items;
     const suma = r2(items.reduce((a, i) => a + i.importe, 0));
