@@ -7,6 +7,9 @@ import { MAX_ARCHIVO, hoy, soles, subirComprobanteGasto } from "@/lib/storage";
 import { parseFactura, renglonesDePalabras, type FacturaLeida, type ItemLeido } from "@/lib/parseFactura";
 import type { ArchivoGasto } from "@/lib/types";
 
+/** Monto en soles o, si el comprobante es en dólares, en US$. */
+const dinero = (n: number, usd: boolean) => (usd ? `US$ ${n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : soles(n));
+
 /** Lado mayor de la imagen que se lee y se guarda: nítida para el OCR y liviana para Storage. */
 const LADO_MAX = 2200;
 
@@ -130,7 +133,7 @@ export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => v
     setProgreso(p);
     setPasada(n);
   };
-  const [ultimo, setUltimo] = useState<{ nombre: string; detectados: string[]; faltan: string[]; igvMal: boolean; items: ItemLeido[]; conIgv?: boolean } | null>(null);
+  const [ultimo, setUltimo] = useState<{ nombre: string; detectados: string[]; faltan: string[]; igvMal: boolean; items: ItemLeido[]; conIgv?: boolean; usd: boolean } | null>(null);
   const ocupado = estado !== "";
 
   const escanear = async (file?: File) => {
@@ -178,7 +181,7 @@ export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => v
       ];
       const detectados = etiquetas.filter(([k]) => datos[k] !== undefined).map(([, l]) => l);
       const faltan = etiquetas.filter(([k]) => datos[k] === undefined && !(k === "igv" && datos.comprobante === "BOLETA")).map(([, l]) => l);
-      setUltimo({ nombre, detectados, faltan, igvMal: datos.igvCuadra === false, items: datos.items ?? [], conIgv: datos.itemsConIgv });
+      setUltimo({ nombre, detectados, faltan, igvMal: datos.igvCuadra === false, items: datos.items ?? [], conIgv: datos.itemsConIgv, usd: datos.moneda === "USD" });
       onLeido({ datos, archivo, texto });
       toast(detectados.length ? `Comprobante leído: revise los campos en amarillo y dé Guardar.` : "No se reconocieron datos: complete el formulario a mano.", detectados.length ? "ok" : "error");
     } catch (e) {
@@ -218,11 +221,16 @@ export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => v
         </div>
       )}
       {ultimo && !ocupado && (
-        <div className={cn("mt-3 flex items-start gap-2 rounded-lg px-3 py-2 text-xs", ultimo.faltan.length || ultimo.igvMal ? "bg-amber-50 text-amber-900" : "bg-emerald-50 text-emerald-800")}>
+        <div className={cn("mt-3 flex items-start gap-2 rounded-lg px-3 py-2 text-xs", ultimo.faltan.length || ultimo.igvMal || ultimo.usd ? "bg-amber-50 text-amber-900" : "bg-emerald-50 text-emerald-800")}>
           <div className="mr-auto">
             <b>{ultimo.nombre}</b> · detectado: {ultimo.detectados.join(", ") || "nada"}
             {ultimo.faltan.length > 0 && <> · <b>revisar:</b> {ultimo.faltan.join(", ")}</>}
             {ultimo.igvMal && <> · <b>el IGV leído no es el 18 % del total: revise el importe</b></>}
+            {ultimo.usd && (
+              <span className="mt-1 block font-semibold text-amber-900">
+                Comprobante en DÓLARES (US$): el gasto se registra en soles. Convierta el importe y los precios con el tipo de cambio antes de guardar.
+              </span>
+            )}
           </div>
           <button type="button" onClick={() => setUltimo(null)} aria-label="Cerrar aviso" className="opacity-60 hover:opacity-100">
             <X size={14} />
@@ -247,8 +255,8 @@ export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => v
                   <td className="px-2 py-1 text-right">{i.cantidad}</td>
                   <td className="px-2 py-1">{i.unidad}</td>
                   <td className="px-2 py-1">{i.descripcion}</td>
-                  <td className="px-2 py-1 text-right">{soles(i.precioUnit)}</td>
-                  <td className="px-2 py-1 text-right font-semibold">{soles(i.importe)}</td>
+                  <td className="px-2 py-1 text-right">{dinero(i.precioUnit, ultimo.usd)}</td>
+                  <td className="px-2 py-1 text-right font-semibold">{dinero(i.importe, ultimo.usd)}</td>
                 </tr>
               ))}
             </tbody>
@@ -257,7 +265,7 @@ export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => v
                 <td colSpan={4} className="px-2 py-1.5 text-right text-plomo-600">
                   Suma de artículos{ultimo.conIgv === true ? " (con IGV, cuadra con el total)" : ultimo.conIgv === false ? " (sin IGV, cuadra con la op. gravada)" : " (no cuadra con el total: revise)"}
                 </td>
-                <td className={cn("px-2 py-1.5 text-right font-bold", ultimo.conIgv === undefined && "text-amber-700")}>{soles(ultimo.items.reduce((a, i) => a + i.importe, 0))}</td>
+                <td className={cn("px-2 py-1.5 text-right font-bold", ultimo.conIgv === undefined && "text-amber-700")}>{dinero(ultimo.items.reduce((a, i) => a + i.importe, 0), ultimo.usd)}</td>
               </tr>
             </tfoot>
           </table>

@@ -131,14 +131,16 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
     const falta = new Set<CampoOcr>();
     if (datos.fecha) setFechaTxt(fechaPE(datos.fecha));
     else falta.add("fecha");
-    if (!datos.total || datos.igvCuadra === false) falta.add("importe");
+    // Comprobante en dólares: el gasto se registra en soles, el importe se convierte a mano (tipo de cambio)
+    if (!datos.total || datos.igvCuadra === false || datos.moneda === "USD") falta.add("importe");
     if (!datos.comprobante) falta.add("comprobante");
     if (!datos.numero) falta.add("numero");
     // Detalle: la descripción del gasto lista cada artículo con su costo; si las líneas no suman el total, a revisar
     const items = datos.items ?? [];
     if (!items.length || datos.itemsConIgv === undefined) falta.add("descripcion");
+    const mon = (n: number) => (datos.moneda === "USD" ? `US$ ${n.toFixed(2)}` : soles(n));
     const descripcion = items
-      .map((i) => `${i.cantidad} ${i.unidad} ${i.descripcion} x ${soles(i.precioUnit)} = ${soles(i.importe)}`)
+      .map((i) => `${i.cantidad} ${i.unidad} ${i.descripcion} x ${mon(i.precioUnit)} = ${mon(i.importe)}`)
       .join("; ")
       .concat(items.length && datos.itemsConIgv === false ? " (valores sin IGV)" : "")
       .slice(0, 1000);

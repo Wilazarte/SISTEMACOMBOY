@@ -35,6 +35,8 @@ export interface FacturaLeida {
   igv?: number;
   /** Base imponible (op. gravada / subtotal) si figura. */
   subtotal?: number;
+  /** Moneda del comprobante: USD si dice DÓLAR / US$ / $ (el importe del gasto en el ERP es en soles). */
+  moneda?: "PEN" | "USD";
   /** Detalle: cantidad, descripción, precio unitario e importe de cada artículo. */
   items?: ItemLeido[];
   /**
@@ -223,25 +225,24 @@ const FIN_DETALLE = /(SUB\s*-?\s*TOTAL|OP(\.|ERACION)?\s*GRAVADA|VALOR\s+(DE\s+)
 const NO_ITEM = /(R\.?\s*U\.?\s*C|FECHA|SE[NÑ]OR|CLIENTE|DIRECCI|TELEF|CORREO|EMAIL|VENDEDOR|CAJERO|TICKET|FACTURA|BOLETA|MONEDA|GUIA|ORDEN|PEDIDO|CONDICI)/;
 
 /** Una línea de detalle: [código] cantidad [unidad] descripción [cantidad] p.unit importe. */
-function leerItem(linea: string): ItemLeido | undefined {
-  const tokens = linea.replace(/[^\wÁÉÍÓÚÑáéíóúñ.,/%()\-]+$/g, "").split(/\s+/).filter(Boolean);
-  // Montos al final de la línea (hasta 3: cantidad, p. unit, importe)
-  const nums: number[] = [];
-  const crudos: string[] = [];
-  while (tokens.length && nums.length < 3) {
-    const n = numeroCelda(tokens[tokens.length - 1]);
-    if (n === undefined) break;
-    nums.unshift(n);
-    crudos.unshift(tokens.pop()!);
-  }
-  // Tres números que no son cantidad × precio = importe: el primero es parte de la descripción ("MIG 1.0 12.50 125.00")
-  if (nums.length === 3 && !cuadra(nums[0], nums[1], nums[2])) {
-    nums.shift();
-    tokens.push(crudos.shift()!);
-  }
-  const ultimo = linea.trim().split(/\s+/).filter((t) => numeroCelda(t) !== undefined).pop() ?? "";
-  if (!nums.length || !/[.,]\d{2}$/.test(ultimo)) return undefined; // el importe lleva 2 decimales
-  // Cantidad y unidad al inicio (puede haber un código de producto antes)
+/** Columnas numéricas de la tabla de detalle, a la derecha de la descripción (según la cabecera). */
+type Columna = "UNIT" | "IMPORTE" | "OTRO";
+
+function columnasDeCabecera(cabecera: string): Columna[] {
+  const c = sinTildes(cabecera).toUpperCase();
+  const desde = Math.max(0, c.search(/DESCRIPCI|DETALLE|CONCEPTO/));
+  const marcas: { pos: number; col: Columna }[] = [];
+  const buscar = (re: RegExp, col: Columna) => {
+    for (const m of c.slice(desde).matchAll(re)) marcas.push({ pos: (m.index ?? 0) + desde, col });
+  };
+  buscar(/(V(ALOR)?\.?\s*UNIT|P(RECIO)?\.?\s*UNIT|P\.?\s*\/\s*U\b|\bPU\b|PUNIT|COSTO\s+UNIT)/g, "UNIT");
+  buscar(/(IMPORTE|P(RECIO)?\.?\s*TOTAL|SUB\s*TOTAL|VALOR\s+(DE\s+)?VENTA|\bMONTO\b|\bTOTAL\b)/g, "IMPORTE");
+  buscar(/(ICBPER|DSCTO|DESCUENTO|\bIGV\b|\bISC\b)/g, "OTRO");
+  return marcas.sort((a, b) => a.pos - b.pos).map((m) => m.col);
+}
+
+/** Inicio de la línea: [código] cantidad [unidad] descripción. */
+function inicioItem(tokens: string[]): { cantidad?: number; unidad: string; descripcion: string } | undefined {
   let cantidad: number | undefined;
   let unidad = "UND";
   const cab = [...tokens];
@@ -260,6 +261,48 @@ function leerItem(linea: string): ItemLeido | undefined {
   }
   const descripcion = cab.join(" ").replace(/^[-–—:|]+\s*/, "").trim();
   if ((descripcion.match(/[A-Za-zÁÉÍÓÚÑáéíóúñ]/g) ?? []).length < 3 || FIN_DETALLE.test(sinTildes(descripcion).toUpperCase())) return undefined;
+  return { cantidad, unidad, descripcion: descripcion.toUpperCase() };
+}
+
+function leerItem(linea: string, columnas: Columna[] = []): ItemLeido | undefined {
+  const tokens = linea.replace(/[^\wÁÉÍÓÚÑáéíóúñ.,/%()\-]+$/g, "").split(/\s+/).filter(Boolean);
+  // Con la cabecera conocida (ej. "Valor Unitario | ICBPER"): cada número de la derecha va a su columna
+  if (columnas.length && columnas.some((c) => c !== "OTRO")) {
+    const crudos = tokens.slice(-columnas.length);
+    const valores = crudos.map(numeroCelda);
+    if (crudos.length === columnas.length && valores.every((v) => v !== undefined) && /[.,]\d{2}$/.test(crudos[crudos.length - 1])) {
+      const ini = inicioItem(tokens.slice(0, -columnas.length));
+      const unit = valores[columnas.indexOf("UNIT")];
+      const imp = valores[columnas.indexOf("IMPORTE")];
+      if (ini) {
+        const cantidad = ini.cantidad ?? (unit && imp ? r2(imp / unit) : 1);
+        const precioUnit = unit ?? r2((imp as number) / cantidad);
+        const importe = imp ?? r2(cantidad * precioUnit);
+        if (importe > 0) return { cantidad, unidad: ini.unidad, descripcion: ini.descripcion, precioUnit, importe };
+      }
+    }
+  }
+  // Montos al final de la línea (hasta 3: cantidad, p. unit, importe)
+  const nums: number[] = [];
+  const crudos: string[] = [];
+  while (tokens.length && nums.length < 3) {
+    const n = numeroCelda(tokens[tokens.length - 1]);
+    if (n === undefined) break;
+    nums.unshift(n);
+    crudos.unshift(tokens.pop()!);
+  }
+  // Tres números que no son cantidad × precio = importe: el primero es parte de la descripción ("MIG 1.0 12.50 125.00")
+  if (nums.length === 3 && !cuadra(nums[0], nums[1], nums[2])) {
+    nums.shift();
+    tokens.push(crudos.shift()!);
+  }
+  const ultimo = linea.trim().split(/\s+/).filter((t) => numeroCelda(t) !== undefined).pop() ?? "";
+  if (!nums.length || !/[.,]\d{2}$/.test(ultimo)) return undefined; // el importe lleva 2 decimales
+  // Cantidad y unidad al inicio (puede haber un código de producto antes)
+  const ini = inicioItem(tokens);
+  if (!ini) return undefined;
+  let cantidad = ini.cantidad;
+  const { unidad, descripcion } = ini;
   let precioUnit: number;
   let importe: number;
   if (nums.length === 3 && cuadra(nums[0], nums[1], nums[2])) {
@@ -276,7 +319,7 @@ function leerItem(linea: string): ItemLeido | undefined {
     precioUnit = r2(importe / cantidad);
   }
   if (!(importe > 0)) return undefined;
-  return { cantidad: cantidad ?? 1, unidad, descripcion: descripcion.toUpperCase(), precioUnit, importe };
+  return { cantidad: cantidad ?? 1, unidad, descripcion, precioUnit, importe };
 }
 
 /**
@@ -288,14 +331,24 @@ function buscarItems(lineas: string[]): ItemLeido[] {
   const cabeceras = may.flatMap((l, i) => (/DESCRIPCI|CANT\b|CANT\.|DETALLE|CONCEPTO/.test(l) && !FIN_DETALLE.test(l) ? [i] : []));
   for (const ini of cabeceras.length ? cabeceras : [-1]) {
     const items: ItemLeido[] = [];
+    const columnas = ini >= 0 ? columnasDeCabecera(lineas[ini]) : [];
+    let continuaciones = 0;
     for (let i = ini + 1; i < lineas.length; i++) {
       if (FIN_DETALLE.test(may[i])) {
         if (items.length || ini >= 0) break;
         continue;
       }
       if (NO_ITEM.test(may[i])) continue;
-      const it = leerItem(lineas[i]);
-      if (it) items.push(it);
+      const it = leerItem(lineas[i], columnas);
+      if (it) {
+        items.push(it);
+        continuaciones = 0;
+      } else if (items.length && continuaciones < 3 && !montosDeLinea(lineas[i]).length && /[A-Za-z]{2}/.test(lineas[i])) {
+        // Descripción en dos o más renglones ("HOJA SIERRA CINTA … / 10/14 DPP RONTGEN")
+        const ult = items[items.length - 1];
+        ult.descripcion = `${ult.descripcion} ${lineas[i].trim().toUpperCase()}`.slice(0, 250);
+        continuaciones++;
+      }
     }
     if (items.length) return items;
   }
@@ -335,6 +388,8 @@ export function parseFactura(texto: string, hoyISO = new Date().toISOString().sl
     const esperado = r2(r.total - r.total / (1 + TASA_IGV));
     r.igvCuadra = Math.abs(esperado - r.igv) <= 0.05;
   }
+  const t = sinTildes(texto).toUpperCase();
+  r.moneda = /DOLAR|US\s*\$|\bUSD\b/.test(t) || (/\$\s*\d/.test(t) && !/S\/\s*\d|\bSOLES\b/.test(t)) ? "USD" : "PEN";
   const items = buscarItems(lineas);
   if (items.length) {
     r.items = items;
