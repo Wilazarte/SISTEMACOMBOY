@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ClipboardList, Factory, FileLock2, Gauge, HandCoins, Layers, Package, ShoppingCart, TrendingUp } from "lucide-react";
+import { AlertTriangle, Calculator, CircleDollarSign, ClipboardList, Cog, Factory, FileLock2, Gauge, HandCoins, Layers, Package, Receipt, ShoppingCart, TrendingUp, Truck, type LucideIcon } from "lucide-react";
 import { ErpAlertList, type ErpAlerta } from "@/components/erp/ErpAlertList";
 import { PanelResumen } from "@/components/inicio/PanelResumen";
 import type { ModuloInicio } from "@/lib/inicioModulos";
@@ -82,8 +82,8 @@ export function GerenciaDashboard() {
         accion={
           <div className="flex flex-wrap items-center gap-3">
             {/* Costo de Producción (2026-11-17): Gerencia aprueba el costo final de cada equipo */}
-            <Link href="/gerencia/costos-produccion" className="rounded-lg bg-tema-sec px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-tema-sec/90">
-              Costos de producción por aprobar
+            <Link href="/gerencia/costos-produccion" className="inline-flex items-center gap-1.5 rounded-lg bg-tema-sec px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-tema-sec/90">
+              <Calculator size={15} /> Costos de producción por aprobar
             </Link>
             {/* Gestión Documentaria: Gerencia aprueba, ve archivados y audita quién descargó qué */}
             <Link href="/documentos" className="inline-flex items-center gap-1.5 rounded-lg bg-tema-acento px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-tema-acento/90">
@@ -148,12 +148,13 @@ export function GerenciaDashboard() {
   );
 }
 
-const MODULOS_RESUMEN: { id: Exclude<ModuloInicio, "soporte">; label: string }[] = [
-  { id: "finanzas", label: "Finanzas" },
-  { id: "logistica", label: "Logística" },
-  { id: "almacen", label: "Almacén" },
-  { id: "produccion", label: "Producción" },
-  { id: "ventas", label: "Ventas" },
+// Mismos íconos de cada módulo que la fila de accesos (MODULOS_PLANTA)
+const MODULOS_RESUMEN: { id: Exclude<ModuloInicio, "soporte">; label: string; icono: LucideIcon }[] = [
+  { id: "finanzas", label: "Finanzas", icono: CircleDollarSign },
+  { id: "logistica", label: "Logística", icono: Truck },
+  { id: "almacen", label: "Almacén", icono: Package },
+  { id: "produccion", label: "Producción", icono: Cog },
+  { id: "ventas", label: "Ventas", icono: Receipt },
 ];
 
 function ResumenModulos() {
@@ -168,9 +169,9 @@ function ResumenModulos() {
             type="button"
             onClick={() => setModulo(m.id)}
             aria-pressed={modulo === m.id}
-            className={`rounded-full px-4 py-1.5 text-[13px] font-semibold transition ${modulo === m.id ? "grad-azul text-white" : "btn-glass text-[#D1D5DB] hover:text-white"}`}
+            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-[13px] font-semibold transition ${modulo === m.id ? "grad-azul text-white" : "btn-glass text-[#D1D5DB] hover:text-white"}`}
           >
-            {m.label}
+            <m.icono size={15} aria-hidden /> {m.label}
           </button>
         ))}
       </div>
