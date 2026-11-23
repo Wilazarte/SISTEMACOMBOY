@@ -758,6 +758,9 @@ function pdfGasto(f: Factura, codigo: string): void {
         ["Fecha", fechaPE(f.fecha)],
         ["Comprobante", `${comp} ${f.numero}`],
         ["Cotización", f.cotizacionProveedor ? `${f.cotizacionProveedor}${f.cotizacionAuto ? " (interna)" : ""}` : "-"],
+        ...(f.moneda === "USD"
+          ? ([["Moneda", `Dólares: US$ ${(f.totalUsd ?? 0).toFixed(2)} × T.C. ${(f.tipoCambio ?? 0).toFixed(3)} = ${soles(f.total)}`]] as [string, string][])
+          : []),
         ["Adjuntos", f.archivos?.length ? f.archivos.map((a) => a.nombre).join(", ") : "-"],
       ],
       head: ["#", "Descripción", "Importe"],
@@ -765,6 +768,12 @@ function pdfGasto(f: Factura, codigo: string): void {
       alinearDerecha: [2],
       totales: [
         ...(f.igv ? ([["Subtotal", soles(f.subtotal)], ["IGV 18%", soles(f.igv)]] as [string, string][]) : []),
+        ...((f.notas ?? []).length
+          ? ([
+              ["Total comprobante", soles(f.totalOriginal ?? f.total)],
+              ...(f.notas ?? []).map((n) => [`${n.tipo === "CREDITO" ? "Nota de crédito" : "Nota de débito"} ${n.numero}`, `${n.tipo === "CREDITO" ? "-" : "+"} ${soles(n.monto)}`]),
+            ] as [string, string][])
+          : []),
         ["Total", soles(f.total)],
         ...(f.detraccionMonto ? ([[`Detracción ${f.detraccionPorc}%`, `- ${soles(f.detraccionMonto)}`]] as [string, string][]) : []),
         ...(f.retencionMonto ? ([[`Retención 4ta cat. ${f.retencionPorc}%`, `- ${soles(f.retencionMonto)}`]] as [string, string][]) : []),

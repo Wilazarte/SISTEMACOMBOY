@@ -11,6 +11,7 @@ import { getSesion, rolNegocio } from "./auth";
 import { createClient } from "./supabase/client";
 import { errorCaja, nombreCaja } from "./cajas";
 import type {
+  NotaGasto,
   AliasHuellas,
   ArchivoGasto,
   ConcesionContratista,
@@ -1571,8 +1572,11 @@ async function subirVoucher(file: File): Promise<string> {
 // El campo del documento guarda "sb:tesoreria/<ruta>"; los antiguos siguen siendo "data:..." y se muestran igual.
 // ---------------------------------------------------------------------
 const PREFIJO_SB = `sb:${BUCKET_TESORERIA}/`;
+/** Comprobantes de gasto escaneados con OCR (Registrar gasto › Escanear factura): "sb:gastos-comprobantes/<ruta>". */
+export const BUCKET_GASTOS_COMPROBANTES = "gastos-comprobantes";
+const PREFIJO_SB_GASTOS = `sb:${BUCKET_GASTOS_COMPROBANTES}/`;
 const EXT_ARCHIVO: Record<string, string> = { ...TIPOS_VOUCHER, "image/webp": "webp" };
-export const esArchivoStorage = (ref?: string): boolean => !!ref && ref.startsWith(PREFIJO_SB);
+export const esArchivoStorage = (ref?: string): boolean => !!ref && (ref.startsWith(PREFIJO_SB) || ref.startsWith(PREFIJO_SB_GASTOS));
 
 const leerComoDataUrl = (archivo: Blob): Promise<string> =>
   new Promise((ok, mal) => {
@@ -1611,7 +1615,7 @@ export async function urlArchivo(ref: string): Promise<string> {
   if (!esArchivoStorage(ref)) return ref;
   const guardada = urlsFirmadas.get(ref);
   if (guardada && guardada.vence > Date.now()) return guardada.url;
-  const url = await urlVoucher(ref.slice(PREFIJO_SB.length));
+  const url = ref.startsWith(PREFIJO_SB_GASTOS) ? await urlComprobanteGasto(ref.slice(PREFIJO_SB_GASTOS.length)) : await urlVoucher(ref.slice(PREFIJO_SB.length));
   urlsFirmadas.set(ref, { url, vence: Date.now() + 240_000 });
   return url;
 }
@@ -1646,6 +1650,30 @@ export function abrirArchivo(ref: string): void {
       w.close();
       avisarError((e as Error).message);
     });
+}
+
+async function urlComprobanteGasto(ruta: string): Promise<string> {
+  const { data, error } = await createClient().storage.from(BUCKET_GASTOS_COMPROBANTES).createSignedUrl(ruta, 300);
+  if (error || !data) throw new ErpError(`No se pudo abrir el comprobante: ${error?.message ?? "sin respuesta"}`);
+  return data.signedUrl;
+}
+
+/**
+ * Sube la imagen o PDF de un comprobante escaneado al bucket privado gastos-comprobantes como
+ * <AAAA-MM>/<id>.<ext> y devuelve la referencia para ArchivoGasto.dataUrl.
+ * Si el bucket aún no existe (falta correr supabase/migrations/20261227_bucket_gastos_comprobantes.sql) o su rol no
+ * puede subir, se guarda como cualquier adjunto de gasto (subirBaucher → tesoreria o base64): no se pierde.
+ */
+export async function subirComprobanteGasto(archivo: Blob): Promise<{ ref: string; enBucket: boolean }> {
+  const ext = EXT_ARCHIVO[archivo.type];
+  if (ext && archivo.size <= MAX_VOUCHER) {
+    const ruta = `${hoy().slice(0, 7)}/${uid()}.${ext}`;
+    const { error } = await createClient().storage.from(BUCKET_GASTOS_COMPROBANTES).upload(ruta, archivo, { contentType: archivo.type, upsert: false });
+    if (!error) return { ref: PREFIJO_SB_GASTOS + ruta, enBucket: true };
+    console.warn(`subirComprobanteGasto: ${BUCKET_GASTOS_COMPROBANTES} rechazó ${ruta} (${error.message}); se usa el adjunto de siempre`);
+  }
+  const { ref } = await subirBaucher(archivo, "gasto-factura");
+  return { ref, enBucket: false };
 }
 
 /** URL temporal (5 min) para ver un baucher privado. */
@@ -2920,7 +2948,18 @@ export interface DatosGasto {
   suministro?: string;
   /** N° de la cotización emitida por el proveedor. Vacío: se genera COT-PROV-0001-2026 al guardar. */
   cotizacion?: string;
+  /** Comprobante en dólares: `importeUsd` × `tipoCambio` = `importe` (soles, con el que se registra todo). */
+  moneda?: "PEN" | "USD";
+  tipoCambio?: number;
+  importeUsd?: number;
 }
+
+/** Tipo de cambio razonable (S/ por US$) para validar lo que se escribe. */
+export const TC_MIN = 2;
+export const TC_MAX = 8;
+
+/** Gasto en dólares → importe en soles. */
+export const solesDeUsd = (usd: number, tc: number): number => r2((Number(usd) || 0) * (Number(tc) || 0));
 
 /** Detracción y neto a pagar: ej. agencia S/ 100 con 4 % -> detracción S/ 4, neto S/ 96. */
 export function calcularDetraccion(importe: number, aplica: boolean, porc: number): { monto: number; neto: number } {
@@ -3333,7 +3372,14 @@ function prepararGasto(d: DatosGasto, rol: Rol): Factura {
   if (d.fecha > hoy()) throw new ErpError("La fecha del gasto no puede ser futura.");
   if (!(d.tipoGasto in TIPOS_GASTO)) throw new ErpError("Seleccione el tipo de gasto.");
   if (!d.descripcion.trim()) throw new ErpError("Describa el gasto.");
-  const total = r2(Number(d.importe));
+  const enUsd = d.moneda === "USD";
+  if (enUsd) {
+    if (!(Number(d.importeUsd) > 0)) throw new ErpError("Ingrese el importe total en dólares (US$).");
+    if (!(Number(d.tipoCambio) >= TC_MIN && Number(d.tipoCambio) <= TC_MAX))
+      throw new ErpError(`Ingrese el tipo de cambio del día (S/ por US$, entre ${TC_MIN} y ${TC_MAX}).`);
+  }
+  // En dólares, el importe en soles sale siempre de US$ × tipo de cambio
+  const total = enUsd ? solesDeUsd(d.importeUsd as number, d.tipoCambio as number) : r2(Number(d.importe));
   if (!(total > 0)) throw new ErpError("El importe total debe ser mayor a 0.");
   if (!(d.comprobante in COMPROBANTES_GASTO)) throw new ErpError("Seleccione el tipo de comprobante.");
   const numero = d.numero.trim().toUpperCase();
@@ -3392,8 +3438,9 @@ function prepararGasto(d: DatosGasto, rol: Rol): Factura {
     igv: r2(total - subtotal),
     total,
     estadoPago: "POR_PAGAR",
-    historial: [evento(rol, "Gasto de Tesorería registrado", `${TIPOS_GASTO[d.tipoGasto]} · ${COMPROBANTES_GASTO[d.comprobante]} ${numero}${monto ? ` · detracción ${d.detraccionPorc}% S/ ${monto.toFixed(2)}` : ""}${retencion ? ` · retención 4ta ${PORC_RETENCION_RHE}% S/ ${retencion.toFixed(2)}` : ""}`)],
+    historial: [evento(rol, "Gasto de Tesorería registrado", `${TIPOS_GASTO[d.tipoGasto]} · ${COMPROBANTES_GASTO[d.comprobante]} ${numero}${monto ? ` · detracción ${d.detraccionPorc}% S/ ${monto.toFixed(2)}` : ""}${retencion ? ` · retención 4ta ${PORC_RETENCION_RHE}% S/ ${retencion.toFixed(2)}` : ""}${enUsd ? ` · US$ ${r2(Number(d.importeUsd)).toFixed(2)} × T.C. ${Number(d.tipoCambio).toFixed(3)} = S/ ${total.toFixed(2)}` : ""}`)],
     esGastoTesoreria: true,
+    ...(enUsd ? { moneda: "USD" as const, tipoCambio: Number(d.tipoCambio), totalUsd: r2(Number(d.importeUsd)) } : {}),
     tipoGasto: d.tipoGasto,
     descripcion: d.descripcion.trim(),
     comprobanteGasto: d.comprobante,
@@ -3425,6 +3472,83 @@ export function permisoEditarGasto(f: Factura, sesion: { usuario: string; rol: s
 }
 
 /** Corrige un gasto POR PAGAR. Con OC vinculada el importe no cambia (debe coincidir con la OC). */
+/**
+ * Nota de crédito (resta) o de débito (suma) del proveedor vinculada a un gasto registrado: ajusta su total,
+ * IGV, detracción, retención y neto a pagar, y deja la nota en su historial. Gasto en US$: el monto de la nota
+ * viene en dólares y se pasa a soles con el tipo de cambio del gasto.
+ */
+export function aplicarNotaAGasto(
+  gastoId: string,
+  n: { tipo: "CREDITO" | "DEBITO"; numero: string; fecha: string; monto: number; motivo?: string; archivo?: ArchivoGasto; ruc?: string },
+  rol: Rol
+): Factura {
+  const lista = getFacturas();
+  const f = lista.find((x) => x.id === gastoId);
+  if (!f || !f.esGastoTesoreria) throw new ErpError("Gasto no encontrado.");
+  const numero = n.numero.trim().toUpperCase();
+  if (!/^[A-Z0-9]{4}-\d{1,8}$/.test(numero)) throw new ErpError("N° de la nota inválido. Ej: FC01-45");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(n.fecha) || n.fecha > hoy()) throw new ErpError("Fecha de la nota inválida (no puede ser futura).");
+  if (n.fecha < f.fecha) throw new ErpError("La nota no puede ser anterior al comprobante que modifica.");
+  if (n.ruc && f.ruc && f.ruc !== RUC_VARIOS && n.ruc !== f.ruc) throw new ErpError(`La nota es del RUC ${n.ruc} y el gasto del RUC ${f.ruc}: vincúlela al comprobante del mismo proveedor.`);
+  if (lista.some((x) => (x.notas ?? []).some((y) => y.numero === numero && x.ruc === f.ruc))) throw new ErpError(`La nota ${numero} ya fue aplicada.`);
+  const enUsd = f.moneda === "USD" && !!f.tipoCambio;
+  const montoUsd = enUsd ? r2(Number(n.monto)) : undefined;
+  const monto = enUsd ? solesDeUsd(Number(n.monto), f.tipoCambio as number) : r2(Number(n.monto));
+  if (!(monto > 0)) throw new ErpError("El monto de la nota debe ser mayor a 0.");
+  const signo = n.tipo === "CREDITO" ? -1 : 1;
+  const total = r2(f.total + signo * monto);
+  if (total < 0) throw new ErpError(`La nota de crédito (${soles(monto)}) supera el total del gasto (${soles(f.total)}).`);
+  const comp = f.comprobanteGasto ?? "FACTURA";
+  const subtotal = comp === "FACTURA" ? r2(total / (1 + IGV)) : total;
+  const { monto: detr, neto: netoDetraccion } = calcularDetraccion(total, !!f.detraccionPorc, f.detraccionPorc ?? 0);
+  const retencion = comp === "RXH" ? retencionRHE(total, f.retencionPorc !== undefined || f.total <= TOPE_RETENCION_RHE) : 0;
+  const nombre = n.tipo === "CREDITO" ? "Nota de crédito" : "Nota de débito";
+  const pagado = f.estadoPago === "PAGADA";
+  const nota: NotaGasto = {
+    tipo: n.tipo,
+    numero,
+    fecha: n.fecha,
+    monto,
+    ...(montoUsd !== undefined ? { montoUsd } : {}),
+    ...(n.motivo?.trim() ? { motivo: n.motivo.trim().slice(0, 200) } : {}),
+    ...(n.archivo ? { archivo: n.archivo } : {}),
+    registradoPor: usuarioActual(),
+    registradoEn: new Date().toISOString(),
+  };
+  const detalle = [
+    `${nombre} ${numero} ${signo < 0 ? "−" : "+"}${soles(monto)}${montoUsd !== undefined ? ` (US$ ${montoUsd.toFixed(2)})` : ""}`,
+    `total ${soles(f.total)} → ${soles(total)}`,
+    pagado && (signo < 0 ? `ya pagado: saldo a favor ${soles(monto)} por cobrar al proveedor` : `ya pagado: falta pagar ${soles(monto)}`),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const actualizado: Factura = {
+    ...f,
+    totalOriginal: f.totalOriginal ?? f.total,
+    subtotal,
+    igv: r2(total - subtotal),
+    total,
+    ...(enUsd ? { totalUsd: r2((f.totalUsd ?? 0) + signo * (montoUsd as number)) } : {}),
+    ...(f.detraccionPorc ? { detraccionMonto: detr } : {}),
+    retencionPorc: retencion ? PORC_RETENCION_RHE : f.retencionPorc,
+    retencionMonto: retencion || undefined,
+    netoPagar: r2(netoDetraccion - retencion),
+    notas: [...(f.notas ?? []), nota],
+    historial: [...f.historial, evento(rol, `${nombre} vinculada`, detalle)],
+  };
+  escribir(KEYS.FACTURAS, lista.map((x) => (x.id === gastoId ? actualizado : x)));
+  return actualizado;
+}
+
+/** "F001-00004521" y "F001-4521" son el mismo comprobante. */
+export const mismoComprobante = (a: string, b: string): boolean => {
+  const n = (s: string) => {
+    const m = /^([A-Z0-9]{4})-0*(\d+)$/.exec(s.trim().toUpperCase());
+    return m ? `${m[1]}-${m[2]}` : s.trim().toUpperCase();
+  };
+  return n(a) === n(b);
+};
+
 export function editarGasto(id: string, c: EdicionGasto, rol: Rol): Factura {
   const lista = getFacturas();
   const f = lista.find((x) => x.id === id);
@@ -3486,6 +3610,8 @@ export function editarGasto(id: string, c: EdicionGasto, rol: Rol): Factura {
     retencionMonto: retencion || undefined,
     netoPagar: neto,
     ...(cambiaCot ? { cotizacionProveedor: cot, cotizacionAuto: false } : {}),
+    // Gasto en dólares: los US$ del comprobante no cambian; el nuevo importe en soles ajusta el tipo de cambio
+    ...(f.moneda === "USD" && f.totalUsd && total !== f.total ? { tipoCambio: Math.round((total / f.totalUsd) * 10000) / 10000 } : {}),
     editadoPor: usuarioActual(),
     editadoEn: new Date().toISOString(),
     historial: [...f.historial, evento(rol, "Gasto editado", cambios || undefined)],

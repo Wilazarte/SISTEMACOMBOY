@@ -22,6 +22,9 @@ import {
   parseFechaPE,
   desglosarIgv,
   TOPE_BANCARIZACION,
+  TC_MAX,
+  TC_MIN,
+  solesDeUsd,
   r2,
   registrarGastoCompleto,
   requiereBancarizacion,
@@ -33,6 +36,7 @@ import {
 import type { ArchivoGasto, Factura, Bancarizacion, ComprobanteGasto, OrdenAGenerar, Proveedor, Rol, StockItem, TipoGasto } from "@/lib/types";
 import { ProductoInput } from "@/components/productos/ProductoInput";
 import { SelectorOrden } from "@/components/compras/SelectorOrden";
+import { EscanearGasto, type ResultadoEscaneo } from "@/components/compras/EscanearGasto";
 import { ServiciosOS, lineasServicio, servicioVacio, type FilaServicio } from "@/components/compras/ServiciosOS";
 import {
   OPCIONES_COMPROBANTE,
@@ -57,6 +61,24 @@ const mascara = (v: string) => {
   return d.length > 4 ? `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}` : d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d;
 };
 
+/** Campos que el escaneo (OCR) no pudo leer o que no cuadran: se pintan en amarillo hasta que el usuario los toque. */
+type CampoOcr = "fecha" | "importe" | "tipoCambio" | "descripcion" | "comprobante" | "numero" | "proveedor" | "ruc";
+const AMARILLO = "!border-amber-400 !bg-amber-50 !text-amber-950 ring-2 ring-amber-200";
+
+/** Último tipo de cambio usado en este equipo (comodidad: se propone en el siguiente gasto en dólares). */
+const CLAVE_TC = "erp:gasto-tipo-cambio";
+const tcGuardado = (): number => {
+  try {
+    const n = Number(localStorage.getItem(CLAVE_TC));
+    return n >= TC_MIN && n <= TC_MAX ? n : 0;
+  } catch {
+    return 0;
+  }
+};
+
+/** Línea leída del comprobante: precio CON IGV en la moneda del comprobante. */
+type LineaEscaneo = { nombre: string; unidad: string; cantidad: number; precio: number };
+
 const vacio = (): Omit<DatosGasto, "fecha"> => ({
   tipoGasto: "TRANSPORTE",
   descripcion: "",
@@ -72,6 +94,9 @@ const vacio = (): Omit<DatosGasto, "fecha"> => ({
   retencion: true,
   suministro: "",
   cotizacion: "",
+  moneda: "PEN",
+  tipoCambio: tcGuardado(),
+  importeUsd: 0,
 });
 
 /**
@@ -86,6 +111,51 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
   const [filas, setFilas] = useState<FilaOC[]>([filaOC()]);
   // OS: servicios en texto libre (sin catálogo)
   const [servicios, setServicios] = useState<FilaServicio[]>([servicioVacio()]);
+  // Artículos del último escaneo: se jalan a la OC / OS cuando el gestor la elige (en soles: US$ × tipo de cambio)
+  const [escaneo, setEscaneo] = useState<{ lineas: LineaEscaneo[]; usd: boolean } | null>(null);
+  // true mientras las líneas de la OC / OS sean las del escaneo sin tocar: se recalculan si cambia el tipo de cambio
+  const [lineasAuto, setLineasAuto] = useState(false);
+  const enUsd = d.moneda === "USD";
+  const factorMoneda = (usd: boolean) => (usd ? d.tipoCambio || 0 : 1);
+  const lineasOC = (e: { lineas: LineaEscaneo[]; usd: boolean }, k = factorMoneda(e.usd)): FilaOC[] =>
+    e.lineas.map((l) => ({ ...filaOC(), nombre: l.nombre, unidad: l.unidad, cantidad: l.cantidad, precioUnit: r2(l.precio * k) }));
+  const lineasOS = (e: { lineas: LineaEscaneo[]; usd: boolean }, k = factorMoneda(e.usd)): FilaServicio[] =>
+    e.lineas.map((l) => ({ ...servicioVacio(), descripcion: l.nombre, descTocada: true, cantidad: l.cantidad, unidad: l.unidad, precioUnit: r2(l.precio * k) }));
+  /** Dólares: el importe en soles es siempre US$ × tipo de cambio; las líneas escaneadas se recalculan. */
+  const setUsd = (cambios: Partial<Pick<DatosGasto, "moneda" | "tipoCambio" | "importeUsd">>) => {
+    setD((x) => {
+      const n = { ...x, ...cambios };
+      return n.moneda === "USD" ? { ...n, importe: solesDeUsd(n.importeUsd || 0, n.tipoCambio || 0) } : n;
+    });
+    if (cambios.tipoCambio !== undefined && escaneo?.usd && lineasAuto) {
+      setFilas(lineasOC(escaneo, cambios.tipoCambio || 0));
+      setServicios(lineasOS(escaneo, cambios.tipoCambio || 0));
+    }
+    if (cambios.tipoCambio && cambios.tipoCambio >= TC_MIN && cambios.tipoCambio <= TC_MAX)
+      try {
+        localStorage.setItem(CLAVE_TC, String(cambios.tipoCambio));
+      } catch {
+        /* sin almacenamiento local: solo no se recuerda */
+      }
+  };
+  const ocVacia = (fs: FilaOC[]) => fs.every((f) => !f.nombre.trim() && !f.precioUnit);
+  const osVacia = (fs: FilaServicio[]) => fs.every((f) => !f.descripcion.trim() && !f.precioUnit);
+  /** OC u OS según elija el gestor: si sus líneas están vacías, se llenan con lo escaneado (o el gasto en una línea). */
+  const elegirOrden = (o: OrdenAGenerar) => {
+    setOrden(o);
+    if (o === "OC" && ocVacia(filas)) {
+      if (escaneo?.lineas.length) {
+        setFilas(lineasOC(escaneo));
+        setLineasAuto(true);
+      }
+      else if ((d.importe || 0) > 0 && d.descripcion.trim())
+        setFilas([{ ...filaOC(), nombre: d.descripcion.trim().toUpperCase().slice(0, 200), cantidad: 1, precioUnit: r2(d.importe) }]);
+    }
+    if (o === "OS" && osVacia(servicios) && escaneo?.lineas.length) {
+      setServicios(lineasOS(escaneo));
+      setLineasAuto(true);
+    }
+  };
   // Bancarización: con ella el gasto queda PAGADO ("Registrar y pagar")
   const [pagar, setPagar] = useState(false);
   const [banc, setBanc] = useState<Bancarizacion>(bancarizacionVacia);
@@ -102,6 +172,71 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
   // Sin cotización del proveedor: el sistema genera COT-PROV-0001-2026 al guardar
   const [sinCotizacion, setSinCotizacion] = useState(false);
   const set = <K extends keyof typeof d>(k: K, v: (typeof d)[K]) => setD((x) => ({ ...x, [k]: v }));
+  // Escanear factura: campos a revisar (amarillo). Se quitan al editar el campo.
+  const [revisar, setRevisar] = useState<Set<CampoOcr>>(() => new Set());
+  const revisado = (...c: CampoOcr[]) => setRevisar((r) => (c.some((k) => r.has(k)) ? new Set([...r].filter((k) => !c.includes(k))) : r));
+  const ocr = (c: CampoOcr) => (revisar.has(c) ? AMARILLO : undefined);
+  /** Rellena el formulario con lo leído; no guarda (el usuario revisa y da Registrar gasto). */
+  const descripcionActual = () => d.descripcion.trim();
+  const aplicarEscaneo = ({ datos, archivo }: ResultadoEscaneo) => {
+    // Guía de remisión: solo se adjunta al gasto (no cambia importe ni comprobante)
+    if (datos.tipoElectronico === "GUIA") {
+      if (archivo) setD((x) => ({ ...x, archivos: [...x.archivos.filter((a) => a.tipo !== "GUIA"), archivo] }));
+      return;
+    }
+    const falta = new Set<CampoOcr>();
+    if (datos.fecha) setFechaTxt(fechaPE(datos.fecha));
+    else falta.add("fecha");
+    // Comprobante en dólares: moneda US$ y el tipo de cambio queda en amarillo para confirmarlo
+    const usd = datos.moneda === "USD";
+    if (!datos.total || datos.igvCuadra === false) falta.add("importe");
+    if (usd) falta.add("tipoCambio");
+    if (!datos.comprobante) falta.add("comprobante");
+    if (!datos.numero) falta.add("numero");
+    // Detalle: la descripción del gasto lista cada artículo con su costo; si las líneas no suman el total, a revisar
+    const items = datos.items ?? [];
+    if (!items.length || datos.itemsConIgv === undefined) falta.add("descripcion");
+    const mon = (n: number) => (datos.moneda === "USD" ? `US$ ${n.toFixed(2)}` : soles(n));
+    const descripcion = items
+      .map((i) => `${i.cantidad} ${i.unidad} ${i.descripcion} x ${mon(i.precioUnit)} = ${mon(i.importe)}`)
+      .join("; ")
+      .concat(items.length && datos.itemsConIgv === false ? " (valores sin IGV)" : "")
+      .slice(0, 1000);
+    if (items.length) {
+      // OC / OS del gasto: líneas ya cargadas con precio CON IGV incluido (si el comprobante las trae sin IGV, se suma)
+      const factor = datos.itemsConIgv === false && (datos.comprobante ?? d.comprobante) === "FACTURA" ? 1.18 : 1;
+      const e = { usd, lineas: items.map((i) => ({ nombre: i.descripcion, unidad: i.unidad, cantidad: i.cantidad, precio: r2(i.precioUnit * factor) })) };
+      setEscaneo(e);
+      setFilas(lineasOC(e));
+      setServicios(lineasOS(e));
+      setLineasAuto(true);
+    } else {
+      setEscaneo(null);
+      // Sin artículos leídos: la OC ya elegida toma el gasto en una línea (descripción e importe leídos)
+      if (orden === "OC" && ocVacia(filas) && datos.total && descripcionActual())
+        setFilas([{ ...filaOC(), nombre: descripcionActual().toUpperCase().slice(0, 200), cantidad: 1, precioUnit: r2(datos.total * factorMoneda(usd)) }]);
+    }
+    // RUC leído: la razón social la pone el padrón SUNAT (rucSunat) o la consulta Decolecta de EstadoRuc al validar
+    const sunat = datos.ruc ? rucSunat(datos.ruc) : undefined;
+    if (!datos.ruc) falta.add("ruc").add("proveedor");
+    else if (!sunat) falta.add("proveedor");
+    setD((x) => ({
+      ...x,
+      ...(datos.comprobante ? { comprobante: datos.comprobante } : {}),
+      // Recibo por honorarios: servicio profesional de 4ta categoría (como al elegirlo a mano)
+      ...(datos.comprobante === "RXH" ? { tipoGasto: "SERV_PROFESIONALES" as const, detraccionPorc: DETRACCION_SUGERIDA.SERV_PROFESIONALES } : {}),
+      ...(datos.numero ? { numero: datos.numero } : {}),
+      ...(datos.total
+        ? usd
+          ? { moneda: "USD" as const, importeUsd: datos.total, importe: solesDeUsd(datos.total, x.tipoCambio || 0) }
+          : { moneda: "PEN" as const, importe: datos.total, importeUsd: 0 }
+        : {}),
+      ...(descripcion ? { descripcion } : {}),
+      ...(datos.ruc ? { ruc: datos.ruc, proveedor: sunat ? sunat.razon_social : esProveedorVarios(x.proveedor) ? "" : x.proveedor } : {}),
+      archivos: archivo ? [...x.archivos.filter((a) => a.tipo !== "FACTURA"), archivo] : x.archivos,
+    }));
+    setRevisar(falta);
+  };
   const fechaISO = parseFechaPE(fechaTxt);
   const fechaError = fechaTxt.length === 10 && !fechaISO ? "Fecha inexistente" : fechaISO > hoy() ? "La fecha no puede ser futura" : undefined;
   const { monto, neto: netoDetraccion } = calcularDetraccion(d.importe, d.detraccion, d.detraccionPorc);
@@ -114,7 +249,14 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
   const totalOC = subOC;
   const igvOC = d.comprobante === "FACTURA" ? desglosarIgv(subOC).igv : 0;
   const bancObligatoria = requiereBancarizacion(d.importe || 0, d.ruc);
-  const setFila = (id: string, cambios: Partial<FilaOC>) => setFilas((p) => p.map((f) => (f.id === id ? { ...f, ...cambios } : f)));
+  const editarFilas = (fn: (p: FilaOC[]) => FilaOC[]) => {
+    setLineasAuto(false);
+    setFilas(fn);
+  };
+  const setFila = (id: string, cambios: Partial<FilaOC>) => {
+    setLineasAuto(false);
+    setFilas((p) => p.map((f) => (f.id === id ? { ...f, ...cambios } : f)));
+  };
   const elegirProducto = (id: string, nombre: string) => {
     const p = productos.find((x) => x.nombre === nombre);
     setFila(id, p ? { nombre: p.nombre, unidad: p.unidad, precioUnit: p.costoUnit || 0 } : { nombre });
@@ -169,8 +311,11 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
     if (auto && cot) toast(`Cotización generada: ${cot}`);
     if (aviso) toast(`Gasto registrado sin código de cotización: ${aviso}`, "error");
     setD(vacio());
+    setRevisar(new Set());
     setSinCotizacion(false);
     setOrden("NINGUNA");
+    setEscaneo(null);
+    setLineasAuto(false);
     setFilas([filaOC()]);
     setServicios([servicioVacio()]);
     setPagar(false);
@@ -191,6 +336,9 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
     <Card>
       <CardHeader title="Gasto / servicio sin stock" subtitle="Tesorería: no ingresa a almacén. Al guardar va directo a la pestaña Facturas como POR PAGAR." />
       <div className="grid gap-4 p-5 md:grid-cols-3">
+        <div className="md:col-span-3">
+          <EscanearGasto onLeido={aplicarEscaneo} rol={rol} />
+        </div>
         <Field label="Tipo de gasto *">
           <Select
             value={d.tipoGasto}
@@ -204,12 +352,25 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
           {d.tipoGasto === "SERV_PROFESIONALES" && <span className="mt-1 block text-xs text-plomo-500">Persona natural con RUC 10 - 4ta categoría</span>}
         </Field>
         <Field label="Fecha de gasto *" hint={fechaError ? `⚠ ${fechaError}` : "DD/MM/AAAA"}>
-          <Input value={fechaTxt} inputMode="numeric" maxLength={10} onChange={(e) => setFechaTxt(mascara(e.target.value))} className={cn(fechaError && "border-red-400")} />
+          <Input
+            value={fechaTxt}
+            inputMode="numeric"
+            maxLength={10}
+            onChange={(e) => {
+              setFechaTxt(mascara(e.target.value));
+              revisado("fecha");
+            }}
+            className={cn(ocr("fecha"), fechaError && "border-red-400")}
+          />
         </Field>
         <Field
-          label="Importe total (S/) *"
+          label={enUsd ? "Importe total (US$) *" : "Importe total (S/) *"}
           hint={
-            d.comprobante === "FACTURA"
+            enUsd
+              ? d.tipoCambio
+                ? `Equivale a ${soles(d.importe || 0)}${d.comprobante === "FACTURA" ? " · con IGV incluido" : ""}`
+                : "Ingrese el tipo de cambio para ver el importe en soles"
+              : d.comprobante === "FACTURA"
               ? "Con IGV incluido"
               : d.comprobante === "DJ"
                 ? `Movilidad: máx. ${soles(TOPE_DJ_MOVILIDAD_DIA)} por día (SUNAT)`
@@ -218,17 +379,89 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
                   : undefined
           }
         >
-          <Input type="number" min={0} step="0.01" value={d.importe || ""} onChange={(e) => set("importe", parseFloat(e.target.value) || 0)} className="text-lg font-semibold" />
+          <div className="flex gap-2">
+            <div role="group" aria-label="Moneda del comprobante" className="flex shrink-0 overflow-hidden rounded-lg border border-plomo-200">
+              {(["PEN", "USD"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() =>
+                    setUsd(
+                      m === "USD"
+                        ? { moneda: "USD", importeUsd: d.moneda === "USD" ? d.importeUsd : d.importe || 0 }
+                        : { moneda: "PEN" }
+                    )
+                  }
+                  className={cn("px-3 text-sm font-bold", d.moneda === m || (m === "PEN" && !d.moneda) ? "bg-azul-900 text-white" : "bg-surface text-plomo-600 hover:bg-red-50")}
+                  aria-pressed={d.moneda === m}
+                >
+                  {m === "PEN" ? "S/" : "US$"}
+                </button>
+              ))}
+            </div>
+            <Input
+              type="number"
+              min={0}
+              step="0.01"
+              value={(enUsd ? d.importeUsd : d.importe) || ""}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value) || 0;
+                if (enUsd) setUsd({ importeUsd: v });
+                else set("importe", v);
+                revisado("importe");
+              }}
+              className={cn("text-lg font-semibold", ocr("importe"))}
+            />
+          </div>
         </Field>
+        {enUsd && (
+          <div className="grid gap-3 rounded-xl border border-plomo-200 p-4 md:col-span-3 md:grid-cols-3">
+            <Field label="Tipo de cambio (S/ por US$) *" hint="Venta SUNAT del día del comprobante">
+              <Input
+                type="number"
+                min={TC_MIN}
+                max={TC_MAX}
+                step="0.001"
+                value={d.tipoCambio || ""}
+                onChange={(e) => {
+                  setUsd({ tipoCambio: parseFloat(e.target.value) || 0 });
+                  revisado("tipoCambio");
+                }}
+                placeholder="Ej: 3.750"
+                className={cn(ocr("tipoCambio"), !!d.tipoCambio && (d.tipoCambio < TC_MIN || d.tipoCambio > TC_MAX) && "border-red-400")}
+              />
+            </Field>
+            <div className="flex flex-col justify-center rounded-lg bg-emerald-50 px-4 py-2 text-sm text-emerald-900 md:col-span-2">
+              <span className="text-xs uppercase tracking-wide text-emerald-700">Cambio a soles</span>
+              <span>
+                US$ {(d.importeUsd || 0).toFixed(2)} × {(d.tipoCambio || 0).toFixed(3)} = <b className="text-lg">{soles(d.importe || 0)}</b>
+              </span>
+              <span className="text-xs text-emerald-700">El gasto se registra en soles (Facturas, cajas y detracción); se guardan los US$ y el tipo de cambio.</span>
+            </div>
+          </div>
+        )}
         <Field label="Descripción del gasto *" className="md:col-span-3">
-          <Textarea value={d.descripcion} onChange={(e) => set("descripcion", e.target.value)} placeholder="Ej: Servicio de transporte Arequipa - Lima" />
+          <Textarea
+            value={d.descripcion}
+            onChange={(e) => {
+              set("descripcion", e.target.value);
+              revisado("descripcion");
+            }}
+            placeholder="Ej: Servicio de transporte Arequipa - Lima"
+            className={ocr("descripcion")}
+          />
         </Field>
 
         {/* Orden de compra u orden de servicio opcional (una sola) */}
         <div className="md:col-span-3">
-          <SelectorOrden value={orden} onChange={setOrden} nota="Opcional. La OS nace APROBADA con correlativo OS-001-2026.">
+          <SelectorOrden value={orden} onChange={elegirOrden} nota="Opcional. La OS nace APROBADA con correlativo OS-001-2026.">
             {orden === "OS" ? (
-              <ServiciosOS filas={servicios} onChange={setServicios} descripcionGasto={d.descripcion} importe={d.importe} conIgv={d.comprobante === "FACTURA"} />
+              <ServiciosOS
+                filas={servicios}
+                onChange={(fs) => {
+                  setLineasAuto(false);
+                  setServicios(fs);
+                }} descripcionGasto={d.descripcion} importe={d.importe} conIgv={d.comprobante === "FACTURA"} />
             ) : (
             <div className="mt-3 space-y-3">
               <p className="text-xs text-plomo-500">
@@ -272,7 +505,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
                         <td className="px-2 py-1.5">
                           <button
                             type="button"
-                            onClick={() => setFilas((p) => (p.length > 1 ? p.filter((x) => x.id !== f.id) : [filaOC()]))}
+                            onClick={() => editarFilas((p) => (p.length > 1 ? p.filter((x) => x.id !== f.id) : [filaOC()]))}
                             className="rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
                             aria-label="Quitar producto"
                           >
@@ -285,7 +518,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
                 </table>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <Button type="button" size="sm" variant="secondary" onClick={() => setFilas((p) => [...p, filaOC()])}>
+                <Button type="button" size="sm" variant="secondary" onClick={() => editarFilas((p) => [...p, filaOC()])}>
                   <Plus size={14} /> Agregar producto
                 </Button>
                 <p className={cn("text-sm", Math.abs(totalOC - (d.importe || 0)) > 0.05 ? "text-red-600" : "text-emerald-700")}>
@@ -302,6 +535,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
             value={d.comprobante}
             onChange={(e) => {
               const comprobante = e.target.value as ComprobanteGasto;
+              revisado("comprobante");
               setD((x) => ({
                 ...x,
                 comprobante,
@@ -312,6 +546,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
               }));
             }}
             options={OPCIONES_COMPROBANTE}
+            className={ocr("comprobante")}
           />
           {esRHE && <span className="mt-1 block text-xs text-plomo-500">Persona natural con RUC 10 - 4ta categoría</span>}
         </Field>
@@ -322,8 +557,12 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
           <Input
             value={numeroAutomatico(d.comprobante) ? "" : d.numero}
             disabled={numeroAutomatico(d.comprobante)}
-            onChange={(e) => set("numero", e.target.value.toUpperCase())}
+            onChange={(e) => {
+              set("numero", e.target.value.toUpperCase());
+              revisado("numero");
+            }}
             placeholder={placeholderComprobante(d.comprobante)}
+            className={ocr("numero")}
           />
         </Field>
         {d.comprobante === "SERVICIO_PUBLICO" ? (
@@ -336,11 +575,12 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
         <Field label={d.comprobante === "DJ" ? "Nombre de quien declara *" : esRHE ? "Persona que emite el RHE *" : "Proveedor / agencia *"} className="md:col-span-2">
           <Input value={d.proveedor} list="proveedores-gasto" onChange={(e) => {
             const v = e.target.value;
+            revisado("proveedor");
             const p = proveedores.find((x) => x.razonSocial === v.toUpperCase());
             // VARIOS/SIN DATOS pone 010101; al cambiar a otro proveedor, el 010101 se limpia
             const ruc = esProveedorVarios(v) ? RUC_VARIOS : p?.ruc ?? "";
             setD((x) => ({ ...x, proveedor: v, ruc: esProveedorVarios(v) || p ? ruc : x.ruc === RUC_VARIOS ? "" : x.ruc }));
-          }} onFocus={(e) => esProveedorVarios(d.proveedor) && e.target.select()} placeholder="Razón social o nombre" />
+          }} onFocus={(e) => esProveedorVarios(d.proveedor) && e.target.select()} placeholder="Razón social o nombre" className={ocr("proveedor")} />
           {esProveedorVarios(d.proveedor) && (
             <span className="mt-1 block text-xs text-plomo-500">
               Por defecto (N° {RUC_VARIOS}). Escriba encima o elija otro de la lista; si escribe un RUC real, se pone la razón social de SUNAT.
@@ -366,15 +606,19 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
             inputMode="numeric"
             onChange={(e) => {
               const ruc = e.target.value.replace(/\D/g, "");
+              revisado("ruc");
               // RUC ya validado en el sistema: reemplaza PROVEEDORES VARIOS por su razón social
               const sunat = ruc.length === 11 ? rucSunat(ruc) : undefined;
               setD((x) => ({ ...x, ruc, proveedor: sunat ? sunat.razon_social : x.proveedor }));
             }}
-            className={cn(d.ruc.length === 11 && (rucMal ? "border-red-400" : "border-emerald-400"))}
+            className={cn(ocr("ruc"), d.ruc.length === 11 && (rucMal ? "border-red-400" : "border-emerald-400"))}
           />
           <EstadoRuc
             ruc={d.ruc}
-            onValidado={(r) => setD((x) => ({ ...x, proveedor: r.razon_social }))}
+            onValidado={(r) => {
+              setD((x) => ({ ...x, proveedor: r.razon_social }));
+              revisado("proveedor");
+            }}
             onDni={(r) => setD((x) => ({ ...x, proveedor: nombreDesdeDni(r) }))}
           />
         </Field>

@@ -282,6 +282,17 @@ export interface Factura {
   cotizacionProveedor?: string;
   /** true: el N° lo generó el sistema porque no había cotización del proveedor. */
   cotizacionAuto?: boolean;
+  /**
+   * Gasto en dólares: el comprobante es en US$ (totalUsd) y el ERP lo registra en soles con el tipo de cambio
+   * (total = totalUsd × tipoCambio). Sin moneda: soles.
+   */
+  moneda?: "PEN" | "USD";
+  tipoCambio?: number;
+  totalUsd?: number;
+  /** Notas de crédito (restan) y de débito (suman) del proveedor vinculadas a este gasto. */
+  notas?: NotaGasto[];
+  /** Total del comprobante original, antes de aplicar notas. */
+  totalOriginal?: number;
   archivos?: ArchivoGasto[];
   /**
    * DJ automática de sustento (Williams 2026-11-13): solo el gasto marcado "Sin comprobante" lleva su declaración
@@ -324,6 +335,21 @@ export type ComprobanteGasto =
   | "TRANSPORTE_GUIA"
   | "SIN_COMPROBANTE"
   | "RECIBO";
+/** Nota de crédito / débito electrónica del proveedor aplicada a un gasto (resta o suma a su total). */
+export interface NotaGasto {
+  tipo: "CREDITO" | "DEBITO";
+  numero: string; // FC01-45
+  fecha: string;
+  /** Monto en soles (con IGV si el gasto es factura). */
+  monto: number;
+  /** Monto en US$ si el gasto es en dólares. */
+  montoUsd?: number;
+  motivo?: string;
+  archivo?: ArchivoGasto;
+  registradoPor?: string;
+  registradoEn: string;
+}
+
 export interface ArchivoGasto {
   tipo: "FACTURA" | "GUIA" | "COTIZACION";
   nombre: string;
