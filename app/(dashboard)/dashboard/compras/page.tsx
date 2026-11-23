@@ -2071,6 +2071,11 @@ function Facturas({
           total: (
             <>
               {soles(f.total)}
+              {f.moneda === "USD" && (
+                <span className="block text-[11px] font-normal text-plomo-500">
+                  US$ {(f.totalUsd ?? 0).toFixed(2)} · T.C. {f.tipoCambio?.toFixed(3)}
+                </span>
+              )}
             </>
           ),
           acciones: (

@@ -758,6 +758,9 @@ function pdfGasto(f: Factura, codigo: string): void {
         ["Fecha", fechaPE(f.fecha)],
         ["Comprobante", `${comp} ${f.numero}`],
         ["Cotización", f.cotizacionProveedor ? `${f.cotizacionProveedor}${f.cotizacionAuto ? " (interna)" : ""}` : "-"],
+        ...(f.moneda === "USD"
+          ? ([["Moneda", `Dólares: US$ ${(f.totalUsd ?? 0).toFixed(2)} × T.C. ${(f.tipoCambio ?? 0).toFixed(3)} = ${soles(f.total)}`]] as [string, string][])
+          : []),
         ["Adjuntos", f.archivos?.length ? f.archivos.map((a) => a.nombre).join(", ") : "-"],
       ],
       head: ["#", "Descripción", "Importe"],

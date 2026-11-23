@@ -2947,7 +2947,18 @@ export interface DatosGasto {
   suministro?: string;
   /** N° de la cotización emitida por el proveedor. Vacío: se genera COT-PROV-0001-2026 al guardar. */
   cotizacion?: string;
+  /** Comprobante en dólares: `importeUsd` × `tipoCambio` = `importe` (soles, con el que se registra todo). */
+  moneda?: "PEN" | "USD";
+  tipoCambio?: number;
+  importeUsd?: number;
 }
+
+/** Tipo de cambio razonable (S/ por US$) para validar lo que se escribe. */
+export const TC_MIN = 2;
+export const TC_MAX = 8;
+
+/** Gasto en dólares → importe en soles. */
+export const solesDeUsd = (usd: number, tc: number): number => r2((Number(usd) || 0) * (Number(tc) || 0));
 
 /** Detracción y neto a pagar: ej. agencia S/ 100 con 4 % -> detracción S/ 4, neto S/ 96. */
 export function calcularDetraccion(importe: number, aplica: boolean, porc: number): { monto: number; neto: number } {
@@ -3360,7 +3371,14 @@ function prepararGasto(d: DatosGasto, rol: Rol): Factura {
   if (d.fecha > hoy()) throw new ErpError("La fecha del gasto no puede ser futura.");
   if (!(d.tipoGasto in TIPOS_GASTO)) throw new ErpError("Seleccione el tipo de gasto.");
   if (!d.descripcion.trim()) throw new ErpError("Describa el gasto.");
-  const total = r2(Number(d.importe));
+  const enUsd = d.moneda === "USD";
+  if (enUsd) {
+    if (!(Number(d.importeUsd) > 0)) throw new ErpError("Ingrese el importe total en dólares (US$).");
+    if (!(Number(d.tipoCambio) >= TC_MIN && Number(d.tipoCambio) <= TC_MAX))
+      throw new ErpError(`Ingrese el tipo de cambio del día (S/ por US$, entre ${TC_MIN} y ${TC_MAX}).`);
+  }
+  // En dólares, el importe en soles sale siempre de US$ × tipo de cambio
+  const total = enUsd ? solesDeUsd(d.importeUsd as number, d.tipoCambio as number) : r2(Number(d.importe));
   if (!(total > 0)) throw new ErpError("El importe total debe ser mayor a 0.");
   if (!(d.comprobante in COMPROBANTES_GASTO)) throw new ErpError("Seleccione el tipo de comprobante.");
   const numero = d.numero.trim().toUpperCase();
@@ -3419,8 +3437,9 @@ function prepararGasto(d: DatosGasto, rol: Rol): Factura {
     igv: r2(total - subtotal),
     total,
     estadoPago: "POR_PAGAR",
-    historial: [evento(rol, "Gasto de Tesorería registrado", `${TIPOS_GASTO[d.tipoGasto]} · ${COMPROBANTES_GASTO[d.comprobante]} ${numero}${monto ? ` · detracción ${d.detraccionPorc}% S/ ${monto.toFixed(2)}` : ""}${retencion ? ` · retención 4ta ${PORC_RETENCION_RHE}% S/ ${retencion.toFixed(2)}` : ""}`)],
+    historial: [evento(rol, "Gasto de Tesorería registrado", `${TIPOS_GASTO[d.tipoGasto]} · ${COMPROBANTES_GASTO[d.comprobante]} ${numero}${monto ? ` · detracción ${d.detraccionPorc}% S/ ${monto.toFixed(2)}` : ""}${retencion ? ` · retención 4ta ${PORC_RETENCION_RHE}% S/ ${retencion.toFixed(2)}` : ""}${enUsd ? ` · US$ ${r2(Number(d.importeUsd)).toFixed(2)} × T.C. ${Number(d.tipoCambio).toFixed(3)} = S/ ${total.toFixed(2)}` : ""}`)],
     esGastoTesoreria: true,
+    ...(enUsd ? { moneda: "USD" as const, tipoCambio: Number(d.tipoCambio), totalUsd: r2(Number(d.importeUsd)) } : {}),
     tipoGasto: d.tipoGasto,
     descripcion: d.descripcion.trim(),
     comprobanteGasto: d.comprobante,
@@ -3513,6 +3532,8 @@ export function editarGasto(id: string, c: EdicionGasto, rol: Rol): Factura {
     retencionMonto: retencion || undefined,
     netoPagar: neto,
     ...(cambiaCot ? { cotizacionProveedor: cot, cotizacionAuto: false } : {}),
+    // Gasto en dólares: los US$ del comprobante no cambian; el nuevo importe en soles ajusta el tipo de cambio
+    ...(f.moneda === "USD" && f.totalUsd && total !== f.total ? { tipoCambio: Math.round((total / f.totalUsd) * 10000) / 10000 } : {}),
     editadoPor: usuarioActual(),
     editadoEn: new Date().toISOString(),
     historial: [...f.historial, evento(rol, "Gasto editado", cambios || undefined)],

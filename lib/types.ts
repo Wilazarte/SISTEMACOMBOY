@@ -282,6 +282,13 @@ export interface Factura {
   cotizacionProveedor?: string;
   /** true: el N° lo generó el sistema porque no había cotización del proveedor. */
   cotizacionAuto?: boolean;
+  /**
+   * Gasto en dólares: el comprobante es en US$ (totalUsd) y el ERP lo registra en soles con el tipo de cambio
+   * (total = totalUsd × tipoCambio). Sin moneda: soles.
+   */
+  moneda?: "PEN" | "USD";
+  tipoCambio?: number;
+  totalUsd?: number;
   archivos?: ArchivoGasto[];
   /**
    * DJ automática de sustento (Williams 2026-11-13): solo el gasto marcado "Sin comprobante" lleva su declaración

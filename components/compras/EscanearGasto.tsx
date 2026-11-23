@@ -228,7 +228,7 @@ export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => v
             {ultimo.igvMal && <> · <b>el IGV leído no es el 18 % del total: revise el importe</b></>}
             {ultimo.usd && (
               <span className="mt-1 block font-semibold text-amber-900">
-                Comprobante en DÓLARES (US$): el gasto se registra en soles. Convierta el importe y los precios con el tipo de cambio antes de guardar.
+                Comprobante en DÓLARES (US$): se puso la moneda US$. Confirme el tipo de cambio: el importe y la OC / OS se pasan a soles solos.
               </span>
             )}
           </div>
