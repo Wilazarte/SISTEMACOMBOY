@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { AlertTriangle, BarChart3, CheckCircle2, ChevronRight } from "lucide-react";
+import { BarChart3, CheckCircle2, ChevronRight, Eye, ListTodo } from "lucide-react";
 import type { EquipoTerminado } from "@/lib/equipos";
 import { mantenimientosPendientes, normalizarActivo, type Activo } from "@/lib/activos";
 import { useExpedientes } from "@/lib/expedientes";
@@ -10,6 +10,7 @@ import { useLogistica } from "@/lib/logistica";
 import { irA } from "@/lib/navegacion";
 import type { OrdenProduccion } from "@/lib/produccion";
 import { estiloSeccion } from "@/lib/seccionColor";
+import { iconoInicio } from "@/lib/iconosFunciones";
 import { KEYS, TIPOS_GASTO, getPendientes, hoy, r2, useStore } from "@/lib/storage";
 import type { ComprobanteVenta, Factura, Guia, NotaPedido, OrdenCompra, OrdenDespacho, StockItem } from "@/lib/types";
 import { estadoOD, npPorCobrar, saldoNP, vencimientoNP } from "@/lib/ventas";
@@ -434,8 +435,8 @@ export function PanelResumen({ modulo, soloLectura = false }: { modulo: ModuloIn
   return (
     <div className="space-y-4">
       <section className="seccion rounded-xl border glass-card glass-blur p-5" style={estiloSeccion(3)}>
-        <h2 className="seccion-titulo mb-3 text-[13px] font-bold uppercase tracking-wide">
-          Tareas pendientes
+        <h2 className="seccion-titulo con-icono mb-3 flex items-center gap-2 text-[13px] font-bold uppercase tracking-wide">
+          <ListTodo size={16} aria-hidden /> Tareas pendientes
         </h2>
         {abiertas.length === 0 ? (
           <p className="flex items-center gap-2 text-[13px] text-[#4ade80]">
@@ -443,7 +444,10 @@ export function PanelResumen({ modulo, soloLectura = false }: { modulo: ModuloIn
           </p>
         ) : (
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {pendientes.map((p) => (
+            {pendientes.map((p) => {
+              // Ícono según el título de la tarea (Williams 2026-11-22)
+              const I = iconoInicio(p.texto);
+              return (
               <button
                 key={p.texto}
                 type="button"
@@ -456,14 +460,16 @@ export function PanelResumen({ modulo, soloLectura = false }: { modulo: ModuloIn
                 <span className={`min-w-[40px] text-center text-2xl font-bold ${p.cantidad === 0 ? "text-[#6b7280]" : p.urgente ? "text-[#ff6a7f]" : "text-white"}`}>{p.cantidad}</span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5 text-[13px] font-semibold text-white">
-                    {p.urgente && p.cantidad > 0 && <AlertTriangle size={13} className="shrink-0 text-[#ff6a7f]" />}
+                    {/* Ícono según el título (rojo si es urgente) */}
+                    <I size={15} aria-hidden className={`shrink-0 ${p.cantidad === 0 ? "text-[#6b7280]" : p.urgente ? "text-[#ff6a7f]" : "text-[#294D61]"}`} />
                     {p.texto}
                   </span>
                   {p.detalle && p.cantidad > 0 && <span className="block text-[12px] text-[#9CA3AF]">{p.detalle}</span>}
                 </span>
                 {!soloLectura && <ChevronRight size={16} className="shrink-0 text-[#6b7280]" />}
               </button>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
@@ -480,15 +486,19 @@ export function PanelResumen({ modulo, soloLectura = false }: { modulo: ModuloIn
 const formato = (g: Grafico, v: number) => (g.moneda ? montoCorto(v) : `${v.toLocaleString("es-PE")}${g.unidad ? ` ${g.unidad}` : ""}`);
 
 function TarjetaGrafico({ g, i, ir }: { g: Grafico; i: number; ir?: (href: string) => void }) {
+  const I = iconoInicio(g.titulo);
   const max = Math.max(0, ...g.series.flatMap((s) => s.valores));
   const vacio = max === 0 || g.etiquetas.length === 0;
   return (
     <section className="seccion flex flex-col rounded-xl border glass-card glass-blur p-5" style={estiloSeccion(i)}>
       <div className="mb-1 flex items-start justify-between gap-3">
-        <h3 className="seccion-titulo text-[13px] font-bold uppercase tracking-wide">{g.titulo}</h3>
+        <h3 className="seccion-titulo con-icono flex items-center gap-2 text-[13px] font-bold uppercase tracking-wide">
+          <I size={16} className="shrink-0" aria-hidden />
+          {g.titulo}
+        </h3>
         {ir && (
-          <button type="button" onClick={() => ir(g.href)} className="shrink-0 rounded-md px-2 py-0.5 text-[12px] font-semibold text-[#9CA3AF] transition hover:bg-white/10 hover:text-white">
-            Ver detalle
+          <button type="button" onClick={() => ir(g.href)} className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[12px] font-semibold text-[#9CA3AF] transition hover:bg-white/10 hover:text-white">
+            <Eye size={13} aria-hidden /> Ver detalle
           </button>
         )}
       </div>

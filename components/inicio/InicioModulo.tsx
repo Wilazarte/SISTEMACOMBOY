@@ -11,6 +11,7 @@ import { enSucursal, recargarDatos, type StoreKey, KEYS } from "@/lib/storage";
 import { AccesosModulos, type ModuloPlanta } from "@/components/logistica/planta";
 import { permisosPlanta } from "@/lib/permisosPlanta";
 import { estiloSeccion } from "@/lib/seccionColor";
+import { iconoInicio } from "@/lib/iconosFunciones";
 import { HOOK_KPIS, type KpiInicio } from "./kpis";
 import { NotificacionesEnVivo } from "./NotificacionesEnVivo";
 import { PanelResumen } from "./PanelResumen";
@@ -140,9 +141,14 @@ function FilaKpis({ modulo }: { modulo: ModuloInicio }) {
 }
 
 function TarjetaKpi({ k, i }: { k: KpiInicio; i: number }) {
+  // Ícono según el título del KPI (Williams 2026-11-22)
+  const I = iconoInicio(k.titulo);
   return (
     <button type="button" onClick={() => abrirEnPestana(k.href)} className="seccion min-w-0 rounded-xl border glass-card glass-blur px-3 py-3 text-left hover-cian" style={estiloSeccion(i)}>
-      <span className="block truncate text-[11px] font-medium uppercase tracking-wide text-[#9CA3AF]">{k.titulo}</span>
+      <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-[#9CA3AF]">
+        <I size={14} className="shrink-0 text-[rgb(var(--sec))]" aria-hidden />
+        <span className="truncate">{k.titulo}</span>
+      </span>
       <span className="mt-0.5 block truncate text-xl font-bold text-white">{k.valor}</span>
       <span className={`mt-0.5 block truncate text-[11px] ${k.alerta ? "text-[#ff6a5f]" : "text-[#4ade80]"}`}>{k.detalle}</span>
     </button>
