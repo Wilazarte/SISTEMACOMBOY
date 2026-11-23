@@ -28,9 +28,9 @@ import { et, fechaCorta, fechaHora, registrarConsultaHistoria, sha256Hex, type D
 import { Boton, ChipEstado, Tarjeta, Vacio, claseInput, cx } from "./piezas";
 
 const COLOR_ESTADO: Record<HistoriaProceso["estado"], { fondo: string; texto: string }> = {
-  "EN CURSO": { fondo: "#800021", texto: "#FFFFFF" },
-  CERRADO: { fondo: "#294D61", texto: "#FFFFFF" },
-  ANULADO: { fondo: "#CCD0CF", texto: "#11212D" },
+  "EN CURSO": { fondo: "var(--accent)", texto: "#FFFFFF" },
+  CERRADO: { fondo: "var(--secundario)", texto: "#FFFFFF" },
+  ANULADO: { fondo: "var(--border)", texto: "var(--text)" },
 };
 
 function ChipProceso({ estado }: { estado: HistoriaProceso["estado"] }) {
@@ -138,8 +138,8 @@ export function HistoriaProcesos({
 
   return (
     <div className="space-y-3">
-      <Tarjeta className="flex flex-wrap items-start gap-3 px-4 py-3 text-[13px] text-[#11212D]">
-        <Route size={20} className="mt-0.5 shrink-0 text-[#294D61]" />
+      <Tarjeta className="flex flex-wrap items-start gap-3 px-4 py-3 text-[13px] text-tema-texto">
+        <Route size={20} className="mt-0.5 shrink-0 text-tema-sec" />
         <p className="min-w-0 flex-1 basis-64">
           <b>Historia clínica por proceso.</b> Cada compra, servicio, venta, producción y gasto se arma como una línea: desde el documento que lo inicia hasta el último paso, con
           todos sus documentos, fechas, responsables y adjuntos. Busque con cualquier código del proceso.
@@ -148,7 +148,7 @@ export function HistoriaProcesos({
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1 basis-60">
-          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#11212D]/50" />
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-tema-texto/50" />
           <input
             className={cx(claseInput, "pl-9")}
             value={q}
@@ -195,43 +195,43 @@ export function HistoriaProcesos({
           {filtrados.length === 0 ? (
             <Vacio texto={procesos.length ? "Ningún proceso coincide con la búsqueda." : "Cargando los procesos de los módulos…"} icono={<Route size={26} />} />
           ) : (
-            <ul className="divide-y divide-[#11212D]/10">
+            <ul className="divide-y divide-tema-texto/10">
               {filtrados.slice(0, 300).map((p) => {
                 const avance = p.etapasHechas.length / ETAPAS[p.tipo].length;
                 return (
                   <li key={p.tipo + p.id}>
                     <button
                       onClick={() => elegir(p.id)}
-                      className={cx("block w-full px-3 py-2.5 text-left text-[#11212D] transition hover:bg-[#CCD0CF]/35", sel === p.id && "bg-[#CCD0CF]/55")}
+                      className={cx("block w-full px-3 py-2.5 text-left text-tema-texto transition hover:bg-tema-borde/35", sel === p.id && "bg-tema-borde/55")}
                     >
                       <span className="flex items-center justify-between gap-2">
                         <b className="min-w-0 break-words text-[13px]">{p.id}</b>
                         <ChipProceso estado={p.estado} />
                       </span>
-                      <span className="block text-[11px] font-semibold uppercase tracking-wide text-[#294D61]">{NOMBRE_PROCESO[p.tipo]}</span>
-                      <span className="block break-words text-[12px] text-[#11212D]/75">{p.partes || "—"}</span>
+                      <span className="block text-[11px] font-semibold uppercase tracking-wide text-tema-sec">{NOMBRE_PROCESO[p.tipo]}</span>
+                      <span className="block break-words text-[12px] text-tema-texto/75">{p.partes || "—"}</span>
                       <span className="mt-1 flex items-center gap-2">
-                        <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#CCD0CF]">
+                        <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-tema-borde">
                           <span
                             className="block h-full rounded-full"
                             style={{
                               width: `${Math.round(avance * 100)}%`,
-                              background: p.estado === "CERRADO" ? "#294D61" : "#800021",
+                              background: p.estado === "CERRADO" ? "var(--secundario)" : "var(--accent)",
                             }}
                           />
                         </span>
-                        <span className="shrink-0 text-[11px] text-[#11212D]/60">
+                        <span className="shrink-0 text-[11px] text-tema-texto/60">
                           {p.etapasHechas.length}/{ETAPAS[p.tipo].length} · {fechaHistoria(p.inicio)}
                         </span>
                       </span>
-                      <span className="block text-[11px] text-[#11212D]/60">{p.etapaActual}</span>
+                      <span className="block text-[11px] text-tema-texto/60">{p.etapaActual}</span>
                     </button>
                   </li>
                 );
               })}
             </ul>
           )}
-          {filtrados.length > 300 && <p className="px-3 py-2 text-[11px] text-[#11212D]/60">Se muestran 300 de {filtrados.length}. Afine la búsqueda.</p>}
+          {filtrados.length > 300 && <p className="px-3 py-2 text-[11px] text-tema-texto/60">Se muestran 300 de {filtrados.length}. Afine la búsqueda.</p>}
         </Tarjeta>
 
         {/* Historia clínica */}
@@ -252,7 +252,7 @@ export function HistoriaProcesos({
           )}
         </div>
       </div>
-      <p className="text-[11px] text-[#11212D]/60">
+      <p className="text-[11px] text-tema-texto/60">
         {filtrados.length} de {procesos.length} proceso(s). Se ven los procesos de los módulos que su rol puede leer; la historia no modifica ningún documento.
       </p>
     </div>
@@ -281,7 +281,7 @@ function HistoriaClinica({
   return (
     <Tarjeta className="overflow-hidden">
       {/* Cabecera */}
-      <div className="!bg-[#11212D] px-4 py-3.5 !text-white sm:px-5">
+      <div className="!bg-tema-fuerte px-4 py-3.5 !text-white sm:px-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">Historia clínica del proceso</p>
@@ -311,7 +311,7 @@ function HistoriaClinica({
           {puedeSubir && (
             <button
               onClick={() => onAdjuntar(p.id)}
-              className="inline-flex items-center gap-1.5 rounded-lg !bg-[#800021] px-3 py-1.5 text-[12px] font-semibold !text-white hover:opacity-90"
+              className="inline-flex items-center gap-1.5 rounded-lg !bg-tema-acento px-3 py-1.5 text-[12px] font-semibold !text-white hover:opacity-90"
             >
               <Plus size={14} /> Adjuntar documento al proceso
             </button>
@@ -320,7 +320,7 @@ function HistoriaClinica({
       </div>
 
       {/* Etapas */}
-      <ol className="flex flex-wrap gap-x-1 gap-y-2 border-b border-[#11212D]/10 bg-[#CCD0CF]/30 px-4 py-3 sm:px-5">
+      <ol className="flex flex-wrap gap-x-1 gap-y-2 border-b border-tema-texto/10 bg-tema-borde/30 px-4 py-3 sm:px-5">
         {etapas.map((e, i) => {
           const hecha = p.etapasHechas.includes(e);
           const actualE = !hecha && p.estado === "EN CURSO" && p.etapaActual === `Pendiente: ${e}`;
@@ -331,15 +331,15 @@ function HistoriaClinica({
                 style={
                   hecha
                     ? {
-                        background: "#294D61",
+                        background: "var(--secundario)",
                         color: "#FFFFFF",
-                        borderColor: "#294D61",
+                        borderColor: "var(--secundario)",
                       }
                     : actualE
                       ? {
                           background: "#FFFFFF",
-                          color: "#800021",
-                          borderColor: "#800021",
+                          color: "var(--accent)",
+                          borderColor: "var(--accent)",
                         }
                       : {
                           background: "#FFFFFF",
@@ -350,7 +350,7 @@ function HistoriaClinica({
               >
                 {hecha ? <CheckCircle2 size={12} /> : actualE ? <Clock3 size={12} /> : <Circle size={12} />} {e}
               </span>
-              {i < etapas.length - 1 && <ChevronRight size={12} className="text-[#11212D]/35" />}
+              {i < etapas.length - 1 && <ChevronRight size={12} className="text-tema-texto/35" />}
             </li>
           );
         })}
@@ -358,7 +358,7 @@ function HistoriaClinica({
 
       {/* Línea de tiempo */}
       <div className="px-3 py-4 sm:px-5">
-        <ol className="relative ml-2 border-l-2 border-[#11212D]/15">
+        <ol className="relative ml-2 border-l-2 border-tema-texto/15">
           {p.docs.map((d) => (
             <Nodo key={d.clave} d={d} />
           ))}
@@ -366,24 +366,24 @@ function HistoriaClinica({
 
         {/* Documentos de Gestión Documentaria enlazados por código */}
         <div className="mt-5">
-          <h3 className="mb-2 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-[#11212D]/75">
+          <h3 className="mb-2 flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider text-tema-texto/75">
             <Paperclip size={14} /> Documentos adjuntos en Gestión Documentaria ({docsGD.length})
           </h3>
           {docsGD.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-[#11212D]/20 px-3 py-3 text-[12px] text-[#11212D]/60">
+            <p className="rounded-lg border border-dashed border-tema-texto/20 px-3 py-3 text-[12px] text-tema-texto/60">
               Ninguno todavía. Use &quot;Adjuntar documento al proceso&quot; (planos, contratos, actas, fotos…): quedan versionados, con hash y auditoría, y aparecen aquí.
             </p>
           ) : (
-            <ul className="divide-y divide-[#11212D]/10 rounded-lg border border-[#11212D]/10">
+            <ul className="divide-y divide-tema-texto/10 rounded-lg border border-tema-texto/10">
               {docsGD.map((g) => (
                 <li key={g.id}>
                   <button
                     onClick={() => onAbrirDocumento(g.id)}
-                    className="flex w-full flex-wrap items-center justify-between gap-2 px-3 py-2 text-left text-[13px] text-[#11212D] hover:bg-[#CCD0CF]/35"
+                    className="flex w-full flex-wrap items-center justify-between gap-2 px-3 py-2 text-left text-[13px] text-tema-texto hover:bg-tema-borde/35"
                   >
                     <span className="min-w-0">
                       <b>{g.codigo_unico}</b> · {g.version_actual} · <span className="break-words">{g.nombre}</span>
-                      <span className="block text-[11px] text-[#11212D]/60">
+                      <span className="block text-[11px] text-tema-texto/60">
                         {et(g.categoria)} · {g.dueno_nombre} · {fechaCorta(g.fecha_creacion)}
                       </span>
                     </span>
@@ -410,25 +410,25 @@ function Dato({ label, children, ancho }: { label: string; children: React.React
 
 function Nodo({ d }: { d: DocHistoria }) {
   const [bitacora, setBitacora] = useState(false);
-  const color = !d.hecho ? "#CCD0CF" : d.critico ? "#800021" : "#294D61";
+  const color = !d.hecho ? "var(--border)" : d.critico ? "var(--accent)" : "var(--secundario)";
   return (
     <li className="relative mb-4 pl-5 last:mb-0">
       <span className="absolute -left-[9px] top-1 h-4 w-4 rounded-full border-2 border-white shadow" style={{ background: color }} aria-hidden />
-      <div className={cx("rounded-lg border px-3 py-2", d.hecho ? "border-[#11212D]/12 bg-white" : "border-dashed border-[#11212D]/20 bg-[#CCD0CF]/20")}>
+      <div className={cx("rounded-lg border px-3 py-2", d.hecho ? "border-tema-texto/12 bg-white" : "border-dashed border-tema-texto/20 bg-tema-borde/20")}>
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-          <p className={cx("min-w-0 break-words text-[13px]", d.hecho ? "text-[#11212D]" : "text-[#11212D]/55")}>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[#294D61]">{d.etapa}</span>
+          <p className={cx("min-w-0 break-words text-[13px]", d.hecho ? "text-tema-texto" : "text-tema-texto/55")}>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-tema-sec">{d.etapa}</span>
             <br />
             <b>{d.tipoDoc}</b>
             {d.codigo && <> · {d.codigo}</>}
           </p>
-          <span className="shrink-0 text-[11px] text-[#11212D]/60">{d.hecho ? fechaHistoria(d.fecha) : "Pendiente"}</span>
+          <span className="shrink-0 text-[11px] text-tema-texto/60">{d.hecho ? fechaHistoria(d.fecha) : "Pendiente"}</span>
         </div>
-        <p className={cx("mt-0.5 break-words text-[12px]", d.hecho ? "text-[#11212D]/80" : "text-[#11212D]/50")}>{d.detalle}</p>
+        <p className={cx("mt-0.5 break-words text-[12px]", d.hecho ? "text-tema-texto/80" : "text-tema-texto/50")}>{d.detalle}</p>
         {(d.estado || d.responsable || d.monto) && d.hecho && (
-          <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-[#11212D]/70">
+          <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-tema-texto/70">
             {d.estado && (
-              <span className="font-bold uppercase" style={{ color: d.critico ? "#800021" : "#294D61" }}>
+              <span className="font-bold uppercase" style={{ color: d.critico ? "var(--accent)" : "var(--secundario)" }}>
                 {d.estado.replace(/_/g, " ")}
               </span>
             )}
@@ -441,7 +441,7 @@ function Nodo({ d }: { d: DocHistoria }) {
             {d.ver && (
               <button
                 onClick={() => abrirDoc(d.ver!)}
-                className="inline-flex items-center gap-1 rounded-md border border-[#11212D]/20 px-2 py-0.5 text-[11px] font-semibold text-[#11212D] hover:bg-[#CCD0CF]/40"
+                className="inline-flex items-center gap-1 rounded-md border border-tema-texto/20 px-2 py-0.5 text-[11px] font-semibold text-tema-texto hover:bg-tema-borde/40"
               >
                 <Eye size={12} /> Ver
               </button>
@@ -449,7 +449,7 @@ function Nodo({ d }: { d: DocHistoria }) {
             {d.pdf && (
               <button
                 onClick={() => void d.pdf!().catch((e) => toast((e as Error).message, "error"))}
-                className="inline-flex items-center gap-1 rounded-md border border-[#11212D]/20 px-2 py-0.5 text-[11px] font-semibold text-[#11212D] hover:bg-[#CCD0CF]/40"
+                className="inline-flex items-center gap-1 rounded-md border border-tema-texto/20 px-2 py-0.5 text-[11px] font-semibold text-tema-texto hover:bg-tema-borde/40"
               >
                 <FileText size={12} /> PDF
               </button>
@@ -458,7 +458,7 @@ function Nodo({ d }: { d: DocHistoria }) {
               <button
                 key={i}
                 onClick={() => abrirArchivo(a.ref)}
-                className="inline-flex max-w-full items-center gap-1 rounded-md !bg-[#294D61] px-2 py-0.5 text-[11px] font-semibold !text-white hover:opacity-90"
+                className="inline-flex max-w-full items-center gap-1 rounded-md !bg-tema-sec px-2 py-0.5 text-[11px] font-semibold !text-white hover:opacity-90"
                 title={a.nombre}
               >
                 <Paperclip size={12} className="shrink-0" /> <span className="truncate">{a.nombre}</span>
@@ -467,7 +467,7 @@ function Nodo({ d }: { d: DocHistoria }) {
             {d.bitacora.length > 0 && (
               <button
                 onClick={() => setBitacora((v) => !v)}
-                className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold text-[#294D61] hover:bg-[#CCD0CF]/40"
+                className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold text-tema-sec hover:bg-tema-borde/40"
               >
                 {bitacora ? <ChevronDown size={12} /> : <ChevronRight size={12} />} Bitácora ({d.bitacora.length})
               </button>
@@ -475,10 +475,10 @@ function Nodo({ d }: { d: DocHistoria }) {
           </div>
         )}
         {bitacora && (
-          <ul className="mt-2 space-y-1 border-t border-[#11212D]/10 pt-2">
+          <ul className="mt-2 space-y-1 border-t border-tema-texto/10 pt-2">
             {d.bitacora.map((e, i) => (
-              <li key={i} className="break-words text-[11px] text-[#11212D]/80">
-                <span className="text-[#11212D]/55">{fechaHistoria(e.fecha)}</span> · <b>{String(e.usuario ?? "")}</b> · {e.accion}
+              <li key={i} className="break-words text-[11px] text-tema-texto/80">
+                <span className="text-tema-texto/55">{fechaHistoria(e.fecha)}</span> · <b>{String(e.usuario ?? "")}</b> · {e.accion}
                 {e.detalle && <> · {e.detalle}</>}
               </li>
             ))}

@@ -207,10 +207,10 @@ export function HojaCosto({ hoja, datos, onVolver }: { hoja: Hoja; datos: Estado
             <ArrowLeft size={15} /> Volver
           </Boton>
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-[#294D61]">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-tema-sec">
               {hoja.codigo} · versión v{costos?.version_actual ?? "—"}
             </p>
-            <h2 className="break-words text-[18px] font-bold text-[#11212D]">
+            <h2 className="break-words text-[18px] font-bold text-tema-texto">
               {porModelo ? `Ficha de costo por modelo · ${NOMBRE_MODELO[hoja.orden_produccion_id] ?? hoja.orden_produccion_id}` : `${hoja.orden_produccion_id} · ${hoja.tipo_equipo}`}
               {!porModelo && hoja.modelo ? ` ${hoja.modelo}` : ""}
             </h2>
@@ -331,7 +331,7 @@ export function HojaCosto({ hoja, datos, onVolver }: { hoja: Hoja; datos: Estado
                     <Entrada type="number" min={0} step="0.5" className="w-24" value={l.cantidad} disabled={!editable} onChange={(e) => cambiarLinea(l.key, { cantidad: n(e.target.value) })} />
                   </Celda>
                   <Celda className="whitespace-nowrap">
-                    {S(l.costo_unitario)} <span className="text-[11px] text-[#294D61]">· no editable</span>
+                    {S(l.costo_unitario)} <span className="text-[11px] text-tema-sec">· no editable</span>
                   </Celda>
                   <Celda className="whitespace-nowrap font-bold">{S(subtotalLinea(l))}</Celda>
                   <Celda>{editable && <BotonQuitar l={l} onQuitar={quitarNueva} onAnular={(id) => setDialogo({ accion: "ANULAR_LINEA", lineaId: id, titulo: "Anular línea de costo", motivoMin: 10 })} />}</Celda>
@@ -339,7 +339,7 @@ export function HojaCosto({ hoja, datos, onVolver }: { hoja: Hoja; datos: Estado
               ))}
             </Tabla>
             {editable && (
-              <div className="flex flex-wrap items-end gap-2 border-t border-[#CCD0CF] p-3">
+              <div className="flex flex-wrap items-end gap-2 border-t border-tema-borde p-3">
                 <Etiqueta texto="Agregar trabajador (de la planilla)" className="min-w-[220px] flex-1">
                   <Lista
                     value=""
@@ -371,7 +371,7 @@ export function HojaCosto({ hoja, datos, onVolver }: { hoja: Hoja; datos: Estado
                       <div className="space-y-1">
                         <Entrada value={l.descripcion} disabled={!editable} onChange={(e) => cambiarLinea(l.key, { descripcion: e.target.value })} />
                         {l.subtipo === "OTROS" && (
-                          <Entrada placeholder="Justificación (obligatoria)" className={cn((l.justificacion ?? "").trim().length < 10 && "border-[#800021]")} value={l.justificacion ?? ""} disabled={!editable} onChange={(e) => cambiarLinea(l.key, { justificacion: e.target.value })} />
+                          <Entrada placeholder="Justificación (obligatoria)" className={cn((l.justificacion ?? "").trim().length < 10 && "border-tema-acento")} value={l.justificacion ?? ""} disabled={!editable} onChange={(e) => cambiarLinea(l.key, { justificacion: e.target.value })} />
                         )}
                       </div>
                     ) : (
@@ -398,8 +398,8 @@ export function HojaCosto({ hoja, datos, onVolver }: { hoja: Hoja; datos: Estado
               ))}
             </Tabla>
             {editable && (
-              <div className="grid gap-2 border-t border-[#CCD0CF] p-3 sm:grid-cols-2 lg:grid-cols-4">
-                <Etiqueta texto="+ Energía (máquina)" ayuda={datos.config.tarifa_kwh > 0 ? `Tarifa ${S(datos.config.tarifa_kwh)}/kWh` : <span className="text-[#800021]">Falta tarifa kWh en Parámetros</span>}>
+              <div className="grid gap-2 border-t border-tema-borde p-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Etiqueta texto="+ Energía (máquina)" ayuda={datos.config.tarifa_kwh > 0 ? `Tarifa ${S(datos.config.tarifa_kwh)}/kWh` : <span className="text-tema-tinta">Falta tarifa kWh en Parámetros</span>}>
                   <Lista
                     value=""
                     disabled={datos.config.tarifa_kwh <= 0}
@@ -472,25 +472,25 @@ export function HojaCosto({ hoja, datos, onVolver }: { hoja: Hoja; datos: Estado
                 </Celda>
                 <Celda>
                   <div className="flex items-center gap-1">
-                    <Entrada type="number" min={0} max={95} step="0.1" className={cn("w-24", t.alerta_merma && "border-[#800021] text-[#800021]")} value={Math.round(cab.merma_pct * 1000) / 10} disabled={!editable} onChange={(e) => cambiarCab("merma_pct", n(e.target.value) / 100)} />%
+                    <Entrada type="number" min={0} max={95} step="0.1" className={cn("w-24", t.alerta_merma && "border-tema-acento text-tema-tinta")} value={Math.round(cab.merma_pct * 1000) / 10} disabled={!editable} onChange={(e) => cambiarCab("merma_pct", n(e.target.value) / 100)} />%
                   </div>
                 </Celda>
-                <Celda className={cn("whitespace-nowrap font-bold", t.alerta_merma && "text-[#800021]")}>{S(t.merma_monto)}</Celda>
+                <Celda className={cn("whitespace-nowrap font-bold", t.alerta_merma && "text-tema-tinta")}>{S(t.merma_monto)}</Celda>
                 <Celda />
               </tr>
             </Tabla>
             {t.alerta_merma && (
-              <div className="grid gap-2 border-t border-[#800021]/30 p-3 sm:grid-cols-2">
+              <div className="grid gap-2 border-t border-tema-acento/30 p-3 sm:grid-cols-2">
                 <Etiqueta texto="Justificación de la merma (obligatoria)">
-                  <Area className={cn(cab.justificacion_merma.trim().length < 15 && "border-[#800021]")} value={cab.justificacion_merma} disabled={!editable} onChange={(e) => cambiarCab("justificacion_merma", e.target.value)} />
+                  <Area className={cn(cab.justificacion_merma.trim().length < 15 && "border-tema-acento")} value={cab.justificacion_merma} disabled={!editable} onChange={(e) => cambiarCab("justificacion_merma", e.target.value)} />
                 </Etiqueta>
                 <Etiqueta texto="Plan de mejora (bloquea el cierre sin él)">
-                  <Area className={cn(cab.plan_mejora.trim().length < 20 && "border-[#800021]")} value={cab.plan_mejora} disabled={!editable} onChange={(e) => cambiarCab("plan_mejora", e.target.value)} />
+                  <Area className={cn(cab.plan_mejora.trim().length < 20 && "border-tema-acento")} value={cab.plan_mejora} disabled={!editable} onChange={(e) => cambiarCab("plan_mejora", e.target.value)} />
                 </Etiqueta>
               </div>
             )}
             {editable && (
-              <div className="flex flex-wrap gap-2 border-t border-[#CCD0CF] p-3">
+              <div className="flex flex-wrap gap-2 border-t border-tema-borde p-3">
                 <Boton variante="borde" onClick={() => agregar({ seccion: "ADICIONAL", subtipo: "TRANSPORTE", descripcion: "Transporte / Flete", cantidad: 1, costo_unitario: 0, origen_costo: "MANUAL" })}>
                   <Plus size={14} /> Transporte / Flete
                 </Boton>
@@ -505,12 +505,12 @@ export function HojaCosto({ hoja, datos, onVolver }: { hoja: Hoja; datos: Estado
             <Tarjeta titulo={`Líneas anuladas (${anuladas.length}) · quedan en auditoría`}>
               <Tabla head={["Sección", "Descripción", "Subtotal", "Anulado por", "Motivo"]}>
                 {anuladas.map((a) => (
-                  <tr key={a.id} className="text-[#11212D]/70">
+                  <tr key={a.id} className="text-tema-texto/70">
                     <Celda>{NOMBRE_SECCION[a.seccion].slice(3)}</Celda>
                     <Celda className="line-through">{a.descripcion}</Celda>
                     <Celda className="whitespace-nowrap line-through">{S(a.subtotal)}</Celda>
                     <Celda>{a.anulado_usuario}</Celda>
-                    <Celda className="text-[#800021]">{a.motivo_anulacion}</Celda>
+                    <Celda className="text-tema-tinta">{a.motivo_anulacion}</Celda>
                   </tr>
                 ))}
               </Tabla>
@@ -521,7 +521,7 @@ export function HojaCosto({ hoja, datos, onVolver }: { hoja: Hoja; datos: Estado
         {/* Totales en vivo */}
         <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
           <Tarjeta titulo="Cálculo automático" tono={t.alerta_margen ? "vino" : "acero"} accion={sucio ? <span className="rounded bg-white/20 px-1.5 text-[10px] font-bold">SIN GUARDAR</span> : null}>
-            <dl className="divide-y divide-[#CCD0CF] px-4 py-2 text-[13px]">
+            <dl className="divide-y divide-tema-borde px-4 py-2 text-[13px]">
               {[
                 ["Materiales", t.materiales],
                 ["Mano de obra", t.mano_obra],
@@ -543,19 +543,19 @@ export function HojaCosto({ hoja, datos, onVolver }: { hoja: Hoja; datos: Estado
               </div>
               <div className="flex justify-between gap-2 py-1.5">
                 <dt>Precio sugerido ({pct(cab.margen_deseado, 0)})</dt>
-                <dd className="font-semibold text-[#294D61]">{S(t.precio_sugerido)}</dd>
+                <dd className="font-semibold text-tema-sec">{S(t.precio_sugerido)}</dd>
               </div>
               <div className="flex justify-between gap-2 py-1.5">
                 <dt>Precio de venta</dt>
                 <dd className="font-semibold">{cab.precio_venta > 0 ? S(cab.precio_venta) : "—"}</dd>
               </div>
-              <div className={cn("flex justify-between gap-2 py-2 text-[15px] font-bold", t.alerta_margen ? "text-[#800021]" : "text-[#294D61]")}>
+              <div className={cn("flex justify-between gap-2 py-2 text-[15px] font-bold", t.alerta_margen ? "text-tema-tinta" : "text-tema-sec")}>
                 <dt>Margen real</dt>
                 <dd>{pct(t.margen_real)}</dd>
               </div>
             </dl>
             {t.alerta_margen && <div className="px-3 py-2 text-center text-[12px] font-bold uppercase" style={pinta(VINO)}>Costo elevado - requiere aprobación de Gerencia</div>}
-            <p className="px-4 pb-3 pt-1 text-[11px] text-[#11212D]/70">Total = Materiales + Mano de obra + CIF + Adicionales. Precio sugerido = Costo unitario ÷ (1 − margen deseado). Margen real = (Precio − Costo unitario) ÷ Precio. Lo calcula y guarda la base de datos.</p>
+            <p className="px-4 pb-3 pt-1 text-[11px] text-tema-texto/70">Total = Materiales + Mano de obra + CIF + Adicionales. Precio sugerido = Costo unitario ÷ (1 − margen deseado). Margen real = (Precio − Costo unitario) ÷ Precio. Lo calcula y guarda la base de datos.</p>
           </Tarjeta>
 
           <Tarjeta titulo="Comparador (por unidad)">
@@ -569,7 +569,7 @@ export function HojaCosto({ hoja, datos, onVolver }: { hoja: Hoja; datos: Estado
                 <dd className="font-semibold">{S(comp.real)}</dd>
               </div>
               {comp.vsEstimado && (
-                <div className={cn("flex justify-between gap-2 font-bold", comp.vsEstimado.soles > 0 ? "text-[#800021]" : "text-[#294D61]")}>
+                <div className={cn("flex justify-between gap-2 font-bold", comp.vsEstimado.soles > 0 ? "text-tema-tinta" : "text-tema-sec")}>
                   <dt>Desviación vs estimado</dt>
                   <dd>
                     {comp.vsEstimado.soles > 0 ? "+" : ""}
@@ -578,12 +578,12 @@ export function HojaCosto({ hoja, datos, onVolver }: { hoja: Hoja; datos: Estado
                   </dd>
                 </div>
               )}
-              <div className="flex justify-between gap-2 border-t border-[#CCD0CF] pt-1.5">
+              <div className="flex justify-between gap-2 border-t border-tema-borde pt-1.5">
                 <dt>Equipo anterior {comp.anterior ? `(${comp.anterior.hoja.orden_produccion_id})` : ""}</dt>
                 <dd className="font-semibold">{comp.anterior ? S(comp.anterior.costo) : "—"}</dd>
               </div>
               {comp.vsAnterior && (
-                <div className={cn("flex justify-between gap-2 font-bold", comp.vsAnterior.soles > 0 ? "text-[#800021]" : "text-[#294D61]")}>
+                <div className={cn("flex justify-between gap-2 font-bold", comp.vsAnterior.soles > 0 ? "text-tema-tinta" : "text-tema-sec")}>
                   <dt>Desviación vs anterior</dt>
                   <dd>
                     {comp.vsAnterior.soles > 0 ? "+" : ""}
@@ -597,7 +597,7 @@ export function HojaCosto({ hoja, datos, onVolver }: { hoja: Hoja; datos: Estado
 
           <Tarjeta titulo="Top 5 que más encarecen">
             <ol className="space-y-2 px-4 py-3 text-[12.5px]">
-              {top.length === 0 && <li className="text-[#11212D]/60">Sin costos cargados.</li>}
+              {top.length === 0 && <li className="text-tema-texto/60">Sin costos cargados.</li>}
               {top.map((r, i) => (
                 <li key={i}>
                   <div className="flex justify-between gap-2">
@@ -606,10 +606,10 @@ export function HojaCosto({ hoja, datos, onVolver }: { hoja: Hoja; datos: Estado
                     </span>
                     <span className="shrink-0">{S(r.subtotal)}</span>
                   </div>
-                  <div className="mt-0.5 h-1.5 rounded bg-[#CCD0CF]">
-                    <div className={cn("h-1.5 rounded", i === 0 ? "bg-[#800021]" : "bg-[#294D61]")} style={{ width: `${Math.min(100, r.peso * 100)}%` }} />
+                  <div className="mt-0.5 h-1.5 rounded bg-tema-borde">
+                    <div className={cn("h-1.5 rounded", i === 0 ? "bg-tema-acento" : "bg-tema-sec")} style={{ width: `${Math.min(100, r.peso * 100)}%` }} />
                   </div>
-                  <span className="text-[10.5px] text-[#294D61]">{pct(r.peso)} del costo</span>
+                  <span className="text-[10.5px] text-tema-sec">{pct(r.peso)} del costo</span>
                 </li>
               ))}
             </ol>
@@ -618,7 +618,7 @@ export function HojaCosto({ hoja, datos, onVolver }: { hoja: Hoja; datos: Estado
       </div>
 
       {/* Botones */}
-      <div className="sticky bottom-2 z-10 flex flex-wrap gap-2 rounded-xl border border-[#11212D]/15 bg-white/95 p-2.5 shadow-lg backdrop-blur" data-sin-guardar={!editable || undefined}>
+      <div className="sticky bottom-2 z-10 flex flex-wrap gap-2 rounded-xl border border-tema-texto/15 bg-white/95 p-2.5 shadow-lg backdrop-blur" data-sin-guardar={!editable || undefined}>
         {editable && (
           <Boton onClick={guardar} disabled={ocupado} data-guardar-pestana>
             <Save size={15} /> Guardar Borrador
@@ -682,7 +682,7 @@ export function HojaCosto({ hoja, datos, onVolver }: { hoja: Hoja; datos: Estado
           </Boton>
         )}
         {(perfil === "produccion" || perfil === "soporte") && !["CERRADO", "ANULADO"].includes(hoja.estado) && (
-          <Boton variante="borde" className="text-[#800021]" disabled={ocupado} onClick={() => setDialogo({ accion: "ANULAR", titulo: "Anular hoja de costo", motivoMin: 10, aviso: "No se borra: queda ANULADA con su motivo en la auditoría." })}>
+          <Boton variante="borde" className="text-tema-tinta" disabled={ocupado} onClick={() => setDialogo({ accion: "ANULAR", titulo: "Anular hoja de costo", motivoMin: 10, aviso: "No se borra: queda ANULADA con su motivo en la auditoría." })}>
             <Ban size={15} /> Anular hoja
           </Boton>
         )}
@@ -696,11 +696,11 @@ export function HojaCosto({ hoja, datos, onVolver }: { hoja: Hoja; datos: Estado
 
 function BotonQuitar({ l, onQuitar, onAnular }: { l: LineaBorrador; onQuitar: (k: string) => void; onAnular: (id: string) => void }) {
   return l.id ? (
-    <button title="Anular con motivo (no existe eliminar)" className="rounded p-1 text-[#800021] hover:bg-[#800021]/10" onClick={() => onAnular(l.id!)}>
+    <button title="Anular con motivo (no existe eliminar)" className="rounded p-1 text-tema-tinta hover:bg-tema-acento/10" onClick={() => onAnular(l.id!)}>
       <Ban size={15} />
     </button>
   ) : (
-    <button title="Quitar (aún no se guardó)" className="rounded p-1 text-[#294D61] hover:bg-[#294D61]/10" onClick={() => onQuitar(l.key)}>
+    <button title="Quitar (aún no se guardó)" className="rounded p-1 text-tema-sec hover:bg-tema-sec/10" onClick={() => onQuitar(l.key)}>
       <Trash2 size={15} />
     </button>
   );
@@ -742,11 +742,11 @@ function SeccionMateriales({
   return (
     <Tarjeta titulo={NOMBRE_SECCION.MATERIAL} accion={<span className="text-[13px] font-bold">{S(total)}</span>}>
       {desdeCero && lineas.length === 0 && (
-        <p className="px-4 pt-3 text-[12.5px] text-[#294D61]">Ficha vacía: toque «Agregar material» y escriba el material, la unidad, la cantidad por equipo y el costo unitario.</p>
+        <p className="px-4 pt-3 text-[12.5px] text-tema-sec">Ficha vacía: toque «Agregar material» y escriba el material, la unidad, la cantidad por equipo y el costo unitario.</p>
       )}
       {desdeCero && libres.length > 0 && (
-        <div className="divide-y divide-[#CCD0CF]">
-          <p className="bg-[#CCD0CF]/60 px-3 py-2 text-[10.5px] font-bold uppercase tracking-wide text-[#11212D]">Material · unidad · cantidad por equipo · costo unitario S/ · subtotal</p>
+        <div className="divide-y divide-tema-borde">
+          <p className="bg-tema-borde/60 px-3 py-2 text-[10.5px] font-bold uppercase tracking-wide text-tema-texto">Material · unidad · cantidad por equipo · costo unitario S/ · subtotal</p>
           {libres.map((l, idx) => (
             <div key={l.key} className="grid grid-cols-3 items-center gap-2 px-3 py-2.5 sm:grid-cols-[96px_96px_120px_minmax(0,1fr)_32px]">
               <Entrada className="col-span-3 font-semibold sm:col-span-5" title={l.descripcion} placeholder={`${idx + 1}. Ej. Plancha LAC 3/16`} value={l.descripcion} disabled={!editable} onChange={(e) => onCambio(l.key, { descripcion: e.target.value.toUpperCase() })} />
@@ -773,25 +773,25 @@ function SeccionMateriales({
           const pideMotivo = editable && !desdeCero && (cambiado || sinAlmacen) && (l.motivo_manual ?? "").trim().length < 10;
           const alza = avisos.some((a) => a.tipo === "ALZA_MATERIAL" && a.lineaKey === l.key);
           return (
-            <tr key={l.key} className={cn(alza && "bg-[#800021]/[0.05]")}>
+            <tr key={l.key} className={cn(alza && "bg-tema-acento/[0.05]")}>
               <Celda className="whitespace-nowrap text-[12px]">{l.codigo ?? "—"}</Celda>
               <Celda>
                 <p className="font-semibold">{sinAlmacen && editable ? <Entrada value={l.descripcion} onChange={(e) => onCambio(l.key, { descripcion: e.target.value })} /> : l.descripcion}</p>
-                <p className="text-[11px] text-[#294D61]">
+                <p className="text-[11px] text-tema-sec">
                   {[l.requerimiento_id, l.proveedor, sinAlmacen ? "Fuera de Almacén" : null].filter(Boolean).join(" · ")}
-                  {alza && <span className="ml-1 font-bold text-[#800021]">▲ subió</span>}
+                  {alza && <span className="ml-1 font-bold text-tema-tinta">▲ subió</span>}
                 </p>
               </Celda>
               <Celda>
                 <Entrada type="number" min={0} step="0.01" className="w-24" value={l.cantidad} disabled={!editable} onChange={(e) => onCambio(l.key, { cantidad: n(e.target.value) })} />
               </Celda>
               <Celda>
-                <Entrada type="number" min={0} step="0.01" className={cn("w-28", (cambiado || sinAlmacen) && "border-[#800021] text-[#800021]")} value={l.costo_unitario} disabled={!editable} onChange={(e) => onCambio(l.key, { costo_unitario: n(e.target.value) })} />
-                {cambiado && <p className="mt-0.5 text-[10.5px] text-[#800021]">Almacén: {S(l.costo_origen)}</p>}
+                <Entrada type="number" min={0} step="0.01" className={cn("w-28", (cambiado || sinAlmacen) && "border-tema-acento text-tema-tinta")} value={l.costo_unitario} disabled={!editable} onChange={(e) => onCambio(l.key, { costo_unitario: n(e.target.value) })} />
+                {cambiado && <p className="mt-0.5 text-[10.5px] text-tema-tinta">Almacén: {S(l.costo_origen)}</p>}
                 {(cambiado || sinAlmacen) && (
                   <Entrada
                     placeholder="MOTIVO obligatorio (queda en auditoría)"
-                    className={cn("mt-1 min-w-[180px] text-[12px]", pideMotivo && "border-[#800021]")}
+                    className={cn("mt-1 min-w-[180px] text-[12px]", pideMotivo && "border-tema-acento")}
                     value={l.motivo_manual ?? ""}
                     disabled={!editable}
                     onChange={(e) => onCambio(l.key, { motivo_manual: e.target.value })}
@@ -806,7 +806,7 @@ function SeccionMateriales({
       </Tabla>
       )}
       {editable && (
-        <div className="space-y-2 border-t border-[#CCD0CF] p-3">
+        <div className="space-y-2 border-t border-tema-borde p-3">
           {desdeCero && (
             <Boton onClick={() => onAgregar({ seccion: "MATERIAL", descripcion: "", unidad: "UND", cantidad: 1, costo_unitario: 0, origen_costo: "MANUAL" })}>
               <Plus size={15} /> Agregar material
@@ -815,7 +815,7 @@ function SeccionMateriales({
           <div className="flex flex-wrap items-end gap-2">
             <Etiqueta texto={desdeCero ? "O tomar un material de Almacén (opcional)" : "Agregar material de Almacén (código o nombre)"} className="min-w-[220px] flex-1">
               <div className="relative">
-                <Search size={14} className="absolute left-2.5 top-2.5 text-[#294D61]" />
+                <Search size={14} className="absolute left-2.5 top-2.5 text-tema-sec" />
                 <Entrada className="pl-8" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ej. plancha, MP-0012…" />
               </div>
             </Etiqueta>
@@ -826,11 +826,11 @@ function SeccionMateriales({
             )}
           </div>
           {res.length > 0 && (
-            <ul className="max-h-56 overflow-y-auto rounded-lg border border-[#CCD0CF] bg-white">
+            <ul className="max-h-56 overflow-y-auto rounded-lg border border-tema-borde bg-white">
               {res.map((s) => (
                 <li key={s.id}>
                   <button
-                    className="flex w-full flex-wrap justify-between gap-2 px-3 py-1.5 text-left text-[12.5px] hover:bg-[#CCD0CF]/40"
+                    className="flex w-full flex-wrap justify-between gap-2 px-3 py-1.5 text-left text-[12.5px] hover:bg-tema-borde/40"
                     onClick={() => {
                       onAgregar({ seccion: "MATERIAL", stock_id: s.id, codigo: s.sku, descripcion: s.nombre, unidad: s.unidad, cantidad: 1, costo_unitario: s.costo, costo_origen: s.costo, origen_costo: "ALMACEN" });
                       setQ("");
@@ -840,7 +840,7 @@ function SeccionMateriales({
                       {s.sku ? `${s.sku} · ` : ""}
                       {s.nombre}
                     </span>
-                    <span className="text-[#294D61]">
+                    <span className="text-tema-sec">
                       {s.sede} · stock {s.cantidad} {s.unidad} · {S(s.costo)}
                     </span>
                   </button>
@@ -876,7 +876,7 @@ function DialogoMotivo({
           <Area rows={3} value={motivo} onChange={(e) => setMotivo(e.target.value)} />
         </Etiqueta>
         {d.firma && <FirmaPad titulo="Firma de Gerencia" archivo="firma-gerencia.png" onChange={(f) => setFirma(f?.url)} />}
-        <p className="text-[11px] text-[#294D61]">Queda en la bitácora con su usuario, fecha y hora, IP y hash SHA-256.</p>
+        <p className="text-[11px] text-tema-sec">Queda en la bitácora con su usuario, fecha y hora, IP y hash SHA-256.</p>
         <div className="flex justify-end gap-2">
           <Boton variante="borde" onClick={onCerrar}>
             Cancelar

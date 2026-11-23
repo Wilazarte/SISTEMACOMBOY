@@ -5,9 +5,10 @@ import { usePathname } from "next/navigation";
 import { ID_BARRA_PESTANAS } from "@/components/ui";
 import type { Sesion } from "@/lib/auth";
 import { VERSION_LOGISTICA } from "@/lib/logistica";
-import { ETIQUETA_PERFIL, inicialesDe, perfilPlanta } from "@/lib/permisosPlanta";
+import { ETIQUETA_PERFIL, esSoporteReal, inicialesDe, perfilPlanta } from "@/lib/permisosPlanta";
 import { ChatGlobal, ANCHO_CHAT } from "@/components/chat/ChatGlobal";
 import { ErpHeader, NOMBRE_EMPRESA } from "./ErpHeader";
+import { TemaProvider } from "@/components/temas/TemaProvider";
 
 const CLAVE_CHAT = "erp-chat-abierto";
 
@@ -74,8 +75,11 @@ export function ErpLayout({
   const nombreUsuario = sesion.nombreCompleto?.trim() || sesion.nombre || sesion.usuario;
   const iniciales = inicialesDe(nombreUsuario, sesion.iniciales);
   const moduloUsuario = etiqueta?.label ?? (sesion.moduloAsignado?.toUpperCase() || undefined);
+  // Temas de color (2026-11-22): data-tema elige el juego de variables de app/themes.css (módulo > usuario > global)
   return (
-    <div className={"dark tema-planta tema-login relative isolate flex min-h-screen flex-col pb-32 text-fg"} data-modulo={moduleName}>
+    <TemaProvider moduleName={moduleName} usuario={sesion.usuario} puedeAdministrar={esSoporteReal(sesion)}>
+    {(tema) => (
+    <div className={"dark tema-planta tema-login relative isolate flex min-h-screen flex-col pb-32 text-fg"} data-modulo={moduleName} data-tema={tema}>
       {/* Tema GLASS (2026-11-04): negro grafito con malla abstracta (luz azul eléctrico arriba, fuego abajo). En los
           módulos el mapa mundial queda apenas visible debajo; los INICIO, solo la malla. */}
       <div aria-hidden className="fondo-login pointer-events-none fixed inset-0 z-[-1]">
@@ -110,6 +114,8 @@ export function ErpLayout({
       <ChatGlobal sesion={sesion} modulo={moduleName} abierto={chatAbierto} setAbierto={setChatAbierto} />
       {overlays}
     </div>
+    )}
+    </TemaProvider>
   );
 }
 
@@ -117,9 +123,9 @@ export function ErpLayout({
 function OndasFondo() {
   return (
     <svg viewBox="0 0 400 140" preserveAspectRatio="none" className="absolute inset-x-0 bottom-0 h-24 w-full md:h-40">
-      <path d="M0,70 C90,20 170,120 260,70 C320,38 360,50 400,30 L400,140 L0,140 Z" fill="#294D61" opacity="0.16" />
-      <path d="M0,95 C80,60 180,140 280,92 C330,70 370,78 400,62 L400,140 L0,140 Z" fill="#800021" opacity="0.12" />
-      <path d="M0,120 C100,92 190,140 300,112 C350,100 380,104 400,96 L400,140 L0,140 Z" fill="#11212D" opacity="0.6" />
+      <path d="M0,70 C90,20 170,120 260,70 C320,38 360,50 400,30 L400,140 L0,140 Z" style={{ fill: "var(--onda-1)" }} opacity="0.16" />
+      <path d="M0,95 C80,60 180,140 280,92 C330,70 370,78 400,62 L400,140 L0,140 Z" style={{ fill: "var(--onda-2)" }} opacity="0.12" />
+      <path d="M0,120 C100,92 190,140 300,112 C350,100 380,104 400,96 L400,140 L0,140 Z" style={{ fill: "var(--onda-3)" }} opacity="0.6" />
     </svg>
   );
 }

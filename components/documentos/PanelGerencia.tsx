@@ -158,14 +158,14 @@ function EstadoCadena() {
   useEffect(() => {
     verificarCadena().then(setC, (e) => setError((e as Error).message));
   }, []);
-  if (error) return <p className="text-[12px] font-semibold text-[#800021]">{error}</p>;
-  if (!c) return <p className="text-[12px] text-[#11212D]/60">Verificando la cadena del audit_log…</p>;
+  if (error) return <p className="text-[12px] font-semibold text-tema-tinta">{error}</p>;
+  if (!c) return <p className="text-[12px] text-tema-texto/60">Verificando la cadena del audit_log…</p>;
   return c.ok ? (
-    <p className="flex items-center gap-1.5 text-[12px] font-semibold text-[#294D61]">
+    <p className="flex items-center gap-1.5 text-[12px] font-semibold text-tema-sec">
       <ShieldCheck size={15} /> Auditoría íntegra: {c.total} registro(s) encadenados por hash, ninguno borrado ni alterado.
     </p>
   ) : (
-    <p className="flex items-center gap-1.5 text-[12px] font-bold text-[#800021]">
+    <p className="flex items-center gap-1.5 text-[12px] font-bold text-tema-tinta">
       <ShieldAlert size={15} /> ALERTA: {c.error}. Alguien con acceso directo a la base modificó el registro de auditoría.
     </p>
   );
@@ -200,7 +200,7 @@ export function QuienDescargo({ usuario }: { usuario: string }) {
     <div className="space-y-3">
       <Tarjeta className="space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-[15px] font-semibold text-[#11212D]">¿Quién descargó qué?</h3>
+          <h3 className="text-[15px] font-semibold text-tema-texto">¿Quién descargó qué?</h3>
           <EstadoCadena />
         </div>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
@@ -299,7 +299,7 @@ export function Reportes({ usuario }: { usuario: string }) {
           <button
             key={id}
             onClick={() => setRep(id)}
-            className={cx("inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-[13px] font-semibold", rep === id ? "border-[#11212D] !bg-[#11212D] !text-white" : "border-[#11212D]/25 bg-white text-[#11212D]")}
+            className={cx("inline-flex items-center gap-1.5 rounded-full border px-4 py-1.5 text-[13px] font-semibold", rep === id ? "border-tema-texto !bg-tema-fuerte !text-white" : "border-tema-texto/25 bg-white text-tema-texto")}
           >
             <Icono size={14} /> {label}
           </button>
@@ -329,7 +329,7 @@ export function Reportes({ usuario }: { usuario: string }) {
                 </Campo>
               </>
             )}
-            {cargando && <Loader2 size={16} className="mb-2.5 animate-spin text-[#294D61]" />}
+            {cargando && <Loader2 size={16} className="mb-2.5 animate-spin text-tema-sec" />}
           </div>
           <BotonesExportar
             titulo={titulo}
@@ -343,15 +343,15 @@ export function Reportes({ usuario }: { usuario: string }) {
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
             {(
               [
-                ["Creados", resumen.creados, "#294D61"],
-                ["Versiones nuevas", resumen.versiones, "#294D61"],
-                ["Aprobados", resumen.aprobados, "#294D61"],
-                ["Rechazados", resumen.rechazados, "#800021"],
-                ["Descargas", resumen.descargas, "#11212D"],
+                ["Creados", resumen.creados, "var(--secundario)"],
+                ["Versiones nuevas", resumen.versiones, "var(--secundario)"],
+                ["Aprobados", resumen.aprobados, "var(--secundario)"],
+                ["Rechazados", resumen.rechazados, "var(--accent)"],
+                ["Descargas", resumen.descargas, "var(--text)"],
               ] as const
             ).map(([l, n, c]) => (
-              <div key={l} className="rounded-lg border border-[#11212D]/10 px-3 py-2">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-[#11212D]/60">{l}</p>
+              <div key={l} className="rounded-lg border border-tema-texto/10 px-3 py-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-tema-texto/60">{l}</p>
                 <p className="text-[22px] font-semibold" style={{ color: c }}>
                   {n}
                 </p>
@@ -367,16 +367,16 @@ export function Reportes({ usuario }: { usuario: string }) {
           ) : venc.length === 0 ? (
             <Vacio texto={`Ningún documento vence en los próximos ${dias} días.`} />
           ) : (
-            <ul className="divide-y divide-[#11212D]/10">
+            <ul className="divide-y divide-tema-texto/10">
               {venc.map((v) => (
-                <li key={v.codigo_unico} className="flex flex-wrap items-center justify-between gap-2 px-1 py-2 text-[13px] text-[#11212D]">
+                <li key={v.codigo_unico} className="flex flex-wrap items-center justify-between gap-2 px-1 py-2 text-[13px] text-tema-texto">
                   <span className="min-w-0">
                     <b>{v.codigo_unico}</b> {v.version_actual} · {v.nombre}
-                    <span className="block text-[12px] text-[#11212D]/60">
+                    <span className="block text-[12px] text-tema-texto/60">
                       {v.categoria} · {v.modulo} · dueño {v.dueno_nombre}
                     </span>
                   </span>
-                  <span className={cx("rounded-full px-2.5 py-0.5 text-[12px] font-bold", v.dias_restantes < 0 ? "!bg-[#800021] !text-white" : "border border-[#800021] text-[#800021]")}>
+                  <span className={cx("rounded-full px-2.5 py-0.5 text-[12px] font-bold", v.dias_restantes < 0 ? "!bg-tema-acento !text-white" : "border border-tema-acento text-tema-tinta")}>
                     {v.dias_restantes < 0 ? `Vencido hace ${-v.dias_restantes} d` : v.dias_restantes === 0 ? "Vence hoy" : `${fechaCorta(v.fecha_vencimiento)} · ${v.dias_restantes} d`}
                   </span>
                 </li>
@@ -389,7 +389,7 @@ export function Reportes({ usuario }: { usuario: string }) {
           <Vacio texto="Cargando…" />
         )}
       </Tarjeta>
-      <p className="flex items-center gap-1 text-[11px] text-[#11212D]/60">
+      <p className="flex items-center gap-1 text-[11px] text-tema-texto/60">
         <Link2 size={12} /> Los reportes salen del audit_log (solo inserción): no dependen de que el documento siga visible.
       </p>
     </div>

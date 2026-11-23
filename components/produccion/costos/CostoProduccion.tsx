@@ -83,7 +83,7 @@ export function CostoProduccion({ modo }: { modo: ModoCostos }) {
     return (
       <FondoCostos>
         <Encabezado titulo="Costo de Producción" subtitulo={SUBTITULO[modo]} />
-        <p className="flex items-center gap-2 py-16 text-[13px] text-[#11212D]">
+        <p className="flex items-center gap-2 py-16 text-[13px] text-tema-texto">
           <Loader2 size={16} className="animate-spin" /> Cargando costos…
         </p>
       </FondoCostos>
@@ -118,7 +118,7 @@ export function CostoProduccion({ modo }: { modo: ModoCostos }) {
                 ["parametros", "Parámetros", Settings2],
               ] as [Vista, string, typeof Factory][]
             ).map(([id, txt, Icono]) => (
-              <button key={id} onClick={() => setVista(id)} className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[12px] font-bold hover:opacity-90" style={vista === id ? pinta("#ffffff", NOCHE) : { backgroundColor: "rgba(255,255,255,0.12)", color: "#ffffff" }}>
+              <button key={id} onClick={() => setVista(id)} className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[12px] font-bold hover:opacity-90" style={vista === id ? pinta("var(--card-bg)", NOCHE) : { backgroundColor: "rgba(255,255,255,0.12)", color: "#ffffff" }}>
                 <Icono size={13} /> {txt}
               </button>
             ))}
@@ -131,7 +131,7 @@ export function CostoProduccion({ modo }: { modo: ModoCostos }) {
           {/* Buscador + filtros */}
           <div className="grid gap-2 rounded-xl bg-white/90 p-3 shadow-sm sm:grid-cols-[minmax(0,1fr)_150px_150px_auto]">
             <div className="relative">
-              <Search size={14} className="absolute left-2.5 top-2.5 text-[#294D61]" />
+              <Search size={14} className="absolute left-2.5 top-2.5 text-tema-sec" />
               <Entrada className="pl-8" placeholder="Buscar por OP, equipo, cliente o CP-…" value={q} onChange={(e) => setQ(e.target.value)} />
             </div>
             <Entrada type="date" aria-label="Desde" value={desde} onChange={(e) => setDesde(e.target.value)} />
@@ -149,8 +149,8 @@ export function CostoProduccion({ modo }: { modo: ModoCostos }) {
                   <button
                     key={e.id}
                     onClick={() => setEstados((s) => (on ? s.filter((x) => x !== e.id) : [...s, e.id]))}
-                    className={cn("rounded-full border px-2.5 py-0.5 text-[11.5px] font-semibold", on ? "border-[#11212D]" : "border-[#CCD0CF]")}
-                    style={on ? pinta(NOCHE) : pinta("#ffffff", NOCHE)}
+                    className={cn("rounded-full border px-2.5 py-0.5 text-[11.5px] font-semibold", on ? "border-tema-texto" : "border-tema-borde")}
+                    style={on ? pinta(NOCHE) : pinta("var(--card-bg)", NOCHE)}
                   >
                     {e.nombre} ({cuenta})
                   </button>
@@ -158,7 +158,7 @@ export function CostoProduccion({ modo }: { modo: ModoCostos }) {
               })}
               {(estados.length > 0 || q || desde || hasta) && (
                 <button
-                  className="text-[11.5px] font-semibold text-[#800021] underline"
+                  className="text-[11.5px] font-semibold text-tema-tinta underline"
                   onClick={() => {
                     setEstados([]);
                     setQ("");
@@ -187,29 +187,29 @@ export function CostoProduccion({ modo }: { modo: ModoCostos }) {
 
           <Tarjeta titulo={`Órdenes con hoja de costo (${lista.length})`}>
             {lista.length === 0 ? (
-              <p className="py-10 text-center text-[13px] text-[#11212D]/70">{datos.hojas.length ? "Ninguna hoja con esos filtros." : "Aún no hay hojas de costo. Abra una por modelo de equipo."}</p>
+              <p className="py-10 text-center text-[13px] text-tema-texto/70">{datos.hojas.length ? "Ninguna hoja con esos filtros." : "Aún no hay hojas de costo. Abra una por modelo de equipo."}</p>
             ) : (
               <Tabla head={["Modelo / OP", "Equipo", "Cantidad", "Costo estimado", "Costo real", "Desviación", "Margen", "Estado"]}>
                 {lista.map((h) => {
                   const c = datos.costos.get(h.id);
                   const dv = desviacion(c);
                   return (
-                    <tr key={h.id} className="cursor-pointer hover:bg-[#CCD0CF]/35" onClick={() => setAbierta(h.id)}>
+                    <tr key={h.id} className="cursor-pointer hover:bg-tema-borde/35" onClick={() => setAbierta(h.id)}>
                       <Celda>
                         <p className="font-bold">{h.origen === "MODELO" ? NOMBRE_MODELO[h.orden_produccion_id] ?? h.orden_produccion_id : h.orden_produccion_id}</p>
-                        <p className="text-[11px] text-[#294D61]">{h.codigo}</p>
+                        <p className="text-[11px] text-tema-sec">{h.codigo}</p>
                       </Celda>
                       <Celda>
                         <p className="font-semibold">{h.tipo_equipo}</p>
-                        <p className="text-[11px] text-[#294D61]">{[h.modelo, h.cliente_proyecto].filter(Boolean).join(" · ")}</p>
+                        <p className="text-[11px] text-tema-sec">{[h.modelo, h.cliente_proyecto].filter(Boolean).join(" · ")}</p>
                       </Celda>
                       <Celda>{h.cantidad}</Celda>
-                      <Celda className="whitespace-nowrap">{c?.costo_estimado ? S(c.costo_estimado) : <span className="text-[#11212D]/50">Sin fijar</span>}</Celda>
+                      <Celda className="whitespace-nowrap">{c?.costo_estimado ? S(c.costo_estimado) : <span className="text-tema-texto/50">Sin fijar</span>}</Celda>
                       <Celda className="whitespace-nowrap font-semibold">{S(c?.costo_total)}</Celda>
-                      <Celda className={cn("whitespace-nowrap font-semibold", dv && dv.soles > 0 ? "text-[#800021]" : "text-[#294D61]")}>
+                      <Celda className={cn("whitespace-nowrap font-semibold", dv && dv.soles > 0 ? "text-tema-tinta" : "text-tema-sec")}>
                         {dv ? `${dv.soles > 0 ? "+" : ""}${S(dv.soles)} (${dv.soles > 0 ? "+" : ""}${pct(dv.pct)})` : "—"}
                       </Celda>
-                      <Celda className={cn("whitespace-nowrap font-bold", c?.alerta_margen ? "text-[#800021]" : "text-[#294D61]")}>
+                      <Celda className={cn("whitespace-nowrap font-bold", c?.alerta_margen ? "text-tema-tinta" : "text-tema-sec")}>
                         {pct(c?.margen_real)}
                         {c?.alerta_margen && <AlertTriangle size={12} className="ml-1 inline" />}
                       </Celda>
@@ -265,13 +265,13 @@ function NuevaHoja({ inicial, ops, config, onCerrar, onCreada }: { inicial: OpDi
                 type="button"
                 onClick={() => setSel(o.codigo)}
                 className="rounded-lg border-2 px-3 py-2 text-left"
-                style={sel === o.codigo ? { borderColor: "#294D61", backgroundColor: "rgba(41,77,97,0.08)", color: NOCHE } : { borderColor: "#CCD0CF", backgroundColor: "#ffffff", color: NOCHE }}
+                style={sel === o.codigo ? { borderColor: "var(--secundario)", backgroundColor: "color-mix(in srgb, var(--secundario) 8%, transparent)", color: NOCHE } : { borderColor: "var(--border)", backgroundColor: "var(--card-bg)", color: NOCHE }}
               >
                 <span className="block text-[13.5px] font-bold">{NOMBRE_MODELO[o.codigo] ?? o.codigo}</span>
-                <span className="block text-[11.5px] text-[#294D61]">{o.detalle}</span>
+                <span className="block text-[11.5px] text-tema-sec">{o.detalle}</span>
               </button>
             ))}
-            {ops.length === 0 && <p className="text-[12.5px] text-[#800021]">Los 4 modelos ya tienen una ficha abierta: ábrala desde la lista.</p>}
+            {ops.length === 0 && <p className="text-[12.5px] text-tema-tinta">Los 4 modelos ya tienen una ficha abierta: ábrala desde la lista.</p>}
           </div>
         </Etiqueta>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -288,7 +288,7 @@ function NuevaHoja({ inicial, ops, config, onCerrar, onCreada }: { inicial: OpDi
             <Entrada type="number" min={0} max={95} value={Math.round(f.margen_deseado * 100)} onChange={(e) => setF({ ...f, margen_deseado: Number(e.target.value) / 100 })} />
           </Etiqueta>
         </div>
-        <p className="text-[11.5px] text-[#294D61]">La ficha empieza vacía: usted agrega cada material con su cantidad y costo. Todo queda en la bitácora de auditoría.</p>
+        <p className="text-[11.5px] text-tema-sec">La ficha empieza vacía: usted agrega cada material con su cantidad y costo. Todo queda en la bitácora de auditoría.</p>
         <div className="flex justify-end gap-2">
           <Boton variante="borde" onClick={onCerrar}>
             Cancelar
@@ -314,9 +314,9 @@ function DashboardCostos({ datos, onAbrir }: { datos: EstadoCostos; onAbrir: (id
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {kpis.map(([k, v, alerta]) => (
-          <div key={k} className={cn("rounded-xl border-l-4 bg-white/95 p-3 shadow-sm", alerta ? "border-[#800021]" : "border-[#294D61]")}>
-            <p className="text-[11px] font-bold uppercase text-[#294D61]">{k}</p>
-            <p className={cn("mt-1 text-[20px] font-bold", alerta ? "text-[#800021]" : "text-[#11212D]")}>{v}</p>
+          <div key={k} className={cn("rounded-xl border-l-4 bg-white/95 p-3 shadow-sm", alerta ? "border-tema-acento" : "border-tema-sec")}>
+            <p className="text-[11px] font-bold uppercase text-tema-sec">{k}</p>
+            <p className={cn("mt-1 text-[20px] font-bold", alerta ? "text-tema-tinta" : "text-tema-texto")}>{v}</p>
           </div>
         ))}
       </div>
@@ -326,12 +326,12 @@ function DashboardCostos({ datos, onAbrir }: { datos: EstadoCostos; onAbrir: (id
             {d.tipos.length ? (
               <ResponsiveContainer>
                 <BarChart data={d.tipos} margin={{ left: 8, right: 8, top: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#CCD0CF" />
-                  <XAxis dataKey="tipo" tick={{ fontSize: 10, fill: "#11212D" }} interval={0} />
-                  <YAxis tick={{ fontSize: 10, fill: "#11212D" }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="tipo" tick={{ fontSize: 10, fill: "var(--text)" }} interval={0} />
+                  <YAxis tick={{ fontSize: 10, fill: "var(--text)" }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
                   <Tooltip formatter={(v: number) => S(v)} />
-                  <Bar dataKey="promedio" name="Promedio" fill="#294D61" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="maximo" name="Máximo" fill="#800021" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="promedio" name="Promedio" fill="var(--secundario)" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="maximo" name="Máximo" fill="var(--accent)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -344,13 +344,13 @@ function DashboardCostos({ datos, onAbrir }: { datos: EstadoCostos; onAbrir: (id
             {d.tendencia.length ? (
               <ResponsiveContainer>
                 <LineChart data={d.tendencia} margin={{ left: 8, right: 8, top: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#CCD0CF" />
-                  <XAxis dataKey="mes" tick={{ fontSize: 10, fill: "#11212D" }} />
-                  <YAxis tick={{ fontSize: 10, fill: "#11212D" }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="mes" tick={{ fontSize: 10, fill: "var(--text)" }} />
+                  <YAxis tick={{ fontSize: 10, fill: "var(--text)" }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
                   <Tooltip formatter={(v: number) => S(v)} />
                   <Legend wrapperStyle={{ fontSize: 11 }} />
-                  <Line type="monotone" dataKey="total" name="Real" stroke="#800021" strokeWidth={2.5} dot />
-                  <Line type="monotone" dataKey="estimado" name="Estimado" stroke="#294D61" strokeWidth={2} strokeDasharray="5 4" dot />
+                  <Line type="monotone" dataKey="total" name="Real" stroke="var(--accent)" strokeWidth={2.5} dot />
+                  <Line type="monotone" dataKey="estimado" name="Estimado" stroke="var(--secundario)" strokeWidth={2} strokeDasharray="5 4" dot />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -365,12 +365,12 @@ function DashboardCostos({ datos, onAbrir }: { datos: EstadoCostos; onAbrir: (id
         ) : (
           <Tabla head={["OP", "Equipo", "Estimado", "Real", "Sobrecosto", "Margen", "Estado"]}>
             {d.sobrecosto.map((x) => (
-              <tr key={x.hoja.id} className="cursor-pointer hover:bg-[#CCD0CF]/35" onClick={() => onAbrir(x.hoja.id)}>
+              <tr key={x.hoja.id} className="cursor-pointer hover:bg-tema-borde/35" onClick={() => onAbrir(x.hoja.id)}>
                 <Celda className="font-bold">{referenciaHoja(x.hoja)}</Celda>
                 <Celda>{x.hoja.tipo_equipo}</Celda>
                 <Celda className="whitespace-nowrap">{S(x.estimado)}</Celda>
                 <Celda className="whitespace-nowrap">{S(x.real)}</Celda>
-                <Celda className="whitespace-nowrap font-bold text-[#800021]">
+                <Celda className="whitespace-nowrap font-bold text-tema-tinta">
                   +{S(x.soles)} (+{pct(x.pct)})
                 </Celda>
                 <Celda>{pct(x.margen)}</Celda>
@@ -389,8 +389,8 @@ function DashboardCostos({ datos, onAbrir }: { datos: EstadoCostos; onAbrir: (id
               <Celda className="font-semibold">{x.tipo}</Celda>
               <Celda>{x.hojas}</Celda>
               <Celda className="whitespace-nowrap">{S(x.promedio)}</Celda>
-              <Celda className="whitespace-nowrap text-[#294D61]">{S(x.minimo)}</Celda>
-              <Celda className="whitespace-nowrap text-[#800021]">{S(x.maximo)}</Celda>
+              <Celda className="whitespace-nowrap text-tema-sec">{S(x.minimo)}</Celda>
+              <Celda className="whitespace-nowrap text-tema-tinta">{S(x.maximo)}</Celda>
             </tr>
           ))}
         </Tabla>
@@ -442,7 +442,7 @@ function Parametros({ config, edita }: { config: ConfigCosto; edita: boolean }) 
         ))}
       </div>
       {edita && (
-        <div className="flex flex-wrap items-end gap-2 border-t border-[#CCD0CF] p-4">
+        <div className="flex flex-wrap items-end gap-2 border-t border-tema-borde p-4">
           <Etiqueta texto="Motivo del cambio (obligatorio)" className="min-w-[240px] flex-1">
             <Area rows={1} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej. Recibo SEAL noviembre 2026" />
           </Etiqueta>
@@ -452,7 +452,7 @@ function Parametros({ config, edita }: { config: ConfigCosto; edita: boolean }) 
         </div>
       )}
       {config.updated_by && (
-        <p className="px-4 pb-3 text-[11px] text-[#294D61]">
+        <p className="px-4 pb-3 text-[11px] text-tema-sec">
           Último cambio: {config.updated_by} · {config.updated_at ? new Date(config.updated_at).toLocaleString("es-PE", { timeZone: "America/Lima" }) : ""}
         </p>
       )}
