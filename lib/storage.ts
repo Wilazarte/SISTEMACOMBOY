@@ -11,6 +11,7 @@ import { getSesion, rolNegocio } from "./auth";
 import { createClient } from "./supabase/client";
 import { errorCaja, nombreCaja } from "./cajas";
 import type {
+  NotaGasto,
   AliasHuellas,
   ArchivoGasto,
   ConcesionContratista,
@@ -3471,6 +3472,83 @@ export function permisoEditarGasto(f: Factura, sesion: { usuario: string; rol: s
 }
 
 /** Corrige un gasto POR PAGAR. Con OC vinculada el importe no cambia (debe coincidir con la OC). */
+/**
+ * Nota de crédito (resta) o de débito (suma) del proveedor vinculada a un gasto registrado: ajusta su total,
+ * IGV, detracción, retención y neto a pagar, y deja la nota en su historial. Gasto en US$: el monto de la nota
+ * viene en dólares y se pasa a soles con el tipo de cambio del gasto.
+ */
+export function aplicarNotaAGasto(
+  gastoId: string,
+  n: { tipo: "CREDITO" | "DEBITO"; numero: string; fecha: string; monto: number; motivo?: string; archivo?: ArchivoGasto; ruc?: string },
+  rol: Rol
+): Factura {
+  const lista = getFacturas();
+  const f = lista.find((x) => x.id === gastoId);
+  if (!f || !f.esGastoTesoreria) throw new ErpError("Gasto no encontrado.");
+  const numero = n.numero.trim().toUpperCase();
+  if (!/^[A-Z0-9]{4}-\d{1,8}$/.test(numero)) throw new ErpError("N° de la nota inválido. Ej: FC01-45");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(n.fecha) || n.fecha > hoy()) throw new ErpError("Fecha de la nota inválida (no puede ser futura).");
+  if (n.fecha < f.fecha) throw new ErpError("La nota no puede ser anterior al comprobante que modifica.");
+  if (n.ruc && f.ruc && f.ruc !== RUC_VARIOS && n.ruc !== f.ruc) throw new ErpError(`La nota es del RUC ${n.ruc} y el gasto del RUC ${f.ruc}: vincúlela al comprobante del mismo proveedor.`);
+  if (lista.some((x) => (x.notas ?? []).some((y) => y.numero === numero && x.ruc === f.ruc))) throw new ErpError(`La nota ${numero} ya fue aplicada.`);
+  const enUsd = f.moneda === "USD" && !!f.tipoCambio;
+  const montoUsd = enUsd ? r2(Number(n.monto)) : undefined;
+  const monto = enUsd ? solesDeUsd(Number(n.monto), f.tipoCambio as number) : r2(Number(n.monto));
+  if (!(monto > 0)) throw new ErpError("El monto de la nota debe ser mayor a 0.");
+  const signo = n.tipo === "CREDITO" ? -1 : 1;
+  const total = r2(f.total + signo * monto);
+  if (total < 0) throw new ErpError(`La nota de crédito (${soles(monto)}) supera el total del gasto (${soles(f.total)}).`);
+  const comp = f.comprobanteGasto ?? "FACTURA";
+  const subtotal = comp === "FACTURA" ? r2(total / (1 + IGV)) : total;
+  const { monto: detr, neto: netoDetraccion } = calcularDetraccion(total, !!f.detraccionPorc, f.detraccionPorc ?? 0);
+  const retencion = comp === "RXH" ? retencionRHE(total, f.retencionPorc !== undefined || f.total <= TOPE_RETENCION_RHE) : 0;
+  const nombre = n.tipo === "CREDITO" ? "Nota de crédito" : "Nota de débito";
+  const pagado = f.estadoPago === "PAGADA";
+  const nota: NotaGasto = {
+    tipo: n.tipo,
+    numero,
+    fecha: n.fecha,
+    monto,
+    ...(montoUsd !== undefined ? { montoUsd } : {}),
+    ...(n.motivo?.trim() ? { motivo: n.motivo.trim().slice(0, 200) } : {}),
+    ...(n.archivo ? { archivo: n.archivo } : {}),
+    registradoPor: usuarioActual(),
+    registradoEn: new Date().toISOString(),
+  };
+  const detalle = [
+    `${nombre} ${numero} ${signo < 0 ? "−" : "+"}${soles(monto)}${montoUsd !== undefined ? ` (US$ ${montoUsd.toFixed(2)})` : ""}`,
+    `total ${soles(f.total)} → ${soles(total)}`,
+    pagado && (signo < 0 ? `ya pagado: saldo a favor ${soles(monto)} por cobrar al proveedor` : `ya pagado: falta pagar ${soles(monto)}`),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const actualizado: Factura = {
+    ...f,
+    totalOriginal: f.totalOriginal ?? f.total,
+    subtotal,
+    igv: r2(total - subtotal),
+    total,
+    ...(enUsd ? { totalUsd: r2((f.totalUsd ?? 0) + signo * (montoUsd as number)) } : {}),
+    ...(f.detraccionPorc ? { detraccionMonto: detr } : {}),
+    retencionPorc: retencion ? PORC_RETENCION_RHE : f.retencionPorc,
+    retencionMonto: retencion || undefined,
+    netoPagar: r2(netoDetraccion - retencion),
+    notas: [...(f.notas ?? []), nota],
+    historial: [...f.historial, evento(rol, `${nombre} vinculada`, detalle)],
+  };
+  escribir(KEYS.FACTURAS, lista.map((x) => (x.id === gastoId ? actualizado : x)));
+  return actualizado;
+}
+
+/** "F001-00004521" y "F001-4521" son el mismo comprobante. */
+export const mismoComprobante = (a: string, b: string): boolean => {
+  const n = (s: string) => {
+    const m = /^([A-Z0-9]{4})-0*(\d+)$/.exec(s.trim().toUpperCase());
+    return m ? `${m[1]}-${m[2]}` : s.trim().toUpperCase();
+  };
+  return n(a) === n(b);
+};
+
 export function editarGasto(id: string, c: EdicionGasto, rol: Rol): Factura {
   const lista = getFacturas();
   const f = lista.find((x) => x.id === id);

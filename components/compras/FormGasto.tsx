@@ -337,7 +337,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
       <CardHeader title="Gasto / servicio sin stock" subtitle="Tesorería: no ingresa a almacén. Al guardar va directo a la pestaña Facturas como POR PAGAR." />
       <div className="grid gap-4 p-5 md:grid-cols-3">
         <div className="md:col-span-3">
-          <EscanearGasto onLeido={aplicarEscaneo} />
+          <EscanearGasto onLeido={aplicarEscaneo} rol={rol} />
         </div>
         <Field label="Tipo de gasto *">
           <Select

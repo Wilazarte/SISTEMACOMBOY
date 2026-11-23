@@ -2076,6 +2076,12 @@ function Facturas({
                   US$ {(f.totalUsd ?? 0).toFixed(2)} · T.C. {f.tipoCambio?.toFixed(3)}
                 </span>
               )}
+              {(f.notas ?? []).map((n) => (
+                <span key={n.numero} className={cn("block text-[11px] font-normal", n.tipo === "CREDITO" ? "text-emerald-700" : "text-red-600")} title={n.motivo}>
+                  {n.tipo === "CREDITO" ? "NC" : "ND"} {n.numero} {n.tipo === "CREDITO" ? "−" : "+"}
+                  {soles(n.monto)}
+                </span>
+              ))}
             </>
           ),
           acciones: (

@@ -768,6 +768,12 @@ function pdfGasto(f: Factura, codigo: string): void {
       alinearDerecha: [2],
       totales: [
         ...(f.igv ? ([["Subtotal", soles(f.subtotal)], ["IGV 18%", soles(f.igv)]] as [string, string][]) : []),
+        ...((f.notas ?? []).length
+          ? ([
+              ["Total comprobante", soles(f.totalOriginal ?? f.total)],
+              ...(f.notas ?? []).map((n) => [`${n.tipo === "CREDITO" ? "Nota de crédito" : "Nota de débito"} ${n.numero}`, `${n.tipo === "CREDITO" ? "-" : "+"} ${soles(n.monto)}`]),
+            ] as [string, string][])
+          : []),
         ["Total", soles(f.total)],
         ...(f.detraccionMonto ? ([[`Detracción ${f.detraccionPorc}%`, `- ${soles(f.detraccionMonto)}`]] as [string, string][]) : []),
         ...(f.retencionMonto ? ([[`Retención 4ta cat. ${f.retencionPorc}%`, `- ${soles(f.retencionMonto)}`]] as [string, string][]) : []),

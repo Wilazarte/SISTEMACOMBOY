@@ -5,7 +5,8 @@ import { Camera, FileUp, ScanLine, X } from "lucide-react";
 import { Button, cn, toast } from "@/components/ui";
 import { MAX_ARCHIVO, hoy, soles, subirComprobanteGasto } from "@/lib/storage";
 import { NOMBRE_ELECTRONICO, parseFactura, renglonesDePalabras, type FacturaLeida, type ItemLeido } from "@/lib/parseFactura";
-import type { ArchivoGasto } from "@/lib/types";
+import type { ArchivoGasto, Rol } from "@/lib/types";
+import { VincularNota } from "@/components/compras/VincularNota";
 
 /** Monto en soles o, si el comprobante es en dólares, en US$. */
 const dinero = (n: number, usd: boolean) => (usd ? `US$ ${n.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : soles(n));
@@ -23,6 +24,8 @@ type Ultimo = {
   /** No se cargó al formulario (no es electrónico, o es nota de crédito / débito). */
   rechazo?: string;
   guia?: boolean;
+  /** Nota de crédito / débito leída (se vincula abajo). */
+  nota?: string;
 };
 const vacioUltimo = (nombre: string): Ultimo => ({ nombre, detectados: [], faltan: [], igvMal: false, items: [], usd: false });
 
@@ -139,7 +142,9 @@ async function ocr(imagen: HTMLCanvasElement, progreso: (p: number, pasada: 1 | 
  * Botón "Escanear factura" de Registrar gasto: foto o PDF del comprobante → OCR (Tesseract, español) →
  * parseFactura → devuelve los datos para rellenar el formulario. No guarda nada: el usuario revisa y da Guardar.
  */
-export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => void }) {
+export function EscanearGasto({ onLeido, rol }: { onLeido: (r: ResultadoEscaneo) => void; rol: Rol }) {
+  // Nota de crédito / débito escaneada, a la espera de vincularla al gasto original
+  const [nota, setNota] = useState<{ datos: FacturaLeida; archivo: Blob; nombre: string } | null>(null);
   const refCamara = useRef<HTMLInputElement>(null);
   const refArchivo = useRef<HTMLInputElement>(null);
   const [estado, setEstado] = useState<"" | "preparando" | "leyendo" | "subiendo">("");
@@ -158,6 +163,7 @@ export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => v
     if (!esPdf && !/^image\/(png|jpe?g|webp)$/.test(file.type)) return toast("Escanee una foto (JPG, PNG, WEBP) o un PDF del comprobante.", "error");
     if (esPdf && file.size > MAX_ARCHIVO) return toast(`El PDF pesa ${(file.size / 1048576).toFixed(1)} MB. Máximo 1.5 MB.`, "error");
     setUltimo(null);
+    setNota(null);
     avance(0, 1);
     setEstado("preparando");
     try {
@@ -186,13 +192,15 @@ export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => v
         return toast("No es un comprobante electrónico: regístrelo a mano.", "error");
       }
       // Nota de crédito / débito: modifica otro comprobante, no es un gasto nuevo
+      // Nota de crédito / débito: no es un gasto nuevo; se vincula al gasto del comprobante original
       if (tipo === "NOTA_CREDITO" || tipo === "NOTA_DEBITO") {
         setUltimo({
           ...vacioUltimo(nombre),
           tipoNombre: NOMBRE_ELECTRONICO[tipo],
-          rechazo: `${NOMBRE_ELECTRONICO[tipo]} ${datos.numero ?? ""}${datos.referencia ? ` que modifica ${datos.referencia}` : ""}${datos.total ? ` por ${dinero(datos.total, datos.moneda === "USD")}` : ""}: no es un gasto nuevo. Corrija el gasto del comprobante original en Facturas.`,
+          nota: `${datos.numero ?? ""}${datos.referencia ? ` · modifica ${datos.referencia}` : ""}${datos.total ? ` · ${dinero(datos.total, datos.moneda === "USD")}` : ""}`,
         });
-        return toast(`${NOMBRE_ELECTRONICO[tipo]}: no se registra como gasto nuevo.`, "error");
+        setNota({ datos, archivo: guardar, nombre });
+        return toast(`${NOMBRE_ELECTRONICO[tipo]} leída: vincúlela a la factura original.`);
       }
       setEstado("subiendo");
       const esGuia = tipo === "GUIA";
@@ -248,7 +256,7 @@ export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => v
         </Button>
       </div>
       <p className="mt-1 text-xs text-plomo-500">
-        Factura, boleta, recibo por honorarios, liquidación de compra y guía de remisión electrónicos (las notas de crédito / débito se reconocen pero no se registran como gasto). Lee RUC, fecha, serie-número, artículos, total e IGV y rellena el formulario. No guarda: revise y dé Registrar gasto.
+        Factura, boleta, recibo por honorarios, liquidación de compra y guía de remisión electrónicos (las notas de crédito / débito se vinculan a la factura original y le restan o suman). Lee RUC, fecha, serie-número, artículos, total e IGV y rellena el formulario. No guarda: revise y dé Registrar gasto.
       </p>
       {ocupado && (
         <div className="mt-3">
@@ -267,6 +275,8 @@ export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => v
             {ultimo.tipoNombre && <> · <b>{ultimo.tipoNombre}</b></>}
             {ultimo.rechazo ? (
               <span className="mt-1 block font-semibold">{ultimo.rechazo}</span>
+            ) : ultimo.nota ? (
+              <> · {ultimo.nota}</>
             ) : ultimo.guia ? (
               <> · {ultimo.detectados.join(", ")} · adjuntada como guía de remisión del gasto</>
             ) : (
@@ -284,6 +294,18 @@ export function EscanearGasto({ onLeido }: { onLeido: (r: ResultadoEscaneo) => v
             <X size={14} />
           </button>
         </div>
+      )}
+      {nota && !ocupado && (
+        <VincularNota
+          datos={nota.datos}
+          archivo={nota.archivo}
+          nombreArchivo={nota.nombre}
+          rol={rol}
+          onListo={() => {
+            setNota(null);
+            setUltimo(null);
+          }}
+        />
       )}
       {ultimo && !ocupado && ultimo.items.length > 0 && (
         <div className="mt-3 overflow-x-auto rounded-lg border border-plomo-200 bg-surface">
