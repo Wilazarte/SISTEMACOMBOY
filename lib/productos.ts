@@ -37,6 +37,8 @@ let porNombre = new Map<string, ProductoMaestro>();
 let canal: RealtimeChannel | null = null;
 let carga: Promise<void> | null = null;
 let espera: ReturnType<typeof setTimeout> | null = null;
+/** La última lectura falló por red o sesión (no porque falten las tablas). */
+let fallo = false;
 
 const faltaTabla = (e: { code?: string; message?: string } | null) => !!e && (e.code === "42P01" || e.code === "PGRST205" || /does not exist|schema cache/i.test(e.message ?? ""));
 
@@ -85,6 +87,7 @@ async function leerCatalogo(): Promise<void> {
   // Sin la tabla de categorías (falta correr 20261203_categorias_productos.sql) se usa la lista base
   const cats = !c.error && c.data.length ? c.data.map((x) => ({ ...x, palabras: x.palabras ?? [] })) : CATEGORIAS_BASE;
   const catsEnBD = !c.error;
+  fallo = !!p.error && !faltaTabla(p.error);
   if (faltaTabla(p.error)) return fijar({ ...VACIO, categorias: cats, categoriasEnBD: catsEnBD, listo: true });
   if (p.error) {
     console.warn("Catálogo de productos:", p.error.message);
@@ -93,25 +96,116 @@ async function leerCatalogo(): Promise<void> {
   fijar({ productos: p.data, alias: a.data, solicitudes: [...s.data].reverse().map(leerSolicitud), categorias: cats, categoriasEnBD: catsEnBD, listo: true, disponible: true });
 }
 
+const TABLAS_CATALOGO = ["productos_maestro", "productos_alias", "productos_solicitudes", "productos_categorias"];
+/** Respaldo si Realtime no avisa (publicación sin las tablas, red que corta el WebSocket, PC suspendida). */
+const CADA_MS = 20_000;
+let sondeo: ReturnType<typeof setInterval> | null = null;
+let reintento: ReturnType<typeof setTimeout> | null = null;
+let firma = "";
+let quitarEventos: (() => void) | null = null;
+
+function programarLectura(ms = 400): void {
+  if (espera) clearTimeout(espera);
+  espera = setTimeout(() => void leerCatalogo().catch(() => undefined), ms);
+}
+
+/**
+ * Huella barata del catálogo: cuántos productos/alias hay y el estado de las últimas solicitudes.
+ * Si cambia, se vuelve a leer todo. Así una solicitud nueva o un producto aprobado aparecen sin F5
+ * aunque Realtime no llegue.
+ */
+async function huella(): Promise<string | null> {
+  const sb = createClient();
+  const [p, a, s] = await Promise.all([
+    sb.from("productos_maestro").select("*", { count: "exact", head: true }),
+    sb.from("productos_alias").select("*", { count: "exact", head: true }),
+    sb.from("productos_solicitudes").select("id,estado").order("created_at", { ascending: false }).limit(100),
+  ]);
+  if (p.error || s.error) return null;
+  return `${p.count ?? 0}|${a.count ?? 0}|${(s.data ?? []).map((x: { id: string; estado: string }) => `${x.id}:${x.estado}`).join(",")}`;
+}
+
+async function revisar(): Promise<void> {
+  if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+  const h = await huella().catch(() => null);
+  if (h === null) return;
+  if (firma && h !== firma) programarLectura(0);
+  firma = h;
+}
+
+function suscribir(): void {
+  const sb = createClient();
+  let primera = true;
+  canal = TABLAS_CATALOGO.reduce(
+    (c, t) => c.on("postgres_changes", { event: "*", schema: "public", table: t }, () => programarLectura()),
+    sb.channel(`erp-productos-${Math.random().toString(36).slice(2)}`)
+  ).subscribe((st) => {
+    if (st === "SUBSCRIBED") {
+      // Al reconectar se recarga por si hubo cambios mientras estaba cortado
+      if (!primera) programarLectura(0);
+      primera = false;
+      return;
+    }
+    if (st === "CHANNEL_ERROR" || st === "TIMED_OUT" || st === "CLOSED") {
+      if (!carga || reintento) return; // sesión cerrada o ya se está reintentando
+      const viejo = canal;
+      canal = null;
+      reintento = setTimeout(() => {
+        reintento = null;
+        if (!carga) return;
+        if (viejo) void sb.removeChannel(viejo);
+        suscribir();
+      }, 5000);
+    }
+  });
+}
+
 /** Al iniciar sesión: descarga el catálogo y escucha los cambios de las otras PCs. */
 export function iniciarCatalogo(): Promise<void> {
-  carga ??= leerCatalogo().then(() => {
-    if (!estado.disponible || canal) return;
-    const recargar = () => {
-      if (espera) clearTimeout(espera);
-      espera = setTimeout(() => void leerCatalogo(), 400);
-    };
-    canal = ["productos_maestro", "productos_alias", "productos_solicitudes", "productos_categorias"]
-      .reduce((c, t) => c.on("postgres_changes", { event: "*", schema: "public", table: t }, recargar), createClient().channel("erp-productos"))
-      .subscribe();
-  });
+  carga ??= leerCatalogo()
+    .then(() => {
+      if (!estado.disponible) {
+        // Error pasajero de red/sesión (no falta de tablas): se vuelve a intentar en la próxima pantalla que lo pida
+        if (fallo) carga = null;
+        return;
+      }
+      if (canal) return;
+      suscribir();
+      void revisar();
+      sondeo ??= setInterval(() => void revisar(), CADA_MS);
+      if (typeof window !== "undefined" && !quitarEventos) {
+        const alVolver = () => {
+          if (document.visibilityState === "visible") programarLectura(0);
+        };
+        window.addEventListener("focus", alVolver);
+        document.addEventListener("visibilitychange", alVolver);
+        window.addEventListener("online", alVolver);
+        quitarEventos = () => {
+          window.removeEventListener("focus", alVolver);
+          document.removeEventListener("visibilitychange", alVolver);
+          window.removeEventListener("online", alVolver);
+        };
+      }
+    })
+    .catch((e) => {
+      console.warn("Catálogo de productos:", (e as Error).message);
+      carga = null;
+    });
   return carga;
 }
 
 export async function detenerCatalogo(): Promise<void> {
-  if (canal) await createClient().removeChannel(canal);
+  const c = canal;
   canal = null;
   carga = null;
+  if (sondeo) clearInterval(sondeo);
+  if (reintento) clearTimeout(reintento);
+  if (espera) clearTimeout(espera);
+  sondeo = reintento = espera = null;
+  quitarEventos?.();
+  quitarEventos = null;
+  firma = "";
+  if (c) await createClient().removeChannel(c);
   estado = VACIO;
   porNombre = new Map();
 }
