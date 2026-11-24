@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from "lucide-react";
 import { Input, Select, Table, Td, cn } from "@/components/ui";
 import { fechaPE } from "@/lib/storage";
@@ -111,8 +111,16 @@ export function ListaDocs({
     });
   }, [filas, q, desde, hasta, contraparte, tipoDoc, estado]);
 
+  // Solo avisa si cambió lo filtrado. Si la pantalla arma `filas` en cada render (Stock y Kardex), avisar siempre
+  // hacía un ciclo sin fin (aviso -> setState -> render -> filas nuevas -> aviso) que dejaba trabada la navegación.
+  const ultimoAviso = useRef("");
   useEffect(() => {
-    onFiltradas?.(filtradas.map((f) => f.id), q.trim());
+    if (!onFiltradas) return;
+    const ids = filtradas.map((f) => f.id);
+    const clave = `${q.trim()}\u0000${ids.join("\u0001")}`;
+    if (clave === ultimoAviso.current) return;
+    ultimoAviso.current = clave;
+    onFiltradas(ids, q.trim());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtradas]);
 

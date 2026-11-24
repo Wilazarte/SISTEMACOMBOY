@@ -935,7 +935,11 @@ export function escribir<T>(key: StoreKey, value: T): void {
       const err = e as { code?: string; message?: string };
       errorEscritura ??= err.message ?? String(e);
       avisarError(
-        err.code === "42501" ? "Su usuario no tiene permiso para guardar este cambio." : `No se guardó en el servidor: ${err.message ?? e}`
+        err.code === "42501"
+          ? "Su usuario no tiene permiso para guardar este cambio."
+          : err.code === "23505" && /almacen_stock_producto_sede/.test(err.message ?? "")
+            ? "No se guardó el stock: ese producto ya tiene una fila en ese almacén (otro usuario lo registró al mismo tiempo). La pantalla se actualizó; avise a Soporte antes de repetir el registro."
+            : `No se guardó en el servidor: ${err.message ?? e}`
       );
       sucias.add(key); // se vuelve a lo que realmente hay en el servidor
     } finally {
@@ -2616,8 +2620,23 @@ export function crearProveedor(data: Pick<Proveedor, "razonSocial" | "ruc"> & Pa
   return prov;
 }
 
-/** Clave de producto en stock: misma sede + mismo nombre (sin mayúsculas/espacios extra) + misma unidad. */
-const claveStock = (sede: string, nombre: string, unidad: string): string => `${sedeNormalizada(sede)}|${normalizarNombre(nombre)}|${unidad}`;
+/**
+ * Almacén según el índice único de la base (idx_almacen_stock_producto_sede_unico): todo lo que diga "Aqp" o
+ * "Arequipa" es Taller Principal Aqp y todo lo que diga "Secocha" es Sucursal Secocha.
+ */
+const almacenIndice = (sede: string): string => {
+  const s = (sede ?? "").trim();
+  if (/aqp|arequipa/i.test(s)) return "Taller Principal Aqp";
+  if (/secocha/i.test(s)) return "Sucursal Secocha";
+  return sedeNormalizada(s);
+};
+
+/**
+ * Clave de producto en stock: mismo almacén + mismo nombre (sin mayúsculas/espacios extra). La unidad NO entra:
+ * la base solo admite UNA fila por producto y almacén (aunque la factura traiga "NIU" o "PZA" y el stock "UND");
+ * si entrara la unidad se crearía una segunda fila y el servidor la rechaza (duplicate key).
+ */
+const claveStock = (sede: string, nombre: string, _unidad?: string): string => `${almacenIndice(sede)}|${normalizarNombre(nombre)}`;
 
 // ---------------------------------------------------------------------
 // KARDEX: cada movimiento de stock (ingreso por V°B°, salida por venta / producción, transferencia)
@@ -2655,6 +2674,7 @@ function ingresarStock(sede: string, items: { nombre: string; unidad: string; ca
     const k = claveStock(sede, nombre, i.unidad);
     let existente = stock.find((s) => claveStock(s.sede, s.nombre, s.unidad) === k);
     if (existente) {
+      // Misma fila aunque la unidad venga escrita distinto: se conserva la unidad del stock
       existente.cantidad = r2(existente.cantidad + i.cantidad);
       existente.costoUnit = i.precioUnit;
       existente.actualizado = ahora;
@@ -2663,7 +2683,7 @@ function ingresarStock(sede: string, items: { nombre: string; unidad: string; ca
       existente = { id: uid(), sede: sedeNormalizada(sede), nombre, unidad: i.unidad, cantidad: i.cantidad, costoUnit: i.precioUnit, actualizado: ahora, ...(i.productoId ? { productoId: i.productoId, sku: i.sku } : {}) };
       stock.push(existente);
     }
-    if (ref) movs.push({ sede, stock_id: existente.id, producto: nombre, unidad: i.unidad, tipo_movimiento: ref.tipo, documento: ref.documento, chasis: ref.chasis, motivo: ref.motivo, cantidad: i.cantidad, saldo: existente.cantidad });
+    if (ref) movs.push({ sede, stock_id: existente.id, producto: nombre, unidad: existente.unidad, tipo_movimiento: ref.tipo, documento: ref.documento, chasis: ref.chasis, motivo: ref.motivo, cantidad: i.cantidad, saldo: existente.cantidad });
   });
   escribir(KEYS.STOCK, stock);
   anotarKardex(movs);
@@ -2697,7 +2717,7 @@ export function importarSaldosStock(productos: { nombre: string; unidad: string;
       stock.push(e);
       nuevos++;
     }
-    movs.push({ sede: p.sede, stock_id: e.id, producto: nombre, unidad: p.unidad, tipo_movimiento: "SALDO_INICIAL", documento, cantidad, saldo: e.cantidad });
+    movs.push({ sede: p.sede, stock_id: e.id, producto: nombre, unidad: e.unidad, tipo_movimiento: "SALDO_INICIAL", documento, cantidad, saldo: e.cantidad });
   });
   escribir(KEYS.STOCK, stock);
   anotarKardex(movs);
@@ -2723,7 +2743,7 @@ export interface PlanReemplazo {
  * El mismo producto en el mismo almacén se reconoce por nombre (sin importar la unidad, que toma la del Excel).
  */
 export function planReemplazoStock(productos: { nombre: string; unidad: string; sede: string; cantidad: number; costoUnit?: number }[], alcance = ""): PlanReemplazo {
-  const enAlcance = (sede: string) => !alcance || sedeNormalizada(sede) === sedeNormalizada(alcance);
+  const enAlcance = (sede: string) => !alcance || almacenIndice(sede) === almacenIndice(alcance);
   const stock = getStock().filter((s) => enAlcance(s.sede));
   const usados = new Set<string>();
   const omitidos: string[] = [];
@@ -2743,13 +2763,13 @@ export function planReemplazoStock(productos: { nombre: string; unidad: string; 
     }
     const nombre = oficial?.nombre_normalizado ?? normalizarNombre(p.nombre);
     const sede = sedeNormalizada(p.sede);
-    const k = `${sede}|${normalizarNombre(nombre)}`;
+    const k = claveStock(sede, nombre);
     const previo = porClave.get(k);
     if (previo) {
       previo.cantidad = r2(previo.cantidad + p.cantidad);
       continue;
     }
-    const candidatos = stock.filter((s) => !usados.has(s.id) && sedeNormalizada(s.sede) === sede && normalizarNombre(s.nombre) === normalizarNombre(nombre));
+    const candidatos = stock.filter((s) => !usados.has(s.id) && claveStock(s.sede, s.nombre) === k);
     const existente = candidatos.find((s) => s.unidad === p.unidad) ?? [...candidatos].sort((a, b) => b.cantidad - a.cantidad)[0];
     if (existente) usados.add(existente.id);
     const fila = { nombre, unidad: p.unidad, sede, cantidad: r2(Math.max(0, p.cantidad)), ...(p.costoUnit ? { costoUnit: p.costoUnit } : {}), existente, antes: existente?.cantidad ?? 0 };
