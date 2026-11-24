@@ -1929,7 +1929,7 @@ const pagoDesdeOC = (oc: OrdenCompra): Partial<Factura> =>
   oc.bancarizacion ? { estadoPago: "PAGADA", caja: oc.bancarizacion.caja, bancarizacion: oc.bancarizacion } : {};
 
 export function crearFactura(
-  data: Pick<Factura, "numero" | "fecha" | "fechaVencimiento" | "ocId" | "total">,
+  data: Pick<Factura, "numero" | "fecha" | "fechaVencimiento" | "ocId" | "total"> & Partial<Pick<Factura, "archivos">>,
   rol: Rol
 ): Factura {
   const oc = getOrdenes().find((o) => o.id === data.ocId);
@@ -3679,7 +3679,7 @@ export function totalesCompra(tipo: Compra["tipoComprobante"], items: { cantidad
 
 /** Registra la compra y suma las cantidades al stock de la sede. Valida todo antes de escribir. */
 export type DatosCompra = Pick<Compra, "fecha" | "proveedorId" | "tipoComprobante" | "numero" | "sede"> &
-  Partial<Pick<Compra, "caja" | "pago" | "preciosConIgv">> & { items: Omit<ItemCompra, "subtotal">[]; /** "Generar Orden de Compra OC / de Servicio OS" */ generarOrden?: OrdenAGenerar };
+  Partial<Pick<Compra, "caja" | "pago" | "preciosConIgv" | "archivos" | "moneda" | "tipoCambio">> & { items: Omit<ItemCompra, "subtotal">[]; /** "Generar Orden de Compra OC / de Servicio OS" */ generarOrden?: OrdenAGenerar };
 
 export const docCompra = (c: Pick<Compra, "tipoComprobante" | "numero">) => `${COMPROBANTES[c.tipoComprobante] ?? "Factura"} ${c.numero}`;
 
@@ -3941,6 +3941,8 @@ function prepararCompra(data: DatosCompra, excluirId?: string): Omit<Compra, "id
     sede: data.sede,
     caja: data.caja.trim(),
     ...(pago ? { pago } : {}),
+    ...(data.archivos?.length ? { archivos: data.archivos } : {}),
+    ...(data.moneda === "USD" && data.tipoCambio ? { moneda: "USD" as const, tipoCambio: data.tipoCambio } : {}),
     items,
     subtotal,
     igv,

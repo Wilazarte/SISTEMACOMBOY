@@ -5,6 +5,8 @@ import { Send } from "lucide-react";
 import { Button, Card, CardHeader, Field, Input, Select, Textarea, ejecutarAsync } from "@/components/ui";
 import { BotonNuevo } from "@/components/ui/BotonFiltros";
 import { ItemsEditor, itemVacio } from "@/components/compras/EditarReq";
+import { EscanearGasto, type ResultadoEscaneo } from "@/components/compras/EscanearGasto";
+import { uid } from "@/lib/storage";
 import { hoy } from "@/lib/storage";
 import type { ItemReq, TipoRequerimiento } from "@/lib/types";
 
@@ -85,6 +87,12 @@ export function RequerimientoForm({
   const [items, setItems] = useState<ItemReq[]>([itemVacio()]);
   const [tipo, setTipo] = useState<TipoRequerimiento>("BIEN");
   const [enviando, setEnviando] = useState(false);
+  // Escanear documento o foto (Williams 2026-11-24): los artículos leídos se agregan a la tabla (sin borrar lo ya escrito)
+  const aplicarEscaneo = ({ datos }: ResultadoEscaneo) => {
+    const leidos: ItemReq[] = (datos.items ?? []).map((i) => ({ ...itemVacio(), id: uid(), nombre: i.descripcion.toUpperCase().slice(0, 200), cantidad: i.cantidad || 1, unidad: i.unidad || "UND" }));
+    if (!leidos.length) return;
+    setItems((actuales) => [...actuales.filter((x) => x.nombre.trim()), ...leidos]);
+  };
 
   const guardar = async () => {
     setEnviando(true);
@@ -162,6 +170,9 @@ export function RequerimientoForm({
         <Field label="Motivo *" className="md:col-span-4">
           <Textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej: Mantenimiento preventivo del remolcador U35 — cambio de rodamientos" />
         </Field>
+      </div>
+      <div className="px-5 pb-4">
+        <EscanearGasto onLeido={aplicarEscaneo} modo="req" />
       </div>
       <ItemsEditor items={items} onChange={setItems} modulo={modulo} servicio={conTipoReal && tipo === "SERVICIO"} />
       <div className="flex justify-end border-t border-plomo-100 px-5 py-4">

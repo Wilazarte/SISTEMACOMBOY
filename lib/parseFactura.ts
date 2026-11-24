@@ -456,3 +456,20 @@ export function parseFactura(texto: string, hoyISO = new Date().toISOString().sl
   if (r.comprobante === "BOLETA" && r.igv === undefined) r.igvCuadra = undefined;
   return r;
 }
+
+/**
+ * Lista de productos sin precios (pedido escrito, lista de materiales) para el REQ de Almacén:
+ * cada renglón que empieza con una cantidad ("4 UND PERNOS 1/2 X 2", "2 GALONES DE PINTURA") es un artículo.
+ * Solo se usa cuando parseFactura no encontró artículos con precio.
+ */
+export function itemsDeLista(texto: string): ItemLeido[] {
+  const items: ItemLeido[] = [];
+  for (const linea of texto.split(/\r?\n/)) {
+    const tokens = linea.trim().replace(/^[-•*·]+\s*/, "").split(/\s+/).filter(Boolean);
+    if (tokens.length < 2) continue;
+    const it = inicioItem(tokens);
+    if (!it?.cantidad) continue;
+    items.push({ cantidad: it.cantidad, unidad: it.unidad, descripcion: it.descripcion.slice(0, 250), precioUnit: 0, importe: 0 });
+  }
+  return items;
+}

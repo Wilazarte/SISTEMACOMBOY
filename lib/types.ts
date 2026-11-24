@@ -607,6 +607,11 @@ export interface Compra {
   aprobadoPor?: string;
   /** Precios de las líneas con IGV incluido (Williams 2026-11-14). Los anteriores no lo tienen: valores sin IGV. */
   preciosConIgv?: boolean;
+  /** Comprobante / guía escaneados (Williams 2026-11-24): mismo formato que los adjuntos de un gasto. */
+  archivos?: ArchivoGasto[];
+  /** Compra en dólares (escaneada): precios ya en soles con este tipo de cambio. */
+  moneda?: "PEN" | "USD";
+  tipoCambio?: number;
   items: ItemCompra[];
   subtotal: number;
   igv: number;

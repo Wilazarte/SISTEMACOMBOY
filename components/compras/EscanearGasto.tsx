@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { Camera, FileUp, ScanLine, X } from "lucide-react";
 import { Button, cn, toast } from "@/components/ui";
 import { MAX_ARCHIVO, hoy, soles, subirComprobanteGasto } from "@/lib/storage";
-import { NOMBRE_ELECTRONICO, parseFactura, renglonesDePalabras, type FacturaLeida, type ItemLeido } from "@/lib/parseFactura";
+import { NOMBRE_ELECTRONICO, itemsDeLista, parseFactura, renglonesDePalabras, type FacturaLeida, type ItemLeido } from "@/lib/parseFactura";
 import type { ArchivoGasto, Rol } from "@/lib/types";
 import { VincularNota } from "@/components/compras/VincularNota";
 
@@ -139,10 +139,51 @@ async function ocr(imagen: HTMLCanvasElement, progreso: (p: number, pasada: 1 | 
 }
 
 /**
- * Botón "Escanear factura" de Registrar gasto: foto o PDF del comprobante → OCR (Tesseract, español) →
- * parseFactura → devuelve los datos para rellenar el formulario. No guarda nada: el usuario revisa y da Guardar.
+ * Dónde se usa el escaneo (Williams 2026-11-24: el mismo botón en todo registro de gasto y en los REQ):
+ * - gasto: Registrar gasto (sin stock). Notas de crédito / débito se vinculan al gasto original.
+ * - compra: Registrar compra con ingreso a stock (los artículos van a la tabla de productos).
+ * - factura: Registrar factura de una OC (número, fecha, total y adjunto).
+ * - req: Nuevo requerimiento de Almacén. Acepta cualquier documento o foto (proforma, lista, cotización):
+ *   solo lee los artículos y no adjunta nada.
  */
-export function EscanearGasto({ onLeido, rol }: { onLeido: (r: ResultadoEscaneo) => void; rol: Rol }) {
+export type ModoEscaneo = "gasto" | "compra" | "factura" | "req";
+
+const TEXTOS: Record<ModoEscaneo, { titulo: string; ayuda: string; boton: string; pie: string }> = {
+  gasto: {
+    titulo: "Escanear comprobante electrónico",
+    boton: "Escanear Factura (foto o PDF)",
+    ayuda:
+      "Factura, boleta, recibo por honorarios, liquidación de compra y guía de remisión electrónicos (las notas de crédito / débito se vinculan a la factura original y le restan o suman). Lee RUC, fecha, serie-número, artículos, total e IGV y rellena el formulario. No guarda: revise y dé Registrar gasto.",
+    pie: "Los artículos van a la descripción del gasto y quedan cargados si elige Generar OC u OS (precios con IGV incluido).",
+  },
+  compra: {
+    titulo: "Escanear comprobante electrónico",
+    boton: "Escanear Factura (foto o PDF)",
+    ayuda:
+      "Factura, boleta, liquidación de compra y guía de remisión electrónicas. Lee RUC, fecha, serie-número y los artículos, y llena la tabla de productos (precios con IGV incluido). El comprobante queda adjunto a la compra. No guarda: revise y dé Guardar compra.",
+    pie: "Los artículos se cargaron en la tabla de productos con precio CON IGV incluido. Revise que cada uno sea el producto correcto del catálogo.",
+  },
+  factura: {
+    titulo: "Escanear factura electrónica",
+    boton: "Escanear Factura (foto o PDF)",
+    ayuda: "Lee serie-número, fecha y total de la factura de la OC y la deja adjunta. No guarda: revise y dé Registrar factura.",
+    pie: "Compare los artículos leídos con los de la OC antes de registrar.",
+  },
+  req: {
+    titulo: "Escanear documento o imagen",
+    boton: "Escanear documento (foto o PDF)",
+    ayuda:
+      "Proforma, cotización, factura, guía o una lista de productos con columnas de cantidad y descripción. Lee los artículos y los pone en la tabla del requerimiento. No envía nada: revise cada producto y dé Emitir.",
+    pie: "Los artículos se cargaron en la tabla del requerimiento. Elija el producto correcto del catálogo en cada línea.",
+  },
+};
+
+/**
+ * Botón "Escanear factura": foto o PDF del comprobante → OCR (Tesseract, español) → parseFactura →
+ * devuelve los datos para rellenar el formulario. No guarda nada: el usuario revisa y da Guardar.
+ */
+export function EscanearGasto({ onLeido, rol, modo = "gasto" }: { onLeido: (r: ResultadoEscaneo) => void; /** Solo para vincular notas de crédito / débito (modo gasto). */ rol?: Rol; modo?: ModoEscaneo }) {
+  const txt = TEXTOS[modo];
   // Nota de crédito / débito escaneada, a la espera de vincularla al gasto original
   const [nota, setNota] = useState<{ datos: FacturaLeida; archivo: Blob; nombre: string } | null>(null);
   const refCamara = useRef<HTMLInputElement>(null);
@@ -186,13 +227,25 @@ export function EscanearGasto({ onLeido, rol }: { onLeido: (r: ResultadoEscaneo)
       }
       const datos = parseFactura(texto, hoy());
       const tipo = datos.tipoElectronico;
+      // Requerimiento: cualquier documento sirve; solo interesan los artículos (no se adjunta nada)
+      if (modo === "req") {
+        // Sin precios (lista escrita): cada renglón que empieza con una cantidad es un artículo
+        const items = datos.items?.length ? datos.items : itemsDeLista(texto);
+        datos.items = items;
+        setUltimo({ ...vacioUltimo(nombre), tipoNombre: tipo ? NOMBRE_ELECTRONICO[tipo] : undefined, detectados: items.length ? [`${items.length} artículo(s)`] : [], faltan: items.length ? [] : ["artículos"], items, usd: datos.moneda === "USD" });
+        onLeido({ datos, texto });
+        return toast(items.length ? `${items.length} artículo(s) leído(s): revise la tabla del requerimiento.` : "No se reconocieron artículos: llene la tabla a mano.", items.length ? "ok" : "error");
+      }
       // Solo comprobantes electrónicos SUNAT: lo demás (tickets, notas internas, fotos sueltas) no se escanea
       if (!tipo) {
         setUltimo({ ...vacioUltimo(nombre), rechazo: `No se reconoce como comprobante electrónico. Solo se escanean: ${Object.values(NOMBRE_ELECTRONICO).join(", ")}.` });
         return toast("No es un comprobante electrónico: regístrelo a mano.", "error");
       }
-      // Nota de crédito / débito: modifica otro comprobante, no es un gasto nuevo
-      // Nota de crédito / débito: no es un gasto nuevo; se vincula al gasto del comprobante original
+      // Nota de crédito / débito: no es un gasto nuevo; se vincula al gasto del comprobante original (en Registrar gasto)
+      if ((tipo === "NOTA_CREDITO" || tipo === "NOTA_DEBITO") && modo !== "gasto") {
+        setUltimo({ ...vacioUltimo(nombre), tipoNombre: NOMBRE_ELECTRONICO[tipo], rechazo: `Es una ${NOMBRE_ELECTRONICO[tipo].toLowerCase()}: escanéela en Registrar gasto (Gasto / Servicio sin stock) para vincularla a la factura original.` });
+        return toast(`${NOMBRE_ELECTRONICO[tipo]}: escanéela en Registrar gasto.`, "error");
+      }
       if (tipo === "NOTA_CREDITO" || tipo === "NOTA_DEBITO") {
         setUltimo({
           ...vacioUltimo(nombre),
@@ -215,7 +268,7 @@ export function EscanearGasto({ onLeido, rol }: { onLeido: (r: ResultadoEscaneo)
       if (esGuia) {
         setUltimo({ ...vacioUltimo(nombre), tipoNombre: NOMBRE_ELECTRONICO.GUIA, detectados: [datos.numero ?? "guía"], guia: true });
         onLeido({ datos: { tipoElectronico: "GUIA" }, archivo, texto });
-        return toast(`Guía de remisión ${datos.numero ?? ""} adjuntada al gasto.`);
+        return toast(`Guía de remisión ${datos.numero ?? ""} adjuntada${modo === "compra" ? " a la compra" : modo === "factura" ? " a la factura" : " al gasto"}.`);
       }
       const etiquetas: [keyof FacturaLeida, string][] = [
         ["ruc", "RUC"],
@@ -245,19 +298,17 @@ export function EscanearGasto({ onLeido, rol }: { onLeido: (r: ResultadoEscaneo)
     <div className="rounded-xl border border-dashed border-corp/40 bg-corp/5 p-4">
       <div className="flex flex-wrap items-center gap-2">
         <ScanLine size={18} className="text-corp" />
-        <span className="mr-auto text-sm font-semibold text-fg">Escanear comprobante electrónico</span>
+        <span className="mr-auto text-sm font-semibold text-fg">{txt.titulo}</span>
         <input ref={refCamara} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => escanear(e.target.files?.[0])} />
         <input ref={refArchivo} type="file" accept="image/png,image/jpeg,image/webp,application/pdf" className="hidden" onChange={(e) => escanear(e.target.files?.[0])} />
         <Button type="button" size="sm" onClick={() => refCamara.current?.click()} disabled={ocupado} className="md:hidden">
           <Camera size={14} /> Tomar foto
         </Button>
         <Button type="button" size="sm" variant="secondary" onClick={() => refArchivo.current?.click()} disabled={ocupado}>
-          <FileUp size={14} /> Escanear Factura (foto o PDF)
+          <FileUp size={14} /> {txt.boton}
         </Button>
       </div>
-      <p className="mt-1 text-xs text-plomo-500">
-        Factura, boleta, recibo por honorarios, liquidación de compra y guía de remisión electrónicos (las notas de crédito / débito se vinculan a la factura original y le restan o suman). Lee RUC, fecha, serie-número, artículos, total e IGV y rellena el formulario. No guarda: revise y dé Registrar gasto.
-      </p>
+      <p className="mt-1 text-xs text-plomo-500">{txt.ayuda}</p>
       {ocupado && (
         <div className="mt-3">
           <div className="h-2 overflow-hidden rounded-full bg-plomo-100">
@@ -278,15 +329,17 @@ export function EscanearGasto({ onLeido, rol }: { onLeido: (r: ResultadoEscaneo)
             ) : ultimo.nota ? (
               <> · {ultimo.nota}</>
             ) : ultimo.guia ? (
-              <> · {ultimo.detectados.join(", ")} · adjuntada como guía de remisión del gasto</>
+              <> · {ultimo.detectados.join(", ")} · adjuntada como guía de remisión</>
             ) : (
               <> · detectado: {ultimo.detectados.join(", ") || "nada"}</>
             )}
             {ultimo.faltan.length > 0 && <> · <b>revisar:</b> {ultimo.faltan.join(", ")}</>}
             {ultimo.igvMal && <> · <b>el IGV leído no es el 18 % del total: revise el importe</b></>}
-            {ultimo.usd && (
+            {ultimo.usd && modo !== "req" && (
               <span className="mt-1 block font-semibold text-amber-900">
-                Comprobante en DÓLARES (US$): se puso la moneda US$. Confirme el tipo de cambio: el importe y la OC / OS se pasan a soles solos.
+                {modo === "gasto"
+                  ? "Comprobante en DÓLARES (US$): se puso la moneda US$. Confirme el tipo de cambio: el importe y la OC / OS se pasan a soles solos."
+                  : "Comprobante en DÓLARES (US$): confirme el tipo de cambio abajo; los precios y el total se pasan a soles solos."}
               </span>
             )}
           </div>
@@ -295,7 +348,7 @@ export function EscanearGasto({ onLeido, rol }: { onLeido: (r: ResultadoEscaneo)
           </button>
         </div>
       )}
-      {nota && !ocupado && (
+      {nota && rol && !ocupado && (
         <VincularNota
           datos={nota.datos}
           archivo={nota.archivo}
@@ -315,8 +368,8 @@ export function EscanearGasto({ onLeido, rol }: { onLeido: (r: ResultadoEscaneo)
                 <th className="px-2 py-1.5 text-right">Cant.</th>
                 <th className="px-2 py-1.5 text-left">Und.</th>
                 <th className="px-2 py-1.5 text-left">Descripción leída</th>
-                <th className="px-2 py-1.5 text-right">P. unit.</th>
-                <th className="px-2 py-1.5 text-right">Importe</th>
+                {modo !== "req" && <th className="px-2 py-1.5 text-right">P. unit.</th>}
+                {modo !== "req" && <th className="px-2 py-1.5 text-right">Importe</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-plomo-100">
@@ -325,21 +378,21 @@ export function EscanearGasto({ onLeido, rol }: { onLeido: (r: ResultadoEscaneo)
                   <td className="px-2 py-1 text-right">{i.cantidad}</td>
                   <td className="px-2 py-1">{i.unidad}</td>
                   <td className="px-2 py-1">{i.descripcion}</td>
-                  <td className="px-2 py-1 text-right">{dinero(i.precioUnit, ultimo.usd)}</td>
-                  <td className="px-2 py-1 text-right font-semibold">{dinero(i.importe, ultimo.usd)}</td>
+                  {modo !== "req" && <td className="px-2 py-1 text-right">{dinero(i.precioUnit, ultimo.usd)}</td>}
+                  {modo !== "req" && <td className="px-2 py-1 text-right font-semibold">{dinero(i.importe, ultimo.usd)}</td>}
                 </tr>
               ))}
             </tbody>
-            <tfoot>
+            {modo !== "req" && <tfoot>
               <tr className="border-t border-plomo-200">
                 <td colSpan={4} className="px-2 py-1.5 text-right text-plomo-600">
                   Suma de artículos{ultimo.conIgv === true ? " (con IGV, cuadra con el total)" : ultimo.conIgv === false ? " (sin IGV, cuadra con la op. gravada)" : " (no cuadra con el total: revise)"}
                 </td>
                 <td className={cn("px-2 py-1.5 text-right font-bold", ultimo.conIgv === undefined && "text-amber-700")}>{dinero(ultimo.items.reduce((a, i) => a + i.importe, 0), ultimo.usd)}</td>
               </tr>
-            </tfoot>
+            </tfoot>}
           </table>
-          <p className="px-2 py-1.5 text-[11px] text-plomo-500">Los artículos van a la descripción del gasto y quedan cargados si elige Generar OC u OS (precios con IGV incluido).</p>
+          <p className="px-2 py-1.5 text-[11px] text-plomo-500">{txt.pie}</p>
         </div>
       )}
     </div>

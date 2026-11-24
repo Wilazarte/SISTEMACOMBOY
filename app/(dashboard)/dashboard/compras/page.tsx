@@ -32,7 +32,9 @@ import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Ta
 import { abrirDoc } from "@/components/doc-viewer";
 import { EstadoRuc } from "@/components/EstadoRuc";
 import { avisoDniDuplicado, nombreDesdeDni } from "@/lib/dni";
-import { FormGasto } from "@/components/compras/FormGasto";
+import { CLAVE_TC, FormGasto, tcGuardado } from "@/components/compras/FormGasto";
+import { EscanearGasto, type ResultadoEscaneo } from "@/components/compras/EscanearGasto";
+import { rucSunat } from "@/lib/ruc";
 import { SelectorCaja } from "@/components/SelectorCaja";
 import { FormBancarizacion, bancarizacionVacia } from "@/components/compras/FormBancarizacion";
 import { OPCIONES_COMPROBANTE, PROVEEDOR_VARIOS_ID, numeroAutomatico, placeholderComprobante, proveedorVarios } from "@/lib/comprobantes";
@@ -78,6 +80,8 @@ import {
   parseFechaPE,
   puede,
   r2,
+  TC_MIN,
+  TC_MAX,
   subirBaucher,
   rechazarMultiple,
   rechazarRequerimiento,
@@ -109,7 +113,7 @@ import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { EditarGasto } from "@/components/compras/EditarGasto";
 import { FormOrdenServicio, filasOrdenesServicio } from "@/components/compras/OrdenesServicio";
 import type { Trabajador } from "@/lib/types";
-import type { Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, OrdenServicio, Proveedor, Requerimiento, Rol, OrdenAGenerar, StockItem, TipoComprobanteCompra } from "@/lib/types";
+import type { ArchivoGasto, Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, OrdenServicio, Proveedor, Requerimiento, Rol, OrdenAGenerar, StockItem, TipoComprobanteCompra } from "@/lib/types";
 
 type Tab = "nuevos" | "registrar" | "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias" | "planilla" | "declaraciones";
 
@@ -584,6 +588,57 @@ function RegistrarCompra({
   useDJsAutomaticas(rol);
   const [guardandoCompra, setGuardandoCompra] = useState(false);
   const [filas, setFilas] = useState<FilaCompra[]>([filaVacia()]);
+  // Escaneo del comprobante (Williams 2026-11-24): adjuntos y, si vino en dólares, las líneas en US$ y el tipo de cambio
+  const [archivosCompra, setArchivosCompra] = useState<ArchivoGasto[]>([]);
+  const [lineasUsd, setLineasUsd] = useState<FilaCompra[] | null>(null);
+  const [tcCompra, setTcCompra] = useState(0);
+  const conTc = (lineas: FilaCompra[], tc: number) => lineas.map((l) => ({ ...l, id: uid(), precioUnit: tc ? r2(l.precioUnit * tc) : 0 }));
+  const cambiarTc = (tc: number) => {
+    setTcCompra(tc);
+    if (lineasUsd) setFilas(conTc(lineasUsd, tc));
+    if (tc >= TC_MIN && tc <= TC_MAX)
+      try {
+        localStorage.setItem(CLAVE_TC, String(tc));
+      } catch {
+        /* sin almacenamiento local: no pasa nada */
+      }
+  };
+  const aplicarEscaneo = ({ datos, archivo }: ResultadoEscaneo) => {
+    // Guía de remisión: solo se adjunta
+    if (datos.tipoElectronico === "GUIA") {
+      if (archivo) setArchivosCompra((a) => [...a.filter((x) => x.tipo !== "GUIA"), archivo]);
+      return;
+    }
+    if (archivo) setArchivosCompra((a) => [...a.filter((x) => x.tipo !== "FACTURA"), archivo]);
+    if (datos.fecha) setFechaTxt(fechaPE(datos.fecha));
+    const comp = datos.comprobante ?? tipo;
+    if (datos.comprobante) setTipo(datos.comprobante);
+    if (datos.numero) setNumero(datos.numero);
+    // Proveedor: el de la base con ese RUC; si no existe, se abre "Nuevo proveedor" con el RUC y la razón social SUNAT
+    if (datos.ruc) {
+      const p = proveedores.find((x) => x.ruc === datos.ruc);
+      if (p) setProveedorId(p.id);
+      else {
+        setNuevoProv({ razonSocial: rucSunat(datos.ruc)?.razon_social ?? "", ruc: datos.ruc });
+        toast(`El RUC ${datos.ruc} no está en proveedores: confírmelo y guárdelo.`);
+      }
+    }
+    // Artículos → tabla de productos, precio CON IGV incluido (si el comprobante los trae sin IGV, se suma)
+    const factor = datos.itemsConIgv === false && comp === "FACTURA" ? 1.18 : 1;
+    const leidas: FilaCompra[] = (datos.items ?? []).map((i) => ({ id: uid(), nombre: i.descripcion.toUpperCase().slice(0, 200), unidad: i.unidad || "UND", cantidad: i.cantidad, precioUnit: r2(i.precioUnit * factor) }));
+    // Sin artículos leídos: una línea con el total para que elija el producto
+    const lineas = leidas.length ? leidas : datos.total ? [{ ...filaVacia(), precioUnit: datos.total }] : [];
+    setPreciosConIgv(true);
+    if (datos.moneda === "USD") {
+      const tc = tcCompra || tcGuardado();
+      setLineasUsd(lineas);
+      setTcCompra(tc);
+      if (lineas.length) setFilas(conTc(lineas, tc));
+    } else {
+      setLineasUsd(null);
+      if (lineas.length) setFilas(lineas);
+    }
+  };
   // Precios con IGV incluido (Williams 2026-11-14). false solo al editar una compra con factura anterior (sin IGV)
   const [preciosConIgv, setPreciosConIgv] = useState(true);
   const habilitado = puede(rol, "compra.crear");
@@ -605,6 +660,9 @@ function RegistrarCompra({
     setGenerarOrden(c.ordenCompraId ? "OC" : c.ordenServicioId ? "OS" : "NINGUNA");
     setFilas(c.items.map((i) => ({ id: uid(), nombre: i.nombre, unidad: i.unidad, cantidad: i.cantidad, precioUnit: i.precioUnit })));
     setPreciosConIgv(c.preciosConIgv === true || c.tipoComprobante !== "FACTURA");
+    setArchivosCompra(c.archivos ?? []);
+    setLineasUsd(null);
+    setTcCompra(c.tipoCambio ?? 0);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
   const cancelarEdicion = () => {
@@ -614,6 +672,9 @@ function RegistrarCompra({
     setPreciosConIgv(true);
     setPago(pagoCompraVacio());
     setGenerarOrden("NINGUNA");
+    setArchivosCompra([]);
+    setLineasUsd(null);
+    setTcCompra(0);
   };
 
   const fechaISO = parseFechaPE(fechaTxt);
@@ -648,7 +709,10 @@ function RegistrarCompra({
       generarOrden,
       items: filas,
       preciosConIgv,
+      archivos: archivosCompra,
+      ...(lineasUsd ? { moneda: "USD" as const, tipoCambio: tcCompra } : {}),
     };
+    if (lineasUsd && !(tcCompra >= TC_MIN && tcCompra <= TC_MAX)) return toast("Compra en dólares: ingrese el tipo de cambio.", "error");
     setGuardandoCompra(true);
     let ordenNumero = "";
     const ok = await ejecutarAsync(
@@ -716,6 +780,37 @@ function RegistrarCompra({
                 : "Factura y boleta: escriba los precios CON IGV incluido (el sistema desglosa base e IGV). Recibos, DJ, ticket y sin comprobante: sin IGV. Al guardar, los productos ingresan al stock del almacén seleccionado."
             }
           />
+          <div className="px-5 pt-5">
+            <EscanearGasto onLeido={aplicarEscaneo} rol={rol} modo="compra" />
+            {(archivosCompra.length > 0 || lineasUsd) && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                {archivosCompra.map((a) => (
+                  <span key={a.tipo} className="inline-flex items-center gap-1 rounded-full bg-plomo-100 px-2.5 py-1 font-medium text-fg">
+                    <button type="button" onClick={() => abrirArchivo(a.dataUrl)} className="underline" title="Ver adjunto">
+                      {a.tipo === "GUIA" ? "Guía" : "Comprobante"}: {a.nombre}
+                    </button>
+                    <button type="button" onClick={() => setArchivosCompra((x) => x.filter((y) => y.tipo !== a.tipo))} aria-label="Quitar adjunto" className="opacity-60 hover:opacity-100">
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+                {lineasUsd && (
+                  <label className="inline-flex items-center gap-2 rounded-lg bg-amber-50 px-2.5 py-1 font-semibold text-amber-900">
+                    Comprobante en US$ · Tipo de cambio
+                    <Input
+                      type="number"
+                      min={TC_MIN}
+                      max={TC_MAX}
+                      step="0.001"
+                      value={tcCompra || ""}
+                      onChange={(e) => cambiarTc(parseFloat(e.target.value) || 0)}
+                      className="!h-8 w-24 text-right"
+                    />
+                  </label>
+                )}
+              </div>
+            )}
+          </div>
           <div className="grid gap-4 p-5 md:grid-cols-3">
             <Field label="Proveedor" className="md:col-span-2" hint={prov ? (prov.id === PROVEEDOR_VARIOS_ID ? `Por defecto · N° ${prov.ruc}` : `RUC ${prov.ruc}`) : undefined}>
               <div className="flex gap-2">
@@ -994,6 +1089,16 @@ function RegistrarCompra({
               ))}
             </Table>
             <Totales subtotal={verCompra.subtotal} igv={verCompra.igv} total={verCompra.total} />
+            {verCompra.moneda === "USD" && <p className="text-right text-xs text-plomo-500">Comprobante en dólares: precios pasados a soles con T.C. {verCompra.tipoCambio}.</p>}
+            {(verCompra.archivos ?? []).length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {verCompra.archivos!.map((a) => (
+                  <Button key={a.tipo} size="sm" variant="secondary" title={a.nombre} onClick={() => abrirArchivo(a.dataUrl)}>
+                    <Upload size={14} /> {a.tipo === "GUIA" ? "Guía de remisión" : "Comprobante escaneado"}
+                  </Button>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </Modal>
@@ -1896,19 +2001,34 @@ function Facturas({
   const { subtotal, igv } = desglosarIgv(totalFac);
   const difiere = oc && Math.abs(totalFac - oc.total) > 0.01;
 
+  // Factura escaneada (Williams 2026-11-24): adjunto y total leído (manda sobre el total de la OC)
+  const [archivosFac, setArchivosFac] = useState<ArchivoGasto[]>([]);
+  const totalLeido = useRef<number | null>(null);
   useEffect(() => {
-    if (oc) {
-      setTotalFac(oc.total);
-      setVenc(sumarDias(fecha, diasCredito(oc.formaPago)));
-    }
+    if (oc) setTotalFac(totalLeido.current ?? oc.total);
+  }, [oc]);
+  useEffect(() => {
+    if (oc) setVenc(sumarDias(fecha, diasCredito(oc.formaPago)));
   }, [oc, fecha]);
+  const aplicarEscaneoFactura = ({ datos, archivo }: ResultadoEscaneo) => {
+    if (archivo) setArchivosFac((a) => [...a.filter((x) => x.tipo !== archivo.tipo), archivo]);
+    if (datos.tipoElectronico === "GUIA") return;
+    if (datos.comprobante && datos.comprobante !== "FACTURA") toast("El documento no es una factura: aquí solo se registran facturas de una OC.", "error");
+    if (datos.numero) setNumero(datos.numero);
+    if (datos.fecha) setFecha(datos.fecha);
+    if (datos.total && datos.moneda !== "USD") {
+      totalLeido.current = datos.total;
+      setTotalFac(datos.total);
+    } else if (datos.moneda === "USD") toast("Factura en dólares: escriba el total en soles.", "error");
+    if (datos.ruc && oc && datos.ruc !== oc.ruc) toast(`El RUC leído (${datos.ruc}) no es el de la OC (${oc.ruc}): revise que sea la OC correcta.`, "error");
+  };
 
   const [enviando, setEnviando] = useState(false);
   const guardar = async () => {
     setEnviando(true);
     const ok =
       modo === "FACTURA"
-        ? ejecutar(() => crearFactura({ ocId, numero, fecha, fechaVencimiento: venc, total: totalFac }, rol), "Factura registrada")
+        ? ejecutar(() => crearFactura({ ocId, numero, fecha, fechaVencimiento: venc, total: totalFac, ...(archivosFac.length ? { archivos: archivosFac } : {}) }, rol), "Factura registrada")
         : await ejecutarAsync(
             () => crearDeclaracionJurada({ ocId, fecha, dniVendedor: dni, nombreVendedor: vendedor, motivoSinComprobante: motivoDJ, aprobadoPor: aprobador }, rol),
             "Declaración jurada registrada"
@@ -1921,6 +2041,8 @@ function Facturas({
       setDni("");
       setVendedor("");
       setMotivoDJ("");
+      setArchivosFac([]);
+      totalLeido.current = null;
     }
   };
 
@@ -1963,6 +2085,23 @@ function Facturas({
             </Field>
             {modo === "FACTURA" ? (
               <>
+                <div className="md:col-span-3">
+                  <EscanearGasto onLeido={aplicarEscaneoFactura} rol={rol} modo="factura" />
+                  {archivosFac.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                      {archivosFac.map((a) => (
+                        <span key={a.tipo} className="inline-flex items-center gap-1 rounded-full bg-plomo-100 px-2.5 py-1 font-medium text-fg">
+                          <button type="button" onClick={() => abrirArchivo(a.dataUrl)} className="underline" title="Ver adjunto">
+                            {a.tipo === "GUIA" ? "Guía" : "Factura"}: {a.nombre}
+                          </button>
+                          <button type="button" onClick={() => setArchivosFac((x) => x.filter((y) => y.tipo !== a.tipo))} aria-label="Quitar adjunto" className="opacity-60 hover:opacity-100">
+                            <X size={12} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <Field label="Nro factura">
                   <Input value={numero} onChange={(e) => setNumero(e.target.value.toUpperCase())} placeholder="F001-00001234" />
                 </Field>

@@ -66,8 +66,8 @@ type CampoOcr = "fecha" | "importe" | "tipoCambio" | "descripcion" | "comprobant
 const AMARILLO = "!border-amber-400 !bg-amber-50 !text-amber-950 ring-2 ring-amber-200";
 
 /** Último tipo de cambio usado en este equipo (comodidad: se propone en el siguiente gasto en dólares). */
-const CLAVE_TC = "erp:gasto-tipo-cambio";
-const tcGuardado = (): number => {
+export const CLAVE_TC = "erp:gasto-tipo-cambio";
+export const tcGuardado = (): number => {
   try {
     const n = Number(localStorage.getItem(CLAVE_TC));
     return n >= TC_MIN && n <= TC_MAX ? n : 0;
