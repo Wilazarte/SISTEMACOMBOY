@@ -66,8 +66,8 @@ type CampoOcr = "fecha" | "importe" | "tipoCambio" | "descripcion" | "comprobant
 const AMARILLO = "!border-amber-400 !bg-amber-50 !text-amber-950 ring-2 ring-amber-200";
 
 /** Último tipo de cambio usado en este equipo (comodidad: se propone en el siguiente gasto en dólares). */
-const CLAVE_TC = "erp:gasto-tipo-cambio";
-const tcGuardado = (): number => {
+export const CLAVE_TC = "erp:gasto-tipo-cambio";
+export const tcGuardado = (): number => {
   try {
     const n = Number(localStorage.getItem(CLAVE_TC));
     return n >= TC_MIN && n <= TC_MAX ? n : 0;
@@ -178,7 +178,13 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
   const ocr = (c: CampoOcr) => (revisar.has(c) ? AMARILLO : undefined);
   /** Rellena el formulario con lo leído; no guarda (el usuario revisa y da Registrar gasto). */
   const descripcionActual = () => d.descripcion.trim();
-  const aplicarEscaneo = ({ datos, archivo }: ResultadoEscaneo) => {
+  const aplicarEscaneo = ({ datos, archivo, cotizacion }: ResultadoEscaneo) => {
+    // Cotización / proforma del proveedor: N° y adjunto del bloque "Cotización del proveedor"
+    if (cotizacion !== undefined) {
+      setSinCotizacion(false);
+      setD((x) => ({ ...x, ...(cotizacion ? { cotizacion } : {}), archivos: archivo ? [...x.archivos.filter((a) => a.tipo !== "COTIZACION"), archivo] : x.archivos }));
+      return;
+    }
     // Guía de remisión: solo se adjunta al gasto (no cambia importe ni comprobante)
     if (datos.tipoElectronico === "GUIA") {
       if (archivo) setD((x) => ({ ...x, archivos: [...x.archivos.filter((a) => a.tipo !== "GUIA"), archivo] }));

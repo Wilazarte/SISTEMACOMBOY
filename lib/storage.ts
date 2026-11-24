@@ -1477,7 +1477,7 @@ export const rucValido = (ruc: string): boolean => {
 };
 
 export function crearCotizacion(
-  data: Pick<Cotizacion, "numero" | "fechaEmision" | "reqId" | "proveedor" | "ruc" | "items">,
+  data: Pick<Cotizacion, "numero" | "fechaEmision" | "reqId" | "proveedor" | "ruc" | "items"> & Partial<Pick<Cotizacion, "archivos">>,
   rol: Rol
 ): Cotizacion {
   const req = getProcesados().find((r) => r.id === data.reqId);
@@ -1689,7 +1689,7 @@ export async function urlVoucher(ruta: string): Promise<string> {
  */
 export async function emitirOrdenCompra(
   data: Pick<OrdenCompra, "fecha" | "cotizacionId" | "formaPago" | "tiempoEntrega" | "lugarEntrega" | "cuentaOrigenPago" | "voucherMonto"> &
-    Partial<Pick<OrdenCompra, "almacenIngreso" | "caja">>,
+    Partial<Pick<OrdenCompra, "almacenIngreso" | "caja" | "archivos">>,
   voucher: File | null,
   rol: Rol
 ): Promise<OrdenCompra> {
@@ -1806,7 +1806,7 @@ export async function editarOrdenCompra(id: string, d: EdicionOC, rol: Rol): Pro
 
 export async function crearOrdenCompra(
   data: Pick<OrdenCompra, "fecha" | "cotizacionId" | "formaPago" | "tiempoEntrega" | "lugarEntrega"> &
-    Partial<Pick<OrdenCompra, "cuentaOrigenPago" | "voucherUrl" | "voucherNombre" | "voucherTipo" | "voucherMonto" | "almacenIngreso" | "caja">>,
+    Partial<Pick<OrdenCompra, "cuentaOrigenPago" | "voucherUrl" | "voucherNombre" | "voucherTipo" | "voucherMonto" | "almacenIngreso" | "caja" | "archivos">>,
   rol: Rol
 ): Promise<OrdenCompra> {
   validarOrdenCompra(data);
@@ -1929,7 +1929,7 @@ const pagoDesdeOC = (oc: OrdenCompra): Partial<Factura> =>
   oc.bancarizacion ? { estadoPago: "PAGADA", caja: oc.bancarizacion.caja, bancarizacion: oc.bancarizacion } : {};
 
 export function crearFactura(
-  data: Pick<Factura, "numero" | "fecha" | "fechaVencimiento" | "ocId" | "total">,
+  data: Pick<Factura, "numero" | "fecha" | "fechaVencimiento" | "ocId" | "total"> & Partial<Pick<Factura, "archivos">>,
   rol: Rol
 ): Factura {
   const oc = getOrdenes().find((o) => o.id === data.ocId);
@@ -1942,8 +1942,11 @@ export function crearFactura(
   // El total se ingresa con IGV incluido: base = total / 1.18, IGV = total − base
   if (!(data.total > 0)) throw new ErpError("El total de la factura debe ser mayor a 0.");
   const { subtotal, igv, total } = desglosarIgv(data.total);
+  // Sin adjunto propio: la factura escaneada al emitir la OC pasa a la factura
+  const archivos = data.archivos?.length ? data.archivos : oc.archivos?.filter((a) => a.tipo !== "COTIZACION");
   const fac: Factura = {
     ...data,
+    ...(archivos?.length ? { archivos } : {}),
     tipo: "FACTURA",
     numero: num,
     subtotal,
@@ -3679,7 +3682,7 @@ export function totalesCompra(tipo: Compra["tipoComprobante"], items: { cantidad
 
 /** Registra la compra y suma las cantidades al stock de la sede. Valida todo antes de escribir. */
 export type DatosCompra = Pick<Compra, "fecha" | "proveedorId" | "tipoComprobante" | "numero" | "sede"> &
-  Partial<Pick<Compra, "caja" | "pago" | "preciosConIgv">> & { items: Omit<ItemCompra, "subtotal">[]; /** "Generar Orden de Compra OC / de Servicio OS" */ generarOrden?: OrdenAGenerar };
+  Partial<Pick<Compra, "caja" | "pago" | "preciosConIgv" | "archivos" | "moneda" | "tipoCambio">> & { items: Omit<ItemCompra, "subtotal">[]; /** "Generar Orden de Compra OC / de Servicio OS" */ generarOrden?: OrdenAGenerar };
 
 export const docCompra = (c: Pick<Compra, "tipoComprobante" | "numero">) => `${COMPROBANTES[c.tipoComprobante] ?? "Factura"} ${c.numero}`;
 
@@ -3941,6 +3944,8 @@ function prepararCompra(data: DatosCompra, excluirId?: string): Omit<Compra, "id
     sede: data.sede,
     caja: data.caja.trim(),
     ...(pago ? { pago } : {}),
+    ...(data.archivos?.length ? { archivos: data.archivos } : {}),
+    ...(data.moneda === "USD" && data.tipoCambio ? { moneda: "USD" as const, tipoCambio: data.tipoCambio } : {}),
     items,
     subtotal,
     igv,
