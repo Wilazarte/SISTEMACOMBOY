@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { Camera, FileUp, ScanLine, X } from "lucide-react";
 import { Button, cn, toast } from "@/components/ui";
 import { MAX_ARCHIVO, hoy, soles, subirComprobanteGasto } from "@/lib/storage";
-import { NOMBRE_ELECTRONICO, itemsDeLista, parseFactura, renglonesDePalabras, type FacturaLeida, type ItemLeido } from "@/lib/parseFactura";
+import { NOMBRE_ELECTRONICO, itemsDeLista, numeroCotizacion, parseFactura, renglonesDePalabras, type FacturaLeida, type ItemLeido } from "@/lib/parseFactura";
 import type { ArchivoGasto, Rol } from "@/lib/types";
 import { VincularNota } from "@/components/compras/VincularNota";
 
@@ -37,6 +37,8 @@ export interface ResultadoEscaneo {
   /** La imagen / PDF escaneado, listo para d.archivos (tipo FACTURA). */
   archivo?: ArchivoGasto;
   texto: string;
+  /** Registrar gasto: se escaneó una cotización / proforma del proveedor (N° leído, o "" si no se leyó). */
+  cotizacion?: string;
 }
 
 const cargarImagen = (file: Blob): Promise<HTMLImageElement> =>
@@ -140,22 +142,25 @@ async function ocr(imagen: HTMLCanvasElement, progreso: (p: number, pasada: 1 | 
 
 /**
  * Dónde se usa el escaneo (Williams 2026-11-24: el mismo botón en todo registro de gasto y en los REQ):
- * - gasto: Registrar gasto (sin stock). Notas de crédito / débito se vinculan al gasto original.
+ * - gasto: Registrar gasto (sin stock). Notas de crédito / débito se vinculan al gasto original; una cotización
+ *   o proforma del proveedor llena "Cotización del proveedor" (N° y adjunto).
  * - compra: Registrar compra con ingreso a stock (los artículos van a la tabla de productos).
  * - factura: Registrar factura de una OC (número, fecha, total y adjunto).
  * - oc: Emitir orden de compra. Cualquier documento del proveedor (factura, proforma, cotización): elige la
  *   cotización por RUC, compara el total y queda adjunto a la OC.
+ * - coti: Registrar cotización. Cotización / proforma del proveedor: RUC, N°, fecha y precios de los productos del
+ *   REQ (por parecido del nombre); queda adjunta a la cotización.
  * - req: Nuevo requerimiento de Almacén. Acepta cualquier documento o foto (proforma, lista, cotización):
  *   solo lee los artículos y no adjunta nada.
  */
-export type ModoEscaneo = "gasto" | "compra" | "factura" | "req" | "oc";
+export type ModoEscaneo = "gasto" | "compra" | "factura" | "req" | "oc" | "coti";
 
 const TEXTOS: Record<ModoEscaneo, { titulo: string; ayuda: string; boton: string; pie: string }> = {
   gasto: {
     titulo: "Escanear comprobante electrónico",
     boton: "Escanear Factura (foto o PDF)",
     ayuda:
-      "Factura, boleta, recibo por honorarios, liquidación de compra y guía de remisión electrónicos (las notas de crédito / débito se vinculan a la factura original y le restan o suman). Lee RUC, fecha, serie-número, artículos, total e IGV y rellena el formulario. No guarda: revise y dé Registrar gasto.",
+      "Factura, boleta, recibo por honorarios, liquidación de compra y guía de remisión electrónicos, y la cotización o proforma del proveedor (las notas de crédito / débito se vinculan a la factura original y le restan o suman). Lee RUC, fecha, serie-número, artículos, total e IGV y rellena el formulario. No guarda: revise y dé Registrar gasto.",
     pie: "Los artículos van a la descripción del gasto y quedan cargados si elige Generar OC u OS (precios con IGV incluido).",
   },
   compra: {
@@ -177,6 +182,13 @@ const TEXTOS: Record<ModoEscaneo, { titulo: string; ayuda: string; boton: string
     ayuda:
       "Factura, proforma o cotización del proveedor. Lee el RUC y el total: elige la cotización de ese proveedor, avisa si el total no coincide y deja el documento adjunto a la OC. No emite nada: revise y dé Emitir OC.",
     pie: "Compare los artículos leídos con los de la cotización antes de emitir.",
+  },
+  coti: {
+    titulo: "Escanear cotización del proveedor",
+    boton: "Escanear cotización (foto o PDF)",
+    ayuda:
+      "Cotización o proforma del proveedor. Lee RUC, N° de cotización, fecha y los precios, y los pone en los productos del REQ que se parecen por nombre. El documento queda adjunto. No guarda: revise los precios y dé Guardar cotización.",
+    pie: "Los precios se pasaron a los productos del REQ con nombre parecido (con IGV incluido). Revise los que quedaron en 0.",
   },
   req: {
     titulo: "Escanear documento o imagen",
@@ -245,9 +257,24 @@ export function EscanearGasto({ onLeido, rol, modo = "gasto" }: { onLeido: (r: R
         onLeido({ datos, texto });
         return toast(items.length ? `${items.length} artículo(s) leído(s): revise la tabla del requerimiento.` : "No se reconocieron artículos: llene la tabla a mano.", items.length ? "ok" : "error");
       }
+      // Registrar gasto: una cotización o proforma del proveedor va al bloque "Cotización del proveedor" (N° y adjunto)
+      if (!tipo && modo === "gasto" && /COTIZACI[OÓ]N|PROFORMA|PRESUPUESTO/i.test(texto)) {
+        setEstado("subiendo");
+        let archivo: ArchivoGasto | undefined;
+        try {
+          const { ref } = await subirComprobanteGasto(guardar);
+          archivo = { tipo: "COTIZACION", nombre, mime: guardar.type, dataUrl: ref };
+        } catch (e) {
+          toast(`Se leyó la cotización pero no se pudo adjuntar: ${(e as Error).message}. Adjúntela abajo.`, "error");
+        }
+        const n = numeroCotizacion(texto) ?? "";
+        setUltimo({ ...vacioUltimo(nombre), tipoNombre: "Cotización del proveedor", detectados: n ? [`N° ${n}`] : [], faltan: n ? [] : ["N° de cotización"] });
+        onLeido({ datos: {}, archivo, texto, cotizacion: n });
+        return toast(n ? `Cotización ${n} adjuntada al gasto.` : "Cotización adjuntada: escriba su N° abajo.", n ? "ok" : "error");
+      }
       // Solo comprobantes electrónicos SUNAT: lo demás (tickets, notas internas, fotos sueltas) no se escanea
       // (la OC sí acepta proformas y cotizaciones del proveedor)
-      if (!tipo && modo !== "oc") {
+      if (!tipo && modo !== "oc" && modo !== "coti") {
         setUltimo({ ...vacioUltimo(nombre), rechazo: `No se reconoce como comprobante electrónico. Solo se escanean: ${Object.values(NOMBRE_ELECTRONICO).join(", ")}.` });
         return toast("No es un comprobante electrónico: regístrelo a mano.", "error");
       }
@@ -270,7 +297,7 @@ export function EscanearGasto({ onLeido, rol, modo = "gasto" }: { onLeido: (r: R
       let archivo: ArchivoGasto | undefined;
       try {
         const { ref } = await subirComprobanteGasto(guardar);
-        archivo = { tipo: esGuia ? "GUIA" : tipo ? "FACTURA" : "COTIZACION", nombre, mime: guardar.type, dataUrl: ref };
+        archivo = { tipo: esGuia ? "GUIA" : tipo && modo !== "coti" ? "FACTURA" : "COTIZACION", nombre, mime: guardar.type, dataUrl: ref };
       } catch (e) {
         toast(`Se leyó el comprobante pero no se pudo adjuntar: ${(e as Error).message}. Adjúntelo abajo.`, "error");
       }

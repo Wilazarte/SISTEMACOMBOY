@@ -473,3 +473,21 @@ export function itemsDeLista(texto: string): ItemLeido[] {
   }
   return items;
 }
+
+/** N° de una cotización o proforma: "COTIZACIÓN N° 000123", "PROFORMA Nro: P-45". */
+export function numeroCotizacion(texto: string): string | undefined {
+  const m = sinTildes(texto).match(/(?:COTIZACION|PROFORMA|PRESUPUESTO)\s*(?:N\s*[°ºo.]?|NRO\.?|NUMERO|#)?\s*[:.]?\s*([A-Z0-9][A-Z0-9-]{2,24})/i);
+  const n = m?.[1]?.toUpperCase();
+  return n && /\d/.test(n) ? n : undefined;
+}
+
+/** Parecido entre dos nombres de producto (0 a 1): palabras en común sobre las del nombre más corto. */
+export function parecidoNombre(a: string, b: string): number {
+  const pal = (s: string) => new Set(sinTildes(s).toUpperCase().split(/[^A-Z0-9/]+/).filter((w) => w.length > 1));
+  const x = pal(a);
+  const y = pal(b);
+  if (!x.size || !y.size) return 0;
+  let comun = 0;
+  x.forEach((w) => y.has(w) && comun++);
+  return comun / Math.min(x.size, y.size);
+}

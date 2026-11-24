@@ -50,6 +50,7 @@ function resolver(ref: DocRef): Resuelto | null {
       ],
       historial: c.historial,
       pdf: () => pdfCotizacion(c),
+      ...(c.archivos?.[0] ? { archivo: { url: c.archivos[0].dataUrl, tipo: c.archivos[0].mime, nombre: c.archivos[0].nombre } } : {}),
     };
   }
   if (ref.tipo === "OC") {

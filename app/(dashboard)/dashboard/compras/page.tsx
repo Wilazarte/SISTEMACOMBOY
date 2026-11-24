@@ -35,6 +35,7 @@ import { avisoDniDuplicado, nombreDesdeDni } from "@/lib/dni";
 import { CLAVE_TC, FormGasto, tcGuardado } from "@/components/compras/FormGasto";
 import { EscanearGasto, type ResultadoEscaneo } from "@/components/compras/EscanearGasto";
 import { rucSunat } from "@/lib/ruc";
+import { numeroCotizacion, parecidoNombre } from "@/lib/parseFactura";
 import { SelectorCaja } from "@/components/SelectorCaja";
 import { FormBancarizacion, bancarizacionVacia } from "@/components/compras/FormBancarizacion";
 import { OPCIONES_COMPROBANTE, PROVEEDOR_VARIOS_ID, numeroAutomatico, placeholderComprobante, proveedorVarios } from "@/lib/comprobantes";
@@ -1271,6 +1272,47 @@ function Cotizaciones({
   const [fecha, setFecha] = useState(hoy());
   const [items, setItems] = useState<ItemPrecio[]>([]);
   const habilitado = puede(rol, "coti.crear");
+  // Cotización escaneada (Williams 2026-11-24): datos del proveedor, precios por parecido del nombre y adjunto
+  const [archivosCoti, setArchivosCoti] = useState<ArchivoGasto[]>([]);
+  const aplicarEscaneoCoti = ({ datos, archivo, texto }: ResultadoEscaneo) => {
+    if (archivo) setArchivosCoti((a) => [...a.filter((x) => x.tipo !== archivo.tipo), archivo]);
+    if (datos.tipoElectronico === "GUIA") return;
+    if (datos.ruc) {
+      setRuc(datos.ruc);
+      const s = rucSunat(datos.ruc);
+      if (s) setProveedor(s.razon_social);
+    }
+    const n = numeroCotizacion(texto) ?? datos.numero;
+    if (n) setNumero(n);
+    if (datos.fecha) setFecha(datos.fecha);
+    if (datos.moneda === "USD") toast("Cotización en dólares: los precios se pusieron tal cual (US$). Páselos a soles antes de guardar.", "error");
+    const leidos = datos.items ?? [];
+    if (!leidos.length) return toast("No se leyeron precios: escríbalos a mano.", "error");
+    if (!items.length) return toast("Elija primero el requerimiento y vuelva a escanear para poner los precios.", "error");
+    const factor = datos.itemsConIgv === false ? 1.18 : 1;
+    const usados = new Set<number>();
+    let puestos = 0;
+    const nuevos = items.map((it, k) => {
+      // El más parecido por nombre; si no se parece ninguno y hay tantas líneas como productos, el del mismo orden
+      let mejor = -1;
+      let puntaje = 0.5;
+      leidos.forEach((l, j) => {
+        const p = parecidoNombre(it.nombre, l.descripcion);
+        if (!usados.has(j) && p >= puntaje) {
+          mejor = j;
+          puntaje = p;
+        }
+      });
+      if (mejor < 0 && leidos.length === items.length && !usados.has(k)) mejor = k;
+      if (mejor < 0) return it;
+      usados.add(mejor);
+      puestos++;
+      const precioUnit = r2(leidos[mejor].precioUnit * factor);
+      return { ...it, precioUnit, subtotal: r2(precioUnit * it.cantidad) };
+    });
+    setItems(nuevos);
+    toast(`Precios puestos en ${puestos} de ${items.length} producto(s)${puestos < items.length ? ": complete los que faltan" : ""}.`, puestos === items.length ? "ok" : "error");
+  };
 
   useEffect(() => {
     const req = reqs.find((r) => r.id === reqId);
@@ -1286,8 +1328,9 @@ function Cotizaciones({
   const { subtotal, igv, total } = totalesLineas(items, true, true);
 
   const guardar = () => {
-    const ok = ejecutar(() => crearCotizacion({ reqId, proveedor, ruc, numero, fechaEmision: fecha, items }, rol), "Cotización registrada");
+    const ok = ejecutar(() => crearCotizacion({ reqId, proveedor, ruc, numero, fechaEmision: fecha, items, ...(archivosCoti.length ? { archivos: archivosCoti } : {}) }, rol), "Cotización registrada");
     if (ok) {
+      setArchivosCoti([]);
       setProveedor("");
       setRuc("");
       setNumero("");
@@ -1310,6 +1353,7 @@ function Cotizaciones({
     setRuc("");
     setNumero("");
     setFecha(hoy());
+    setArchivosCoti([]);
     setShowRegistrar(true);
   };
 
@@ -1323,6 +1367,23 @@ function Cotizaciones({
             subtitle="Vinculada a un requerimiento ACEPTADO. Puede registrar varias cotizaciones por REQ para comparar."
             action={<CerrarForm onClick={() => setShowRegistrar(false)} />}
           />
+          <div className="px-5 pt-5">
+            <EscanearGasto onLeido={aplicarEscaneoCoti} modo="coti" />
+            {archivosCoti.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                {archivosCoti.map((a) => (
+                  <span key={a.tipo} className="inline-flex items-center gap-1 rounded-full bg-plomo-100 px-2.5 py-1 font-medium text-fg">
+                    <button type="button" onClick={() => abrirArchivo(a.dataUrl)} className="underline" title="Ver adjunto">
+                      {a.tipo === "GUIA" ? "Guía" : "Cotización"}: {a.nombre}
+                    </button>
+                    <button type="button" onClick={() => setArchivosCoti((x) => x.filter((y) => y.tipo !== a.tipo))} aria-label="Quitar adjunto" className="opacity-60 hover:opacity-100">
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="grid gap-4 p-5 md:grid-cols-3">
             <Field label="Requerimiento">
               <Select

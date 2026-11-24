@@ -1477,7 +1477,7 @@ export const rucValido = (ruc: string): boolean => {
 };
 
 export function crearCotizacion(
-  data: Pick<Cotizacion, "numero" | "fechaEmision" | "reqId" | "proveedor" | "ruc" | "items">,
+  data: Pick<Cotizacion, "numero" | "fechaEmision" | "reqId" | "proveedor" | "ruc" | "items"> & Partial<Pick<Cotizacion, "archivos">>,
   rol: Rol
 ): Cotizacion {
   const req = getProcesados().find((r) => r.id === data.reqId);

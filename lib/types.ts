@@ -104,6 +104,8 @@ export interface Cotizacion {
   subtotal: number;
   igv: number;
   total: number;
+  /** Cotización escaneada del proveedor (Williams 2026-11-24). */
+  archivos?: ArchivoGasto[];
   estado: "REGISTRADA" | "CON_OC";
   historial: EventoHistorial[];
 }
