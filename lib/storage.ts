@@ -1689,7 +1689,7 @@ export async function urlVoucher(ruta: string): Promise<string> {
  */
 export async function emitirOrdenCompra(
   data: Pick<OrdenCompra, "fecha" | "cotizacionId" | "formaPago" | "tiempoEntrega" | "lugarEntrega" | "cuentaOrigenPago" | "voucherMonto"> &
-    Partial<Pick<OrdenCompra, "almacenIngreso" | "caja">>,
+    Partial<Pick<OrdenCompra, "almacenIngreso" | "caja" | "archivos">>,
   voucher: File | null,
   rol: Rol
 ): Promise<OrdenCompra> {
@@ -1806,7 +1806,7 @@ export async function editarOrdenCompra(id: string, d: EdicionOC, rol: Rol): Pro
 
 export async function crearOrdenCompra(
   data: Pick<OrdenCompra, "fecha" | "cotizacionId" | "formaPago" | "tiempoEntrega" | "lugarEntrega"> &
-    Partial<Pick<OrdenCompra, "cuentaOrigenPago" | "voucherUrl" | "voucherNombre" | "voucherTipo" | "voucherMonto" | "almacenIngreso" | "caja">>,
+    Partial<Pick<OrdenCompra, "cuentaOrigenPago" | "voucherUrl" | "voucherNombre" | "voucherTipo" | "voucherMonto" | "almacenIngreso" | "caja" | "archivos">>,
   rol: Rol
 ): Promise<OrdenCompra> {
   validarOrdenCompra(data);
@@ -1942,8 +1942,11 @@ export function crearFactura(
   // El total se ingresa con IGV incluido: base = total / 1.18, IGV = total − base
   if (!(data.total > 0)) throw new ErpError("El total de la factura debe ser mayor a 0.");
   const { subtotal, igv, total } = desglosarIgv(data.total);
+  // Sin adjunto propio: la factura escaneada al emitir la OC pasa a la factura
+  const archivos = data.archivos?.length ? data.archivos : oc.archivos?.filter((a) => a.tipo !== "COTIZACION");
   const fac: Factura = {
     ...data,
+    ...(archivos?.length ? { archivos } : {}),
     tipo: "FACTURA",
     numero: num,
     subtotal,

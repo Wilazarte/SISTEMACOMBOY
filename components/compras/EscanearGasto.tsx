@@ -143,10 +143,12 @@ async function ocr(imagen: HTMLCanvasElement, progreso: (p: number, pasada: 1 | 
  * - gasto: Registrar gasto (sin stock). Notas de crédito / débito se vinculan al gasto original.
  * - compra: Registrar compra con ingreso a stock (los artículos van a la tabla de productos).
  * - factura: Registrar factura de una OC (número, fecha, total y adjunto).
+ * - oc: Emitir orden de compra. Cualquier documento del proveedor (factura, proforma, cotización): elige la
+ *   cotización por RUC, compara el total y queda adjunto a la OC.
  * - req: Nuevo requerimiento de Almacén. Acepta cualquier documento o foto (proforma, lista, cotización):
  *   solo lee los artículos y no adjunta nada.
  */
-export type ModoEscaneo = "gasto" | "compra" | "factura" | "req";
+export type ModoEscaneo = "gasto" | "compra" | "factura" | "req" | "oc";
 
 const TEXTOS: Record<ModoEscaneo, { titulo: string; ayuda: string; boton: string; pie: string }> = {
   gasto: {
@@ -168,6 +170,13 @@ const TEXTOS: Record<ModoEscaneo, { titulo: string; ayuda: string; boton: string
     boton: "Escanear Factura (foto o PDF)",
     ayuda: "Lee serie-número, fecha y total de la factura de la OC y la deja adjunta. No guarda: revise y dé Registrar factura.",
     pie: "Compare los artículos leídos con los de la OC antes de registrar.",
+  },
+  oc: {
+    titulo: "Escanear documento del proveedor",
+    boton: "Escanear documento (foto o PDF)",
+    ayuda:
+      "Factura, proforma o cotización del proveedor. Lee el RUC y el total: elige la cotización de ese proveedor, avisa si el total no coincide y deja el documento adjunto a la OC. No emite nada: revise y dé Emitir OC.",
+    pie: "Compare los artículos leídos con los de la cotización antes de emitir.",
   },
   req: {
     titulo: "Escanear documento o imagen",
@@ -237,12 +246,13 @@ export function EscanearGasto({ onLeido, rol, modo = "gasto" }: { onLeido: (r: R
         return toast(items.length ? `${items.length} artículo(s) leído(s): revise la tabla del requerimiento.` : "No se reconocieron artículos: llene la tabla a mano.", items.length ? "ok" : "error");
       }
       // Solo comprobantes electrónicos SUNAT: lo demás (tickets, notas internas, fotos sueltas) no se escanea
-      if (!tipo) {
+      // (la OC sí acepta proformas y cotizaciones del proveedor)
+      if (!tipo && modo !== "oc") {
         setUltimo({ ...vacioUltimo(nombre), rechazo: `No se reconoce como comprobante electrónico. Solo se escanean: ${Object.values(NOMBRE_ELECTRONICO).join(", ")}.` });
         return toast("No es un comprobante electrónico: regístrelo a mano.", "error");
       }
       // Nota de crédito / débito: no es un gasto nuevo; se vincula al gasto del comprobante original (en Registrar gasto)
-      if ((tipo === "NOTA_CREDITO" || tipo === "NOTA_DEBITO") && modo !== "gasto") {
+      if (tipo && (tipo === "NOTA_CREDITO" || tipo === "NOTA_DEBITO") && modo !== "gasto") {
         setUltimo({ ...vacioUltimo(nombre), tipoNombre: NOMBRE_ELECTRONICO[tipo], rechazo: `Es una ${NOMBRE_ELECTRONICO[tipo].toLowerCase()}: escanéela en Registrar gasto (Gasto / Servicio sin stock) para vincularla a la factura original.` });
         return toast(`${NOMBRE_ELECTRONICO[tipo]}: escanéela en Registrar gasto.`, "error");
       }
@@ -260,7 +270,7 @@ export function EscanearGasto({ onLeido, rol, modo = "gasto" }: { onLeido: (r: R
       let archivo: ArchivoGasto | undefined;
       try {
         const { ref } = await subirComprobanteGasto(guardar);
-        archivo = { tipo: esGuia ? "GUIA" : "FACTURA", nombre, mime: guardar.type, dataUrl: ref };
+        archivo = { tipo: esGuia ? "GUIA" : tipo ? "FACTURA" : "COTIZACION", nombre, mime: guardar.type, dataUrl: ref };
       } catch (e) {
         toast(`Se leyó el comprobante pero no se pudo adjuntar: ${(e as Error).message}. Adjúntelo abajo.`, "error");
       }
@@ -282,9 +292,10 @@ export function EscanearGasto({ onLeido, rol, modo = "gasto" }: { onLeido: (r: R
       const sinIgv = datos.comprobante === "BOLETA" || datos.comprobante === "RXH";
       const detectados = etiquetas.filter(([k]) => datos[k] !== undefined).map(([, l]) => l);
       const faltan = etiquetas.filter(([k]) => datos[k] === undefined && !(k === "igv" && sinIgv)).map(([, l]) => l);
-      setUltimo({ nombre, tipoNombre: NOMBRE_ELECTRONICO[tipo], detectados, faltan, igvMal: datos.igvCuadra === false, items: datos.items ?? [], conIgv: datos.itemsConIgv, usd: datos.moneda === "USD" });
+      const tipoNombre = tipo ? NOMBRE_ELECTRONICO[tipo] : "Documento";
+      setUltimo({ nombre, tipoNombre, detectados, faltan, igvMal: datos.igvCuadra === false, items: datos.items ?? [], conIgv: datos.itemsConIgv, usd: datos.moneda === "USD" });
       onLeido({ datos, archivo, texto });
-      toast(detectados.length ? `${NOMBRE_ELECTRONICO[tipo]} leída: revise los campos en amarillo y dé Guardar.` : "No se reconocieron datos: complete el formulario a mano.", detectados.length ? "ok" : "error");
+      toast(detectados.length ? `${tipoNombre} leído: revise los campos en amarillo y dé Guardar.` : "No se reconocieron datos: complete el formulario a mano.", detectados.length ? "ok" : "error");
     } catch (e) {
       toast(`No se pudo leer el comprobante: ${(e as Error).message}`, "error");
     } finally {

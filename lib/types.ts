@@ -174,6 +174,8 @@ export interface OrdenCompra {
   voucherNombre?: string;
   voucherTipo?: string;
   voucherMonto?: number;
+  /** Documento del proveedor escaneado al emitir la OC (factura, proforma o cotización), Williams 2026-11-24. */
+  archivos?: ArchivoGasto[];
   historial: EventoHistorial[];
   /** Fotos de la guía física tomadas con el celular (bucket "guias" de Supabase Storage, ver lib/movil/fotosGuia.ts). */
   fotosGuia?: FotoGuia[];

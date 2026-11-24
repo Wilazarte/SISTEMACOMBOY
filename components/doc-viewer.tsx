@@ -69,6 +69,7 @@ function resolver(ref: DocRef): Resuelto | null {
         ["Cuenta de pago", o.caja || (o.cuentaOrigenPago ? CUENTAS_ORIGEN_PAGO[o.cuentaOrigenPago] : "-")],
         ...(o.bancarizacion ? ([["Bancarización", `${o.bancarizacion.tipo}${o.bancarizacion.nroOperacion ? ` · N° ${o.bancarizacion.nroOperacion}` : ""}`]] as [string, string][]) : []),
         ...(o.voucherMonto !== undefined ? ([["Monto baucher", soles(o.voucherMonto)]] as [string, string][]) : []),
+        ...(o.archivos?.length ? ([["Documento escaneado", o.archivos.map((a) => a.nombre).join(" · ")]] as [string, string][]) : []),
         ["Entrega", `${o.tiempoEntrega} · ${o.lugarEntrega}`],
         ...(o.vistoBueno ? ([["V°B° almacén", `${o.vistoBueno.recibidoPor} · ${new Date(o.vistoBueno.fecha).toLocaleString("es-PE")}`]] as [string, string][]) : []),
         ["Subtotal / IGV", `${soles(o.subtotal)} / ${soles(o.igv)}`],
@@ -79,7 +80,9 @@ function resolver(ref: DocRef): Resuelto | null {
       // El baucher (ruta en el bucket privado) se muestra en el visor con URL firmada
       ...(o.voucherUrl
         ? { archivo: { url: /^(data:|sb:)/.test(o.voucherUrl) ? o.voucherUrl : `sb:tesoreria/${o.voucherUrl}`, tipo: o.voucherTipo ?? "image/jpeg", nombre: o.voucherNombre ?? "Baucher" } }
-        : {}),
+        : o.archivos?.[0]
+          ? { archivo: { url: o.archivos[0].dataUrl, tipo: o.archivos[0].mime, nombre: o.archivos[0].nombre } }
+          : {}),
     };
   }
   if (ref.tipo === "FACTURA") {

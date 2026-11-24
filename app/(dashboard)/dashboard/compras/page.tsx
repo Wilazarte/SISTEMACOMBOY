@@ -1511,6 +1511,25 @@ function Ordenes({
   const [voucherMonto, setVoucherMonto] = useState("");
   const voucherRef = useRef<HTMLInputElement>(null);
   const coti = cotis.find((c) => c.id === cotiId);
+  // Documento del proveedor escaneado (Williams 2026-11-24): elige la cotización por RUC, compara el total y se adjunta
+  const [archivosOC, setArchivosOC] = useState<ArchivoGasto[]>([]);
+  const aplicarEscaneoOC = ({ datos, archivo }: ResultadoEscaneo) => {
+    if (archivo) setArchivosOC((a) => [...a.filter((x) => x.tipo !== archivo.tipo), archivo]);
+    if (datos.tipoElectronico === "GUIA") return;
+    let elegida = coti;
+    if (datos.ruc) {
+      const delProv = cotis.filter((c) => c.ruc === datos.ruc);
+      if (!delProv.length) toast(`No hay cotización pendiente del RUC ${datos.ruc}${rucSunat(datos.ruc) ? ` (${rucSunat(datos.ruc)!.razon_social})` : ""}. Elija la cotización a mano.`, "error");
+      else if (!coti || coti.ruc !== datos.ruc) {
+        // La del mismo total si hay varias; si no, la primera de ese proveedor
+        elegida = delProv.find((c) => datos.total && Math.abs(c.total - datos.total) <= 0.5) ?? delProv[0];
+        setCotiId(elegida.id);
+        toast(`Cotización ${elegida.numero} de ${elegida.proveedor} seleccionada.`);
+      }
+    }
+    if (elegida && datos.total && datos.moneda !== "USD" && Math.abs(elegida.total - datos.total) > 0.5)
+      toast(`El total leído (${soles(datos.total)}) no coincide con la cotización ${elegida.numero} (${soles(elegida.total)}). Revise antes de emitir.`, "error");
+  };
   // Solo TESORERÍA y CREADOR (oc.crear) emiten la OC; el resto ve el formulario en solo lectura.
   const habilitado = puede(rol, "oc.crear");
 
@@ -1551,7 +1570,7 @@ function Ordenes({
     const monto = voucherMonto === "" ? undefined : parseFloat(voucherMonto);
     const ok = await ejecutarAsync(async () => {
       const oc = await emitirOrdenCompra(
-        { cotizacionId: cotiId, fecha, formaPago, tiempoEntrega: tiempo, lugarEntrega: lugar, cuentaOrigenPago: cuentaOrigenDeCaja(caja), caja, voucherMonto: monto, almacenIngreso },
+        { cotizacionId: cotiId, fecha, formaPago, tiempoEntrega: tiempo, lugarEntrega: lugar, cuentaOrigenPago: cuentaOrigenDeCaja(caja), caja, voucherMonto: monto, almacenIngreso, ...(archivosOC.length ? { archivos: archivosOC } : {}) },
         voucher?.file ?? null,
         rol
       );
@@ -1566,6 +1585,7 @@ function Ordenes({
       setTiempo("");
       setCaja(CAJA_POR_DEFECTO);
       setVoucher(null);
+      setArchivosOC([]);
     }
   };
 
@@ -1593,6 +1613,23 @@ function Ordenes({
           action={<CerrarForm onClick={() => setShowRegistrar(false)} />}
         />
         <fieldset disabled={!habilitado} className="min-w-0">
+          <div className="px-5 pt-5">
+            <EscanearGasto onLeido={aplicarEscaneoOC} modo="oc" />
+            {archivosOC.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                {archivosOC.map((a) => (
+                  <span key={a.tipo} className="inline-flex items-center gap-1 rounded-full bg-plomo-100 px-2.5 py-1 font-medium text-fg">
+                    <button type="button" onClick={() => abrirArchivo(a.dataUrl)} className="underline" title="Ver adjunto">
+                      {a.tipo === "GUIA" ? "Guía" : a.tipo === "FACTURA" ? "Factura" : "Documento"}: {a.nombre}
+                    </button>
+                    <button type="button" onClick={() => setArchivosOC((x) => x.filter((y) => y.tipo !== a.tipo))} aria-label="Quitar adjunto" className="opacity-60 hover:opacity-100">
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
           <div className="grid gap-4 p-5 md:grid-cols-3">
             <Field label="Cotización" className="md:col-span-3">
               <Select
