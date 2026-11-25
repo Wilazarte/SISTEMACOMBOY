@@ -3,7 +3,7 @@
 
 /**
  * Motivos del retiro. Con chasis (va al costo del equipo): PRODUCCION - … y MANTENIMIENTO EQUIPO.
- * Sin chasis (gasto general de taller): consumo general, herramientas, insumos de soldadura, oficina / limpieza.
+ * Sin chasis (gasto general de taller): consumo general, herramientas, insumos de soldadura, oficina / limpieza, corrección de stock.
  */
 export const MOTIVOS_RETIRO = [
   "PRODUCCION - PLUS 4000",
@@ -14,6 +14,7 @@ export const MOTIVOS_RETIRO = [
   "HERRAMIENTAS",
   "INSUMOS SOLDADURA",
   "USO OFICINA / LIMPIEZA",
+  "CORRECCION DE STOCK",
 ] as const;
 export type MotivoRetiro = (typeof MOTIVOS_RETIRO)[number];
 
@@ -30,6 +31,7 @@ export const ETIQUETA_MOTIVO: Record<MotivoRetiro, string> = {
   HERRAMIENTAS: "HERRAMIENTAS",
   "INSUMOS SOLDADURA": "INSUMOS SOLDADURA - Antirrespingo, Alambre, Boquilla, Disco",
   "USO OFICINA / LIMPIEZA": "USO OFICINA / LIMPIEZA",
+  "CORRECCION DE STOCK": "CORRECCION DE STOCK",
 };
 
 /** Error si falta el chasis para el motivo (null = todo bien). CONSUMO GENERAL / HERRAMIENTAS / INSUMOS / OFICINA: chasis null. */
