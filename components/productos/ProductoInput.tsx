@@ -191,7 +191,7 @@ export function SolicitarProducto({ nombre, modulo, motivo, onClose }: { nombre:
   const [enviando, setEnviando] = useState(false);
   const enviar = async () => {
     setEnviando(true);
-    const ok = await ejecutarAsync(() => solicitarProducto({ ...f, modulo, usuario: getSesion()?.usuario }), "Solicitud enviada: el administrador la revisará en Catálogo de productos");
+    const ok = await ejecutarAsync(() => solicitarProducto({ ...f, modulo, usuario: getSesion()?.usuario }), "Solicitud enviada: se autoriza en Ventas › Catálogo de productos");
     setEnviando(false);
     if (ok) onClose();
   };
@@ -223,7 +223,7 @@ export function SolicitarProducto({ nombre, modulo, motivo, onClose }: { nombre:
             Cancelar
           </Button>
           <Button onClick={enviar} disabled={enviando}>
-            <PackagePlus size={15} /> {enviando ? "Enviando…" : "Enviar al administrador"}
+            <PackagePlus size={15} /> {enviando ? "Enviando…" : "Enviar para autorización"}
           </Button>
         </div>
       </div>
