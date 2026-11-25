@@ -276,7 +276,9 @@ export function canonizarItems<T extends { nombre: string }>(items: T[]): (T & {
   if (faltan.length > 1) throw new ProductoError(`${faltan.length} productos no están en el catálogo maestro: ${faltan.slice(0, 5).join(", ")}${faltan.length > 5 ? "…" : ""}. Elíjalos del catálogo o solicítelos.`);
   return items.map((i) => {
     const c = canonizar(i.nombre);
-    return { ...i, nombre: c.nombre, productoId: c.productoId, sku: c.sku };
+    // La unidad es la del catálogo maestro (Williams 2026-11-25): otra unidad sería otro producto
+    const unidad = "unidad" in i && c.unidad ? { unidad: c.unidad.trim().toUpperCase() } : {};
+    return { ...i, nombre: c.nombre, productoId: c.productoId, sku: c.sku, ...unidad };
   });
 }
 

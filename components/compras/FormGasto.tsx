@@ -34,7 +34,7 @@ import {
   subirBaucher,
 } from "@/lib/storage";
 import type { ArchivoGasto, Factura, Bancarizacion, ComprobanteGasto, OrdenAGenerar, Proveedor, Rol, StockItem, TipoGasto } from "@/lib/types";
-import { ProductoInput } from "@/components/productos/ProductoInput";
+import { ProductoInput, UnidadProducto } from "@/components/productos/ProductoInput";
 import { SelectorOrden } from "@/components/compras/SelectorOrden";
 import { EscanearGasto, type ResultadoEscaneo } from "@/components/compras/EscanearGasto";
 import { ServiciosOS, lineasServicio, servicioVacio, type FilaServicio } from "@/components/compras/ServiciosOS";
@@ -502,7 +502,7 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
                           <Input type="number" min={0} step="any" value={f.cantidad || ""} onChange={(e) => setFila(f.id, { cantidad: parseFloat(e.target.value) || 0 })} />
                         </td>
                         <td className="px-2 py-1.5">
-                          <Select value={f.unidad} onChange={(e) => setFila(f.id, { unidad: e.target.value })} options={UNIDADES.map((u) => ({ value: u, label: u }))} />
+                          <UnidadProducto nombre={f.nombre} value={f.unidad} onChange={(unidad) => setFila(f.id, { unidad })} modulo="Tesorería · Gasto con OC" />
                         </td>
                         <td className="px-2 py-1.5">
                           <Input type="number" min={0} step="0.01" value={f.precioUnit || ""} onChange={(e) => setFila(f.id, { precioUnit: parseFloat(e.target.value) || 0 })} />

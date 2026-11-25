@@ -9,7 +9,7 @@ import { getSesion } from "@/lib/auth";
 import { SEDES_REQ, UNIDADES } from "@/lib/empresa";
 import { editarRequerimiento, reenviarRequerimiento, uid } from "@/lib/storage";
 import type { ItemReq, Requerimiento, Rol } from "@/lib/types";
-import { ProductoInput } from "@/components/productos/ProductoInput";
+import { ProductoInput, UnidadProducto } from "@/components/productos/ProductoInput";
 
 export const itemVacio = (): ItemReq => ({ id: uid(), nombre: "", cantidad: 1, unidad: "UND", marca: "", caracteristica: "" });
 
@@ -76,7 +76,7 @@ export function ItemsEditor({
                 <Input type="number" min={0} step="any" value={i.cantidad || ""} onChange={(e) => set(i.id, "cantidad", parseFloat(e.target.value) || 0)} />
               </td>
               <td className="px-2 py-1.5">
-                <Select value={i.unidad} onChange={(e) => set(i.id, "unidad", e.target.value)} options={UNIDADES.map((u) => ({ value: u, label: u }))} />
+                <UnidadProducto nombre={i.nombre} value={i.unidad} onChange={(u) => set(i.id, "unidad", u)} modulo="Requerimiento" />
               </td>
               <td className="px-2 py-1.5">
                 <Input value={i.marca} onChange={(e) => set(i.id, "marca", e.target.value)} placeholder="SKF, 3M…" />

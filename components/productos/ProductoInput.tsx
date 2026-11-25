@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PackagePlus } from "lucide-react";
 import { Button, Field, Input, Modal, Select, Textarea, cn, ejecutarAsync } from "@/components/ui";
 import { UNIDADES } from "@/lib/empresa";
@@ -121,13 +121,77 @@ export function ProductoInput({
   );
 }
 
-/** Pedido de producto nuevo: va a aprobación del administrador (no se crea directo). */
-export function SolicitarProducto({ nombre, modulo, onClose }: { nombre: string; modulo?: string; onClose: () => void }) {
-  const [f, setF] = useState({ nombre, unidad: "UND", marca: "", categoria: sugerirCategoriaVigente(nombre) ?? "", motivo: "" });
+/**
+ * Unidad de medida de una fila con producto (Williams 2026-11-25): si el producto está en el catálogo maestro,
+ * la unidad es SIEMPRE la del catálogo (fija, no se puede cambiar). Otra unidad = otro producto: "¿Otra unidad?"
+ * abre la solicitud de producto nuevo, que se autoriza en Ventas › Catálogo de productos.
+ * Sin producto del catálogo (texto libre, servicios) se elige de la lista como antes.
+ */
+export function UnidadProducto({
+  nombre,
+  value,
+  onChange,
+  opciones = UNIDADES,
+  modulo,
+  className,
+}: {
+  nombre: string;
+  value: string;
+  onChange: (unidad: string) => void;
+  opciones?: readonly string[];
+  modulo?: string;
+  className?: string;
+}) {
+  useCatalogo(); // vuelve a dibujar cuando carga o cambia el catálogo
+  const p = nombre?.trim() ? buscarProducto(nombre) : undefined;
+  const fija = p?.unidad?.trim().toUpperCase() || "";
+  const [solicitar, setSolicitar] = useState(false);
+  useEffect(() => {
+    if (fija && value !== fija) onChange(fija);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fija, value]);
+  if (!p || !fija)
+    return (
+      <Select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        options={Array.from(new Set([...opciones, ...(value ? [value] : [])])).map((u) => ({ value: u, label: u }))}
+        className={className}
+        aria-label="Unidad"
+      />
+    );
+  return (
+    <div>
+      <Select
+        value={fija}
+        disabled
+        options={[{ value: fija, label: fija }]}
+        className={cn("cursor-not-allowed opacity-80", className)}
+        title={`Unidad del catálogo maestro (${p.sku}). Para otra unidad, solicite un producto nuevo.`}
+        aria-label="Unidad (del catálogo)"
+      />
+      <button type="button" onClick={() => setSolicitar(true)} className="mt-0.5 block whitespace-nowrap text-[11px] text-amber-600 hover:underline">
+        ¿Otra unidad?
+      </button>
+      {solicitar && (
+        <SolicitarProducto
+          nombre={`${p.nombre_normalizado} `}
+          modulo={modulo}
+          motivo={`Otra unidad de medida: ${p.nombre_normalizado} está registrado en ${fija} (${p.sku}).`}
+          onClose={() => setSolicitar(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Pedido de producto nuevo: va a aprobación en Ventas › Catálogo de productos (no se crea directo). */
+export function SolicitarProducto({ nombre, modulo, motivo, onClose }: { nombre: string; modulo?: string; motivo?: string; onClose: () => void }) {
+  const [f, setF] = useState({ nombre, unidad: "UND", marca: "", categoria: sugerirCategoriaVigente(nombre) ?? "", motivo: motivo ?? "" });
   const [enviando, setEnviando] = useState(false);
   const enviar = async () => {
     setEnviando(true);
-    const ok = await ejecutarAsync(() => solicitarProducto({ ...f, modulo, usuario: getSesion()?.usuario }), "Solicitud enviada: el administrador la revisará en Catálogo de productos");
+    const ok = await ejecutarAsync(() => solicitarProducto({ ...f, modulo, usuario: getSesion()?.usuario }), "Solicitud enviada: se autoriza en Ventas › Catálogo de productos");
     setEnviando(false);
     if (ok) onClose();
   };
@@ -159,7 +223,7 @@ export function SolicitarProducto({ nombre, modulo, onClose }: { nombre: string;
             Cancelar
           </Button>
           <Button onClick={enviar} disabled={enviando}>
-            <PackagePlus size={15} /> {enviando ? "Enviando…" : "Enviar al administrador"}
+            <PackagePlus size={15} /> {enviando ? "Enviando…" : "Enviar para autorización"}
           </Button>
         </div>
       </div>

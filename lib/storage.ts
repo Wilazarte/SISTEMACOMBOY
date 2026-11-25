@@ -2626,7 +2626,7 @@ export function crearProveedor(data: Pick<Proveedor, "razonSocial" | "ruc"> & Pa
  */
 const almacenIndice = (sede: string): string => {
   const s = (sede ?? "").trim();
-  if (/aqp|arequipa/i.test(s)) return "Taller Principal Aqp";
+  if (/aqp|arequipa|taller principal/i.test(s)) return "Taller Principal Aqp";
   if (/secocha/i.test(s)) return "Sucursal Secocha";
   return sedeNormalizada(s);
 };
@@ -2674,8 +2674,9 @@ function ingresarStock(sede: string, items: { nombre: string; unidad: string; ca
     const k = claveStock(sede, nombre, i.unidad);
     let existente = stock.find((s) => claveStock(s.sede, s.nombre, s.unidad) === k);
     if (existente) {
-      // Misma fila aunque la unidad venga escrita distinto: se conserva la unidad del stock
+      // Misma fila aunque la unidad venga escrita distinto. Con producto del catálogo, la unidad es la del catálogo.
       existente.cantidad = r2(existente.cantidad + i.cantidad);
+      if (i.productoId) existente.unidad = i.unidad;
       existente.costoUnit = i.precioUnit;
       existente.actualizado = ahora;
       if (i.productoId) Object.assign(existente, { productoId: i.productoId, sku: i.sku });
@@ -2772,7 +2773,7 @@ export function planReemplazoStock(productos: { nombre: string; unidad: string; 
     const candidatos = stock.filter((s) => !usados.has(s.id) && claveStock(s.sede, s.nombre) === k);
     const existente = candidatos.find((s) => s.unidad === p.unidad) ?? [...candidatos].sort((a, b) => b.cantidad - a.cantidad)[0];
     if (existente) usados.add(existente.id);
-    const fila = { nombre, unidad: p.unidad, sede, cantidad: r2(Math.max(0, p.cantidad)), ...(p.costoUnit ? { costoUnit: p.costoUnit } : {}), existente, antes: existente?.cantidad ?? 0 };
+    const fila = { nombre, unidad: oficial?.unidad?.trim().toUpperCase() || p.unidad, sede, cantidad: r2(Math.max(0, p.cantidad)), ...(p.costoUnit ? { costoUnit: p.costoUnit } : {}), existente, antes: existente?.cantidad ?? 0 };
     porClave.set(k, fila);
     aplicar.push(fila);
   }
