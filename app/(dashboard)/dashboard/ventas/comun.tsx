@@ -1,5 +1,7 @@
 "use client";
 
+import { normalizarNombre, useCatalogo } from "@/lib/productos";
+
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Search, Trash2, UserPlus } from "lucide-react";
 import { Button, Field, Input, Select, cn } from "@/components/ui";
@@ -66,16 +68,21 @@ export function LineasEditor({
   /** Precios con IGV incluido (por defecto). false: documento anterior con precios sin IGV. */
   preciosConIgv?: boolean;
 }) {
-  // Productos de Almacén (nombre + unidad), sin repetir por sede
+  // Productos del CATÁLOGO MAESTRO en vivo (Williams 2026-11-25): uno por producto, con su unidad del catálogo y
+  // el stock sumado de todos los almacenes (aunque en stock haya quedado con otra unidad). Antes salía del stock
+  // agrupado por nombre + unidad: repetía productos (UND / PZA) y no mostraba los productos nuevos sin stock.
+  const { productos: catalogo } = useCatalogo();
   const productos = useMemo(() => {
-    const m = new Map<string, { nombre: string; unidad: string; cantidad: number }>();
+    const enStock = new Map<string, number>();
     stock.forEach((s) => {
-      const k = `${s.nombre}|${s.unidad}`;
-      const p = m.get(k);
-      m.set(k, { nombre: s.nombre, unidad: s.unidad, cantidad: r2((p?.cantidad ?? 0) + s.cantidad) });
+      const k = normalizarNombre(s.nombre);
+      enStock.set(k, r2((enStock.get(k) ?? 0) + s.cantidad));
     });
-    return Array.from(m.values()).sort((a, b) => a.nombre.localeCompare(b.nombre));
-  }, [stock]);
+    return catalogo
+      .filter((p) => p.activo)
+      .map((p) => ({ nombre: p.nombre_normalizado, unidad: (p.unidad || "UND").trim().toUpperCase(), cantidad: enStock.get(p.nombre_normalizado) ?? 0 }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }, [stock, catalogo]);
 
   // Equipos terminados DISPONIBLES (se venden por código de chasis)
   const equipos = useStore<EquipoTerminado[]>(KEYS.EQUIPOS, []).map(normalizarEquipo).filter((e) => e.estado === "DISPONIBLE" && e.codigo_chasis);
@@ -102,7 +109,7 @@ export function LineasEditor({
         descripcion: `${eq.tipo_equipo} ${eq.modelo} · chasis ${eq.codigo_chasis} · motor ${eq.marca_motor} ${eq.serie_motor}`,
         ...conPrecio(precioEquipo(precios, eq.tipo_equipo, eq.modelo)),
       });
-    const p = productos.find((x) => x.nombre === nombre.trim().toUpperCase());
+    const p = productos.find((x) => x.nombre === normalizarNombre(nombre));
     const pv = nombre.trim() ? precioGuardado(precios, "PRODUCTO", nombre) : undefined;
     set(id, p ? { productoNombre: p.nombre, unidad: p.unidad, descripcion: actual?.descripcion || p.nombre, ...conPrecio(pv) } : { productoNombre: nombre, ...conPrecio(pv) });
   };
@@ -177,7 +184,7 @@ export function LineasEditor({
         </table>
         <datalist id="productos-almacen">
           {productos.map((p) => (
-            <option key={`${p.nombre}|${p.unidad}`} value={p.nombre}>{`${p.unidad} · stock ${p.cantidad}`}</option>
+            <option key={p.nombre} value={p.nombre}>{`${p.unidad} · stock ${p.cantidad}`}</option>
           ))}
           {equipos.map((e) => (
             <option key={e.id} value={e.codigo_chasis}>{`Equipo ${e.tipo_equipo} ${e.modelo} · ${sedeEquipo(e)} · DISPONIBLE`}</option>
