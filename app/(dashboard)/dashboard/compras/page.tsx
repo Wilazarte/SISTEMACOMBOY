@@ -1,7 +1,7 @@
 "use client";
 
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
-import { ProductoInput } from "@/components/productos/ProductoInput";
+import { ProductoInput, UnidadProducto } from "@/components/productos/ProductoInput";
 import { EtiquetasCategorias, FiltroCategoria, categoriasDeItems, contarCategoriasDocs, docPasaCategoria } from "@/components/productos/Categorias";
 import { useCatalogo } from "@/lib/productos";
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
@@ -881,7 +881,7 @@ function RegistrarCompra({
                       />
                     </td>
                     <td className="px-2 py-1.5">
-                      <Select value={i.unidad} onChange={(e) => set(i.id, "unidad", e.target.value)} options={UNIDADES.map((u) => ({ value: u, label: u }))} />
+                      <UnidadProducto nombre={i.nombre} value={i.unidad} onChange={(u) => set(i.id, "unidad", u)} modulo="Tesorería" />
                     </td>
                     <td className="px-2 py-1.5">
                       <Input type="number" min={0} step="any" value={i.cantidad || ""} onChange={(e) => set(i.id, "cantidad", parseFloat(e.target.value) || 0)} className="text-right" />
@@ -2019,7 +2019,7 @@ function EditarOC({ oc, rol, cotizaciones, onClose }: { oc: OrdenCompra; rol: Ro
               <Input type="number" min={0} step="any" value={i.cantidad} onChange={(e) => setItem(n, { cantidad: Number(e.target.value) })} />
             </Td>
             <Td className="w-24">
-              <Select value={i.unidad} onChange={(e) => setItem(n, { unidad: e.target.value })} options={UNIDADES.map((u) => ({ value: u, label: u }))} />
+              <UnidadProducto nombre={i.nombre} value={i.unidad} onChange={(unidad) => setItem(n, { unidad })} modulo="Tesorería" />
             </Td>
             <Td className="w-28">
               <Input value={i.marca} onChange={(e) => setItem(n, { marca: e.target.value })} />

@@ -8,7 +8,7 @@ import { Boxes, CheckCircle2, Factory, Truck, ClipboardList, Eye, FilePlus2, Inb
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
 import { EditarReq, permisoEditarReq } from "@/components/compras/EditarReq";
-import { ProductoInput } from "@/components/productos/ProductoInput";
+import { ProductoInput, UnidadProducto } from "@/components/productos/ProductoInput";
 import { RequerimientoForm } from "@/components/requerimientos/RequerimientoForm";
 import { SEDE_PLANTA_PRINCIPAL } from "@/components/layout/ModuloLayout";
 import { getSesion } from "@/lib/auth";
@@ -691,7 +691,7 @@ function RegistrarIngreso({ rol, stock, ordenes }: { rol: Rol; stock: StockItem[
                   />
                 </Field>
                 <Field label="Unidad">
-                  <Select value={f.unidad} onChange={(e) => set(f.id, "unidad", e.target.value)} options={UNIDADES.map((u) => ({ value: u, label: u }))} />
+                  <UnidadProducto nombre={f.nombre} value={f.unidad} onChange={(u) => set(f.id, "unidad", u)} modulo="Almacén · Ingreso" />
                 </Field>
                 <Field label="Cantidad">
                   <Input type="number" min="0" step="any" value={f.cantidad} onChange={(e) => set(f.id, "cantidad", e.target.value)} />

@@ -11,7 +11,7 @@ import { KEYS, cargarCondicionesPago, r2, soles, useStore } from "@/lib/storage"
 import { clasificacionesCliente, DETALLE_LUGAR, LARGO_DOC, LUGARES_ENTREGA, lugarConDireccion, calcularLinea, lineaVacia, totalesVenta, validarDocumento } from "@/lib/ventas";
 import { normalizarEquipo, sedeEquipo, type EquipoTerminado } from "@/lib/equipos";
 import type { ClasificacionCliente, Cliente, CondicionPago, DatosDespacho, LugarEntrega, LineaVenta, StockItem, TipoDocCliente } from "@/lib/types";
-import { ProductoInput } from "@/components/productos/ProductoInput";
+import { ProductoInput, UnidadProducto } from "@/components/productos/ProductoInput";
 import { precioEquipo, precioGuardado, usePreciosVenta, type PrecioVenta } from "@/lib/preciosVenta";
 
 /** Datos de Ventas sincronizados con Supabase (tiempo real). */
@@ -144,7 +144,7 @@ export function LineasEditor({
                   <Input value={l.descripcion} onChange={(e) => set(l.id, { descripcion: e.target.value })} placeholder="Vidrio templado incoloro 8mm / Instalación" />
                 </td>
                 <td className="px-2 py-1.5">
-                  <Select value={l.unidad} onChange={(e) => set(l.id, { unidad: e.target.value })} options={UNIDADES.map((u) => ({ value: u, label: u }))} />
+                  <UnidadProducto nombre={l.productoNombre} value={l.unidad} onChange={(unidad) => set(l.id, { unidad })} modulo="Ventas" />
                 </td>
                 {(["ancho", "alto", "cantidad"] as const).map((c) => (
                   <td key={c} className="px-2 py-1.5">

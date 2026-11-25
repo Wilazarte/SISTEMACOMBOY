@@ -8,7 +8,7 @@ import { nombreDesdeDni } from "@/lib/dni";
 import { BotonFiltros, BotonNuevo } from "@/components/ui/BotonFiltros";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { UNIDADES } from "@/lib/empresa";
-import { ProductoInput } from "@/components/productos/ProductoInput";
+import { ProductoInput, UnidadProducto } from "@/components/productos/ProductoInput";
 import { EtiquetaCategoria, FiltroCategoria, contarCategorias, pasaCategoria } from "@/components/productos/Categorias";
 import { categoriaDe, useCatalogo } from "@/lib/productos";
 import { fechaPE, r2, soles } from "@/lib/storage";
@@ -170,7 +170,7 @@ function FormStock({ item, onListo }: { item?: StockLocal; onListo: () => void }
           <Input value={f.codigo} onChange={set("codigo")} />
         </Field>
         <Field label="Unidad">
-          <Select value={f.unidad} onChange={set("unidad")} options={UNIDADES.map((u) => ({ value: u, label: u }))} />
+          <UnidadProducto nombre={f.producto} value={f.unidad} onChange={(unidad) => setF({ ...f, unidad })} modulo="Sucursal · Stock" />
         </Field>
         <Field label="Stock">
           <Input type="number" min="0" step="any" value={f.stock} onChange={set("stock")} />

@@ -4,7 +4,7 @@ import { Plus, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { Badge, Button, Input, cn } from "@/components/ui";
 import { UNIDADES } from "@/lib/empresa";
-import { ProductoInput } from "@/components/productos/ProductoInput";
+import { ProductoInput, UnidadProducto } from "@/components/productos/ProductoInput";
 import { r2, soles, uid } from "@/lib/storage";
 import { buscarProducto } from "@/lib/productos";
 import type { EstadoDerivacion, EstadoReqSuc, EstadoTraslado, EstadoVenta, StockLocal } from "@/lib/sucursal";
@@ -95,11 +95,9 @@ export function LineasEditor({ lineas, onChange, stock, conPrecio = true }: { li
                 </p>
               )}
             </div>
-            <select value={l.unidad} onChange={(e) => set(l.key, { unidad: e.target.value })} className="col-span-3 h-[38px] rounded-lg border border-plomo-200 bg-surface px-2 text-sm text-fg sm:col-span-2" aria-label="Unidad">
-              {UNIDADES.map((u) => (
-                <option key={u}>{u}</option>
-              ))}
-            </select>
+            <div className="col-span-3 sm:col-span-2">
+              <UnidadProducto nombre={l.producto} value={l.unidad} onChange={(unidad) => set(l.key, { unidad })} modulo="Sucursal" />
+            </div>
             <Input type="number" min="0" step="any" value={l.cantidad} onChange={(e) => set(l.key, { cantidad: e.target.value })} className="col-span-3 sm:col-span-2" aria-label="Cantidad" placeholder="Cant." />
             {conPrecio && (
               <Input type="number" min="0" step="0.01" value={l.precio} onChange={(e) => set(l.key, { precio: e.target.value })} className="col-span-4 sm:col-span-2" aria-label="Precio unitario" placeholder="Precio" />
