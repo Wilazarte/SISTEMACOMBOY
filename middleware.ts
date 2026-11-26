@@ -12,6 +12,13 @@ import { RUTA_NO_AUTORIZADO, homeAsignado } from "@/lib/permisosPlanta";
 const LOGIN = "/login";
 const esLogin = (ruta: string) => ruta === LOGIN || ruta.startsWith(`${LOGIN}/`) || ruta === RUTA_LOGIN_SUCURSAL;
 
+// ERP Comercial (/erp/*, antes COMBOY-ERP): ya no tiene login propio, usa esta misma sesión.
+// Solo queda público lo que Meta (WhatsApp) consulta sin sesión: el webhook, la política de privacidad
+// y los archivos estáticos que descarga al enviar multimedia (fichas PDF, /uploads).
+const PUBLICAS_ERP_COMERCIAL = ["/erp/api/whatsapp/webhook", "/api/whatsapp/webhook", "/erp/privacidad", "/privacidad", "/fichas", "/uploads"];
+const esPublica = (ruta: string) => PUBLICAS_ERP_COMERCIAL.some((r) => ruta === r || ruta.startsWith(`${r}/`));
+const esApi = (ruta: string) => ruta.startsWith("/api/") || ruta.startsWith("/erp/api/");
+
 /** Rutas de módulos cuyo permiso se revisa en el servidor (el resto solo exige sesión). */
 const MODULOS = ["/dashboard", RUTA_SUCURSAL, "/erp", "/gerencia", "/logistica", "/almacen", "/finanzas", "/produccion", "/ventas", "/soporte"];
 const enModulo = (ruta: string) => MODULOS.some((m) => ruta === m || ruta.startsWith(`${m}/`));
@@ -19,7 +26,7 @@ const enModulo = (ruta: string) => MODULOS.some((m) => ruta === m || ruta.starts
 export async function middleware(req: NextRequest) {
   let res = NextResponse.next({ request: req });
   const ruta = req.nextUrl.pathname;
-  if (esLogin(ruta)) return res;
+  if (esLogin(ruta) || esPublica(ruta)) return res;
 
   const sb = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
     cookies: {
@@ -47,7 +54,7 @@ export async function middleware(req: NextRequest) {
   const { data } = await sb.auth.getClaims();
   const uid = data?.claims?.sub;
   if (!uid) {
-    if (ruta.startsWith("/api/")) return NextResponse.json({ error: "SIN_SESION", mensaje: "Inicie sesión." }, { status: 401 });
+    if (esApi(ruta)) return NextResponse.json({ error: "SIN_SESION", mensaje: "Inicie sesión." }, { status: 401 });
     return ir(enSecocha ? RUTA_LOGIN_SUCURSAL : LOGIN, !enSecocha && ruta.startsWith("/dashboard/"));
   }
 
@@ -65,6 +72,8 @@ export async function middleware(req: NextRequest) {
   if (ruta === "/dashboard") return asignado ? ir(asignado) : res;
 
   const permitido = ruta === "/dashboard/compras" ? veTesoreria(sesion) : puedeVer(sesion, ruta);
+  // APIs del ERP Comercial: sin permiso, JSON (el fetch del cliente no debe recibir la página de redirección)
+  if (!permitido && esApi(ruta)) return NextResponse.json({ error: "SIN_PERMISO", mensaje: "No tiene acceso al ERP Comercial." }, { status: 403 });
   // Emitir OP es solo de Logística: quien no lo es ve "Solo Logística puede emitir OP"
   if (!permitido && /^\/logistica\/(crear-op|orden-produccion)(\/|$)/.test(ruta)) {
     const url = req.nextUrl.clone();

@@ -1,0 +1,346 @@
+// COMBOY ERP COMERCIAL + WHATSAPP
+// Base PostgreSQL (Neon) del ERP Comercial, aparte de Supabase. Sin enums nativos: los valores permitidos se documentan
+// en cada campo y se validan en lib/erp-comercial/constants.ts
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Vendedor {
+  id        String    @id @default(cuid())
+  nombre    String
+  email     String?   @unique
+  telefono  String?
+  activo    Boolean   @default(true)
+  clientes  Cliente[]
+  createdAt DateTime  @default(now())
+}
+
+model Equipo {
+  id                          String   @id @default(cuid())
+  codigo                      String   @unique
+  nombre                      String
+  marca                       String
+  categoria                   String
+  descripcion                 String   @default("")
+  fichaTecnica                String   @default("{}") // JSON: { potencia, voltaje, peso, garantia, ... }
+  fotos                       String   @default("[]") // JSON: string[] de URLs
+  videoUrl                    String?
+  stock                       Int      @default(0)
+  costoBase                   Float
+  precioLista                 Float
+  intervaloMantenimientoMeses Int      @default(3)
+  activo                      Boolean  @default(true)
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
+  reglasPrecio        ReglaPrecio[]
+  cotizacionItems     CotizacionItem[]
+  ventaItems          VentaItem[]
+  productosCompetencia ProductoCompetencia[]
+  mantenimientos      Mantenimiento[]
+  campanas            Campana[]
+  costoProduccion     CostoProduccion?
+}
+
+// Discriminacion de precios de 2do grado.
+// tipo: TIPO_CLIENTE | REGION | VOLUMEN
+// equipoId null = regla global; con equipoId = regla especifica que reemplaza a la global del mismo tipo
+// porcentaje: negativo = descuento, positivo = recargo (ej: -15 = 15% dscto)
+model ReglaPrecio {
+  id          String   @id @default(cuid())
+  tipo        String
+  equipoId    String?
+  equipo      Equipo?  @relation(fields: [equipoId], references: [id], onDelete: Cascade)
+  tipoCliente String?  // DISTRIBUIDOR | MAYORISTA | RETAIL | VIP
+  region      String?  // LIMA | AREQUIPA | NORTE | SUR | SELVA
+  minCantidad Int?
+  maxCantidad Int?
+  porcentaje  Float
+  descripcion String?
+  createdAt   DateTime @default(now())
+}
+
+model Cliente {
+  id              String    @id @default(cuid())
+  tipoDocumento   String    @default("RUC") // RUC | DNI
+  documento       String    @unique
+  razonSocial     String
+  contacto        String
+  telefono        String    // formato internacional sin +, ej 51987654321
+  email           String?
+  direccion       String?
+  region          String    // LIMA | AREQUIPA | NORTE | SUR | SELVA
+  tipoCliente     String    // DISTRIBUIDOR | MAYORISTA | RETAIL | VIP
+  vendedorId      String?
+  vendedor        Vendedor? @relation(fields: [vendedorId], references: [id], onDelete: SetNull)
+  limiteCredito   Float     @default(0)
+  creditoUsado    Float     @default(0)
+  diasCredito     Int       @default(0)
+  etapa           String    @default("PROSPECTO") // PROSPECTO | COTIZADO | NEGOCIADO | GANADO | PERDIDO | POSTVENTA
+  ultimoContacto  DateTime?
+  proximoContacto DateTime?
+  fechaGanado     DateTime?
+  encuestaEnviada Boolean   @default(false)
+  optIn           Boolean   @default(true) // acepta recibir WhatsApp
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  notas          Nota[]
+  cotizaciones   Cotizacion[]
+  ventas         Venta[]
+  mensajes       Mensaje[]
+  mantenimientos Mantenimiento[]
+  tareas         Tarea[]
+  envios         CampanaEnvio[]
+}
+
+model Nota {
+  id        String   @id @default(cuid())
+  clienteId String
+  cliente   Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  texto     String
+  createdAt DateTime @default(now())
+}
+
+model Cotizacion {
+  id        String           @id @default(cuid())
+  numero    Int              @unique
+  clienteId String
+  cliente   Cliente          @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  estado    String           @default("BORRADOR") // BORRADOR | ENVIADA | ACEPTADA | RECHAZADA
+  subtotal  Float            @default(0)
+  costo     Float            @default(0)
+  total     Float            @default(0)
+  notas     String?
+  items     CotizacionItem[]
+  venta     Venta?
+  createdAt DateTime         @default(now())
+}
+
+model CotizacionItem {
+  id             String     @id @default(cuid())
+  cotizacionId   String
+  cotizacion     Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  equipoId       String
+  equipo         Equipo     @relation(fields: [equipoId], references: [id])
+  cantidad       Int
+  precioLista    Float
+  precioUnitario Float
+  costoUnitario  Float
+  subtotal       Float
+}
+
+model Venta {
+  id           String      @id @default(cuid())
+  clienteId    String
+  cliente      Cliente     @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  cotizacionId String?     @unique
+  cotizacion   Cotizacion? @relation(fields: [cotizacionId], references: [id], onDelete: SetNull)
+  fecha        DateTime    @default(now())
+  total        Float
+  costo        Float
+  items        VentaItem[]
+}
+
+model VentaItem {
+  id                          String          @id @default(cuid())
+  ventaId                     String
+  venta                       Venta           @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  equipoId                    String
+  equipo                      Equipo          @relation(fields: [equipoId], references: [id])
+  cantidad                    Int
+  precioUnitario              Float
+  costoUnitario               Float
+  intervaloMantenimientoMeses Int             @default(3)
+  mantenimientos              Mantenimiento[]
+}
+
+model Mantenimiento {
+  id              String    @id @default(cuid())
+  ventaItemId     String
+  ventaItem       VentaItem @relation(fields: [ventaItemId], references: [id], onDelete: Cascade)
+  clienteId       String
+  cliente         Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  equipoId        String
+  equipo          Equipo    @relation(fields: [equipoId], references: [id])
+  fechaProgramada DateTime
+  estado          String    @default("PENDIENTE") // PENDIENTE | NOTIFICADO | COMPLETADO
+  notificadoAt    DateTime?
+  completadoAt    DateTime?
+  createdAt       DateTime  @default(now())
+}
+
+model Tarea {
+  id          String    @id @default(cuid())
+  clienteId   String?
+  cliente     Cliente?  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  tipo        String    // MANTENIMIENTO | SEGUIMIENTO | POSTVENTA | GENERAL
+  titulo      String
+  descripcion String?
+  fechaVence  DateTime
+  completada  Boolean   @default(false)
+  refId       String?   // id de mantenimiento u otra entidad (evita duplicados)
+  createdAt   DateTime  @default(now())
+}
+
+model Competidor {
+  id          String                @id @default(cuid())
+  nombre      String
+  web         String?
+  pais        String?
+  fortalezas  String                @default("")
+  debilidades String                @default("")
+  notas       String?
+  productos   ProductoCompetencia[]
+  createdAt   DateTime              @default(now())
+}
+
+model ProductoCompetencia {
+  id           String     @id @default(cuid())
+  competidorId String
+  competidor   Competidor @relation(fields: [competidorId], references: [id], onDelete: Cascade)
+  equipoId     String     // nuestro equipo equivalente
+  equipo       Equipo     @relation(fields: [equipoId], references: [id], onDelete: Cascade)
+  nombre       String
+  marca        String
+  precio       Float
+  fichaTecnica String     @default("{}")
+  fortalezas   String     @default("")
+  debilidades  String     @default("")
+  updatedAt    DateTime   @updatedAt
+}
+
+// ===================== WHATSAPP =====================
+
+model Plantilla {
+  id               String    @id @default(cuid())
+  nombre           String    @unique
+  categoria        String    // BIENVENIDA | COTIZACION | OFERTA | POSTVENTA | MANTENIMIENTO | SEGUIMIENTO
+  contenido        String    // variables: {nombre} {empresa} {equipo} {precio} {vendedor} {fecha}
+  metaTemplateName String?   // nombre de plantilla aprobada en Meta (para mensajes fuera de la ventana de 24h)
+  idioma           String    @default("es")
+  campanas         Campana[]
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model Mensaje {
+  id          String        @id @default(cuid())
+  clienteId   String
+  cliente     Cliente       @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  direccion   String        // IN | OUT
+  tipo        String        @default("text") // text | image | video | document | template
+  contenido   String        @default("")
+  mediaUrl    String?
+  mediaNombre String?
+  waMessageId String?       @unique
+  estado      String        @default("PENDIENTE") // PENDIENTE | ENVIADO | ENTREGADO | LEIDO | FALLIDO | SIMULADO | RECIBIDO
+  error       String?
+  leido       Boolean       @default(false) // para mensajes IN: leido por el agente
+  origen      String        @default("MANUAL") // MANUAL | OFERTA | CAMPANA | AUTOMATIZACION | WEBHOOK
+  envio       CampanaEnvio?
+  createdAt   DateTime      @default(now())
+}
+
+model Campana {
+  id                String         @id @default(cuid())
+  nombre            String
+  plantillaId       String?
+  plantilla         Plantilla?     @relation(fields: [plantillaId], references: [id], onDelete: SetNull)
+  mensaje           String
+  equipoId          String?
+  equipo            Equipo?        @relation(fields: [equipoId], references: [id], onDelete: SetNull)
+  adjuntarFoto      Boolean        @default(false)
+  adjuntarPdf       Boolean        @default(false)
+  adjuntarVideo     Boolean        @default(false)
+  filtroRegion      String?        // CSV de regiones
+  filtroTipoCliente String?        // CSV de tipos
+  filtroEtapa       String?
+  estado            String         @default("BORRADOR") // BORRADOR | ENVIANDO | COMPLETADA
+  envios            CampanaEnvio[]
+  createdAt         DateTime       @default(now())
+}
+
+model CampanaEnvio {
+  id         String    @id @default(cuid())
+  campanaId  String
+  campana    Campana   @relation(fields: [campanaId], references: [id], onDelete: Cascade)
+  clienteId  String
+  cliente    Cliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  mensajeId  String?   @unique
+  mensaje    Mensaje?  @relation(fields: [mensajeId], references: [id], onDelete: SetNull)
+  estado     String    @default("PENDIENTE") // PENDIENTE | ENVIADO | ENTREGADO | LEIDO | FALLIDO | SIMULADO
+  error      String?
+  enviadoAt  DateTime?
+
+  @@unique([campanaId, clienteId])
+}
+
+model Configuracion {
+  clave String @id
+  valor String
+}
+
+model AutomatizacionLog {
+  id        String   @id @default(cuid())
+  tipo      String   // MANTENIMIENTO | SEGUIMIENTO | POSTVENTA
+  detalle   String
+  createdAt DateTime @default(now())
+}
+
+// ---------- Costo de producción (1 por equipo) ----------
+model CostoProduccion {
+  id              String     @id @default(cuid())
+  equipoId        String     @unique
+  equipo          Equipo     @relation(fields: [equipoId], references: [id], onDelete: Cascade)
+  diasFabricacion Float      @default(0) // valor de cabecera; se replica en cada Servicio
+  materiales      Material[]
+  manoObra        ManoObra[]
+  servicios       Servicio[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model Material {
+  id                String          @id @default(cuid())
+  costoProduccionId String
+  costoProduccion   CostoProduccion @relation(fields: [costoProduccionId], references: [id], onDelete: Cascade)
+  orden             Int             @default(0)
+  nombre            String
+  cantidad          Float
+  unidad            String
+  costoUnitario     Float
+
+  @@index([costoProduccionId])
+}
+
+model ManoObra {
+  id                String          @id @default(cuid())
+  costoProduccionId String
+  costoProduccion   CostoProduccion @relation(fields: [costoProduccionId], references: [id], onDelete: Cascade)
+  orden             Int             @default(0)
+  rol               String
+  horas             Float
+  costoHora         Float
+
+  @@index([costoProduccionId])
+}
+
+model Servicio {
+  id                String          @id @default(cuid())
+  costoProduccionId String
+  costoProduccion   CostoProduccion @relation(fields: [costoProduccionId], references: [id], onDelete: Cascade)
+  orden             Int             @default(0)
+  nombre            String
+  costoMensual      Float
+  diasFabricacion   Float
+  prorrateo         Float // costoMensual / 30 * diasFabricacion (calculado al guardar)
+
+  @@index([costoProduccionId])
+}

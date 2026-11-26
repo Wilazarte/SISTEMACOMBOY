@@ -1,0 +1,73 @@
+/* ERP Comercial + WhatsApp (antes COMBOY-ERP): tema oscuro shadcn.
+   Todo vive bajo .erp-comercial (app/(erp)/erp/layout.tsx) para no tocar el diseño del resto del sistema.
+   Los colores los lee tailwind.config.ts (erpColores) como hsl(var(--x) / alpha). */
+.erp-comercial {
+  --background: 222 47% 5%;
+  --foreground: 210 40% 96%;
+  --card: 222 40% 8%;
+  --card-foreground: 210 40% 96%;
+  --popover: 222 40% 8%;
+  --popover-foreground: 210 40% 96%;
+  --primary: 217 91% 60%;
+  --primary-foreground: 222 47% 6%;
+  --secondary: 217 33% 15%;
+  --secondary-foreground: 210 40% 96%;
+  --muted: 217 33% 13%;
+  --muted-foreground: 215 20% 62%;
+  --accent: 217 33% 17%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217 33% 16%;
+  --input: 217 33% 20%;
+  --ring: 217 91% 60%;
+  --erp-radius-lg: 0.65rem;
+  --erp-radius-md: calc(0.65rem - 2px);
+  --erp-radius-sm: calc(0.65rem - 4px);
+  color-scheme: dark;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  background-image: radial-gradient(circle at 15% 0%, hsl(217 91% 60% / 0.08), transparent 40%),
+    radial-gradient(circle at 90% 10%, hsl(142 70% 45% / 0.05), transparent 35%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+}
+
+.erp-comercial,
+.erp-comercial *,
+.erp-comercial *::before,
+.erp-comercial *::after {
+  border-color: hsl(var(--border));
+}
+
+.erp-comercial ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.erp-comercial ::-webkit-scrollbar-thumb {
+  background: hsl(217 33% 22%);
+  border-radius: 8px;
+}
+.erp-comercial ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.erp-comercial .wa-pattern {
+  background-color: #0b141a;
+  background-image: radial-gradient(hsl(200 20% 20% / 0.35) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+@media print {
+  .erp-comercial {
+    background: #fff !important;
+    color: #111 !important;
+  }
+  .erp-comercial .no-print {
+    display: none !important;
+  }
+  .erp-comercial .print-area {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}

@@ -11,3 +11,8 @@ supabase/backups/*.csv
 # Supabase CLI y salidas de compilación
 supabase/.temp/
 dist/
+
+# ERP Comercial (Prisma / uploads)
+prisma/dev.db*
+public/uploads/*
+!public/uploads/.gitkeep

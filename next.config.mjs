@@ -13,6 +13,21 @@ const webpack = (config) => {
 const webConfig = {
   reactStrictMode: true,
   webpack,
+  experimental: {
+    // ERP Comercial: instrumentation.ts arranca el motor de automatizaciones (lib/erp-comercial/scheduler)
+    instrumentationHook: true,
+    serverComponentsExternalPackages: ["@prisma/client", "pdf-lib"],
+  },
+  // ERP Comercial (antes COMBOY-ERP, ahora en /erp/*): las direcciones que ya conoce Meta y las URLs guardadas
+  // en la base siguen funcionando. Rewrite (no redirect) para que el webhook reciba el POST tal cual.
+  async rewrites() {
+    return [
+      { source: "/api/whatsapp/webhook", destination: "/erp/api/whatsapp/webhook" },
+      { source: "/api/whatsapp/media/:id", destination: "/erp/api/whatsapp/media/:id" },
+      { source: "/api/equipos/:id/pdf", destination: "/erp/api/equipos/:id/pdf" },
+      { source: "/privacidad", destination: "/erp/privacidad" },
+    ];
+  },
   // ERP privado: nunca se muestra embebido en otra web (siempre en su propia pestaña) y los buscadores no lo indexan.
   async headers() {
     return [

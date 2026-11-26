@@ -12,7 +12,11 @@
     "tauri:build": "tauri build",
     "cap:sync": "cap sync android",
     "cap:abrir": "cap open android",
-    "apk": "cap sync android && cd android && ./gradlew assembleDebug"
+    "apk": "cap sync android && cd android && ./gradlew assembleDebug",
+    "postinstall": "prisma generate",
+    "db:deploy": "node scripts/erp-db-deploy.mjs",
+    "db:seed": "prisma db seed",
+    "db:reset": "prisma migrate reset --force"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.3",
@@ -21,6 +25,10 @@
     "@capacitor/filesystem": "^6.0.4",
     "@capacitor/network": "^6.0.4",
     "@capacitor/preferences": "^6.0.4",
+    "@prisma/client": "^5.22.0",
+    "@radix-ui/react-dialog": "^1.1.2",
+    "@radix-ui/react-slot": "^1.1.0",
+    "@radix-ui/react-tabs": "^1.1.1",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
     "@tauri-apps/api": "^2.12.4",
@@ -28,6 +36,8 @@
     "@tauri-apps/plugin-process": "^2.4.0",
     "@tauri-apps/plugin-sql": "^2.6.0",
     "@tauri-apps/plugin-updater": "^2.14.1",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
     "dotenv": "^18.0.4",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",
@@ -39,6 +49,9 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "recharts": "^2.15.4",
+    "sonner": "^1.7.0",
+    "tailwind-merge": "^2.5.4",
+    "tailwindcss-animate": "^1.0.7",
     "tesseract.js": "^7.0.0",
     "xlsx": "^0.18.5"
   },
@@ -51,7 +64,12 @@
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.47",
+    "prisma": "^5.22.0",
     "tailwindcss": "^3.4.13",
+    "tsx": "^4.19.2",
     "typescript": "^5.6.2"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }
