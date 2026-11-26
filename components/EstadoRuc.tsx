@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
 import { rucValido } from "@/lib/storage";
-import { avisoRuc, useRucSunat, validarRuc, type RucSunat } from "@/lib/ruc";
+import { RUC_SIN_VALIDAR_TEMPORAL, avisoRuc, useRucSunat, validarRuc, type RucSunat } from "@/lib/ruc";
 import { cn } from "@/components/ui";
 import { VerificarDni } from "@/components/VerificarDni";
 import type { DniReniec } from "@/lib/dni";
@@ -83,6 +83,11 @@ export function EstadoRuc({
           <span className="inline-flex items-center gap-1 font-medium text-red-600">
             <ShieldAlert size={13} /> {error || "RUC sin validar: obligatorio para guardar."}
           </span>
+          {RUC_SIN_VALIDAR_TEMPORAL && (
+            <span className="inline-flex items-center gap-1 font-medium text-amber-600">
+              Validación SUNAT suspendida por ahora: escriba la razón social a mano y guarde.
+            </span>
+          )}
           <button
             type="button"
             onClick={(e) => {
