@@ -26,6 +26,13 @@ export interface RucSunat {
   validado_at: string;
 }
 
+/**
+ * TEMPORAL (Williams 2026-11-26): Decolecta rechaza el token (HTTP 403). Mientras se renueva, se permite guardar
+ * proveedores, clientes y documentos con RUC y razón social escritos a mano, SIN validar en SUNAT (el dígito
+ * verificador del RUC sí se sigue exigiendo). Para volver a exigir la validación: poner false.
+ */
+export const RUC_SIN_VALIDAR_TEMPORAL = true;
+
 /** Días que vale una consulta antes de volver a pedirla. */
 export const VIGENCIA_DIAS = 30;
 
@@ -85,7 +92,7 @@ export function exigirRucSunat(ruc: string | undefined | null, quien = ""): void
   const n = limpiar(ruc ?? "");
   if (n.length !== 11) return;
   if (!rucValido(n)) throw new ErpError(`RUC ${quien ? `${quien} ` : ""}${n} inválido (dígito verificador).`);
-  if (!rucSunat(n))
+  if (!rucSunat(n) && !RUC_SIN_VALIDAR_TEMPORAL)
     throw new ErpError(`El RUC ${quien ? `${quien} ` : ""}${n} no está validado con SUNAT. Pulse "Validar RUC" antes de guardar.`);
 }
 
