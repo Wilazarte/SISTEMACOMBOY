@@ -179,11 +179,17 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
   /** Rellena el formulario con lo leído; no guarda (el usuario revisa y da Registrar gasto). */
   const descripcionActual = () => d.descripcion.trim();
   const aplicarEscaneo = ({ datos, archivo, cotizacion }: ResultadoEscaneo) => {
-    // Cotización / proforma del proveedor: N° y adjunto del bloque "Cotización del proveedor"
-    if (cotizacion !== undefined) {
+    // Cotización / proforma del proveedor: N° y adjunto del bloque "Cotización del proveedor"; además llena
+    // proveedor, RUC, fecha, total y artículos (no el comprobante ni su N°: la factura llega después)
+    const esCoti = cotizacion !== undefined;
+    if (esCoti) {
       setSinCotizacion(false);
       setD((x) => ({ ...x, ...(cotizacion ? { cotizacion } : {}), archivos: archivo ? [...x.archivos.filter((a) => a.tipo !== "COTIZACION"), archivo] : x.archivos }));
-      return;
+      // Ya se escaneó la factura: sus datos mandan; de la cotización solo quedan el N° y el adjunto
+      if (d.archivos.some((a) => a.tipo === "FACTURA")) {
+        toast("Cotización adjuntada. Se mantienen los datos de la factura ya escaneada.");
+        return;
+      }
     }
     // Guía de remisión: solo se adjunta al gasto (no cambia importe ni comprobante)
     if (datos.tipoElectronico === "GUIA") {
@@ -192,13 +198,14 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
     }
     const falta = new Set<CampoOcr>();
     if (datos.fecha) setFechaTxt(fechaPE(datos.fecha));
-    else falta.add("fecha");
+    // La de la cotización puede no ser la del comprobante: a confirmar
+    if (!datos.fecha || esCoti) falta.add("fecha");
     // Comprobante en dólares: moneda US$ y el tipo de cambio queda en amarillo para confirmarlo
     const usd = datos.moneda === "USD";
     if (!datos.total || datos.igvCuadra === false) falta.add("importe");
     if (usd) falta.add("tipoCambio");
-    if (!datos.comprobante) falta.add("comprobante");
-    if (!datos.numero) falta.add("numero");
+    if (!datos.comprobante && !esCoti) falta.add("comprobante");
+    if (!datos.numero && !(esCoti && d.numero.trim())) falta.add("numero");
     // Detalle: la descripción del gasto lista cada artículo con su costo; si las líneas no suman el total, a revisar
     const items = datos.items ?? [];
     if (!items.length || datos.itemsConIgv === undefined) falta.add("descripcion");
@@ -238,8 +245,9 @@ export function FormGasto({ rol, proveedores, stock = [], onGuardado }: { rol: R
           : { moneda: "PEN" as const, importe: datos.total, importeUsd: 0 }
         : {}),
       ...(descripcion ? { descripcion } : {}),
-      ...(datos.ruc ? { ruc: datos.ruc, proveedor: sunat ? sunat.razon_social : esProveedorVarios(x.proveedor) ? "" : x.proveedor } : {}),
-      archivos: archivo ? [...x.archivos.filter((a) => a.tipo !== "FACTURA"), archivo] : x.archivos,
+      // Sin padrón SUNAT: la razón social leída del documento (provisional; al validar el RUC la pone SUNAT)
+      ...(datos.ruc ? { ruc: datos.ruc, proveedor: sunat ? sunat.razon_social : datos.razonSocial ?? (esProveedorVarios(x.proveedor) ? "" : x.proveedor) } : {}),
+      archivos: archivo && !esCoti ? [...x.archivos.filter((a) => a.tipo !== "FACTURA"), archivo] : x.archivos,
     }));
     setRevisar(falta);
   };

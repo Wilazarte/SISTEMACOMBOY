@@ -50,6 +50,12 @@ export interface FacturaLeida {
   itemsConIgv?: boolean;
   /** true: el IGV leído es el 18 % del total (dentro de S/ 0.05); false: no cuadra; undefined: falta uno de los dos. */
   igvCuadra?: boolean;
+  /** Cotización / proforma / presupuesto del proveedor (no es comprobante electrónico). */
+  esCotizacion?: boolean;
+  /** N° de la cotización / proforma, tal como figura (COT-2026-0154). */
+  numeroCotizacion?: string;
+  /** Razón social o nombre del emisor leído del documento (provisional: al validar el RUC manda SUNAT). */
+  razonSocial?: string;
 }
 
 /** Dígito verificador de SUNAT (mismo cálculo que rucValido en lib/storage.ts). */
@@ -259,7 +265,7 @@ const cuadra = (a: number, b: number, c: number) => Math.abs(a * b - c) <= Math.
 /** Fin del detalle: subtotales, IGV, total, "SON: …". */
 const FIN_DETALLE = /(SUB\s*-?\s*TOTAL|OP(\.|ERACION)?\s*GRAVADA|VALOR\s+(DE\s+)?VENTA|\bTOTAL\b|(^|[^A-Z0-9])[I1L|]\.?\s*[G6]\.?\s*[VY]\b|(^|\D)18\s*%|^SON\s*:|IMPORTE\s+EN\s+LETRAS)/;
 /** Líneas de cabecera que no son artículos. */
-const NO_ITEM = /(R\.?\s*U\.?\s*C|FECHA|SE[NÑ]OR|CLIENTE|DIRECCI|TELEF|CORREO|EMAIL|VENDEDOR|CAJERO|TICKET|FACTURA|BOLETA|MONEDA|GUIA|ORDEN|PEDIDO|CONDICI|RETENC|PERCEPC|DETRACC|REDONDEO|ANTICIPO|DESCUENTO|NETO\s+(RECIBIDO|A\s+PAGAR))/;
+const NO_ITEM = /(R\.?\s*U\.?\s*C|FECHA|VALIDEZ|TIEMPO\s+DE\s+ENTREGA|PLAZO|FORMA\s+DE\s+PAGO|ATENCI[OÓ]N|GARANT[IÍ]A|CTA\.?\s|CUENTA|CCI\b|SE[NÑ]OR|CLIENTE|DIRECCI|TELEF|CORREO|EMAIL|VENDEDOR|CAJERO|TICKET|FACTURA|BOLETA|MONEDA|GUIA|ORDEN|PEDIDO|CONDICI|RETENC|PERCEPC|DETRACC|REDONDEO|ANTICIPO|DESCUENTO|NETO\s+(RECIBIDO|A\s+PAGAR))/;
 
 /** Una línea de detalle: [código] cantidad [unidad] descripción [cantidad] p.unit importe. */
 /** Columnas numéricas de la tabla de detalle, a la derecha de la descripción (según la cabecera). */
@@ -283,6 +289,9 @@ function inicioItem(tokens: string[]): { cantidad?: number; unidad: string; desc
   let cantidad: number | undefined;
   let unidad = "UND";
   const cab = [...tokens];
+  // Cotizaciones: "ITEM CANT UND DESCRIPCIÓN…" → "1 2 UND PERNO…": el 1.º entero es el N° de ítem, el 2.º la cantidad
+  if (cab.length > 3 && /^\d{1,3}[.)]?$/.test(cab[0]) && numeroCelda(cab[1]) !== undefined && !/^0\d/.test(cab[1]) && (UNIDAD_ERP[sinTildes(cab[2]).toUpperCase().replace(/\.$/, "")] || numeroCelda(cab[2]) === undefined))
+    cab.shift();
   for (let i = 0; i < Math.min(2, cab.length - 1); i++) {
     const n = numeroCelda(cab[i]);
     if (n !== undefined && n > 0 && n < 100000 && !/^0\d/.test(cab[i])) {
@@ -418,7 +427,10 @@ export function parseFactura(texto: string, hoyISO = new Date().toISOString().sl
   const tipo = tipoElectronico(t0, series[0]);
   // Electrónico: lo dice el título ("… ELECTRÓNICA", "representación impresa") o lleva serie electrónica
   const electronico = /ELECTRONIC|REPRESENTACION\s+IMPRESA|SUNAT/.test(t0) || series.length > 0;
-  if (tipo && electronico) {
+  r.esCotizacion = esCotizacion(lineas, t0, !!tipo && electronico);
+  if (r.esCotizacion) {
+    r.numeroCotizacion = numeroCotizacion(texto);
+  } else if (tipo && electronico) {
     r.tipoElectronico = tipo;
     // N° propio: la primera serie que corresponde al tipo (en una NC, la de la factura que modifica va después)
     const propia = series.find((n) => (tipo === "GUIA" ? /^(T|EG|V)/.test(n) : tipo === "BOLETA" ? /^B/.test(n) : tipo === "RHE" || tipo === "LIQUIDACION" ? /^E/.test(n) : /^[FBE]/.test(n))) ?? series[0];
@@ -452,6 +464,7 @@ export function parseFactura(texto: string, hoyISO = new Date().toISOString().sl
     r.itemsConIgv = cerca(r.total) ? true : cerca(r.subtotal) ? false : r.comprobante === "BOLETA" ? true : undefined;
     if (r.total === undefined && r.itemsConIgv !== false && r.comprobante === "BOLETA") r.total = suma;
   }
+  r.razonSocial = buscarRazonSocial(lineas);
   // Una boleta no desglosa IGV: no se marca descuadre
   if (r.comprobante === "BOLETA" && r.igv === undefined) r.igvCuadra = undefined;
   return r;
@@ -472,6 +485,48 @@ export function itemsDeLista(texto: string): ItemLeido[] {
     items.push({ cantidad: it.cantidad, unidad: it.unidad, descripcion: it.descripcion.slice(0, 250), precioUnit: 0, importe: 0 });
   }
   return items;
+}
+
+const PALABRA_COTI = /COTIZACION|PROFORMA|PRESUPUESTO/;
+
+/**
+ * Cotización / proforma / presupuesto: lo dice el título (primeros renglones) y no es la representación impresa de
+ * un comprobante; si no hay comprobante electrónico, basta que la palabra aparezca en cualquier parte.
+ */
+function esCotizacion(lineas: string[], t: string, comprobante: boolean): boolean {
+  if (!PALABRA_COTI.test(t)) return false;
+  if (!comprobante) return true;
+  const titulo = lineas.slice(0, 15).some((l) => PALABRA_COTI.test(sinTildes(l).toUpperCase()));
+  return titulo && !/REPRESENTACION\s+IMPRESA|FACTURA\s+ELECTRONICA|BOLETA\s+(DE\s+VENTA\s+)?ELECTRONICA/.test(t);
+}
+
+/** Forma societaria al final de la razón social (S.A.C., E.I.R.L., S.R.L., S.A.). */
+const SOCIEDAD = /\b(S\.?\s?A\.?\s?C\.?|E\.?\s?I\.?\s?R\.?\s?L\.?|S\.?\s?R\.?\s?L\.?|S\.?\s?A\.?\s?A\.?|S\.\s?A\.?|SOCIEDAD\s+AN[OÓ]NIMA)(?=\s|$|[,.;])/i;
+const NO_RAZON = /(COTIZACI|PROFORMA|PRESUPUESTO|FACTURA|BOLETA|R\.?\s*U\.?\s*C|SE[NÑ]OR|CLIENTE|ROUSVID|GLOBAL\s+COMPANY|COMBOY|DIRECCI|FECHA|TELEF|CORREO|@|WWW\.|ATENCI)/i;
+
+/**
+ * Razón social del emisor: el primer renglón de la cabecera con forma societaria (S.A.C., E.I.R.L.…) que no sea
+ * la empresa (cliente). Si no hay, el renglón con texto que va justo antes del RUC del emisor.
+ */
+function buscarRazonSocial(lineas: string[]): string | undefined {
+  const limpio = (l: string) => l.replace(/^(RAZ[OÓ]N\s+SOCIAL|EMPRESA|PROVEEDOR)\s*[:.]?\s*/i, "").replace(/\s*R\.?\s*U\.?\s*C.*$/i, "").replace(/[|_~]+/g, " ").replace(/\s+/g, " ").trim().toUpperCase();
+  const cabecera = lineas.slice(0, 20);
+  for (const l of cabecera) {
+    const c = limpio(l);
+    if (NO_RAZON.test(c)) continue;
+    const m = SOCIEDAD.exec(c);
+    if (!m) continue;
+    const r = c.slice(0, (m.index ?? 0) + m[0].length).trim();
+    if ((r.match(/[A-ZÁÉÍÓÚÑ]/g) ?? []).length >= 4) return r.slice(0, 200);
+  }
+  const iRuc = cabecera.findIndex((l) => /R\.?\s*U\.?\s*C/i.test(l) && !/ROUSVID|20613238566/i.test(l));
+  for (let i = iRuc - 1; i >= 0 && i >= iRuc - 3; i--) {
+    const l = cabecera[i];
+    if (NO_RAZON.test(l) || /\d{3,}/.test(l)) continue;
+    const r = limpio(l);
+    if ((r.match(/[A-ZÁÉÍÓÚÑ]/g) ?? []).length >= 4) return r.slice(0, 200);
+  }
+  return undefined;
 }
 
 /** N° de una cotización o proforma: "COTIZACIÓN N° 000123", "PROFORMA Nro: P-45". */

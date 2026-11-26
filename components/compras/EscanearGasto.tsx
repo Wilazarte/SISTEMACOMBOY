@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { Camera, FileUp, ScanLine, X } from "lucide-react";
 import { Button, cn, toast } from "@/components/ui";
 import { MAX_ARCHIVO, hoy, soles, subirComprobanteGasto } from "@/lib/storage";
-import { NOMBRE_ELECTRONICO, itemsDeLista, numeroCotizacion, parseFactura, renglonesDePalabras, type FacturaLeida, type ItemLeido } from "@/lib/parseFactura";
+import { NOMBRE_ELECTRONICO, itemsDeLista, parseFactura, renglonesDePalabras, type FacturaLeida, type ItemLeido } from "@/lib/parseFactura";
 import type { ArchivoGasto, Rol } from "@/lib/types";
 import { VincularNota } from "@/components/compras/VincularNota";
 
@@ -26,6 +26,8 @@ type Ultimo = {
   guia?: boolean;
   /** Nota de crédito / débito leída (se vincula abajo). */
   nota?: string;
+  /** Cotización / proforma del proveedor (Registrar gasto). */
+  cotizacion?: boolean;
 };
 const vacioUltimo = (nombre: string): Ultimo => ({ nombre, detectados: [], faltan: [], igvMal: false, items: [], usd: false });
 
@@ -143,7 +145,7 @@ async function ocr(imagen: HTMLCanvasElement, progreso: (p: number, pasada: 1 | 
 /**
  * Dónde se usa el escaneo (Williams 2026-11-24: el mismo botón en todo registro de gasto y en los REQ):
  * - gasto: Registrar gasto (sin stock). Notas de crédito / débito se vinculan al gasto original; una cotización
- *   o proforma del proveedor llena "Cotización del proveedor" (N° y adjunto).
+ *   o proforma del proveedor llena proveedor, RUC, fecha, total y artículos, y su N° y adjunto van a "Cotización del proveedor".
  * - compra: Registrar compra con ingreso a stock (los artículos van a la tabla de productos).
  * - factura: Registrar factura de una OC (número, fecha, total y adjunto).
  * - oc: Emitir orden de compra. Cualquier documento del proveedor (factura, proforma, cotización): elige la
@@ -157,10 +159,10 @@ export type ModoEscaneo = "gasto" | "compra" | "factura" | "req" | "oc" | "coti"
 
 const TEXTOS: Record<ModoEscaneo, { titulo: string; ayuda: string; boton: string; pie: string }> = {
   gasto: {
-    titulo: "Escanear comprobante electrónico",
-    boton: "Escanear Factura (foto o PDF)",
+    titulo: "Escanear comprobante o cotización",
+    boton: "Escanear factura o cotización (foto o PDF)",
     ayuda:
-      "Factura, boleta, recibo por honorarios, liquidación de compra y guía de remisión electrónicos, y la cotización o proforma del proveedor (las notas de crédito / débito se vinculan a la factura original y le restan o suman). Lee RUC, fecha, serie-número, artículos, total e IGV y rellena el formulario. No guarda: revise y dé Registrar gasto.",
+      "Factura, boleta, recibo por honorarios, liquidación de compra y guía de remisión electrónicos, y la cotización o proforma del proveedor (las notas de crédito / débito se vinculan a la factura original y le restan o suman). Lee proveedor, RUC, fecha, serie-número o N° de cotización, artículos (cantidad, descripción, precio), total e IGV y rellena el formulario. No guarda: revise y dé Registrar gasto.",
     pie: "Los artículos van a la descripción del gasto y quedan cargados si elige Generar OC u OS (precios con IGV incluido).",
   },
   compra: {
@@ -257,8 +259,9 @@ export function EscanearGasto({ onLeido, rol, modo = "gasto" }: { onLeido: (r: R
         onLeido({ datos, texto });
         return toast(items.length ? `${items.length} artículo(s) leído(s): revise la tabla del requerimiento.` : "No se reconocieron artículos: llene la tabla a mano.", items.length ? "ok" : "error");
       }
-      // Registrar gasto: una cotización o proforma del proveedor va al bloque "Cotización del proveedor" (N° y adjunto)
-      if (!tipo && modo === "gasto" && /COTIZACI[OÓ]N|PROFORMA|PRESUPUESTO/i.test(texto)) {
+      // Registrar gasto: cotización / proforma del proveedor. Llena proveedor, RUC, fecha, total y artículos, y su N° y
+      // adjunto van al bloque "Cotización del proveedor" (el N° de la factura se escribe después)
+      if (!tipo && modo === "gasto" && datos.esCotizacion) {
         setEstado("subiendo");
         let archivo: ArchivoGasto | undefined;
         try {
@@ -267,10 +270,20 @@ export function EscanearGasto({ onLeido, rol, modo = "gasto" }: { onLeido: (r: R
         } catch (e) {
           toast(`Se leyó la cotización pero no se pudo adjuntar: ${(e as Error).message}. Adjúntela abajo.`, "error");
         }
-        const n = numeroCotizacion(texto) ?? "";
-        setUltimo({ ...vacioUltimo(nombre), tipoNombre: "Cotización del proveedor", detectados: n ? [`N° ${n}`] : [], faltan: n ? [] : ["N° de cotización"] });
-        onLeido({ datos: {}, archivo, texto, cotizacion: n });
-        return toast(n ? `Cotización ${n} adjuntada al gasto.` : "Cotización adjuntada: escriba su N° abajo.", n ? "ok" : "error");
+        const n = datos.numeroCotizacion ?? "";
+        const etiquetas: [keyof FacturaLeida, string][] = [
+          ["numeroCotizacion", "N° de cotización"],
+          ["razonSocial", "proveedor"],
+          ["ruc", "RUC"],
+          ["fecha", "fecha"],
+          ["total", "total"],
+          ["items", "artículos"],
+        ];
+        const detectados = etiquetas.filter(([k]) => datos[k] !== undefined).map(([, l]) => l);
+        const faltan = etiquetas.filter(([k]) => datos[k] === undefined && k !== "razonSocial").map(([, l]) => l);
+        setUltimo({ nombre, tipoNombre: "Cotización del proveedor", detectados, faltan, igvMal: datos.igvCuadra === false, items: datos.items ?? [], conIgv: datos.itemsConIgv, usd: datos.moneda === "USD", cotizacion: true });
+        onLeido({ datos, archivo, texto, cotizacion: n });
+        return toast(detectados.length > 1 ? "Cotización leída: revise los campos en amarillo y escriba el N° de la factura." : "Cotización adjuntada: complete el formulario a mano.", detectados.length > 1 ? "ok" : "error");
       }
       // Solo comprobantes electrónicos SUNAT: lo demás (tickets, notas internas, fotos sueltas) no se escanea
       // (la OC sí acepta proformas y cotizaciones del proveedor)
@@ -370,6 +383,9 @@ export function EscanearGasto({ onLeido, rol, modo = "gasto" }: { onLeido: (r: R
               <> · {ultimo.detectados.join(", ")} · adjuntada como guía de remisión</>
             ) : (
               <> · detectado: {ultimo.detectados.join(", ") || "nada"}</>
+            )}
+            {ultimo.cotizacion && !ultimo.rechazo && (
+              <span className="mt-1 block">Datos tomados de la cotización: escriba el <b>N° de la factura o boleta</b> cuando la entregue y confirme la fecha del comprobante.</span>
             )}
             {ultimo.faltan.length > 0 && <> · <b>revisar:</b> {ultimo.faltan.join(", ")}</>}
             {ultimo.igvMal && <> · <b>el IGV leído no es el 18 % del total: revise el importe</b></>}
