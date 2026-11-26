@@ -31,7 +31,7 @@ export interface RucSunat {
  * proveedores, clientes y documentos con RUC y razón social escritos a mano, SIN validar en SUNAT (el dígito
  * verificador del RUC sí se sigue exigiendo). Para volver a exigir la validación: poner false.
  */
-export const RUC_SIN_VALIDAR_TEMPORAL = true;
+export const RUC_SIN_VALIDAR_TEMPORAL = false;
 
 /** Días que vale una consulta antes de volver a pedirla. */
 export const VIGENCIA_DIAS = 30;
