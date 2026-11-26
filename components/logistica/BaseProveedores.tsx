@@ -13,6 +13,7 @@ import { KEYS, rucValido, useStore } from "@/lib/storage";
 import { OPCIONES_PROVEEDOR, eliminarProveedor, guardarProveedor, proveedorVacio, proveedoresDeProducto, puedeGestionarProveedores } from "@/lib/proveedores";
 import type { OpcionProveedor, Proveedor } from "@/lib/types";
 import { guardarExcel } from "@/lib/guardarArchivo";
+import { buscarProducto, useCatalogo } from "@/lib/productos";
 
 const COLOR_OPCION: Record<OpcionProveedor, string> = {
   1: "border-emerald-300 bg-emerald-50 text-emerald-800",
@@ -193,6 +194,16 @@ export function BaseProveedores() {
 function FormProveedor({ form, onChange }: { form: Proveedor; onChange: (p: Proveedor) => void }) {
   const set = <K extends keyof Proveedor>(k: K, v: Proveedor[K]) => onChange({ ...form, [k]: v });
   const productos = form.productos ?? [];
+  const { productos: catalogo } = useCatalogo();
+  const categorias = [...new Set(catalogo.filter((p) => p.activo && p.categoria?.trim()).map((p) => p.categoria!.trim()))].sort();
+  /** Agrega de una vez todos los productos del catálogo de una categoría (los que ya están no se repiten). */
+  const agregarCategoria = (cat: string, opcion: OpcionProveedor) => {
+    const ya = new Set(productos.map((x) => x.nombre.trim().toUpperCase()));
+    const nuevos = catalogo.filter((p) => p.activo && p.categoria?.trim() === cat && !ya.has(p.nombre_normalizado)).map((p) => ({ nombre: p.nombre_normalizado, opcion, productoId: p.id, sku: p.sku }));
+    set("productos", [...productos.filter((x) => x.nombre.trim()), ...nuevos]);
+  };
+  const [catElegida, setCatElegida] = useState("");
+  const [opcionCat, setOpcionCat] = useState<OpcionProveedor>(1);
   const setProd = (i: number, cambio: Partial<{ nombre: string; opcion: OpcionProveedor }>) =>
     set(
       "productos",
@@ -289,17 +300,29 @@ function FormProveedor({ form, onChange }: { form: Proveedor; onChange: (p: Prov
 
       <div className="sm:col-span-2">
         <p className="mb-1 text-sm font-medium text-slate-700">Productos que vende *</p>
-        <p className="mb-2 text-xs text-plomo-500">Para cada producto indique si este proveedor es la primera, segunda o tercera opción de compra.</p>
+        <p className="mb-2 text-xs text-plomo-500">
+          Elija los productos del catálogo (o escriba un rubro, p. ej. PERNOS) e indique si este proveedor es la primera, segunda o tercera opción.
+          Con esto los REQ de Almacén se juntan solos en una lista por proveedor para pedir cotización.
+        </p>
         <div className="space-y-2">
-          {productos.map((x, i) => (
+          {productos.map((x, i) => {
+            const cat = x.nombre.trim() ? buscarProducto(x.nombre) : undefined;
+            return (
             <div key={i} className="grid grid-cols-[minmax(0,1fr)_9.5rem_auto] items-center gap-2">
-              <Input
-                value={x.nombre}
-                onChange={(e) => setProd(i, { nombre: e.target.value })}
-                list={ID_LISTA_CATALOGO}
-                placeholder="Producto o rubro (p. ej. PERNOS, PINTURA, NEUMÁTICOS)"
-                aria-label={`Producto ${i + 1}`}
-              />
+              <div className="min-w-0">
+                <Input
+                  value={x.nombre}
+                  onChange={(e) => setProd(i, { nombre: e.target.value })}
+                  list={ID_LISTA_CATALOGO}
+                  placeholder="Producto del catálogo o rubro (p. ej. PERNOS, PINTURA)"
+                  aria-label={`Producto ${i + 1}`}
+                />
+                {x.nombre.trim() && (
+                  <p className={cn("mt-0.5 text-[11px]", cat ? "text-emerald-700" : "text-amber-700")}>
+                    {cat ? `✓ Catálogo ${cat.sku}${cat.categoria ? ` · ${cat.categoria}` : ""}` : "Rubro (no es un producto del catálogo): se cruza por nombre"}
+                  </p>
+                )}
+              </div>
               <Select
                 value={String(x.opcion)}
                 onChange={(e) => setProd(i, { opcion: Number(e.target.value) as OpcionProveedor })}
@@ -310,11 +333,27 @@ function FormProveedor({ form, onChange }: { form: Proveedor; onChange: (p: Prov
                 <X size={14} />
               </Button>
             </div>
-          ))}
+            );
+          })}
         </div>
-        <Button type="button" size="sm" variant="secondary" className="mt-2" onClick={() => set("productos", [...productos, { nombre: "", opcion: 1 }])}>
-          <Plus size={14} /> Agregar producto
-        </Button>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <Button type="button" size="sm" variant="secondary" onClick={() => set("productos", [...productos, { nombre: "", opcion: 1 }])}>
+            <Plus size={14} /> Agregar producto
+          </Button>
+          {categorias.length > 0 && (
+            <>
+              <div className="w-52">
+                <Select value={catElegida} onChange={(e) => setCatElegida(e.target.value)} aria-label="Categoría del catálogo" placeholder="Toda una categoría…" options={categorias.map((c) => ({ value: c, label: c }))} />
+              </div>
+              <div className="w-40">
+                <Select value={String(opcionCat)} onChange={(e) => setOpcionCat(Number(e.target.value) as OpcionProveedor)} aria-label="Opción para la categoría" options={OPCIONES_PROVEEDOR.map((o) => ({ value: String(o.value), label: o.label }))} />
+              </div>
+              <Button type="button" size="sm" variant="secondary" disabled={!catElegida} onClick={() => agregarCategoria(catElegida, opcionCat)}>
+                <Plus size={14} /> Agregar categoría
+              </Button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

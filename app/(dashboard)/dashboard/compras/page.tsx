@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   AlertTriangle,
   ClipboardList,
+  ListChecks,
   Download,
   Check,
   Eye,
@@ -113,10 +114,12 @@ import { BotonNuevo } from "@/components/ui/BotonFiltros";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { EditarGasto } from "@/components/compras/EditarGasto";
 import { FormOrdenServicio, filasOrdenesServicio } from "@/components/compras/OrdenesServicio";
+import { ListasProveedor } from "@/components/compras/ListasProveedor";
+import { sincronizarListas, type ListaProveedor } from "@/lib/listasProveedor";
 import type { Trabajador } from "@/lib/types";
 import type { ArchivoGasto, Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, OrdenServicio, Proveedor, Requerimiento, Rol, OrdenAGenerar, StockItem, TipoComprobanteCompra } from "@/lib/types";
 
-type Tab = "nuevos" | "registrar" | "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias" | "planilla" | "declaraciones";
+type Tab = "nuevos" | "listas" | "registrar" | "antecedentes" | "cotizaciones" | "ordenes" | "facturas" | "guias" | "planilla" | "declaraciones";
 
 const FORMAS_PAGO: FormaPago[] = ["CONTADO", "CREDITO 15 DIAS", "CREDITO 30 DIAS", "CREDITO 60 DIAS", "ADELANTO 50%"];
 const DIAS_CREDITO: Record<FormaPago, number> = {
@@ -172,7 +175,7 @@ export default function ComprasPage() {
   // Contador de la pestaña Planilla (solo se descarga si el usuario ve planilla)
   const trabajadores = useStore<Trabajador[]>(KEYS.TRABAJADORES, [], vePlanilla);
   const activos = trabajadores.filter((t) => t.activo && !esContratista(t)).length;
-  const tabsPermitidas: Tab[] = [...(veCompras ? (["nuevos", "registrar", "antecedentes", "cotizaciones", "ordenes", "facturas", "declaraciones"] as Tab[]) : []), ...(vePlanilla ? (["planilla"] as Tab[]) : [])];
+  const tabsPermitidas: Tab[] = [...(veCompras ? (["nuevos", "listas", "registrar", "antecedentes", "cotizaciones", "ordenes", "facturas", "declaraciones"] as Tab[]) : []), ...(vePlanilla ? (["planilla"] as Tab[]) : [])];
   // Al volver a Tesorería abre la última pestaña usada (salvo que la URL pida otra con ?tab=)
   useEffect(() => {
     try {
@@ -192,6 +195,22 @@ export default function ComprasPage() {
     }
   }, [tab]);
   const [pre, setPre] = useState<{ req?: string; coti?: string; oc?: string; fac?: string; gasto?: string }>({});
+
+  // Listas por proveedor (Williams 2026-11-26): con Tesorería abierta, los REQ nuevos se juntan solos por proveedor
+  const listasProv = useStore<ListaProveedor[]>(KEYS.LISTAS_PROVEEDOR, [], veCompras);
+  const revisaReq = veCompras && puede(rol, "req.revisar");
+  useEffect(() => {
+    if (!revisaReq) return;
+    const t = window.setTimeout(() => {
+      try {
+        sincronizarListas();
+      } catch {
+        /* datos aún cargando: se reintenta con el siguiente cambio */
+      }
+    }, 800);
+    return () => window.clearTimeout(t);
+  }, [revisaReq, pendientes, procesados, proveedores, listasProv]);
+  const listasPorAtender = listasProv.filter((l) => l.estado === "ABIERTA" || l.estado === "ACEPTADA").length;
 
   const ir = (t: Tab, p: typeof pre = {}) => {
     setPre(p);
@@ -232,6 +251,7 @@ export default function ComprasPage() {
           ...(veCompras
             ? [
                 { id: "nuevos" as const, label: "NUEVOS REQ", icon: <ClipboardList size={16} />, count: pendientes.length },
+                { id: "listas" as const, label: "Listas por proveedor", icon: <ListChecks size={16} />, count: listasPorAtender },
                 { id: "registrar" as const, label: "Registrar gasto", icon: <PackagePlus size={16} /> },
                 { id: "cotizaciones" as const, label: "Cotizaciones", icon: <FileSpreadsheet size={16} />, count: cotizables.filter((r) => r.estado === "ACEPTADO").length },
                 { id: "ordenes" as const, label: "Órdenes OC / OS", icon: <ShoppingBag size={16} />, count: cotisSinOC.length },
@@ -257,6 +277,7 @@ export default function ComprasPage() {
           onCotizar={(id) => ir("cotizaciones", { req: id })}
         />
       )}
+      {tab === "listas" && veCompras && <ListasProveedor rol={rol} onIrCotizaciones={() => ir("cotizaciones")} />}
       {tab === "registrar" && <RegistrarCompra rol={rol} proveedores={proveedores} compras={compras} gastos={facturas.filter((f) => f.esGastoTesoreria)} stock={stock} onGenerarOS={(id) => ir("ordenes", { gasto: id })} />}
       {tab === "antecedentes" && <Antecedentes reqs={procesados} ordenes={ordenes} rol={rol} onCotizar={(id) => ir("cotizaciones", { req: id })} onIr={irTab} />}
       {tab === "cotizaciones" && (
@@ -341,7 +362,7 @@ function NuevosReq({
       <Card>
         <CardHeader
           title={`NUEVOS REQ · por revisar (${pendientes.length})`}
-          subtitle="Requerimientos de Almacén. Al aceptar se abre Ingresar cotización con el REQ elegido."
+          subtitle="Requerimientos de Almacén uno por uno. También llegan juntos por proveedor en la pestaña Listas por proveedor. Al aceptar se abre Ingresar cotización con el REQ elegido."
           action={
           habilitado && pendientes.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
@@ -1272,6 +1293,9 @@ function Cotizaciones({
   const [fecha, setFecha] = useState(hoy());
   const [items, setItems] = useState<ItemPrecio[]>([]);
   const habilitado = puede(rol, "coti.crear");
+  // Proveedor de la base (Logística): al elegirlo se jalan RUC, razón social y asesor de ventas
+  const baseProv = useStore<Proveedor[]>(KEYS.PROVEEDORES, []);
+  const provBase = baseProv.find((p) => p.ruc === ruc && ruc.length === 11);
   // Cotización escaneada (Williams 2026-11-24): datos del proveedor, precios por parecido del nombre y adjunto
   const [archivosCoti, setArchivosCoti] = useState<ArchivoGasto[]>([]);
   const aplicarEscaneoCoti = ({ datos, archivo, texto }: ResultadoEscaneo) => {
@@ -1328,7 +1352,8 @@ function Cotizaciones({
   const { subtotal, igv, total } = totalesLineas(items, true, true);
 
   const guardar = () => {
-    const ok = ejecutar(() => crearCotizacion({ reqId, proveedor, ruc, numero, fechaEmision: fecha, items, ...(archivosCoti.length ? { archivos: archivosCoti } : {}) }, rol), "Cotización registrada");
+    const deBase = provBase ? { proveedorId: provBase.id, ...(provBase.asesorVentas ? { asesorVentas: provBase.asesorVentas } : {}) } : {};
+    const ok = ejecutar(() => crearCotizacion({ reqId, proveedor, ruc, numero, fechaEmision: fecha, items, ...deBase, ...(archivosCoti.length ? { archivos: archivosCoti } : {}) }, rol), "Cotización registrada");
     if (ok) {
       setArchivosCoti([]);
       setProveedor("");
@@ -1398,6 +1423,20 @@ function Cotizaciones({
             </Field>
             <Field label="Fecha de emisión">
               <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+            </Field>
+            <Field label="Proveedor de la base" className="md:col-span-3" hint={provBase ? `Asesor: ${provBase.asesorVentas || "-"} · ${[provBase.contacto, provBase.correo].filter(Boolean).join(" · ") || "sin contacto"}` : "Elíjalo y se jalan RUC, razón social y asesor de ventas"}>
+              <Select
+                value={provBase?.id ?? ""}
+                onChange={(e) => {
+                  const p = baseProv.find((x) => x.id === e.target.value);
+                  if (p) {
+                    setRuc(p.ruc);
+                    setProveedor(p.razonSocial);
+                  }
+                }}
+                placeholder="Buscar en la base de proveedores…"
+                options={baseProv.filter((p) => p.estado !== "INACTIVO" && (p.tipoDoc ?? "RUC") === "RUC").map((p) => ({ value: p.id, label: `${p.razonSocial} · ${p.ruc}` }))}
+              />
             </Field>
             <Field label="Proveedor" className="md:col-span-2">
               <Input value={proveedor} onChange={(e) => setProveedor(e.target.value)} placeholder="Razón social" />

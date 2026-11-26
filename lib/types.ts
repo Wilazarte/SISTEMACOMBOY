@@ -106,6 +106,12 @@ export interface Cotizacion {
   total: number;
   /** Cotización escaneada del proveedor (Williams 2026-11-24). */
   archivos?: ArchivoGasto[];
+  /** Registrada desde una lista por proveedor (SC-001-2026): una cotización del proveedor cubre varios REQ. */
+  listaId?: string;
+  listaNumero?: string;
+  /** Proveedor de la base (Logística) y su asesor de ventas. */
+  proveedorId?: string;
+  asesorVentas?: string;
   estado: "REGISTRADA" | "CON_OC";
   historial: EventoHistorial[];
 }
@@ -529,8 +535,12 @@ export interface ConcesionContratista {
 export type OpcionProveedor = 1 | 2 | 3;
 
 export interface ProductoProveedor {
+  /** Producto del catálogo maestro (nombre oficial) o un rubro (p. ej. PERNOS). */
   nombre: string;
   opcion: OpcionProveedor;
+  /** Producto del catálogo maestro (productos_maestro.id) y su SKU: así se cruza con los REQ. */
+  productoId?: string;
+  sku?: string;
 }
 
 /**
