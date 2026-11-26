@@ -37,10 +37,35 @@ function rucValido(ruc: string): boolean {
 function errorDecolecta(status: number, r: Record<string, unknown>, noExiste: string): string {
   const motivo = txt(r, "message", "error", "detail", "mensaje");
   if (status === 404 || status === 422) return noExiste;
+  const crudo = `${r.content_type ?? ""} ${r.servidor ?? ""} ${r.cuerpo ?? ""}`;
+  if (status === 403 && /html|cloudflare/i.test(crudo))
+    return "Decolecta bloqueó la conexión desde Supabase (HTTP 403, firewall/Cloudflare, no es el token). Escriba a soporte de Decolecta.";
   if (status === 401 || status === 403)
     return `Decolecta rechazó el token (HTTP ${status}${motivo ? `: ${motivo}` : ""}). Revise que DECOLECTA_TOKEN en Supabase sea el token vigente de su cuenta Decolecta y que el plan tenga saldo.`;
   if (status === 429) return `Decolecta: límite de consultas alcanzado (HTTP 429). Revise el plan o espere unos minutos.`;
   return `Decolecta no respondió (HTTP ${status || "sin conexión"}${motivo ? `: ${motivo}` : ""}).`;
+}
+
+/** Llama a Decolecta y devuelve status + JSON; si la respuesta no es JSON (p. ej. bloqueo de Cloudflare), guarda el texto crudo. */
+async function llamarDecolecta(url: string, token: string): Promise<{ status: number; r: Record<string, unknown> }> {
+  try {
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json", "User-Agent": "comboy-erp/1.0" } });
+    const cuerpo = await res.text();
+    let r: Record<string, unknown>;
+    try {
+      r = JSON.parse(cuerpo) as Record<string, unknown>;
+      if (!r || typeof r !== "object" || Array.isArray(r)) r = { cuerpo: String(cuerpo).slice(0, 800) };
+    } catch {
+      r = { cuerpo: cuerpo.slice(0, 800) };
+    }
+    r.content_type = res.headers.get("content-type") ?? "";
+    const servidor = res.headers.get("server") ?? "";
+    if (servidor) r.servidor = servidor;
+    r.token_inicio = token.slice(0, 8);
+    return { status: res.status, r };
+  } catch (e) {
+    return { status: 0, r: { error: String(e) } };
+  }
 }
 
 const txt = (o: Record<string, unknown>, ...k: string[]) => {
@@ -71,15 +96,7 @@ Deno.serve(async (req) => {
   if (!token) return json({ error: "Falta el secreto DECOLECTA_TOKEN en Supabase." }, 500);
   const base = Deno.env.get("DECOLECTA_URL") ?? "https://api.decolecta.com/v1/sunat/ruc";
 
-  let respuesta: Record<string, unknown> = {};
-  let status = 0;
-  try {
-    const r = await fetch(`${base}?numero=${ruc}`, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } });
-    status = r.status;
-    respuesta = (await r.json().catch(() => ({}))) as Record<string, unknown>;
-  } catch (e) {
-    respuesta = { error: String(e) };
-  }
+  const { status, r: respuesta } = await llamarDecolecta(`${base}?numero=${ruc}`, token);
 
   const razon = txt(respuesta, "razon_social", "razonSocial", "nombre");
   const estado = txt(respuesta, "estado").toUpperCase();
@@ -119,15 +136,7 @@ async function consultarDni(entrada: string, usuario: string, admin: ReturnType<
   if (!token) return json({ error: "Falta el secreto DECOLECTA_TOKEN en Supabase." }, 500);
   const base = Deno.env.get("DECOLECTA_DNI_URL") ?? "https://api.decolecta.com/v1/reniec/dni";
 
-  let r: Record<string, unknown> = {};
-  let status = 0;
-  try {
-    const res = await fetch(`${base}?numero=${dni}`, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } });
-    status = res.status;
-    r = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  } catch (e) {
-    r = { error: String(e) };
-  }
+  const { status, r } = await llamarDecolecta(`${base}?numero=${dni}`, token);
 
   const nombres = txt(r, "first_name", "nombres");
   let paterno = txt(r, "first_last_name", "apellido_paterno", "apellidoPaterno");
