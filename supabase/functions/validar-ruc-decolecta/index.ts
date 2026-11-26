@@ -33,6 +33,16 @@ function rucValido(ruc: string): boolean {
 }
 
 // Cualquier usuario con perfil puede validar: el RUC es obligatorio en todos los módulos que lo piden.
+/** Mensaje claro cuando Decolecta no responde bien (incluye el motivo que manda Decolecta, si lo manda). */
+function errorDecolecta(status: number, r: Record<string, unknown>, noExiste: string): string {
+  const motivo = txt(r, "message", "error", "detail", "mensaje");
+  if (status === 404 || status === 422) return noExiste;
+  if (status === 401 || status === 403)
+    return `Decolecta rechazó el token (HTTP ${status}${motivo ? `: ${motivo}` : ""}). Revise que DECOLECTA_TOKEN en Supabase sea el token vigente de su cuenta Decolecta y que el plan tenga saldo.`;
+  if (status === 429) return `Decolecta: límite de consultas alcanzado (HTTP 429). Revise el plan o espere unos minutos.`;
+  return `Decolecta no respondió (HTTP ${status || "sin conexión"}${motivo ? `: ${motivo}` : ""}).`;
+}
+
 const txt = (o: Record<string, unknown>, ...k: string[]) => {
   for (const x of k) if (typeof o[x] === "string" && (o[x] as string).trim()) return (o[x] as string).trim();
   return "";
@@ -57,7 +67,7 @@ Deno.serve(async (req) => {
   const ruc = String(body.ruc ?? "").replace(/\D/g, "");
   if (!rucValido(ruc)) return json({ error: `RUC ${ruc || "vacío"} no es válido (11 dígitos y dígito verificador).` }, 400);
 
-  const token = Deno.env.get("DECOLECTA_TOKEN");
+  const token = Deno.env.get("DECOLECTA_TOKEN")?.trim().replace(/^Bearer\s+/i, "");
   if (!token) return json({ error: "Falta el secreto DECOLECTA_TOKEN en Supabase." }, 500);
   const base = Deno.env.get("DECOLECTA_URL") ?? "https://api.decolecta.com/v1/sunat/ruc";
 
@@ -79,7 +89,7 @@ Deno.serve(async (req) => {
   const validado = ok && estado === "ACTIVO" && condicion === "HABIDO";
 
   await admin.from("proveedor_validacion_log").insert({ ruc, cotizacion_id: body.cotizacion_id ?? null, respuesta_decolecta: { status, ...respuesta }, ok, usuario: perfil.usuario });
-  if (!ok) return json({ error: status === 404 ? `RUC ${ruc} no existe en SUNAT.` : `Decolecta no respondió (HTTP ${status || "sin conexión"}).`, status }, 502);
+  if (!ok) return json({ error: errorDecolecta(status, respuesta, `RUC ${ruc} no existe en SUNAT.`), status }, 502);
 
   const validado_at = new Date().toISOString();
   // Padrón del sistema. Si la tabla aún no existe (SQL pendiente) la respuesta igual sirve para esta sesión.
@@ -105,7 +115,7 @@ Deno.serve(async (req) => {
 async function consultarDni(entrada: string, usuario: string, admin: ReturnType<typeof createClient>): Promise<Response> {
   const dni = entrada.replace(/\D/g, "");
   if (!/^\d{8}$/.test(dni)) return json({ error: "El DNI debe tener 8 dígitos." }, 400);
-  const token = Deno.env.get("DECOLECTA_TOKEN");
+  const token = Deno.env.get("DECOLECTA_TOKEN")?.trim().replace(/^Bearer\s+/i, "");
   if (!token) return json({ error: "Falta el secreto DECOLECTA_TOKEN en Supabase." }, 500);
   const base = Deno.env.get("DECOLECTA_DNI_URL") ?? "https://api.decolecta.com/v1/reniec/dni";
 
@@ -132,7 +142,7 @@ async function consultarDni(entrada: string, usuario: string, admin: ReturnType<
   const ok = status === 200 && !!(nombres || completo);
 
   await admin.from("proveedor_validacion_log").insert({ ruc: dni, respuesta_decolecta: { tipo: "DNI", status, ...r }, ok, usuario });
-  if (!ok) return json({ error: status === 404 || status === 422 ? `El DNI ${dni} no existe en RENIEC.` : `Decolecta no respondió (HTTP ${status || "sin conexión"}).`, status }, 502);
+  if (!ok) return json({ error: errorDecolecta(status, r, `El DNI ${dni} no existe en RENIEC.`), status }, 502);
 
   const verificado_at = new Date().toISOString();
   const fila = { dni, nombres, apellido_paterno: paterno, apellido_materno: materno, nombre_completo: completo, verificado_at, usuario };
