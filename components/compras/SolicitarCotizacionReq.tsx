@@ -5,14 +5,15 @@
 // se abre WhatsApp con la lista lista para enviar. Se puede repetir con otro proveedor para comparar.
 
 import { useMemo, useState } from "react";
-import { Check, Copy, ExternalLink, MessageCircle, Send } from "lucide-react";
+import { Check, Copy, ExternalLink, FileText, MessageCircle, Send } from "lucide-react";
 import { Button, Field, Input, Modal, Select, Textarea, cn, ejecutar, toast } from "@/components/ui";
 import { fechaPE } from "@/lib/storage";
 import { useResumenPrecios } from "@/components/compras/AnalisisPrecios";
 import { celularWhatsApp } from "@/lib/listasProveedor";
 import { abrirEnlaceExterno, copiarTexto } from "@/lib/abrirExterno";
 import { actualizarContactoProveedor, enlaceWhatsApp, itemsDelProveedor, mensajeSolicitudReq, proveedoresParaReq, registrarSolicitudReq } from "@/lib/solicitudCotizacion";
-import type { Requerimiento, Rol } from "@/lib/types";
+import { pdfSolicitudCotizacion } from "@/lib/pdf";
+import type { ItemReq, Requerimiento, Rol } from "@/lib/types";
 
 export function SolicitarCotizacionReq({ req, rol, onClose }: { req: Requerimiento; rol: Rol; onClose: () => void }) {
   const { resumen, proveedores } = useResumenPrecios();
@@ -28,7 +29,7 @@ export function SolicitarCotizacionReq({ req, rol, onClose }: { req: Requerimien
   const [guardarFicha, setGuardarFicha] = useState(true);
   const [confirmo, setConfirmo] = useState(false);
   /** Paso 2: solicitud anotada; se muestra el mensaje con los botones para abrir o copiar. */
-  const [enviado, setEnviado] = useState<{ url: string; texto: string; numero: string; proveedor: string; abierto: boolean } | null>(null);
+  const [enviado, setEnviado] = useState<{ url: string; texto: string; numero: string; proveedor: string; ruc: string; asesor: string; items: ItemReq[]; abierto: boolean } | null>(null);
 
   const elegirProveedor = (id: string) => {
     const p = proveedores.find((x) => x.id === id);
@@ -55,7 +56,7 @@ export function SolicitarCotizacionReq({ req, rol, onClose }: { req: Requerimien
     }, `Solicitud anotada en ${req.numero}`);
     if (!ok) return;
     const abierto = await abrirEnlaceExterno(url);
-    setEnviado({ url, texto: mensaje, numero: celularWhatsApp(celular), proveedor: prov.razonSocial, abierto });
+    setEnviado({ url, texto: mensaje, numero: celularWhatsApp(celular), proveedor: prov.razonSocial, ruc: prov.ruc, asesor: asesor.trim().toUpperCase(), items, abierto });
   };
 
   const copiar = async (t: string, que: string) => {
@@ -78,6 +79,15 @@ export function SolicitarCotizacionReq({ req, rol, onClose }: { req: Requerimien
           <Textarea rows={10} readOnly value={enviado.texto} />
         </Field>
         <div className="mt-3 flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            onClick={() =>
+              pdfSolicitudCotizacion({ req, proveedor: enviado.proveedor, ruc: enviado.ruc, asesor: enviado.asesor, celular: enviado.numero, items: enviado.items, mensaje: enviado.texto })
+            }
+            title="Abre el documento con Descargar, Imprimir y WhatsApp"
+          >
+            <FileText size={14} /> Documento PDF
+          </Button>
           <Button
             size="sm"
             variant="success"
@@ -212,6 +222,15 @@ export function SolicitarCotizacionReq({ req, rol, onClose }: { req: Requerimien
         <Button variant="secondary" onClick={onClose}>
           Cancelar
         </Button>
+        {prov && items.length > 0 && (
+          <Button
+            variant="secondary"
+            onClick={() => pdfSolicitudCotizacion({ req, proveedor: prov.razonSocial, ruc: prov.ruc, asesor: asesor.trim().toUpperCase(), celular: celularWhatsApp(celular), items, mensaje })}
+            title="Abre el documento con Descargar, Imprimir y WhatsApp"
+          >
+            <FileText size={15} /> Ver documento PDF
+          </Button>
+        )}
         <Button variant="success" disabled={!listo} onClick={() => void enviar()}>
           {confirmo ? <Send size={15} /> : <Check size={15} />} Confirmar y enviar por WhatsApp
         </Button>
