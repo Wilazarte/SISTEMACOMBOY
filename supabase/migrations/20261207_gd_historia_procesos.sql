@@ -1,5 +1,5 @@
 -- =====================================================================
--- Gestión Documentaria · Historia de procesos (historia clínica por proceso)
+-- Gestión Documentaria · Trazabilidad de procesos (antes "historia clínica")
 -- Correr DESPUÉS de 20261204_gestion_documentaria.sql. Idempotente: se puede correr varias veces.
 --
 -- No toca ninguna tabla de Almacén, Tesorería, Ventas ni Producción: la historia se arma leyendo

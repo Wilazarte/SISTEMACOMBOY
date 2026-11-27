@@ -45,7 +45,7 @@ export function GestionDocumental() {
   const [pendientes, setPendientes] = useState<PendienteGD[]>([]);
   const [abierto, setAbierto] = useState<string | null>(null); // id
   const [subir, setSubir] = useState(false);
-  /** Código del proceso al que se adjunta el documento (desde la Historia de procesos). */
+  /** Código del proceso al que se adjunta el documento (desde la Trazabilidad de procesos). */
   const [subirRef, setSubirRef] = useState<string | undefined>(undefined);
   const [proceso, setProceso] = useState<string | undefined>(undefined);
   const [q, setQ] = useState("");
@@ -174,12 +174,12 @@ export function GestionDocumental() {
         </div>
       )}
 
-      {/* Vistas: todos ven Documentos e Historia de procesos; Gerencia / SOPORTE además auditoría y reportes */}
+      {/* Vistas: todos ven Documentos e Trazabilidad de procesos; Gerencia / SOPORTE además auditoría y reportes */}
       <div className="mt-3 flex flex-wrap gap-1.5">
         {(
           [
             ["documentos", "Documentos", FileStack],
-            ["historia", "Historia de procesos", Route],
+            ["historia", "Trazabilidad de procesos", Route],
             ...(gerencia
               ? ([
                   ["descargas", "¿Quién descargó qué?", FileSearch],
