@@ -708,6 +708,13 @@ export interface ValeProduccion {
 
 export type OrigenEdicion = "RELOJ" | "CREADOR" | "SISTEMA";
 
+export interface DiaJustificado {
+  fecha: string; // YYYY-MM-DD
+  motivo: string;
+  usuario?: string | null;
+  en?: string; // ISO
+}
+
 export interface AsistenciaPeriodo {
   id: string; // `${periodo}|${trabajador}`
   periodo: string; // normalizado: "SEMANA 14 - ABRIL 2026"
@@ -715,6 +722,10 @@ export interface AsistenciaPeriodo {
   dias: number;
   horas?: number; // horas trabajadas según el reloj (sin dato: dias × 9)
   tardanzas: number; // días con entrada después de las 08:20
+  /** Marcas del reloj por día: "2026-10-05" -> ["08:14:41|E", "14:04:42|S"] (importaciones desde 2026-11-27). */
+  detalle?: Record<string, string[]> | null;
+  /** Días agregados a mano con contraseña: cuentan como asistidos en el sueldo (solo se agregan, nunca se quitan). */
+  justificados?: DiaJustificado[];
   origen_edicion: OrigenEdicion;
   updated_by: string | null; // usuario (auth.uid) que hizo el último cambio
   updated_by_creator_id: string | null; // solo en ediciones manuales del creador

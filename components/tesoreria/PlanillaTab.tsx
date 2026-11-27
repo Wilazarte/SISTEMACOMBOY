@@ -4,7 +4,7 @@ import { pdfBoletaPago } from "@/lib/pdf";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Archive, Building2, Calculator, Copy, Eye, FileDown, HandCoins, Lock, Pencil, Plus, Trash2, Upload, Users } from "lucide-react";
+import { AlertTriangle, Archive, Building2, Calculator, CalendarDays, Copy, Eye, FileDown, HandCoins, Lock, Pencil, Plus, Trash2, Upload, Users } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Input, Modal, Tabs, Td, Table, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import {
   AFP_OPTIONS,
@@ -44,7 +44,8 @@ import { AdelantosTrabajador } from "@/components/planilla/AdelantosTrabajador";
 import { PagarSemanaFiltrada } from "@/components/planilla/PagarSemanaFiltrada";
 import { EditarListaSemana } from "@/components/planilla/EditarListaSemana";
 import { enLista, listaDe, type ListaSemana } from "@/lib/listaSemana";
-import { esPeriodoMensual, periodoDeFecha, periodoMensualDeFecha, rangoPeriodoMensual } from "@/lib/periodo";
+import { esPeriodoMensual, periodoDeFecha, periodoMensualDeFecha, rangoPeriodo, rangoPeriodoMensual } from "@/lib/periodo";
+import { AsistenciaDias } from "@/components/planilla/AsistenciaDias";
 import { emparejar, sinHuellas, type DetalleHuella, type NoEncontrado } from "@/lib/emparejarReloj";
 import { ResultadoImportacion } from "@/components/planilla/ResultadoImportacion";
 import { Contratistas } from "@/components/planilla/Contratistas";
@@ -57,13 +58,16 @@ import { useHistorialPlanilla } from "@/components/planilla/useHistorialPlanilla
 import { useAdelantosPendientes } from "@/components/planilla/useAdelantosPendientes";
 import { adelantosADescontar, pendientesDe, type Adelanto, type PendientesTrabajador } from "@/lib/adelantos";
 import type { FilaCierre } from "@/lib/historial";
-import type { AsistenciaPeriodo, LiquidacionPeriodo, ModoLiquidacion, TipoAfp, TipoSueldo, Trabajador } from "@/lib/types";
+import type { AsistenciaPeriodo, DiaJustificado, LiquidacionPeriodo, ModoLiquidacion, TipoAfp, TipoSueldo, Trabajador } from "@/lib/types";
 
 type Tab = "trabajadores" | "planilla" | "historial" | "contratistas";
 
 type TrabajadorCalc = Trabajador & {
   reloj: { dias: number; horas: number; tardanzas: number }; // asistencia del reloj (bloqueada)
-  tieneAsistencia: boolean; // tiene_asistencia_semana: horas (o días) > 0 en el reloj del periodo
+  tieneAsistencia: boolean; // tiene_asistencia_semana: horas (o días) > 0 en el reloj del periodo (o días justificados)
+  fechasReloj: Map<string, string[]> | null; // marcas por día (Excel de esta sesión o detalle guardado); null = import antiguo
+  justificadosLista: DiaJustificado[]; // días justificados con contraseña (no marcados en el reloj)
+  justificados: number; // cuántos: se pagan como días asistidos
   sinHorasReloj: boolean; // S/ por hora: el periodo guardado no tiene horas (edición manual o import antiguo)
   liq: ResultadoLiquidacion; // días / horas a pagar y montos
   dias: number;
@@ -169,6 +173,11 @@ function antiguedad(fechaIngreso: string): string {
 function calcular(t: Trabajador, liq: LiquidacionPeriodo, asistenciaExterna?: AsistenciaMap | null, registro?: AsistenciaPeriodo): TrabajadorCalc {
   const fechas = asistenciaExterna?.get(t.id);
   const porHora = t.tipoSueldo === "POR_HORA";
+  // Marcas por día: las del Excel de esta sesión o el detalle guardado al importar
+  const fechasReloj = fechas ?? (registro?.detalle ? new Map(Object.entries(registro.detalle)) : null);
+  // Días JUSTIFICADOS (Ver días › Editar con contraseña): cuentan como día asistido, salvo que el reloj ya marque ese día
+  const justificadosLista = (registro?.justificados ?? []).filter((j) => !(fechasReloj?.get(j.fecha)?.length));
+  const nJust = justificadosLista.length;
   // S/ por hora: horas REALES del reloj (marcas), nunca días × jornada
   const reloj = fechas
     ? { ...resumirAsistencia(fechas), ...(porHora ? { horas: horasReales(fechas) } : {}) }
@@ -177,14 +186,20 @@ function calcular(t: Trabajador, liq: LiquidacionPeriodo, asistenciaExterna?: As
   // Se paga según el TIPO DE SUELDO (Williams 2026-11-19): por hora solo el sueldo "Por hora"; diario / semanal /
   // quincenal / mensual siempre por DÍAS aunque el periodo esté en modo HORAS (antes: 54 h × S/ 7.75 en vez de 6 días × S/ 62).
   const cfg = liq.modo === "HORAS" ? { ...liq, modo: "DIAS" as const } : liq;
-  const r = porHora ? liquidarPorHora(t.sueldo, reloj.horas, liq.ajustes[t.id]) : liquidar(t.sueldo, divisorSueldo(t), reloj, cfg, liq.ajustes[t.id]);
+  // Cada día justificado = 1 día asistido (S/ por hora: una jornada de horas por día)
+  const jornada = liq.horasJornada > 0 ? liq.horasJornada : 8;
+  const aPagar = { dias: reloj.dias + nJust, horas: reloj.horas + nJust * jornada };
+  const r = porHora ? liquidarPorHora(t.sueldo, aPagar.horas, liq.ajustes[t.id]) : liquidar(t.sueldo, divisorSueldo(t), aPagar, cfg, liq.ajustes[t.id]);
   // AFP / ONP: % sobre lo que se paga por los días (u horas) laborados, nunca sobre el sueldo completo del mes
   const descuentoAfp = r2(r.bruto * ((t.afpPorcentaje || 0) / 100));
   const neto = r2(r.bruto - descuentoAfp);
   return {
     ...t,
     reloj,
-    tieneAsistencia: reloj.horas > 0 || reloj.dias > 0,
+    tieneAsistencia: reloj.horas > 0 || reloj.dias > 0 || nJust > 0,
+    fechasReloj,
+    justificadosLista,
+    justificados: nJust,
     sinHorasReloj: porHora && !fechas && !!registro && (registro.horas === null || registro.horas === undefined),
     liq: r,
     dias: r.dias,
@@ -275,6 +290,7 @@ export default function PlanillaTab() {
   const [filtro, setFiltro] = useState<FiltroSueldo>("DIARIO");
   const [rango, setRango] = useState(semanaActual);
   const [adelantoDe, setAdelantoDe] = useState<TrabajadorCalc | null>(null);
+  const [diasDe, setDiasDe] = useState<string | null>(null); // "Ver días" de la asistencia importada (N° trabajador)
   const [soloAsistencia, setSoloAsistencia] = useState(true);
   const [editarLista, setEditarLista] = useState(false);
   // Huellas del reloj sin trabajador seguro (se vinculan a mano) y el último Excel, para reprocesarlo al vincular
@@ -413,7 +429,8 @@ export default function PlanillaTab() {
       const r = resumirAsistencia(fechas);
       // S/ por hora: se guardan las horas reales de las marcas (los demás: pago por día)
       const porHora = lista.find((x) => x.id === trabajador)?.tipoSueldo === "POR_HORA";
-      return { trabajador, ...r, ...(porHora ? { horas: horasReales(fechas) } : {}) };
+      // detalle: marcas por día, para "Ver días" (tabla tipo Excel) y para justificar faltas
+      return { trabajador, ...r, ...(porHora ? { horas: horasReales(fechas) } : {}), detalle: Object.fromEntries(fechas) };
     };
     // Ficha con pago MENSUAL: su asistencia va a la planilla del mes ("MENSUAL - OCTUBRE 2026"), separada por mes
     const esMensual = (id: string) => {
@@ -421,7 +438,7 @@ export default function PlanillaTab() {
       return !!t && frecuenciaPagoDe(t) === "MENSUAL";
     };
     const semanales = [...mapa].filter(([id]) => !esMensual(id));
-    const porMes = new Map<string, { trabajador: string; dias: number; horas: number; tardanzas: number }[]>();
+    const porMes = new Map<string, ReturnType<typeof filaDe>[]>();
     [...mapa]
       .filter(([id]) => esMensual(id))
       .forEach(([id, fechas]) => {
@@ -505,7 +522,7 @@ export default function PlanillaTab() {
       sueldoDiario: t.liq.sueldoDiario,
       valorHora: valorHoraTxt(t.valorHora),
       modo: MODOS_LIQUIDACION[t.liq.modo].label,
-      basicoDetalle: t.liq.modo === "HORAS" ? `${horasTxt(t.horas)} h` : `${t.dias} días`,
+      basicoDetalle: t.liq.modo === "HORAS" ? `${horasTxt(t.horas)} h` : `${t.dias} días${t.justificados && !t.liq.manual ? ` (${t.justificados} justif.)` : ""}`,
       basico: t.liq.basico,
       horasExtra: `${horasTxt(t.liq.horasExtra)} h`,
       montoExtra: t.liq.montoExtra,
@@ -1032,6 +1049,20 @@ export default function PlanillaTab() {
                         <CampoBloqueado valor={`${t.reloj.dias} d`} />
                         <CampoBloqueado valor={`${horasTxt(t.reloj.horas)} h`} />
                         <CampoBloqueado valor={`${t.reloj.tardanzas} tard`} alerta={t.reloj.tardanzas > 0} />
+                        {t.justificados > 0 && (
+                          <span className="rounded bg-sky-100 px-1.5 py-0.5 text-xs font-semibold text-sky-800" title="Días justificados: se pagan como días asistidos" data-justificados={t.id}>
+                            +{t.justificados} just.
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setDiasDe(t.id)}
+                          className="mt-0.5 flex items-center gap-1 rounded border border-plomo-200 px-1.5 py-0.5 text-[11px] font-semibold text-azul-900 transition hover:border-corp hover:bg-red-50"
+                          title="Ver los días asistidos importados (tabla tipo Excel) y justificar faltas"
+                          data-ver-dias={t.id}
+                        >
+                          <CalendarDays size={11} /> Ver días
+                        </button>
                       </div>
                       {t.sinHorasReloj && (
                         <p className="mt-1 max-w-[180px] whitespace-normal rounded bg-amber-50 px-1.5 py-1 text-[10px] font-semibold text-amber-800" data-sin-horas>
@@ -1139,6 +1170,35 @@ export default function PlanillaTab() {
         />
       )}
 
+      {/* VER DÍAS: asistencia importada por día + justificar faltas con contraseña */}
+      {(() => {
+        const t = diasDe ? calculados.find((x) => x.id === diasDe) : null;
+        if (!t) return null;
+        const sinDetalle = !t.fechasReloj && t.reloj.dias > 0;
+        const motivo = !puedeEditar
+          ? "Su usuario no puede editar la planilla."
+          : pagado(t)
+            ? "Esta planilla ya está pagada: no se pueden agregar días."
+            : sinDetalle
+              ? "Vuelva a importar el Excel del reloj de este periodo para poder justificar días."
+              : sinPeriodo
+                ? "Indique el periodo."
+                : undefined;
+        return (
+          <AsistenciaDias
+            periodo={normalizarPeriodo(periodo)}
+            trabajador={{ id: t.id, nombre: t.nombre }}
+            fechas={t.fechasReloj ?? (t.reloj.dias === 0 ? new Map() : null)}
+            diasReloj={t.reloj.dias}
+            justificados={t.justificadosLista}
+            rango={rangoPeriodo(periodo) ?? (excel ? { desde: excel.desde, hasta: excel.hasta } : null)}
+            editable={!motivo}
+            motivoNoEditable={motivo}
+            onClose={() => setDiasDe(null)}
+          />
+        );
+      })()}
+
       {/* MODAL BOLETA */}
       <Modal open={!!boletaSel} onClose={() => setBoletaSel(null)} title="Boleta de pago">
         {boletaSel && (
@@ -1168,7 +1228,8 @@ export default function PlanillaTab() {
                 <tbody>
                   <tr className="border-t">
                     <td className="p-2">
-                      Básico ({boletaSel.liq.modo === "HORAS" ? `${horasTxt(boletaSel.horas)} h` : `${boletaSel.dias} días`})
+                      Básico ({boletaSel.liq.modo === "HORAS" ? `${horasTxt(boletaSel.horas)} h` : `${boletaSel.dias} días`}
+                      {boletaSel.justificados > 0 && !boletaSel.liq.manual ? `, incluye ${boletaSel.justificados} justificado(s)` : ""})
                     </td>
                     <td className="p-2 text-right">{soles(boletaSel.liq.basico)}</td>
                   </tr>
