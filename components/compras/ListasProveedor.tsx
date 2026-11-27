@@ -77,7 +77,7 @@ export function ListasProveedor({ rol, onIrCotizaciones }: { rol: Rol; onIrCotiz
       <Card>
         <CardHeader
           title={`Listas por proveedor (${visibles.length})`}
-          subtitle={`Los REQ de Almacén se juntan solos por proveedor durante ${DIAS_VENTANA} días (según Logística › Base de proveedores, 1ª opción primero). Revise la lista, pida cotización por WhatsApp o correo y registre la cotización solo con N°, fecha y precios.`}
+          subtitle={`Los REQ de Almacén se juntan solos por proveedor durante ${DIAS_VENTANA} días (según Logística › Base de proveedores: gana el proveedor con más repuestos; si empatan, la mejor opción). Revise la lista, pida cotización por WhatsApp o correo y registre la cotización solo con N°, fecha y precios.`}
           action={
             <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-plomo-600">
               <input type="checkbox" checked={verTodas} onChange={(e) => setVerTodas(e.target.checked)} /> Ver también cotizadas y rechazadas

@@ -38,8 +38,8 @@ import {
 } from "./storage";
 import type { EventoHistorial, ItemReq, OpcionProveedor, ProductoProveedor, Proveedor, Requerimiento, Rol } from "./types";
 
-/** Días que una lista sigue juntando REQ del mismo proveedor desde el primer REQ (Williams: "cada 2-3 días"). */
-export const DIAS_VENTANA = 3;
+/** Días que una lista sigue juntando REQ del mismo proveedor desde el primer REQ (Williams 2026-11-27: 2 días). */
+export const DIAS_VENTANA = 2;
 /** Los REQ aceptados antes de esta fecha no se pasan a listas (ya se cotizaban uno por uno). */
 export const INICIO_LISTAS = "2026-11-27";
 /** proveedorId de la lista de productos que ningún proveedor de la base vende. */
@@ -145,21 +145,22 @@ export function candidatos(item: Pick<ItemReq, "nombre" | "productoId">, proveed
 }
 
 /**
- * Proveedor de cada ítem: gana la primera opción; si dos proveedores son la misma opción, el que tiene MÁS
- * productos de estos REQ (para mandar menos listas). `carga` = productos que cada proveedor ya tiene en listas abiertas.
+ * Proveedor de cada ítem (Williams 2026-11-27): gana el proveedor que vende MÁS repuestos de estos REQ (y de sus
+ * listas abiertas, `carga`), aunque no sea la 1ª opción; con el mismo número de repuestos, gana la mejor opción.
  */
 export function asignar(items: Pick<ItemReq, "id" | "nombre" | "productoId">[], proveedores: Proveedor[], carga: Map<string, number> = new Map()): Map<string, Candidato | null> {
   const cands = new Map(items.map((i) => [i.id, candidatos(i, proveedores)]));
-  // Puntaje para desempatar: productos donde el proveedor también es la mejor opción, luego los que vende, luego los que ya tiene en listas abiertas
-  const cubreMejor = new Map<string, number>();
+  // Puntaje: repuestos de estos REQ que vende el proveedor (más los que ya tiene en listas abiertas)
   const cubre = new Map<string, number>();
+  // Empate de repuestos: el que es la mejor opción en más de ellos (así no se parte un REQ entre dos proveedores iguales)
+  const cubreMejor = new Map<string, number>();
   cands.forEach((cs) =>
     cs.forEach((c) => {
       cubre.set(c.proveedor.id, (cubre.get(c.proveedor.id) ?? 0) + 1);
       if (c.opcion === cs[0].opcion) cubreMejor.set(c.proveedor.id, (cubreMejor.get(c.proveedor.id) ?? 0) + 1);
     }),
   );
-  const puntaje = (id: string) => (cubreMejor.get(id) ?? 0) * 10000 + (cubre.get(id) ?? 0) * 100 + (carga.get(id) ?? 0);
+  const puntaje = (id: string) => ((cubre.get(id) ?? 0) + (carga.get(id) ?? 0)) * 1000 + (cubreMejor.get(id) ?? 0);
   const res = new Map<string, Candidato | null>();
   for (const i of items) {
     const cs = cands.get(i.id) ?? [];
@@ -167,10 +168,8 @@ export function asignar(items: Pick<ItemReq, "id" | "nombre" | "productoId">[], 
       res.set(i.id, null);
       continue;
     }
-    const mejorOpcion = cs[0].opcion;
-    const empatados = cs.filter((c) => c.opcion === mejorOpcion);
-    empatados.sort((a, b) => puntaje(b.proveedor.id) - puntaje(a.proveedor.id) || a.proveedor.razonSocial.localeCompare(b.proveedor.razonSocial));
-    res.set(i.id, empatados[0]);
+    const orden = [...cs].sort((a, b) => puntaje(b.proveedor.id) - puntaje(a.proveedor.id) || a.opcion - b.opcion || a.proveedor.razonSocial.localeCompare(b.proveedor.razonSocial));
+    res.set(i.id, orden[0]);
   }
   return res;
 }
