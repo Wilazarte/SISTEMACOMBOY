@@ -28,6 +28,7 @@ import {
   X,
   Users,
   Wrench,
+  MessageCircle,
 } from "lucide-react";
 import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
@@ -116,6 +117,7 @@ import { EditarGasto } from "@/components/compras/EditarGasto";
 import { FormOrdenServicio, filasOrdenesServicio } from "@/components/compras/OrdenesServicio";
 import { ListasProveedor } from "@/components/compras/ListasProveedor";
 import { SugerenciaProveedorReq } from "@/components/compras/AnalisisPrecios";
+import { SolicitarCotizacionReq, SolicitudesEnviadas } from "@/components/compras/SolicitarCotizacionReq";
 import { sincronizarListas, type ListaProveedor } from "@/lib/listasProveedor";
 import type { Trabajador } from "@/lib/types";
 import type { ArchivoGasto, Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, OrdenServicio, Proveedor, Requerimiento, Rol, OrdenAGenerar, StockItem, TipoComprobanteCompra } from "@/lib/types";
@@ -337,6 +339,7 @@ function NuevosReq({
   const [marcados, setMarcados] = useState<Set<string>>(new Set());
   const [rechazoLote, setRechazoLote] = useState(false);
   const [editReq, setEditReq] = useState<Requerimiento | null>(null);
+  const [solicitar, setSolicitar] = useState<string | null>(null);
   const sesion = getSesion();
   const habilitado = puede(rol, "req.revisar");
   const elegidos = pendientes.filter((r) => marcados.has(r.id)).map((r) => r.id);
@@ -479,6 +482,7 @@ function NuevosReq({
                     {fechaPE(r.fecha)} · {r.sede} · {r.solicitante} · {r.items.length} ítem(s)
                   </p>
                   {r.tipo !== "SERVICIO" && <SugerenciaProveedorReq items={r.items} className="mt-0.5" />}
+                  <SolicitudesEnviadas req={r} />
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "REQ", id: r.id })} title="Ver e historial">
@@ -487,6 +491,11 @@ function NuevosReq({
                   <Button size="sm" variant="ghost" onClick={() => pdfRequerimiento(r)} title="Descargar PDF">
                     <Download size={15} />
                   </Button>
+                  {(puedeCotizar || habilitado) && (
+                    <Button size="sm" variant="success" onClick={() => setSolicitar(r.id)} title="Enviar la lista de productos al WhatsApp del asesor de ventas">
+                      <MessageCircle size={15} /> Solicitar cotización
+                    </Button>
+                  )}
                   {puedeCotizar && (
                     <Button size="sm" onClick={() => onCotizar(r.id)}>
                       <FileSpreadsheet size={15} /> Ingresar cotización
@@ -500,6 +509,10 @@ function NuevosReq({
       )}
 
       {editReq && <EditarReq req={editReq} rol={rol} onClose={() => setEditReq(null)} />}
+      {(() => {
+        const r = solicitar ? porCotizar.find((x) => x.id === solicitar) : undefined;
+        return r ? <SolicitarCotizacionReq key={r.id} req={r} rol={rol} onClose={() => setSolicitar(null)} /> : null;
+      })()}
 
       <Modal open={rechazoLote} onClose={() => setRechazoLote(false)} title={`Rechazar ${elegidos.length} requerimiento(s)`}>
         <div className="flex gap-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">
