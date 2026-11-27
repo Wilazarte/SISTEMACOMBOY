@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Download, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Download, Pencil, Plus, Trash2, TrendingDown, X } from "lucide-react";
 import { Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, cn, ejecutar } from "@/components/ui";
 import { FiltrosPlegables } from "@/components/ui/BotonFiltros";
 import { EstadoRuc } from "@/components/EstadoRuc";
@@ -14,6 +14,7 @@ import { OPCIONES_PROVEEDOR, eliminarProveedor, guardarProveedor, proveedorVacio
 import type { OpcionProveedor, Proveedor } from "@/lib/types";
 import { guardarExcel } from "@/lib/guardarArchivo";
 import { buscarProducto, useCatalogo } from "@/lib/productos";
+import { AnalisisPrecios } from "@/components/compras/AnalisisPrecios";
 
 const COLOR_OPCION: Record<OpcionProveedor, string> = {
   1: "border-emerald-300 bg-emerald-50 text-emerald-800",
@@ -42,6 +43,7 @@ export function BaseProveedores() {
   const [producto, setProducto] = useState("");
   const [opcion, setOpcion] = useState("");
   const habilitado = puedeGestionarProveedores(sesion);
+  const [verPrecios, setVerPrecios] = useState(false);
 
   const lista = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -91,6 +93,9 @@ export function BaseProveedores() {
             <Button variant="secondary" onClick={() => void exportar()} disabled={lista.length === 0}>
               <Download size={16} /> Excel
             </Button>
+            <Button variant="secondary" onClick={() => setVerPrecios((v) => !v)}>
+              <TrendingDown size={16} /> {verPrecios ? "Ocultar precios" : "Análisis de precios"}
+            </Button>
             {habilitado && (
               <Button variant="warning" onClick={() => setForm(proveedorVacio())}>
                 <Plus size={16} /> Nuevo proveedor
@@ -100,6 +105,11 @@ export function BaseProveedores() {
         }
       />
       <DatalistCatalogo />
+      {verPrecios && (
+        <div className="p-4">
+          <AnalisisPrecios puedeLlenar={habilitado} />
+        </div>
+      )}
 
       {ranking.length > 0 && (
         <div className="mx-5 my-3 rounded-lg border border-plomo-200 bg-plomo-50 p-3 text-sm">

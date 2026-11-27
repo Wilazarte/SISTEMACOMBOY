@@ -1,11 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, ArrowRightLeft, Check, ChevronDown, ChevronUp, FileSpreadsheet, Lock, Mail, MessageCircle, MessageSquareWarning, Pencil, Send, Trash2, X } from "lucide-react";
+import { TrendingDown, AlertTriangle, ArrowRightLeft, Check, ChevronDown, ChevronUp, FileSpreadsheet, Lock, Mail, MessageCircle, MessageSquareWarning, Pencil, Send, Trash2, X } from "lucide-react";
 import { Button, Card, CardHeader, Field, Input, Modal, Select, Table, Td, Textarea, cn, ejecutar, toast } from "@/components/ui";
 import { KEYS, fechaPE, hoy, puede, r2, soles, useStore } from "@/lib/storage";
 import { etiquetaOpcion } from "@/lib/proveedores";
 import { EstadoRuc } from "@/components/EstadoRuc";
+import { AnalisisPrecios, useResumenPrecios } from "@/components/compras/AnalisisPrecios";
+import { resumenDe, sugerirProveedor } from "@/lib/analisisPrecios";
+import { puedeGestionarProveedores } from "@/lib/proveedores";
+import { useSesion } from "@/lib/auth";
 import {
   DIAS_VENTANA,
   aceptarLista,
@@ -57,6 +61,9 @@ export function ListasProveedor({ rol, onIrCotizaciones }: { rol: Rol; onIrCotiz
   const [enviar, setEnviar] = useState<ListaProveedor | null>(null);
   const [cotizar, setCotizar] = useState<ListaProveedor | null>(null);
   const revisa = puede(rol, "req.revisar");
+  const { sesion } = useSesion();
+  const { resumen } = useResumenPrecios();
+  const [verPrecios, setVerPrecios] = useState(false);
   const cotiza = puede(rol, "coti.crear");
 
   const orden: Record<string, number> = { ABIERTA: 0, ACEPTADA: 1, SOLICITADA: 2, COTIZADA: 3, RECHAZADA: 4 };
@@ -74,14 +81,20 @@ export function ListasProveedor({ rol, onIrCotizaciones }: { rol: Rol; onIrCotiz
 
   return (
     <div className="space-y-4">
+      {verPrecios && <AnalisisPrecios puedeLlenar={puedeGestionarProveedores(sesion)} />}
       <Card>
         <CardHeader
           title={`Listas por proveedor (${visibles.length})`}
           subtitle={`Los REQ de Almacén se juntan solos por proveedor durante ${DIAS_VENTANA} días (según Logística › Base de proveedores: gana el proveedor con más repuestos; si empatan, la mejor opción). Revise la lista, pida cotización por WhatsApp o correo y registre la cotización solo con N°, fecha y precios.`}
           action={
-            <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-plomo-600">
-              <input type="checkbox" checked={verTodas} onChange={(e) => setVerTodas(e.target.checked)} /> Ver también cotizadas y rechazadas
-            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-plomo-600">
+                <input type="checkbox" checked={verTodas} onChange={(e) => setVerTodas(e.target.checked)} /> Ver también cotizadas y rechazadas
+              </label>
+              <Button size="sm" variant="secondary" onClick={() => setVerPrecios((v) => !v)}>
+                <TrendingDown size={14} /> {verPrecios ? "Ocultar análisis de precios" : "Análisis de precios"}
+              </Button>
+            </div>
           }
         />
         {visibles.length === 0 ? (
@@ -162,7 +175,7 @@ export function ListasProveedor({ rol, onIrCotizaciones }: { rol: Rol; onIrCotiz
                   </div>
                   {expandida && (
                     <div className="mt-3 overflow-x-auto rounded-lg border border-plomo-100">
-                      <Table head={["Producto", "Cant.", "Und.", "Marca", "REQ", "Opción", "Otros proveedores"]}>
+                      <Table head={["Producto", "Cant.", "Und.", "Marca", "REQ", "Opción", "Precio más bajo (sugerido)", "Otros proveedores"]}>
                         {l.lineas.map((x) => {
                           const otros = candidatos(x, proveedores).filter((c) => c.proveedor.id !== l.proveedorId);
                           return (
@@ -179,6 +192,19 @@ export function ListasProveedor({ rol, onIrCotizaciones }: { rol: Rol; onIrCotiz
                               <Td>{x.marca || "-"}</Td>
                               <Td>{x.reqNumero}</Td>
                               <Td>{x.opcion ? etiquetaOpcion(x.opcion) : "-"}</Td>
+                              <Td className="text-xs">
+                                {(() => {
+                                  const sug = sugerirProveedor(resumen, x);
+                                  if (!sug) return <span className="text-plomo-500">Sin historial</span>;
+                                  const esEste = sug.proveedorId === l.proveedorId;
+                                  return (
+                                    <span title={sug.motivo} className={esEste ? "text-emerald-700" : "text-amber-700"}>
+                                      {esEste ? "✓ " : "⚠ "}
+                                      {sug.proveedor} · {soles(sug.precio)}
+                                    </span>
+                                  );
+                                })()}
+                              </Td>
                               <Td className="text-xs text-plomo-500">{otros.map((c) => `${c.proveedor.razonSocial} (${c.opcion}ª)`).join(", ") || "-"}</Td>
                             </tr>
                           );
@@ -252,6 +278,7 @@ export function ListasProveedor({ rol, onIrCotizaciones }: { rol: Rol; onIrCotiz
 // Editar: cantidades, quitar y mover productos a otro proveedor
 // ---------------------------------------------------------------------
 function EditarLista({ lista, proveedores, rol, onClose }: { lista: ListaProveedor; proveedores: Proveedor[]; rol: Rol; onClose: () => void }) {
+  const { resumen } = useResumenPrecios();
   const [cant, setCant] = useState<Record<string, string>>({});
   const [mover, setMover] = useState<Record<string, string>>({});
   const activos = proveedores.filter((p) => p.estado !== "INACTIVO" && p.id !== lista.proveedorId).sort((a, b) => a.razonSocial.localeCompare(b.razonSocial));
@@ -260,7 +287,16 @@ function EditarLista({ lista, proveedores, rol, onClose }: { lista: ListaProveed
       <p className="mb-3 text-xs text-plomo-500">Cambie cantidades, quite productos o páselos a otro proveedor (van a la lista abierta de ese proveedor o a una nueva).</p>
       <div className="space-y-2">
         {lineasActivas(lista).map((x) => {
-          const cands = candidatos(x, proveedores).filter((c) => c.proveedor.id !== lista.proveedorId);
+          const precios = resumenDe(resumen, x)?.proveedores ?? [];
+          const precioDe = (id: string) => precios.find((p) => p.proveedorId === id);
+          const etiquetaPrecio = (id: string) => {
+            const p = precioDe(id);
+            return p ? ` · ${soles(p.ultimo)}${p === precios[0] ? " (más barato)" : ""}` : "";
+          };
+          const sug = sugerirProveedor(resumen, x);
+          const cands = candidatos(x, proveedores)
+            .filter((c) => c.proveedor.id !== lista.proveedorId)
+            .sort((a, b) => (precioDe(a.proveedor.id)?.ultimo ?? Infinity) - (precioDe(b.proveedor.id)?.ultimo ?? Infinity));
           const idsCand = new Set(cands.map((c) => c.proveedor.id));
           return (
             <div key={x.id} className="grid items-end gap-2 rounded-lg border border-plomo-100 p-2 sm:grid-cols-[minmax(0,1fr)_7rem_auto_minmax(0,14rem)_auto_auto]">
@@ -270,6 +306,11 @@ function EditarLista({ lista, proveedores, rol, onClose }: { lista: ListaProveed
                   {x.reqNumero} · {x.unidad}
                   {x.marca && ` · ${x.marca}`}
                 </p>
+                {sug && (
+                  <p className={cn("text-[11px]", sug.proveedorId === lista.proveedorId ? "text-emerald-700" : "text-amber-700")} title={sug.motivo}>
+                    Sugerido por precio: {sug.proveedor} · {soles(sug.precio)}
+                  </p>
+                )}
               </div>
               <Field label="Cantidad">
                 <Input type="number" min={0} step="0.01" value={cant[x.id] ?? String(x.cantidad)} onChange={(e) => setCant((c) => ({ ...c, [x.id]: e.target.value }))} />
@@ -288,8 +329,8 @@ function EditarLista({ lista, proveedores, rol, onClose }: { lista: ListaProveed
                   onChange={(e) => setMover((m) => ({ ...m, [x.id]: e.target.value }))}
                   placeholder="Elegir…"
                   options={[
-                    ...cands.map((c) => ({ value: c.proveedor.id, label: `${c.proveedor.razonSocial} (${c.opcion}ª opción)` })),
-                    ...activos.filter((p) => !idsCand.has(p.id)).map((p) => ({ value: p.id, label: `${p.razonSocial} (no lo tiene registrado)` })),
+                    ...cands.map((c) => ({ value: c.proveedor.id, label: `${c.proveedor.razonSocial} (${c.opcion}ª opción)${etiquetaPrecio(c.proveedor.id)}` })),
+                    ...activos.filter((p) => !idsCand.has(p.id)).map((p) => ({ value: p.id, label: `${p.razonSocial} (no lo tiene registrado)${etiquetaPrecio(p.id)}` })),
                   ]}
                 />
               </Field>
@@ -412,6 +453,7 @@ function PedirCotizacion({ lista, proveedores, rol, onClose }: { lista: ListaPro
 // Registrar la cotización recibida: N°, fecha y precios (el proveedor sale de la base)
 // ---------------------------------------------------------------------
 function RegistrarCotizacionLista({ lista, proveedores, rol, onClose, onListo }: { lista: ListaProveedor; proveedores: Proveedor[]; rol: Rol; onClose: () => void; onListo: () => void }) {
+  const { resumen } = useResumenPrecios();
   const idsPosibles = [...new Set([lista.proveedorId, ...lista.envios.map((e) => e.proveedorId)])].filter(Boolean);
   const posibles = idsPosibles.map((id) => proveedores.find((p) => p.id === id)).filter((p): p is Proveedor => !!p);
   const yaCotizaron = new Set(lista.cotizaciones.map((c) => c.proveedorId));
@@ -463,8 +505,13 @@ function RegistrarCotizacionLista({ lista, proveedores, rol, onClose, onListo }:
         </Field>
       </div>
       <div className="mt-3 overflow-x-auto">
-        <Table head={["Producto", "REQ", "Cant.", "Und.", "P. Unit. (inc. IGV)", "Importe"]}>
-          {productos.map((x) => (
+        <Table head={["Producto", "REQ", "Cant.", "Und.", "Último precio", "P. Unit. (inc. IGV)", "Importe"]}>
+          {productos.map((x) => {
+            const ref = resumenDe(resumen, { nombre: x.nombre, unidad: x.unidad, productoId: x.lineas[0]?.productoId });
+            const deEste = ref?.proveedores.find((p) => p.proveedorId === provId);
+            const mejor = ref?.proveedores[0];
+            const escrito = num(x.clave);
+            return (
             <tr key={x.clave}>
               <Td className="font-medium">
                 {x.nombre}
@@ -473,12 +520,19 @@ function RegistrarCotizacionLista({ lista, proveedores, rol, onClose, onListo }:
               <Td className="text-xs">{x.reqs.join(", ")}</Td>
               <Td>{x.cantidad}</Td>
               <Td>{x.unidad}</Td>
+              <Td className="text-[11px] text-plomo-500">
+                {deEste && <p>Este proveedor: {soles(deEste.ultimo)}</p>}
+                {mejor && mejor !== deEste && <p>Más bajo: {soles(mejor.ultimo)} ({mejor.proveedor})</p>}
+                {!ref && "-"}
+                {mejor && escrito > 0 && escrito > mejor.ultimo && <p className="font-semibold text-red-700">▲ {Math.round(((escrito - mejor.ultimo) / mejor.ultimo) * 100)}% sobre el más bajo</p>}
+              </Td>
               <Td>
                 <Input type="number" min={0} step="0.01" value={precios[x.clave] ?? ""} onChange={(e) => setPrecios((p) => ({ ...p, [x.clave]: e.target.value }))} className="w-32 text-right" aria-label={`Precio ${x.nombre}`} />
               </Td>
               <Td className="text-right">{soles(r2(num(x.clave) * x.cantidad))}</Td>
             </tr>
-          ))}
+            );
+          })}
         </Table>
       </div>
       <p className="mt-2 text-right text-xs text-plomo-500">Precios CON IGV. Deje en blanco lo que el proveedor no cotizó. Fecha de la lista: {fechaPE(lista.inicio)}.</p>
