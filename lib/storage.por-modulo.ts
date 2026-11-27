@@ -74,7 +74,7 @@ export const CLAVES_POR_MODULO: Record<string, StoreKey[]> = {
     "almacen_equipos_terminados",
   ],
   "/dashboard/planilla": PLANILLA,
-  "/dashboard/contable": ["contable_asientos", "contable_plan_cuentas", "contable_cierres", "ventas_asientos", "contable_mov_caja", "contable_activos"],
+  "/dashboard/contable": ["contable_asientos", "contable_plan_cuentas", "contable_cierres", "ventas_asientos", "contable_mov_caja", "contable_activos", "contable_datos_eeff"],
   "/dashboard/creador": ["CV_TRABAJADORES_V2", "planilla_asistencia", "planilla_huellas_alias"],
   // Secocha (app aparte /secocha, antes /sucursal): la base solo entrega las filas de la sede del usuario
   "/secocha": [

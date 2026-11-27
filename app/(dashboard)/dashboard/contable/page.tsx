@@ -3,7 +3,8 @@
 import { Fragment, useMemo, useState } from "react";
 import { EstadosCuenta } from "@/components/contable/EstadosCuenta";
 import { ActivosEmpresa } from "@/components/contable/ActivosEmpresa";
-import { BookOpen, Laptop, FilePlus2, History, Search, ChevronDown, ChevronRight, FileBarChart2, Landmark, Lock, LockOpen, Scale, Sparkles, Wallet } from "lucide-react";
+import { EstadosFinancierosTab, FlujoCajaTab, RatiosTab } from "@/components/contable/ReportesFinancieros";
+import { BookOpen, Gauge, HandCoins, Laptop, FilePlus2, History, Search, ChevronDown, ChevronRight, FileBarChart2, Landmark, Lock, LockOpen, Scale, Sparkles, Wallet } from "lucide-react";
 import { Button, Card, CardHeader, Empty, Field, Select, Table, Tabs, Td, cn, ejecutar, ejecutarAsync, toast } from "@/components/ui";
 import { getSesion } from "@/lib/auth";
 import {
@@ -25,7 +26,7 @@ import { generarAsientosAutomaticos } from "@/lib/contable-auto";
 import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { KEYS, fechaPE, soles, tablaDisponible, useRol, useStore } from "@/lib/storage";
 
-type Tab = "diario" | "mayor" | "balance" | "eeff" | "estados" | "activos";
+type Tab = "diario" | "mayor" | "balance" | "flujo" | "eeff" | "ratios" | "estados" | "activos";
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Setiembre", "Octubre", "Noviembre", "Diciembre"];
 
@@ -88,7 +89,9 @@ export default function ContablePage() {
           <p className="mt-1 text-[13px] text-plomo-600">
             {tab === "activos"
               ? "Registro de activos de la empresa: responsable, ficha de entrega, mantenimiento, depreciación y baja"
-              : "Libro Diario, Mayor, Balance de comprobación y Estados Financieros · asientos automáticos desde Ventas, Compras y Planilla"}
+              : tab === "flujo" || tab === "eeff" || tab === "ratios"
+                ? "Flujo de caja, Estados financieros y Ratios · calculados con los cobros, pagos, ventas, compras, stock, activos y planilla del ERP"
+                : "Libro Diario, Mayor, Balance de comprobación y Estados Financieros · asientos automáticos desde Ventas, Compras y Planilla"}
           </p>
         </div>
         {generando && (
@@ -123,9 +126,13 @@ export default function ContablePage() {
         )}
         <div className="flex flex-wrap items-end gap-3 text-sm">
           <Stat label="Periodo" valor={nombrePeriodo} />
-          <Stat label="Asientos del periodo" valor={String(delPeriodo.length)} />
-          <Stat label="Debe" valor={soles(delPeriodo.reduce((a, x) => a + x.lineas.reduce((b, l) => b + l.debe, 0), 0))} />
-          <Stat label="Haber" valor={soles(delPeriodo.reduce((a, x) => a + x.lineas.reduce((b, l) => b + l.haber, 0), 0))} />
+          {!["flujo", "eeff", "ratios"].includes(tab) && (
+            <>
+              <Stat label="Asientos del periodo" valor={String(delPeriodo.length)} />
+              <Stat label="Debe" valor={soles(delPeriodo.reduce((a, x) => a + x.lineas.reduce((b, l) => b + l.debe, 0), 0))} />
+              <Stat label="Haber" valor={soles(delPeriodo.reduce((a, x) => a + x.lineas.reduce((b, l) => b + l.haber, 0), 0))} />
+            </>
+          )}
           {cerrado && (
             <span className="inline-flex items-center gap-1.5 self-center rounded-full bg-azul-900 px-3 py-1 text-xs font-semibold text-white">
               <Lock size={12} /> Mes cerrado
@@ -146,7 +153,9 @@ export default function ContablePage() {
           { id: "diario", label: "Libro Diario", icon: <BookOpen size={16} />, count: delPeriodo.length },
           { id: "mayor", label: "Mayor", icon: <Landmark size={16} /> },
           { id: "balance", label: "Balance", icon: <Scale size={16} /> },
-          { id: "eeff", label: "EEFF", icon: <FileBarChart2 size={16} /> },
+          { id: "flujo", label: "Flujo de caja", icon: <HandCoins size={16} /> },
+          { id: "eeff", label: "Estados financieros", icon: <FileBarChart2 size={16} /> },
+          { id: "ratios", label: "Ratios", icon: <Gauge size={16} /> },
           { id: "estados", label: "Estados de cuenta", icon: <Wallet size={16} /> },
           { id: "activos", label: "Activos", icon: <Laptop size={16} /> },
         ]}
@@ -166,7 +175,9 @@ export default function ContablePage() {
           puedeCerrar={puedeGenerar}
         />
       )}
-      {tab === "eeff" && <EEFF asientos={acumulado} titulo={filtro.mes ? `Acumulado a ${nombrePeriodo}` : `Año ${filtro.anio}`} />}
+      {tab === "flujo" && <FlujoCajaTab periodo={filtro} />}
+      {tab === "eeff" && <EstadosFinancierosTab periodo={filtro} libroDiario={<EEFF asientos={acumulado} titulo={filtro.mes ? `Acumulado a ${nombrePeriodo}` : `Año ${filtro.anio}`} />} />}
+      {tab === "ratios" && <RatiosTab periodo={filtro} />}
     </div>
   );
 }
