@@ -10,6 +10,8 @@ import { AnalisisPrecios, useResumenPrecios } from "@/components/compras/Analisi
 import { resumenDe, sugerirProveedor } from "@/lib/analisisPrecios";
 import { puedeGestionarProveedores } from "@/lib/proveedores";
 import { useSesion } from "@/lib/auth";
+import { abrirEnlaceExterno, copiarTexto } from "@/lib/abrirExterno";
+import { esTauri } from "@/lib/offline/plataforma";
 import {
   DIAS_VENTANA,
   aceptarLista,
@@ -386,8 +388,11 @@ function PedirCotizacion({ lista, proveedores, rol, onClose }: { lista: ListaPro
     if (medio === "WHATSAPP" && !celularWhatsApp(prov.contacto)) toast(`${prov.razonSocial} no tiene celular en la base: elija el chat en WhatsApp.`, "error");
     if (medio !== "WHATSAPP" && !prov.correo) toast(`${prov.razonSocial} no tiene correo en la base: escríbalo en el correo.`, "error");
     const url = enlaceEnvio(medio, prov, texto, asuntoSolicitud(lista));
-    if (medio === "CORREO") window.location.href = url;
-    else window.open(url, "_blank", "noopener");
+    if (medio === "CORREO" && !esTauri()) window.location.href = url;
+    else
+      void abrirEnlaceExterno(url).then(async (ok) => {
+        if (!ok) toast((await copiarTexto(texto)) ? "No se pudo abrir la ventana: mensaje copiado, péguelo en WhatsApp / correo." : "No se pudo abrir la ventana.", "error");
+      });
     ejecutar(() => registrarEnvio(lista.id, prov, medio, rol), `Solicitud anotada: ${prov.razonSocial}`);
   };
   return (

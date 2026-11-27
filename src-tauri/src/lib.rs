@@ -124,6 +124,8 @@ pub fn run() {
         )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
+        // Enlaces externos (WhatsApp, correo, Gmail) en el navegador / app del sistema: window.open no sale del webview
+        .plugin(tauri_plugin_opener::init())
         .run(tauri::generate_context!())
         .expect("no se pudo iniciar COMBOY VID ERP");
 }

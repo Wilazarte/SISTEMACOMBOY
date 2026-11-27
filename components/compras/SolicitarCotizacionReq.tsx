@@ -5,11 +5,12 @@
 // se abre WhatsApp con la lista lista para enviar. Se puede repetir con otro proveedor para comparar.
 
 import { useMemo, useState } from "react";
-import { Check, MessageCircle, Send } from "lucide-react";
+import { Check, Copy, ExternalLink, MessageCircle, Send } from "lucide-react";
 import { Button, Field, Input, Modal, Select, Textarea, cn, ejecutar, toast } from "@/components/ui";
 import { fechaPE } from "@/lib/storage";
 import { useResumenPrecios } from "@/components/compras/AnalisisPrecios";
 import { celularWhatsApp } from "@/lib/listasProveedor";
+import { abrirEnlaceExterno, copiarTexto } from "@/lib/abrirExterno";
 import { actualizarContactoProveedor, enlaceWhatsApp, itemsDelProveedor, mensajeSolicitudReq, proveedoresParaReq, registrarSolicitudReq } from "@/lib/solicitudCotizacion";
 import type { Requerimiento, Rol } from "@/lib/types";
 
@@ -26,6 +27,8 @@ export function SolicitarCotizacionReq({ req, rol, onClose }: { req: Requerimien
   const [texto, setTexto] = useState<string | null>(null); // null = mensaje automático
   const [guardarFicha, setGuardarFicha] = useState(true);
   const [confirmo, setConfirmo] = useState(false);
+  /** Paso 2: solicitud anotada; se muestra el mensaje con los botones para abrir o copiar. */
+  const [enviado, setEnviado] = useState<{ url: string; texto: string; numero: string; proveedor: string; abierto: boolean } | null>(null);
 
   const elegirProveedor = (id: string) => {
     const p = proveedores.find((x) => x.id === id);
@@ -43,19 +46,70 @@ export function SolicitarCotizacionReq({ req, rol, onClose }: { req: Requerimien
   const contactoCambio = !!prov && (celular.trim() !== (prov.contacto ?? "").trim() || asesor.trim().toUpperCase() !== (prov.asesorVentas ?? "").trim().toUpperCase());
   const listo = !!prov && celValido && items.length > 0 && mensaje.trim().length > 0 && confirmo;
 
-  const enviar = () => {
+  const enviar = async () => {
     if (!prov) return;
-    // Se abre primero (mismo clic) para que el navegador no bloquee la ventana de WhatsApp
-    window.open(enlaceWhatsApp(celular, mensaje), "_blank", "noopener");
+    const url = enlaceWhatsApp(celular, mensaje);
     const ok = ejecutar(() => {
       if (contactoCambio && guardarFicha) actualizarContactoProveedor(prov.id, asesor, celular);
       registrarSolicitudReq(req.id, prov, asesor, celular, items.map((i) => i.nombre), rol);
-    }, `Solicitud enviada a ${prov.razonSocial}`);
+    }, `Solicitud anotada en ${req.numero}`);
     if (!ok) return;
-    const siguiente = sugeridos.find((o) => o.proveedor.id !== prov.id && !ya.has(o.proveedor.id));
-    if (siguiente) toast(`Puede pedir también a ${siguiente.proveedor.razonSocial} para comparar.`);
-    onClose();
+    const abierto = await abrirEnlaceExterno(url);
+    setEnviado({ url, texto: mensaje, numero: celularWhatsApp(celular), proveedor: prov.razonSocial, abierto });
   };
+
+  const copiar = async (t: string, que: string) => {
+    const ok = await copiarTexto(t);
+    toast(ok ? `${que} copiado` : "No se pudo copiar", ok ? undefined : "error");
+  };
+
+  if (enviado) {
+    const siguiente = sugeridos.find((o) => o.proveedor.id !== provId && !ya.has(o.proveedor.id));
+    return (
+      <Modal open onClose={onClose} title={`Solicitud de cotización · ${req.numero}`} wide>
+        <div className={cn("mb-3 rounded-lg p-3 text-sm", enviado.abierto ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800")}>
+          {enviado.abierto ? (
+            <>Se abrió WhatsApp con el mensaje para <b>{enviado.proveedor}</b> (+{enviado.numero}). Revise y pulse <b>Enviar</b> en WhatsApp.</>
+          ) : (
+            <>No se pudo abrir WhatsApp automáticamente en este equipo. Pulse <b>Abrir WhatsApp</b> o copie el mensaje y péguelo en el chat de +{enviado.numero}.</>
+          )}
+        </div>
+        <Field label="Mensaje enviado">
+          <Textarea rows={10} readOnly value={enviado.texto} />
+        </Field>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="success"
+            onClick={() =>
+              void abrirEnlaceExterno(enviado.url).then((ok) => {
+                if (!ok) void copiar(enviado.texto, "No se pudo abrir WhatsApp: mensaje");
+              })
+            }
+          >
+            <ExternalLink size={14} /> Abrir WhatsApp
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => void abrirEnlaceExterno(`https://web.whatsapp.com/send?phone=${enviado.numero}&text=${encodeURIComponent(enviado.texto)}`)}>
+            <MessageCircle size={14} /> WhatsApp Web
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => void copiar(enviado.texto, "Mensaje")}>
+            <Copy size={14} /> Copiar mensaje
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => void copiar(`+${enviado.numero}`, "Número")}>
+            <Copy size={14} /> Copiar número
+          </Button>
+        </div>
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+          {siguiente && (
+            <Button variant="secondary" onClick={() => { setEnviado(null); elegirProveedor(siguiente.proveedor.id); }}>
+              Pedir también a {siguiente.proveedor.razonSocial}
+            </Button>
+          )}
+          <Button onClick={onClose}>Listo</Button>
+        </div>
+      </Modal>
+    );
+  }
 
   const opcionesProv = [
     ...sugeridos.map((o) => ({
@@ -158,7 +212,7 @@ export function SolicitarCotizacionReq({ req, rol, onClose }: { req: Requerimien
         <Button variant="secondary" onClick={onClose}>
           Cancelar
         </Button>
-        <Button variant="success" disabled={!listo} onClick={enviar}>
+        <Button variant="success" disabled={!listo} onClick={() => void enviar()}>
           {confirmo ? <Send size={15} /> : <Check size={15} />} Confirmar y enviar por WhatsApp
         </Button>
       </div>
