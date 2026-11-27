@@ -89,6 +89,8 @@ export const KEYS = {
   REQS_PENDIENTES: "reqs_almacen_pendientes",
   REQS_PROCESADOS: "reqs_procesados_compras",
   COTIZACIONES: "cotizaciones",
+  /** Listas de pedido por proveedor: REQ de Almacén unificados por proveedor (lib/listasProveedor.ts). */
+  LISTAS_PROVEEDOR: "listas_proveedor",
   ORDENES: "ordenes_compra",
   ORDENES_SERVICIO: "ordenes_servicio",
   FACTURAS: "facturas",
@@ -296,6 +298,7 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.REQS_PENDIENTES]: { tabla: "compras", tipo: "req_pendiente", forma: "lista" },
   [KEYS.REQS_PROCESADOS]: { tabla: "compras", tipo: "req_procesado", forma: "lista" },
   [KEYS.COTIZACIONES]: { tabla: "compras", tipo: "cotizacion", forma: "lista" },
+  [KEYS.LISTAS_PROVEEDOR]: { tabla: "compras", tipo: "lista_proveedor", forma: "lista" },
   [KEYS.ORDENES]: { tabla: "compras", tipo: "orden", forma: "lista" },
   [KEYS.ORDENES_SERVICIO]: { tabla: "compras", tipo: "orden_servicio", forma: "lista" },
   [KEYS.FACTURAS]: { tabla: "compras", tipo: "factura", forma: "lista" },
@@ -1481,7 +1484,8 @@ export const rucValido = (ruc: string): boolean => {
 };
 
 export function crearCotizacion(
-  data: Pick<Cotizacion, "numero" | "fechaEmision" | "reqId" | "proveedor" | "ruc" | "items"> & Partial<Pick<Cotizacion, "archivos">>,
+  data: Pick<Cotizacion, "numero" | "fechaEmision" | "reqId" | "proveedor" | "ruc" | "items"> &
+    Partial<Pick<Cotizacion, "archivos" | "listaId" | "listaNumero" | "proveedorId" | "asesorVentas">>,
   rol: Rol
 ): Cotizacion {
   const req = getProcesados().find((r) => r.id === data.reqId);
@@ -1492,7 +1496,8 @@ export function crearCotizacion(
   if (!rucValido(data.ruc)) throw new ErpError("RUC inválido (11 dígitos con dígito verificador correcto).");
   exigirRucSunat(data.ruc, "del proveedor");
   if (!data.numero.trim()) throw new ErpError("Ingrese el Nro de cotización.");
-  if (getCotizaciones().some((c) => c.numero === data.numero.trim() && c.ruc === data.ruc))
+  // Una cotización de una lista por proveedor cubre varios REQ: el mismo N° se guarda una vez por REQ
+  if (getCotizaciones().some((c) => c.numero === data.numero.trim() && c.ruc === data.ruc && (!data.listaId || c.reqId === data.reqId)))
     throw new ErpError("Esa cotización ya fue registrada para este proveedor.");
   if (data.items.some((i) => !(i.precioUnit > 0))) throw new ErpError("Ingrese precio unitario > 0 en todos los productos.");
 

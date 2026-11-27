@@ -7,6 +7,7 @@
 
 import { ErpError, KEYS, escribir, getCompras, getProveedores, rucValido, uid } from "./storage";
 import { exigirRucSunat } from "./ruc";
+import { buscarProducto } from "./productos";
 import { validarDocumentoPersona } from "./dni";
 import { esAdminSede, perfilPlanta } from "./permisosPlanta";
 import type { Sesion } from "./permisos";
@@ -48,10 +49,13 @@ const limpiarProductos = (lista: ProductoProveedor[] | undefined): ProductoProve
   const vistos = new Set<string>();
   const out: ProductoProveedor[] = [];
   for (const p of lista ?? []) {
-    const nombre = (p.nombre ?? "").trim().replace(/\s+/g, " ").toUpperCase();
+    const escrito = (p.nombre ?? "").trim().replace(/\s+/g, " ").toUpperCase();
+    // Del catálogo maestro: nombre oficial + id/SKU (así se cruza con los REQ); si no, queda como rubro
+    const cat = escrito ? buscarProducto(escrito) : undefined;
+    const nombre = cat?.nombre_normalizado ?? escrito;
     if (!nombre || vistos.has(nombre)) continue;
     vistos.add(nombre);
-    out.push({ nombre, opcion: p.opcion === 2 || p.opcion === 3 ? p.opcion : 1 });
+    out.push({ nombre, opcion: p.opcion === 2 || p.opcion === 3 ? p.opcion : 1, ...(cat ? { productoId: cat.id, sku: cat.sku } : {}) });
   }
   return out;
 };

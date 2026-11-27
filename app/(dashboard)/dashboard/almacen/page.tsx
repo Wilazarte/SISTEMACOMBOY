@@ -5,7 +5,7 @@ import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { useCallback, useEffect, useState } from "react";
 import { Boxes, CheckCircle2, Factory, Truck, ClipboardList, Eye, FilePlus2, Inbox, Ban, Send, FileText, MessageSquareWarning, PackageCheck, Pencil, Plus, Trash2 } from "lucide-react";
-import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, Empty, Field, Input, Modal, Select, Table, Tabs, Td, Textarea, cn, ejecutar, toast } from "@/components/ui";
 import { abrirDoc } from "@/components/doc-viewer";
 import { EditarReq, permisoEditarReq } from "@/components/compras/EditarReq";
 import { ProductoInput, UnidadProducto } from "@/components/productos/ProductoInput";
@@ -40,6 +40,7 @@ import { OrdenesDespacho } from "./despacho";
 import { EquiposTerminados } from "@/components/almacen/EquiposTerminados";
 import { StockAlmacen } from "@/components/almacen/StockAlmacen";
 import { estadoOD } from "@/lib/ventas";
+import { textoAviso } from "@/lib/listasProveedor";
 
 type Tab = "nuevo" | "lista" | "secocha" | "ingresos" | "equipos" | "stock" | "despacho";
 
@@ -55,6 +56,8 @@ export default function AlmacenPage() {
   const despachos = useStore<OrdenDespacho[]>(KEYS.DESPACHOS, []);
   // REQ de Secocha al Almacén de Arequipa (Williams 2026-11-22): Arequipa los atiende; Secocha ve los suyos en su lista
   const reqsSecocha = useStore<Requerimiento[]>(KEYS.REQS_SECOCHA_AQP, []);
+  // Base de proveedores: para avisar al emitir un REQ con qué otros REQ se unificará (lista por proveedor)
+  useStore<unknown[]>(KEYS.PROVEEDORES, []);
   const secocha = enSucursal();
   const porAtenderSecocha = reqsSecocha.filter((r) => r.estado === "PENDIENTE" || r.estado === "ACEPTADO").length;
   // Al entrar solo se ve la lista: el formulario se abre con "Nuevo requerimiento" en la isla
@@ -166,7 +169,7 @@ function NuevoReq({ rol, onCreado, onCancelar }: { rol: Rol; onCreado: () => voi
             hint: "El Almacén de Arequipa lo recibe con aviso y lo atiende con su stock (traslado a Secocha).",
           },
         ]}
-        onEnviar={(d) => (d.destino === DESTINO_ALMACEN_AQP ? crearReqAlmacenAqp(d, rol) : crearRequerimiento(d, rol))}
+        onEnviar={(d) => (d.destino === DESTINO_ALMACEN_AQP ? crearReqAlmacenAqp(d, rol) : crearReqConAviso(d, rol))}
         onCreado={onCreado}
         onCancelar={onCancelar}
       />
@@ -181,11 +184,26 @@ function NuevoReq({ rol, onCreado, onCancelar }: { rol: Rol; onCreado: () => voi
       textoEnviar="Emitir y notificar a Tesorería"
       mensajeOk="Requerimiento enviado a Tesorería"
       conTipo
-      onEnviar={(d) => crearRequerimiento(d, rol)}
+      onEnviar={(d) => crearReqConAviso(d, rol)}
       onCreado={onCreado}
       onCancelar={onCancelar}
     />
   );
+}
+
+/**
+ * Emite el REQ y avisa si se unificará con otros REQ del mismo proveedor (Williams 2026-11-26): Tesorería
+ * recibe una sola lista por proveedor (lib/listasProveedor.ts).
+ */
+async function crearReqConAviso(d: Parameters<typeof crearRequerimiento>[0], rol: Rol) {
+  const req = await crearRequerimiento(d, rol);
+  try {
+    const aviso = textoAviso(req);
+    if (aviso) window.setTimeout(() => toast(aviso), 600);
+  } catch {
+    /* el aviso es informativo: el REQ ya se emitió */
+  }
+  return req;
 }
 
 // =====================================================================
