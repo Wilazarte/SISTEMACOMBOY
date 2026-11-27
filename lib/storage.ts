@@ -2547,13 +2547,42 @@ function errorAsistencia(error: { code?: string; message: string }): ErpError {
 /** Importar asistencia (reloj): guarda DÍAS, HORAS y TARD. del periodo con origen RELOJ. */
 export async function importarAsistenciaReloj(
   periodo: string,
-  filas: { trabajador: string; dias: number; horas: number; tardanzas: number }[]
+  filas: { trabajador: string; dias: number; horas: number; tardanzas: number; detalle?: Record<string, string[]> }[]
 ): Promise<number> {
   const p = normalizarPeriodo(periodo);
   if (!p) throw new ErpError("Indique el periodo antes de importar.");
   if (filas.length === 0) throw new ErpError("No hay asistencia para guardar.");
   const { data, error } = await createClient().rpc("importar_asistencia", { p_periodo: p, p_filas: filas });
   if (error) throw errorAsistencia(error);
+  await recargar(KEYS.ASISTENCIA);
+  return Number(data);
+}
+
+/** Contraseña para agregar días justificados (la base la vuelve a validar). */
+export const CLAVE_JUSTIFICAR = "012810";
+
+/**
+ * Asistencia importada › agregar días JUSTIFICADOS (solo agrega, nunca quita). Cada día justificado
+ * cuenta como día asistido en el sueldo. Función justificar_asistencia (SQL 20270104_asistencia_justificados.sql).
+ */
+export async function justificarAsistencia(periodo: string, trabajador: string, fechas: string[], motivo: string, clave: string): Promise<number> {
+  const p = normalizarPeriodo(periodo);
+  if (!p) throw new ErpError("Indique el periodo.");
+  if (clave !== CLAVE_JUSTIFICAR) throw new ErpError("Contraseña de edición incorrecta.");
+  if (!fechas.length) throw new ErpError("Marque al menos un día para justificar.");
+  if (!motivo.trim()) throw new ErpError("Escriba el motivo de la justificación.");
+  const { data, error } = await createClient().rpc("justificar_asistencia", {
+    p_periodo: p,
+    p_trabajador: trabajador,
+    p_fechas: fechas,
+    p_motivo: motivo.trim(),
+    p_clave: clave,
+  });
+  if (error) {
+    if (error.code === "PGRST202" || /could not find the function/i.test(error.message))
+      throw new ErpError("Falta la función en Supabase: ejecute supabase/migrations/20270104_asistencia_justificados.sql.");
+    throw new ErpError(error.message);
+  }
   await recargar(KEYS.ASISTENCIA);
   return Number(data);
 }

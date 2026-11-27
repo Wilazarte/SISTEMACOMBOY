@@ -43,3 +43,24 @@ export function rangoPeriodoMensual(periodo: string): { desde: string; hasta: st
   const mm = String(mes).padStart(2, "0");
   return { desde: `${y}-${mm}-01`, hasta: `${y}-${mm}-${String(ultimo).padStart(2, "0")}` };
 }
+
+/** Lunes a domingo de un periodo semanal ("SEMANA 41 - OCTUBRE 2026" -> 2026-10-05 … 2026-10-11). */
+export function rangoPeriodoSemanal(periodo: string): { desde: string; hasta: string } | null {
+  const m = /SEMANA\s+(\d{1,2})\s*-\s*([A-ZÁÉÍÓÚ]+)\s+(\d{4})/i.exec(periodo);
+  if (!m) return null;
+  const semana = Number(m[1]);
+  const mes = MESES.indexOf(m[2].toUpperCase().replace("SEPTIEMBRE", "SETIEMBRE")) + 1;
+  let anio = Number(m[3]);
+  // Semana 52/53 con mes ENERO: es del año ISO anterior; semana 1 con mes DICIEMBRE: del siguiente
+  if (semana >= 52 && mes === 1) anio -= 1;
+  if (semana === 1 && mes === 12) anio += 1;
+  const ene4 = new Date(Date.UTC(anio, 0, 4));
+  const lunes1 = new Date(ene4.getTime() - ((ene4.getUTCDay() || 7) - 1) * 86400000);
+  const ini = new Date(lunes1.getTime() + (semana - 1) * 7 * 86400000);
+  const fin = new Date(ini.getTime() + 6 * 86400000);
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  return { desde: iso(ini), hasta: iso(fin) };
+}
+
+/** Rango de fechas de cualquier periodo (semana o mes). */
+export const rangoPeriodo = (periodo: string) => rangoPeriodoMensual(periodo) ?? rangoPeriodoSemanal(periodo);
