@@ -73,6 +73,19 @@ export interface Requerimiento {
   sedeId?: string;
   /** BIEN (por defecto, los REQ antiguos no lo tienen) o SERVICIO: este último se atiende con una Orden de Servicio. */
   tipo?: TipoRequerimiento;
+  /** Solicitudes de cotización enviadas por WhatsApp al asesor de cada proveedor (Tesorería, REQ aceptado). */
+  solicitudesCotizacion?: SolicitudCotizacionReq[];
+}
+
+export interface SolicitudCotizacionReq {
+  proveedorId: string;
+  proveedor: string;
+  asesor?: string;
+  celular: string;
+  /** Productos (nombres) pedidos en esa solicitud. */
+  productos: string[];
+  fecha: string; // ISO
+  usuario: string;
 }
 
 export type TipoRequerimiento = "BIEN" | "SERVICIO";
