@@ -108,7 +108,7 @@ export function SubirDocumento({
   onCerrar: () => void;
   onListo: (codigo: string) => void;
   rol: string;
-  /** Historia de procesos: el documento se adjunta al proceso con este código (REQ-ALM-001, NP-0001…). */
+  /** Trazabilidad de procesos: el documento se adjunta al proceso con este código (REQ-ALM-001, NP-0001…). */
   referencia?: string;
 }) {
   const r = rolGD(rol);

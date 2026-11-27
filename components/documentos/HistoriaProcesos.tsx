@@ -1,7 +1,7 @@
 "use client";
 
 // =====================================================================
-// HISTORIA DE PROCESOS (Gestión Documentaria): una "historia clínica" por proceso. Busca por cualquier
+// TRAZABILIDAD DE PROCESOS (Gestión Documentaria): la trazabilidad de cada proceso. Busca por cualquier
 // código (REQ, OC, factura, guía, NP, OD, OP, GST…) y muestra la línea completa del flujo: cada documento
 // con fecha, responsable, estado, bitácora y adjuntos, más los documentos de Gestión Documentaria que
 // apuntan a ese proceso. Solo lectura sobre los módulos; abrir o imprimir una historia queda en audit_log.
@@ -123,7 +123,7 @@ export function HistoriaProcesos({
   useEffect(() => {
     if (!actual || auditados.current.has(actual.id)) return;
     auditados.current.add(actual.id);
-    void registrarConsultaHistoria(actual.id, `Abrió la historia clínica de ${actual.id} (${NOMBRE_PROCESO[actual.tipo]})`, {
+    void registrarConsultaHistoria(actual.id, `Abrió la trazabilidad de ${actual.id} (${NOMBRE_PROCESO[actual.tipo]})`, {
       tipo: actual.tipo,
       documentos: actual.docs.filter((d) => d.hecho).length,
       estado: actual.estado,
@@ -141,7 +141,7 @@ export function HistoriaProcesos({
       <Tarjeta className="flex flex-wrap items-start gap-3 px-4 py-3 text-[13px] text-tema-texto">
         <Route size={20} className="mt-0.5 shrink-0 text-tema-sec" />
         <p className="min-w-0 flex-1 basis-64">
-          <b>Historia clínica por proceso.</b> Cada compra, servicio, venta, producción y gasto se arma como una línea: desde el documento que lo inicia hasta el último paso, con
+          <b>Trazabilidad por proceso.</b> Cada compra, servicio, venta, producción y gasto se arma como una línea: desde el documento que lo inicia hasta el último paso, con
           todos sus documentos, fechas, responsables y adjuntos. Busque con cualquier código del proceso.
         </p>
       </Tarjeta>
@@ -234,10 +234,10 @@ export function HistoriaProcesos({
           {filtrados.length > 300 && <p className="px-3 py-2 text-[11px] text-tema-texto/60">Se muestran 300 de {filtrados.length}. Afine la búsqueda.</p>}
         </Tarjeta>
 
-        {/* Historia clínica */}
+        {/* Trazabilidad del proceso */}
         <div ref={detalle} className="min-w-0 scroll-mt-3">
           {actual ? (
-            <HistoriaClinica
+            <TrazabilidadProceso
               p={actual}
               docsGD={docsGD.filter((d) => referenciaDeProceso(d.referencia_externa, actual))}
               usuario={usuario}
@@ -247,20 +247,20 @@ export function HistoriaProcesos({
             />
           ) : (
             <Tarjeta>
-              <Vacio texto="Elija un proceso para ver su historia clínica completa." icono={<FileText size={26} />} />
+              <Vacio texto="Elija un proceso para ver su trazabilidad completa." icono={<FileText size={26} />} />
             </Tarjeta>
           )}
         </div>
       </div>
       <p className="text-[11px] text-tema-texto/60">
-        {filtrados.length} de {procesos.length} proceso(s). Se ven los procesos de los módulos que su rol puede leer; la historia no modifica ningún documento.
+        {filtrados.length} de {procesos.length} proceso(s). Se ven los procesos de los módulos que su rol puede leer; la trazabilidad no modifica ningún documento.
       </p>
     </div>
   );
 }
 
 // ------------------------------------------------------------------ Historia de un proceso
-function HistoriaClinica({
+function TrazabilidadProceso({
   p,
   docsGD,
   usuario,
@@ -284,7 +284,7 @@ function HistoriaClinica({
       <div className="!bg-tema-fuerte px-4 py-3.5 !text-white sm:px-5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">Historia clínica del proceso</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">Trazabilidad del proceso</p>
             <h2 className="break-words text-[18px] font-semibold">{p.id}</h2>
             <p className="text-[12px] text-white/70">{NOMBRE_PROCESO[p.tipo]}</p>
           </div>
@@ -306,7 +306,7 @@ function HistoriaClinica({
             onClick={() => void imprimirHistoria(p, docsGD, usuario)}
             className="inline-flex items-center gap-1.5 rounded-lg border border-white/30 bg-white/10 px-3 py-1.5 text-[12px] font-semibold !text-white hover:bg-white/20"
           >
-            <Printer size={14} /> Imprimir historia (PDF)
+            <Printer size={14} /> Imprimir trazabilidad (PDF)
           </button>
           {puedeSubir && (
             <button
@@ -513,7 +513,7 @@ async function imprimirHistoria(p: HistoriaProceso, docsGD: DocumentoGD[], usuar
   doc.setTextColor(255, 255, 255);
   doc.setFont("times", "bold");
   doc.setFontSize(14);
-  doc.text("COMBOY VID | Historia clínica del proceso", 10, 11.5);
+  doc.text("COMBOY VID | Trazabilidad del proceso", 10, 11.5);
   doc.setFontSize(11);
   doc.text(p.id, W - 10, 11.5, { align: "right" });
   doc.setTextColor(17, 33, 45);
@@ -576,9 +576,9 @@ async function imprimirHistoria(p: HistoriaProceso, docsGD: DocumentoGD[], usuar
       didDrawPage: pie,
     });
   }
-  mostrarPDF(doc, `Historia-${p.id}`);
+  mostrarPDF(doc, `Trazabilidad-${p.id}`);
   // AUDITORÍA: impresión de la historia, con la huella del contenido
-  void registrarConsultaHistoria(p.id, `Imprimió la historia clínica de ${p.id}`, {
+  void registrarConsultaHistoria(p.id, `Imprimió la trazabilidad de ${p.id}`, {
     formato: "PDF",
     hash_sha256: hash,
     documentos: filas.length,

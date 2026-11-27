@@ -369,11 +369,11 @@ function Detalle({ doc, usuario, versionPrevia }: { doc: DocumentoGD; usuario: s
           <Dato label="Código en otro módulo">
             <button
               type="button"
-              title="Ver la historia clínica del proceso"
+              title="Ver la trazabilidad del proceso"
               onClick={() => window.dispatchEvent(new CustomEvent("gd:proceso", { detail: doc.referencia_externa }))}
               className="inline-flex items-center gap-1 text-left font-semibold text-tema-sec underline-offset-2 hover:underline"
             >
-              <Link2 size={13} /> {doc.referencia_externa} · ver historia
+              <Link2 size={13} /> {doc.referencia_externa} · ver trazabilidad
             </button>
           </Dato>
         )}
