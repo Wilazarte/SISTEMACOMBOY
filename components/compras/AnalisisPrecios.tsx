@@ -5,7 +5,7 @@ import { ChevronDown, ChevronUp, Download, Sparkles, TrendingDown } from "lucide
 import { Button, Card, CardHeader, Input, Modal, Table, Td, cn, ejecutar } from "@/components/ui";
 import { KEYS, fechaPE, soles, useStore } from "@/lib/storage";
 import { useCatalogo } from "@/lib/productos";
-import { aplicarLlenado, llenadoDesdeCompras, preciosObservados, resumenPrecios, type ResumenProducto } from "@/lib/analisisPrecios";
+import { aplicarLlenado, llenadoDesdeCompras, preciosObservados, resumenPrecios, sugerirProveedor, type ResumenProducto } from "@/lib/analisisPrecios";
 import { guardarExcel } from "@/lib/guardarArchivo";
 import type { Compra, Cotizacion, OrdenCompra, Proveedor } from "@/lib/types";
 
@@ -192,5 +192,41 @@ export function AnalisisPrecios({ puedeLlenar }: { puedeLlenar: boolean }) {
         </div>
       </Modal>
     </Card>
+  );
+}
+
+/**
+ * Proveedor sugerido por precio para los productos de un REQ ya aceptado (Williams 2026-11-27): agrupa los
+ * productos por el proveedor que dio el precio más bajo.
+ */
+export function SugerenciaProveedorReq({ items, className }: { items: { nombre: string; unidad?: string; productoId?: string; cantidad: number }[]; className?: string }) {
+  const { resumen } = useResumenPrecios();
+  const grupos = new Map<string, { proveedor: string; productos: string[]; total: number }>();
+  let sinHistorial = 0;
+  for (const i of items) {
+    const s = sugerirProveedor(resumen, i);
+    if (!s) {
+      sinHistorial++;
+      continue;
+    }
+    const k = s.proveedorId || s.proveedor;
+    const g = grupos.get(k) ?? { proveedor: s.proveedor, productos: [], total: 0 };
+    g.productos.push(i.nombre);
+    g.total += s.precio * i.cantidad;
+    grupos.set(k, g);
+  }
+  if (!grupos.size) return sinHistorial ? <p className={cn("text-[11px] text-plomo-500", className)}>Proveedor sugerido: sin historial de precios para estos productos.</p> : null;
+  return (
+    <div className={cn("text-[11px]", className)}>
+      {[...grupos.values()]
+        .sort((a, b) => b.productos.length - a.productos.length)
+        .map((g) => (
+          <p key={g.proveedor} className="text-emerald-700" title={g.productos.join(", ")}>
+            <TrendingDown size={11} className="mr-1 inline" />
+            Sugerido: <b>{g.proveedor}</b> · {g.productos.length} producto(s) · ref. {soles(Math.round(g.total * 100) / 100)}
+          </p>
+        ))}
+      {sinHistorial > 0 && <p className="text-plomo-500">{sinHistorial} producto(s) sin historial de precios.</p>}
+    </div>
   );
 }

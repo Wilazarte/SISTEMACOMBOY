@@ -33,7 +33,7 @@ import {
   type ListaProveedor,
   type MedioEnvio,
 } from "@/lib/listasProveedor";
-import type { Proveedor, Rol } from "@/lib/types";
+import type { Proveedor, Requerimiento, Rol } from "@/lib/types";
 
 const fechaHora = (iso: string) => new Date(iso).toLocaleString("es-PE", { dateStyle: "short", timeStyle: "short" });
 
@@ -64,6 +64,9 @@ export function ListasProveedor({ rol, onIrCotizaciones }: { rol: Rol; onIrCotiz
   const { sesion } = useSesion();
   const { resumen } = useResumenPrecios();
   const [verPrecios, setVerPrecios] = useState(false);
+  // La sugerencia de proveedor se muestra recién con el REQ aceptado (Williams 2026-11-27)
+  const procesados = useStore<Requerimiento[]>(KEYS.REQS_PROCESADOS, []);
+  const aceptados = new Set(procesados.filter((r) => r.estado !== "OBSERVADO").map((r) => r.id));
   const cotiza = puede(rol, "coti.crear");
 
   const orden: Record<string, number> = { ABIERTA: 0, ACEPTADA: 1, SOLICITADA: 2, COTIZADA: 3, RECHAZADA: 4 };
@@ -85,7 +88,7 @@ export function ListasProveedor({ rol, onIrCotizaciones }: { rol: Rol; onIrCotiz
       <Card>
         <CardHeader
           title={`Listas por proveedor (${visibles.length})`}
-          subtitle={`Los REQ de Almacén se juntan solos por proveedor durante ${DIAS_VENTANA} días (según Logística › Base de proveedores: gana el proveedor con más repuestos; si empatan, la mejor opción). Revise la lista, pida cotización por WhatsApp o correo y registre la cotización solo con N°, fecha y precios.`}
+          subtitle={`El proveedor sugerido por precio se muestra al aceptar el REQ. Los REQ de Almacén se juntan solos por proveedor durante ${DIAS_VENTANA} días (según Logística › Base de proveedores: gana el proveedor con más repuestos; si empatan, la mejor opción). Revise la lista, pida cotización por WhatsApp o correo y registre la cotización solo con N°, fecha y precios.`}
           action={
             <div className="flex flex-wrap items-center gap-2">
               <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-plomo-600">
@@ -194,6 +197,7 @@ export function ListasProveedor({ rol, onIrCotizaciones }: { rol: Rol; onIrCotiz
                               <Td>{x.opcion ? etiquetaOpcion(x.opcion) : "-"}</Td>
                               <Td className="text-xs">
                                 {(() => {
+                                  if (l.estado === "ABIERTA" && !aceptados.has(x.reqId)) return <span className="text-plomo-500">Se muestra al aceptar el REQ</span>;
                                   const sug = sugerirProveedor(resumen, x);
                                   if (!sug) return <span className="text-plomo-500">Sin historial</span>;
                                   const esEste = sug.proveedorId === l.proveedorId;
@@ -278,7 +282,9 @@ export function ListasProveedor({ rol, onIrCotizaciones }: { rol: Rol; onIrCotiz
 // Editar: cantidades, quitar y mover productos a otro proveedor
 // ---------------------------------------------------------------------
 function EditarLista({ lista, proveedores, rol, onClose }: { lista: ListaProveedor; proveedores: Proveedor[]; rol: Rol; onClose: () => void }) {
-  const { resumen } = useResumenPrecios();
+  const { resumen: todo } = useResumenPrecios();
+  const procesados = useStore<Requerimiento[]>(KEYS.REQS_PROCESADOS, []);
+  const aceptados = new Set(procesados.filter((r) => r.estado !== "OBSERVADO").map((r) => r.id));
   const [cant, setCant] = useState<Record<string, string>>({});
   const [mover, setMover] = useState<Record<string, string>>({});
   const activos = proveedores.filter((p) => p.estado !== "INACTIVO" && p.id !== lista.proveedorId).sort((a, b) => a.razonSocial.localeCompare(b.razonSocial));
@@ -287,6 +293,8 @@ function EditarLista({ lista, proveedores, rol, onClose }: { lista: ListaProveed
       <p className="mb-3 text-xs text-plomo-500">Cambie cantidades, quite productos o páselos a otro proveedor (van a la lista abierta de ese proveedor o a una nueva).</p>
       <div className="space-y-2">
         {lineasActivas(lista).map((x) => {
+          // Precios y sugerencia solo con el REQ aceptado
+          const resumen = lista.estado !== "ABIERTA" || aceptados.has(x.reqId) ? todo : [];
           const precios = resumenDe(resumen, x)?.proveedores ?? [];
           const precioDe = (id: string) => precios.find((p) => p.proveedorId === id);
           const etiquetaPrecio = (id: string) => {

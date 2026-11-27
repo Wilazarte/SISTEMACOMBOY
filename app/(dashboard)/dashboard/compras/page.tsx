@@ -115,6 +115,7 @@ import { useTogglePanel } from "@/hooks/useTogglePanel";
 import { EditarGasto } from "@/components/compras/EditarGasto";
 import { FormOrdenServicio, filasOrdenesServicio } from "@/components/compras/OrdenesServicio";
 import { ListasProveedor } from "@/components/compras/ListasProveedor";
+import { SugerenciaProveedorReq } from "@/components/compras/AnalisisPrecios";
 import { sincronizarListas, type ListaProveedor } from "@/lib/listasProveedor";
 import type { Trabajador } from "@/lib/types";
 import type { ArchivoGasto, Bancarizacion, Compra, Cotizacion, Factura, FormaPago, Guia, ItemCompra, ItemPrecio, OrdenCompra, OrdenServicio, Proveedor, Requerimiento, Rol, OrdenAGenerar, StockItem, TipoComprobanteCompra } from "@/lib/types";
@@ -477,6 +478,7 @@ function NuevosReq({
                   <p className="truncate text-xs text-plomo-500">
                     {fechaPE(r.fecha)} · {r.sede} · {r.solicitante} · {r.items.length} ítem(s)
                   </p>
+                  {r.tipo !== "SERVICIO" && <SugerenciaProveedorReq items={r.items} className="mt-0.5" />}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   <Button size="sm" variant="ghost" onClick={() => abrirDoc({ tipo: "REQ", id: r.id })} title="Ver e historial">
@@ -1417,6 +1419,10 @@ function Cotizaciones({
                 placeholder={reqs.length ? "Seleccione REQ…" : "No hay REQ aceptados"}
                 options={reqs.map((r) => ({ value: r.id, label: `${r.numero} · ${r.sede} · ${r.estado}` }))}
               />
+              {(() => {
+                const r = reqs.find((x) => x.id === reqId);
+                return r && r.tipo !== "SERVICIO" ? <SugerenciaProveedorReq items={r.items} className="mt-1" /> : null;
+              })()}
             </Field>
             <Field label="Nro cotización">
               <Input value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="COT-000123" />
