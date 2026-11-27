@@ -3,6 +3,7 @@
 // Ventana pequeña de vista previa de PDF (lib/visorPdf.ts › mostrarPDF). Recién aquí están Imprimir,
 // Compartir por WhatsApp, Descargar y Firma virtual. Se monta una vez por layout, junto al <Toaster />.
 
+import { abrirEnlaceExterno } from "@/lib/abrirExterno";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Download, Loader2, MessageCircle, MousePointerClick, PenLine, Printer, Trash2, X } from "lucide-react";
@@ -248,7 +249,7 @@ export function VisorPDF() {
       }
       // Sin menú Compartir: se descarga el PDF y se abre WhatsApp para adjuntarlo
       descargarBytes(bytes, vista.nombre);
-      window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, "_blank", "noopener");
+      void abrirEnlaceExterno(`https://wa.me/?text=${encodeURIComponent(texto)}`);
       toast(`${archivo} descargado: adjúntalo en el chat de WhatsApp (clip 📎)`);
     } catch (e) {
       if (!(e instanceof DOMException && e.name === "AbortError")) toast("No se pudo compartir el PDF", "error");
