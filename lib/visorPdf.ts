@@ -22,6 +22,8 @@ export interface PdfVista {
   nombre: string;
   bytes: ArrayBuffer;
   zonas: ZonaFirma[];
+  /** Botón WhatsApp: número del destinatario (51 + 9 dígitos) y texto del mensaje. */
+  whatsapp?: { numero?: string; texto?: string };
 }
 
 export const EV_PDF = "erp:pdf";
@@ -50,7 +52,7 @@ export function descargarBytes(bytes: ArrayBuffer | Uint8Array, nombre: string):
 }
 
 /** Muestra un PDF ya generado (jsPDF) en la ventana de vista previa. */
-export function mostrarPDF(doc: jsPDF, nombre: string): void {
+export function mostrarPDF(doc: jsPDF, nombre: string, whatsapp?: PdfVista["whatsapp"]): void {
   const n = limpiarNombre(nombre);
   doc.setProperties({ title: n });
   const bytes = doc.output("arraybuffer");
@@ -58,7 +60,7 @@ export function mostrarPDF(doc: jsPDF, nombre: string): void {
     descargarBytes(bytes, n);
     return;
   }
-  const detalle: PdfVista = { nombre: n, bytes, zonas: zonasPorDoc.get(doc) ?? [] };
+  const detalle: PdfVista = { nombre: n, bytes, zonas: zonasPorDoc.get(doc) ?? [], whatsapp };
   window.dispatchEvent(new CustomEvent<PdfVista>(EV_PDF, { detail: detalle }));
 }
 

@@ -2109,3 +2109,43 @@ export function pdfReporteFinanciero(d: {
   pie(doc);
   guardar(doc, d.archivo);
 }
+
+/**
+ * Solicitud de cotización al proveedor (Tesorería › Aceptados · por cotizar, Williams 2026-11-27): documento con la
+ * lista de productos del REQ que se abre en la vista previa (Descargar, Imprimir, WhatsApp al asesor).
+ */
+export function pdfSolicitudCotizacion(s: {
+  req: Requerimiento;
+  proveedor: string;
+  ruc: string;
+  asesor?: string;
+  celular?: string;
+  items: { nombre: string; cantidad: number; unidad: string; marca?: string; caracteristica?: string }[];
+  /** Texto para el botón WhatsApp del visor (el mismo mensaje de la solicitud). */
+  mensaje?: string;
+}): void {
+  const hoyPE = new Date().toLocaleDateString("es-PE", { timeZone: "America/Lima" });
+  const numero = `SOL-${s.req.numero}`;
+  const doc = construir({
+    titulo: "SOLICITUD DE COTIZACIÓN",
+    numero,
+    datos: [
+      ["Proveedor", s.proveedor],
+      ["RUC", s.ruc || "-"],
+      ["Asesor de ventas", s.asesor || "-"],
+      ["WhatsApp", s.celular ? `+${s.celular}` : "-"],
+      ["Fecha", hoyPE],
+      ["Requerimiento", s.req.numero],
+    ],
+    head: ["#", "Producto", "Marca", "Características", "Cant.", "Und."],
+    body: s.items.map((i, k) => [k + 1, i.nombre, i.marca || "-", i.caracteristica || "-", i.cantidad, i.unidad]),
+    alinearDerecha: [4],
+    notas: [
+      "1. Indicar precio unitario con IGV, marca, plazo de entrega, forma de pago y validez de la oferta.",
+      `2. Consignar la referencia ${s.req.numero} en la cotización.`,
+      `3. La cotización debe emitirse a nombre de ${EMPRESA.razonSocial} RUC ${EMPRESA.ruc}.`,
+    ],
+    firmas: ["Tesorería / Compras"],
+  });
+  mostrarPDF(doc, numero, { numero: s.celular, texto: s.mensaje || `Solicitud de cotización ${s.req.numero} - ${EMPRESA.razonSocial}` });
+}

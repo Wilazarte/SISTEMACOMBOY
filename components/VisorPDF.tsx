@@ -238,7 +238,8 @@ export function VisorPDF() {
 
   const whatsapp = async () => {
     if (!bytes) return;
-    const texto = `Le envío el documento ${vista.nombre} - COMBOY VID`;
+    const texto = vista.whatsapp?.texto || `Le envío el documento ${vista.nombre} - COMBOY VID`;
+    const numero = vista.whatsapp?.numero ?? "";
     const file = new File([bytes as BlobPart], archivo, { type: "application/pdf" });
     setOcupado(true);
     try {
@@ -249,7 +250,7 @@ export function VisorPDF() {
       }
       // Sin menú Compartir: se descarga el PDF y se abre WhatsApp para adjuntarlo
       descargarBytes(bytes, vista.nombre);
-      void abrirEnlaceExterno(`https://wa.me/?text=${encodeURIComponent(texto)}`);
+      void abrirEnlaceExterno(`https://wa.me/${numero}?text=${encodeURIComponent(texto)}`);
       toast(`${archivo} descargado: adjúntalo en el chat de WhatsApp (clip 📎)`);
     } catch (e) {
       if (!(e instanceof DOMException && e.name === "AbortError")) toast("No se pudo compartir el PDF", "error");
