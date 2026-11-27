@@ -1982,7 +1982,8 @@ export async function crearDeclaracionJurada(
   data: Pick<Factura, "fecha" | "ocId" | "motivoSinComprobante" | "aprobadoPor"> & { dniVendedor: string; nombreVendedor: string },
   rol: Rol
 ): Promise<Factura> {
-  if (rol !== "GERENCIA") throw new ErpError("Solo GERENCIA puede aprobar una Declaración Jurada.");
+  // Finanzas / Tesorería la genera y aprueba sola, sin pedir autorización a Gerencia (Williams 2026-11-27)
+  if (!puede(rol, "dj.generar")) throw new ErpError("Solo Finanzas / Tesorería (o Soporte) puede generar una Declaración Jurada.");
   const oc = getOrdenes().find((o) => o.id === data.ocId);
   if (!oc) throw new ErpError("Seleccione una Orden de Compra.");
   if (oc.estado !== "EMITIDA" && oc.estado !== "BANCARIZADA") throw new ErpError(`La ${oc.numero} ya tiene comprobante.`);
@@ -1990,7 +1991,7 @@ export async function crearDeclaracionJurada(
   if (!/^\d{8}$/.test(data.dniVendedor)) throw new ErpError("DNI del vendedor inválido (8 dígitos).");
   if (!data.nombreVendedor.trim()) throw new ErpError("Ingrese el nombre del vendedor.");
   if (!data.motivoSinComprobante?.trim()) throw new ErpError("Indique por qué no hay comprobante.");
-  if (!data.aprobadoPor?.trim()) throw new ErpError("Indique quién aprueba.");
+  const aprobadoPor = data.aprobadoPor?.trim() || nombreActual();
 
   const dj: Factura = {
     id: uid(),
@@ -2010,8 +2011,9 @@ export async function crearDeclaracionJurada(
     estadoPago: "POR_PAGAR",
     ...pagoDesdeOC(oc),
     motivoSinComprobante: data.motivoSinComprobante.trim(),
-    aprobadoPor: data.aprobadoPor.trim(),
-    historial: [evento(rol, "Declaración jurada aprobada", data.aprobadoPor)],
+    djEstado: "APROBADA",
+    aprobadoPor,
+    historial: [evento(rol, "Declaración jurada aprobada", aprobadoPor)],
   };
   escribir(KEYS.FACTURAS, [dj, ...getFacturas()]);
   cerrarProcesoOC(oc, `DJ ${dj.numero}`, rol);
@@ -4158,12 +4160,12 @@ export const PERMISOS: Record<Rol, { label: string; puede: string[] }> = {
   ALMACEN: { label: "Almacén", puede: ["req.crear", "req.reenviar", "vb.dar", "despacho.dar"] },
   TESORERIA: {
     label: "Tesorería / Compras",
-    puede: ["compra.crear", "req.revisar", "coti.crear", "oc.crear", "fac.crear", "guia.crear", "fac.pagar", "venta.gestionar", "venta.cobrar"],
+    puede: ["compra.crear", "req.revisar", "coti.crear", "oc.crear", "fac.crear", "guia.crear", "fac.pagar", "dj.generar", "venta.gestionar", "venta.cobrar"],
   },
   GERENCIA: {
     label: "Gerencia (admin)",
     puede: [
-      "compra.crear", "req.crear", "req.reenviar", "req.revisar", "coti.crear", "oc.crear", "fac.crear", "guia.crear", "fac.pagar", "dj.aprobar", "vb.dar",
+      "compra.crear", "req.crear", "req.reenviar", "req.revisar", "coti.crear", "oc.crear", "fac.crear", "guia.crear", "fac.pagar", "dj.aprobar", "dj.generar", "vb.dar",
       "venta.gestionar", "venta.cobrar", "despacho.dar",
     ],
   },
