@@ -8,7 +8,7 @@ import { ListaDocs, type FilaDoc } from "@/components/ui/ListaDocs";
 import { getSesion } from "@/lib/auth";
 import { pdfDeclaracionJurada, urlDeclaracionJurada } from "@/lib/pdf";
 import { useDJsAutomaticas } from "@/components/compras/useDJsAutomaticas";
-import { cambiarEstadoDJ, djsDeCompras, esDJAutomatica, esDeclaracionJurada, fechaPE, numeroDJ, permisoEditarGasto, soles } from "@/lib/storage";
+import { cambiarEstadoDJ, djsDeCompras, esDJAutomatica, esDeclaracionJurada, fechaPE, numeroDJ, permisoEditarGasto, puede, soles } from "@/lib/storage";
 import type { Compra, Factura, Rol } from "@/lib/types";
 
 const estadoDJ = (f: Factura) => f.djEstado ?? "PENDIENTE";
@@ -87,7 +87,8 @@ function VerDJ({ dj, rol, onClose }: { dj: Factura; rol: Rol; onClose: () => voi
   const [url, setUrl] = useState("");
   const sesion = getSesion();
   const estado = estadoDJ(dj);
-  const puedeAprobar = !sesion?.soloLectura && sesion?.rol === "creador";
+  // Finanzas / Tesorería aprueba sola, sin enviarla a Gerencia (Williams 2026-11-27); Soporte (creador) también
+  const puedeAprobar = !sesion?.soloLectura && (sesion?.rol === "creador" || puede(rol, "dj.generar"));
 
   // Vista previa: el PDF se arma en el navegador y se muestra en un iframe
   useEffect(() => {
@@ -128,7 +129,7 @@ function VerDJ({ dj, rol, onClose }: { dj: Factura; rol: Rol; onClose: () => voi
             <Button variant="secondary" onClick={() => pdfDeclaracionJurada(dj)}>
               <Eye size={15} /> Imprimir / Compartir / Firmar
             </Button>
-            {estado === "PENDIENTE" && !sesion?.soloLectura && (
+            {estado === "PENDIENTE" && !sesion?.soloLectura && !puedeAprobar && (
               <Button onClick={() => ejecutar(() => void cambiarEstadoDJ(dj.id, "ENVIADA", rol), `${numeroDJ(dj)} enviada a aprobar`)}>
                 <Send size={15} /> Enviar a aprobar
               </Button>

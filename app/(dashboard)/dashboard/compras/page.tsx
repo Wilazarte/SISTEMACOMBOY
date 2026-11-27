@@ -2216,7 +2216,7 @@ function Facturas({
         <Card id={QA_IDS.formFactura}>
           <CardHeader
             title={modo === "FACTURA" ? "Registrar factura" : "Declaración jurada de compra"}
-            subtitle={modo === "FACTURA" ? "Vinculada a una Orden de Compra. IGV y total se calculan automáticamente." : `Excepción: compras sin comprobante, tope ${soles(TOPE_DJ)}, requiere aprobación de Gerencia.`}
+            subtitle={modo === "FACTURA" ? "Vinculada a una Orden de Compra. IGV y total se calculan automáticamente." : `Excepción: compras sin comprobante, tope ${soles(TOPE_DJ)}. Finanzas la genera y aprueba sin autorización de Gerencia.`}
             action={
               <div className="flex items-center gap-2">
                 <div className="flex rounded-lg bg-plomo-100 p-0.5 text-sm">
@@ -2285,9 +2285,9 @@ function Facturas({
               </>
             ) : (
               <>
-                {rol !== "GERENCIA" && (
+                {!puede(rol, "dj.generar") && (
                   <div className="flex items-center gap-2 rounded-lg bg-plomo-100 px-3 py-2 text-sm text-azul-700 md:col-span-3">
-                    <AlertTriangle size={16} /> Solo el rol GERENCIA puede aprobar una declaración jurada. Cambie de rol en el menú lateral.
+                    <AlertTriangle size={16} /> Solo Finanzas / Tesorería puede generar una declaración jurada.
                   </div>
                 )}
                 <Field label="DNI vendedor">
@@ -2299,8 +2299,8 @@ function Facturas({
                 <Field label="Fecha">
                   <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
                 </Field>
-                <Field label="Aprobado por" className="md:col-span-2">
-                  <Input value={aprobador} onChange={(e) => setAprobador(e.target.value)} placeholder="Nombre del gerente" />
+                <Field label="Aprobado por" className="md:col-span-2" hint="Si lo deja vacío, queda su nombre.">
+                  <Input value={aprobador} onChange={(e) => setAprobador(e.target.value)} placeholder={sesion?.nombreCompleto || sesion?.nombre || "Responsable de Finanzas"} />
                 </Field>
                 <Field label="Motivo (¿por qué no hay comprobante?)" className="md:col-span-3">
                   <Textarea value={motivoDJ} onChange={(e) => setMotivoDJ(e.target.value)} placeholder="Ej: compra en zona rural a persona natural sin RUC" />
@@ -2314,7 +2314,7 @@ function Facturas({
             )}
           </div>
           <div className="flex justify-end border-t border-plomo-100 px-5 py-4">
-            <Button onClick={guardar} disabled={!ocId || enviando || (modo === "DJ" && rol !== "GERENCIA")}>
+            <Button onClick={guardar} disabled={!ocId || enviando || (modo === "DJ" && !puede(rol, "dj.generar"))}>
               <Receipt size={16} /> {modo === "FACTURA" ? "Registrar factura" : "Aprobar declaración jurada"}
             </Button>
           </div>
