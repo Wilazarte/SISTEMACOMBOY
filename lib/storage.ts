@@ -130,6 +130,7 @@ export const KEYS = {
   CONTABLE_CIERRES: "contable_cierres",
   MOV_CAJA: "contable_mov_caja", // movimientos manuales de caja (Estados de cuenta)
   ACTIVOS: "contable_activos", // registro de activos de la empresa (lib/activos.ts)
+  CONTABLE_DATOS_EEFF: "contable_datos_eeff", // datos de apertura y ajustes de los estados financieros (lib/estadosFinancieros.ts)
   // Sucursal Beta (tabla sucursal, ver supabase/migrations/20261022_sucursal_beta.sql y lib/sucursal.ts)
   SUC_SUCURSALES: "sucursal_sucursales",
   SUC_VENTAS: "sucursal_ventas",
@@ -334,6 +335,7 @@ const DESTINOS: Record<StoreKey, Destino> = {
   [KEYS.CONTABLE_CIERRES]: { tabla: "contable", tipo: "CIERRE_MENSUAL", forma: "lista" },
   [KEYS.MOV_CAJA]: { tabla: "contable", tipo: "MOVIMIENTO_CAJA", forma: "lista" },
   [KEYS.ACTIVOS]: { tabla: "contable", tipo: "ACTIVO_FIJO", forma: "lista" },
+  [KEYS.CONTABLE_DATOS_EEFF]: { tabla: "contable", tipo: "DATOS_EEFF", forma: "lista" },
   [KEYS.OBSERVACIONES]: { tabla: "observaciones", forma: "observaciones" },
   [KEYS.SUC_SUCURSALES]: { tabla: "sucursal", tipo: "sucursal", forma: "lista" },
   [KEYS.SUC_VENTAS]: { tabla: "sucursal", tipo: "venta", forma: "lista" },

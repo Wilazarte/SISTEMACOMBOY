@@ -2009,3 +2009,103 @@ function construirYMostrarHoja(a: Activo, d: Depreciacion, cuadro: ReturnType<ty
   });
   guardar(doc, `HOJA-VIDA-${a.codigo}`);
 }
+
+// ---------------------------------------------------------------------
+/**
+ * Reportes financieros (Contabilidad › Flujo de caja, Estados financieros, Ratios), Williams 2026-11-27.
+ * Varias secciones, cada una una tabla con filas de título, línea, subtotal y total (formato SMV / PCGE).
+ */
+export interface FilaReporteFin {
+  celdas: string[];
+  tipo?: "titulo" | "linea" | "subtotal" | "total";
+}
+export interface SeccionReporteFin {
+  titulo: string;
+  head: string[];
+  filas: FilaReporteFin[];
+  /** Columnas numéricas (alineadas a la derecha). */
+  derecha?: number[];
+  anchos?: Record<number, number>;
+}
+export function pdfReporteFinanciero(d: {
+  titulo: string;
+  subtitulo: string;
+  datos: [string, string][];
+  secciones: SeccionReporteFin[];
+  notas?: string[];
+  horizontal?: boolean;
+  firmas?: string[];
+  archivo: string;
+}): void {
+  // Helvetica (WinAnsi) no tiene el signo menos tipográfico «−»: se cambia por el guion
+  const t = (x: string) => x.replace(/\u2212/g, "-");
+  d = {
+    ...d,
+    datos: d.datos.map(([k, v]) => [t(k), t(v)]),
+    notas: d.notas?.map(t),
+    secciones: d.secciones.map((s) => ({ ...s, titulo: t(s.titulo), head: s.head.map(t), filas: s.filas.map((f) => ({ ...f, celdas: f.celdas.map(t) })) })),
+  };
+  const doc = new jsPDF({ unit: "mm", format: "a4", orientation: d.horizontal ? "landscape" : "portrait" });
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  let y = cabecera(doc, d.titulo, d.subtitulo, "REPORTE");
+  y = datosGrid(doc, y, d.datos, 3);
+  for (const s of d.secciones) {
+    if (y > H - ALTO_PIE - 30) {
+      doc.addPage();
+      y = 20;
+    }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(...AZUL);
+    doc.text(s.titulo.toUpperCase(), M, y);
+    y += 2;
+    const columnStyles: Record<number, { halign?: "right"; cellWidth?: number }> = {};
+    Object.entries(s.anchos ?? {}).forEach(([k, w]) => (columnStyles[Number(k)] = { cellWidth: w }));
+    (s.derecha ?? []).forEach((c) => (columnStyles[c] = { ...columnStyles[c], halign: "right" }));
+    autoTable(doc, {
+      startY: y,
+      head: [s.head.map((h) => h.toUpperCase())],
+      body: s.filas.map((f) => f.celdas),
+      theme: "grid",
+      headStyles: { fillColor: AZUL, textColor: 255, fontStyle: "bold", fontSize: d.horizontal ? 6.5 : 7.5, lineColor: AZUL },
+      styles: { fontSize: d.horizontal ? 6.5 : 7.5, cellPadding: 1.3, lineColor: BORDE, lineWidth: 0.2, textColor: NEGRO },
+      columnStyles,
+      margin: { left: M, right: M, top: 14, bottom: ALTO_PIE + 6 },
+      didParseCell: (h) => {
+        if (h.section !== "body") return;
+        const t = s.filas[h.row.index]?.tipo;
+        if (t === "titulo") {
+          h.cell.styles.fontStyle = "bold";
+          h.cell.styles.fillColor = PLOMO_200;
+          h.cell.styles.textColor = AZUL;
+        } else if (t === "subtotal") {
+          h.cell.styles.fontStyle = "bold";
+          h.cell.styles.fillColor = PLOMO_50;
+        } else if (t === "total") {
+          h.cell.styles.fontStyle = "bold";
+          h.cell.styles.fillColor = AZUL;
+          h.cell.styles.textColor = 255;
+        }
+      },
+    });
+    y = finalY(doc) + 6;
+  }
+  if (d.notas?.length) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...GRIS);
+    d.notas.forEach((n) => {
+      const l = doc.splitTextToSize(n, W - 2 * M) as string[];
+      if (y + l.length * 3.4 > H - ALTO_PIE - 6) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.text(l, M, y);
+      y += l.length * 3.4 + 0.6;
+    });
+  }
+  firmas(doc, y, d.firmas ?? ["Contador", "Gerencia"]);
+  pie(doc);
+  guardar(doc, d.archivo);
+}

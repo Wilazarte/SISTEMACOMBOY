@@ -38,7 +38,9 @@ const LIBROS = [
   { label: "Registro Ventas", href: "/dashboard/ventas?tab=comprobantes" },
   { label: "Libro Caja", href: "/dashboard/contable?tab=estados" },
   { label: "Balance Cuentas", href: "/dashboard/contable?tab=balance" },
+  { label: "Flujo de Caja", href: "/dashboard/contable?tab=flujo" },
   { label: "Estados Financieros", href: "/dashboard/contable?tab=eeff" },
+  { label: "Ratios", href: "/dashboard/contable?tab=ratios" },
 ];
 
 /** Finanzas Planta (diseño 4 de Williams): Tesorería, bancarización, planilla, pagos, costeo, libros y facturación. Solo lectura. */
